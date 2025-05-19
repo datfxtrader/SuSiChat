@@ -34,7 +34,7 @@ export default function SunaAgentPage() {
               </div>
               
               <TabsContent value="suna" className="flex-1 overflow-hidden m-0 p-0">
-                <ModernSunaChat threadId={activeThreadId} />
+                <SimpleModernChat threadId={activeThreadId} />
               </TabsContent>
               
               <TabsContent value="info" className="p-6 overflow-auto">
