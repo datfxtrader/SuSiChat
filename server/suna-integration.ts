@@ -240,8 +240,14 @@ export class SunaIntegrationService {
       return conversation;
     } catch (error) {
       console.error('Error retrieving conversation from Suna:', error);
-      // Fall back to the mock implementation
-      return this.mockGetConversation(userId, threadId);
+      // Return an empty conversation if retrieval fails
+      return {
+        id: threadId,
+        title: 'Conversation',
+        messages: [],
+        createdAt: new Date().toISOString(),
+        userId
+      };
     }
   }
 
@@ -282,8 +288,8 @@ export class SunaIntegrationService {
       }));
     } catch (error) {
       console.error('Error retrieving user conversations from Suna:', error);
-      // Fall back to the mock implementation
-      return Object.values(mockConversations).filter(conv => conv.userId === userId);
+      // Return an empty array if retrieval fails
+      return [];
     }
   }
   
