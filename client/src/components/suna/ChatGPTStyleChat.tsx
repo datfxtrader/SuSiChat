@@ -29,6 +29,105 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Mock source structure for research mode responses
+interface Source {
+  title: string;
+  url: string;
+  domain: string;
+  content?: string;
+  publishedDate?: string;
+}
+
+// Research response component
+interface ResearchResponseProps {
+  content: string;
+  sources: Source[];
+}
+
+const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources }) => {
+  const [expandedSources, setExpandedSources] = useState(false);
+  
+  // Function to process content and highlight citations [1], [2], etc.
+  const renderContentWithCitations = (text: string) => {
+    // Simple regex to find citation markers [1], [2], etc.
+    const parts = text.split(/(\[\d+\])/g);
+    
+    if (parts.length <= 1) return <ReactMarkdown>{text}</ReactMarkdown>;
+    
+    return (
+      <>
+        {parts.map((part, i) => {
+          const citationMatch = part.match(/\[(\d+)\]/);
+          if (citationMatch) {
+            const sourceIndex = parseInt(citationMatch[1]) - 1;
+            if (sourceIndex >= 0 && sourceIndex < sources.length) {
+              return (
+                <span key={i} className="inline-flex items-center">
+                  <a 
+                    href={sources[sourceIndex]?.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 bg-blue-50 rounded px-1 text-xs font-medium"
+                  >
+                    {part}
+                  </a>
+                </span>
+              );
+            }
+          }
+          return <span key={i}>{part.length > 0 ? <ReactMarkdown>{part}</ReactMarkdown> : null}</span>;
+        })}
+      </>
+    );
+  };
+  
+  return (
+    <div className="flex flex-col">
+      {/* Main response content */}
+      <div className="prose prose-blue max-w-none">
+        {renderContentWithCitations(content)}
+      </div>
+      
+      {/* Sources section */}
+      {sources.length > 0 && (
+        <div className="mt-3">
+          <button 
+            onClick={() => setExpandedSources(!expandedSources)}
+            className="flex items-center text-xs text-gray-500 hover:text-gray-700"
+          >
+            {expandedSources ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+            {expandedSources ? "Hide Sources" : `View ${sources.length} Sources`}
+          </button>
+          
+          {expandedSources && (
+            <div className="mt-2 border-t pt-2">
+              <h4 className="text-sm font-medium text-gray-700">Sources</h4>
+              <div className="space-y-2 mt-1">
+                {sources.map((source, index) => (
+                  <div key={index} className="text-xs flex">
+                    <span className="font-medium mr-2">[{index + 1}]</span>
+                    <div>
+                      <a 
+                        href={source.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline font-medium"
+                      >
+                        {source.title}
+                      </a>
+                      <p className="text-gray-500">{source.domain}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface ChatGPTStyleChatProps {
   threadId?: string;
 }
