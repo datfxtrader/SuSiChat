@@ -369,16 +369,54 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     }
   }, [messages]);
 
-  // Extract sources from message metadata for research display
+  // Extract sources from message metadata or content for research display
   const getSourcesFromMetadata = (message: any): Source[] => {
-    if (!message.searchMetadata || !message.webSearchUsed) return [];
+    if (!message.webSearchUsed) return [];
     
     const sources: Source[] = [];
     
     // Debug logs to understand what data we're receiving
     console.log("Source metadata:", JSON.stringify(message.searchMetadata, null, 2));
     
-    // First try to use detailed source information if available
+    // Look for URLs in the message content as a fallback
+    // This helps when metadata doesn't contain the full source details
+    const content = message.content || '';
+    const urlRegex = /URL: (https?:\/\/[^\s\n]+)/g;
+    const urlMatches = [...content.matchAll(urlRegex)];
+    
+    // If we found URLs in the content, use these as primary source
+    if (urlMatches.length > 0) {
+      console.log("Found URLs in content:", urlMatches);
+      return urlMatches.map((match, index) => {
+        const url = match[1]; // The captured URL
+        let domain = "unknown";
+        let title = `Source ${index + 1}`;
+        
+        try {
+          // Extract domain from URL
+          domain = new URL(url).hostname;
+          
+          // Try to find title in content
+          const titleMatch = content.match(new RegExp(`\\[${index + 1}\\]\\s+(.+?)\\s*\\n`));
+          if (titleMatch && titleMatch[1]) {
+            title = titleMatch[1].trim();
+          }
+        } catch (e) {
+          console.error("Error parsing URL:", e);
+        }
+        
+        const sourceObj = {
+          title: title,
+          url: url,
+          domain: domain,
+          publishedDate: new Date().toLocaleDateString()
+        };
+        
+        return logSourceInfo(sourceObj);
+      });
+    }
+    
+    // As a second attempt, use detailed source information if available
     if (message.searchMetadata?.sourceDetails && Array.isArray(message.searchMetadata.sourceDetails) && message.searchMetadata.sourceDetails.length > 0) {
       console.log("Using sourceDetails for sources:", message.searchMetadata.sourceDetails);
       return message.searchMetadata.sourceDetails.map((source: any, index: number) => {

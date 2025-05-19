@@ -690,15 +690,23 @@ export class SunaIntegrationService {
             const searchEndTime = Date.now();
             const searchTimeMs = searchEndTime - searchStartTime;
             
-            // Create search metadata
+            // Create search metadata with detailed source information
             searchMetadata = {
               query: finalQuery,
               sources: sourceDomains,
               resultCount: searchResults.length,
               searchEngines: usedSearchEngines,
               searchTime: searchTimeMs,
-              sourceDetails: sourceUrls // Include the full source details with URLs
+              sourceDetails: sourceUrls.map(src => ({
+                title: src.title,
+                url: src.url,
+                domain: src.domain
+              }))
             } as SunaMessage['searchMetadata'];
+            
+            // Log full source details to confirm they're being included
+            console.log("Source details being added to metadata:", 
+              JSON.stringify(sourceUrls, null, 2));
             
             // Sort results by relevance or freshness based on user preference
             const sortingStrategy = data.searchPreferences?.priority || 'relevance';
@@ -1034,14 +1042,26 @@ Use the current date and web search information when responding about current ev
         console.log("Adding source details to message metadata:", 
           JSON.stringify(searchMetadata.sourceDetails, null, 2));
         
-        // Ensure URLs are properly formatted in the response
+        // Explicitly include source URLs in a format that's easier to parse
+        // This ensures the frontend can extract and display the full article URLs
         const sourceInfo = searchMetadata.sourceDetails.map((source, index) => 
-          `[${index + 1}] ${source.title} - ${source.url}`).join('\n');
+          `[${index + 1}] ${source.title}\nURL: ${source.url}`).join('\n\n');
           
         // Append source URLs to the bottom of the response for transparency
         if (!aiResponse.includes('Sources:')) {
           aiResponse += `\n\nSources:\n${sourceInfo}`;
         }
+        
+        // Make sure sourceDetails is properly structured in the metadata
+        // This is a defensive measure to ensure the data reaches the frontend correctly
+        console.log("Final metadata structure:", JSON.stringify({
+          ...searchMetadata,
+          sourceDetails: searchMetadata.sourceDetails.map(s => ({
+            title: s.title,
+            url: s.url,
+            domain: s.domain
+          }))
+        }, null, 2));
       }
       
       const assistantMessage: SunaMessage = {
