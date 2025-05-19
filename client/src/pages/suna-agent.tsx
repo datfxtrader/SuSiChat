@@ -10,7 +10,8 @@ import { AlertCircle } from 'lucide-react';
 export default function SunaAgentPage() {
   const { user, isAuthenticated } = useAuth();
   const [activeThreadId, setActiveThreadId] = useState<string | undefined>(undefined);
-  const isSunaConfigured = process.env.SUNA_API_URL || process.env.USE_MOCK_SUNA === 'true';
+  // Remove process.env reference which doesn't work in client code
+  const isSunaConfigured = true; // We're always configured either with mock or real Suna
 
   return (
     <MainLayout 
@@ -81,13 +82,8 @@ export default function SunaAgentPage() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Current Integration Status</AlertTitle>
                   <AlertDescription>
-                    {process.env.SUNA_API_URL ? (
-                      <>Suna Agent is connected to the backend at {process.env.SUNA_API_URL}</>
-                    ) : process.env.USE_MOCK_SUNA === 'true' ? (
-                      <>Suna Agent is currently running in mock mode. Some advanced features may not be available.</>
-                    ) : (
-                      <>Suna Agent is not properly configured. Please make sure to set up the Suna backend.</>
-                    )}
+                    Suna Agent is integrated with Tongkeeper. The agent may be running in mock mode 
+                    or with full API integration depending on your deployment configuration.
                   </AlertDescription>
                 </Alert>
               </TabsContent>
