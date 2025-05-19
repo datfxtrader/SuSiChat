@@ -38,6 +38,14 @@ interface Source {
   publishedDate?: string;
 }
 
+// Debug source display issues
+function logSourceInfo(source: Source) {
+  console.log(`Source: ${source.title}`);
+  console.log(`URL: ${source.url}`);
+  console.log(`Domain: ${source.domain}`);
+  return source;
+}
+
 // Research progress component to show current search/analysis stage
 interface ResearchProgressProps {
   stage: number; // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
@@ -373,12 +381,18 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     // First try to use detailed source information if available
     if (message.searchMetadata?.sourceDetails && Array.isArray(message.searchMetadata.sourceDetails) && message.searchMetadata.sourceDetails.length > 0) {
       console.log("Using sourceDetails for sources:", message.searchMetadata.sourceDetails);
-      return message.searchMetadata.sourceDetails.map((source: any, index: number) => ({
-        title: source.title || `Source ${index + 1} from ${source.domain}`,
-        url: source.url, // This should be the full article URL
-        domain: source.domain,
-        publishedDate: new Date().toLocaleDateString()
-      }));
+      return message.searchMetadata.sourceDetails.map((source: any, index: number) => {
+        // Create properly formatted source object
+        const sourceObj = {
+          title: source.title || `Source ${index + 1} from ${source.domain}`,
+          url: source.url, // This should be the full article URL
+          domain: source.domain,
+          publishedDate: new Date().toLocaleDateString()
+        };
+        
+        // Log source info for debugging
+        return logSourceInfo(sourceObj);
+      });
     }
     
     // Fallback to basic domain information

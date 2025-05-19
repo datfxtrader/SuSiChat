@@ -1028,6 +1028,22 @@ Use the current date and web search information when responding about current ev
       
       // Create an assistant message with enhanced metadata about model and search
       const runId = `run-${uuidv4()}`;
+      
+      // Add article URLs to response for better source attribution
+      if (searchMetadata?.sourceDetails && searchMetadata.sourceDetails.length > 0) {
+        console.log("Adding source details to message metadata:", 
+          JSON.stringify(searchMetadata.sourceDetails, null, 2));
+        
+        // Ensure URLs are properly formatted in the response
+        const sourceInfo = searchMetadata.sourceDetails.map((source, index) => 
+          `[${index + 1}] ${source.title} - ${source.url}`).join('\n');
+          
+        // Append source URLs to the bottom of the response for transparency
+        if (!aiResponse.includes('Sources:')) {
+          aiResponse += `\n\nSources:\n${sourceInfo}`;
+        }
+      }
+      
       const assistantMessage: SunaMessage = {
         id: runId,
         content: aiResponse,
