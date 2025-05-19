@@ -240,6 +240,12 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <ReactMarkdown>
                           {msg.content}
                         </ReactMarkdown>
+                        {/* Show model and search info if it's an assistant message */}
+                        {!isUserMessage && msg.modelUsed && (
+                          <div className="text-xs text-gray-400 mt-2 italic">
+                            Model: {msg.modelUsed} {msg.webSearchUsed ? '• Web search used' : ''}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

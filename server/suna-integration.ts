@@ -168,6 +168,8 @@ interface SunaMessage {
   content: string;
   role: 'user' | 'assistant';
   timestamp: string;
+  modelUsed?: string;
+  webSearchUsed?: boolean;
 }
 
 /**
@@ -372,10 +374,9 @@ export class SunaIntegrationService {
             webSearchContent = `
 Web Search Results:
 ${searchResults.map((result: any, index: number) => 
-  `[${index + 1}] "${result.title || 'Untitled'}"
+  `[${index + 1}] "${result.title || 'Untitled'}" ${result.source ? `(Source: ${result.source})` : '(Source: Tavily)'}
 URL: ${result.url || 'No URL available'}
 Content: ${result.content || result.description || 'No content available'}
-${result.source ? `Source: ${result.source}` : ''}
 `).join('\n') || 'No results found'}
 
 ${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
@@ -508,13 +509,15 @@ Use the current date and web search information when responding about current ev
         }
       }
       
-      // Create an assistant message
+      // Create an assistant message with metadata about model and search
       const runId = `run-${uuidv4()}`;
       const assistantMessage: SunaMessage = {
         id: runId,
         content: aiResponse,
         role: 'assistant',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        modelUsed: modelUsed,
+        webSearchUsed: !!webSearchContent
       };
       
       // Add to conversation
