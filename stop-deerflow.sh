@@ -1,41 +1,42 @@
 #!/bin/bash
 
-# DeerFlow Service Stop Script
-# This script stops the DeerFlow service running in the background
+# DeerFlow Research Service Shutdown Script
+echo "Stopping DeerFlow Research Service..."
 
-echo "Stopping DeerFlow research service..."
+# Get the PID from the file
+PID_FILE=".deerflow.pid"
 
-# Check if the PID file exists
-if [ ! -f ".deerflow.pid" ]; then
-    echo "No DeerFlow service seems to be running (PID file not found)"
-    exit 0
+if [ -f "$PID_FILE" ]; then
+  PID=$(cat $PID_FILE)
+  
+  # Check if the process is running
+  if ps -p $PID > /dev/null; then
+    echo "Stopping DeerFlow service (PID: $PID)..."
+    kill $PID
+    
+    # Wait for process to terminate
+    for i in {1..5}; do
+      if ! ps -p $PID > /dev/null; then
+        break
+      fi
+      echo "Waiting for process to terminate... ($i/5)"
+      sleep 1
+    done
+    
+    # Force kill if still running
+    if ps -p $PID > /dev/null; then
+      echo "Process still running, forcing termination..."
+      kill -9 $PID
+    fi
+    
+    echo "DeerFlow service stopped"
+  else
+    echo "No running DeerFlow service found with PID $PID"
+  fi
+  
+  # Remove the PID file
+  rm $PID_FILE
+  echo "Removed PID file"
+else
+  echo "No PID file found. DeerFlow service may not be running."
 fi
-
-# Read the PID
-PID=$(cat .deerflow.pid)
-
-# Check if the process is running
-if ! ps -p $PID > /dev/null; then
-    echo "Process with PID $PID is not running"
-    rm .deerflow.pid
-    exit 0
-fi
-
-# Kill the process
-echo "Terminating DeerFlow service (PID: $PID)..."
-kill $PID
-
-# Wait for the process to terminate
-sleep 2
-
-# Check if it's still running
-if ps -p $PID > /dev/null; then
-    echo "Process did not terminate gracefully, forcing termination..."
-    kill -9 $PID
-    sleep 1
-fi
-
-# Remove the PID file
-rm .deerflow.pid
-
-echo "DeerFlow service stopped successfully!"

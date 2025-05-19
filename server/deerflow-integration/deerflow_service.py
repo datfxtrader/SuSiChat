@@ -1,316 +1,292 @@
 """
-DeerFlow Integration Service
+DeerFlow Research Service
 
-This module provides integration with DeerFlow, a deep research framework
-for comprehensive web searching, analysis, and content extraction.
+This service provides a FastAPI-based interface for deep research functionality.
+It integrates with the Tongkeeper application to provide enhanced research capabilities.
 """
+
 import os
-import json
 import asyncio
+import json
 import logging
-from typing import Dict, List, Any, Optional
+import random
+import time
+from typing import Dict, List, Optional, Union, Any
 from datetime import datetime
+import uuid
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('deerflow_service')
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
-# Placeholder for DeerFlow imports - to be replaced with actual imports when DeerFlow library is installed
-# from deerflow import DeepResearch, SearchQuery, ResearchConfig
+# Initialize FastAPI app
+app = FastAPI(title="DeerFlow Research Service")
 
-class DeerFlowService:
-    """Service class for handling DeerFlow research operations"""
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict this
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# In-memory storage for research tasks
+research_tasks = {}
+
+# Models
+class ResearchRequest(BaseModel):
+    query: str
+    depth: Optional[str] = "standard"  # "basic", "standard", or "deep"
+    max_sources: Optional[int] = 5
+    include_domains: Optional[List[str]] = None
+    exclude_domains: Optional[List[str]] = None
+    use_cache: Optional[bool] = True
+    user_context: Optional[str] = None
     
-    def __init__(self):
-        """Initialize the DeerFlow service"""
-        self.api_keys = {
-            'tavily': os.environ.get('TAVILY_API_KEY'),
-            'brave': os.environ.get('BRAVE_API_KEY')
-        }
-        self.research_tasks = {}  # Store ongoing and completed research tasks
-        self.initialize_deerflow()
-        
-    def initialize_deerflow(self):
-        """Initialize DeerFlow components and configuration"""
-        # Check if we have API keys
-        if not self.api_keys['tavily'] and not self.api_keys['brave']:
-            logger.warning("No search API keys found. DeerFlow will have limited functionality.")
-        
-        # Here we would initialize the actual DeerFlow components
-        # self.research_engine = DeepResearch(api_keys=self.api_keys)
-        logger.info("DeerFlow service initialized successfully.")
+class Source(BaseModel):
+    title: str
+    url: str
+    domain: str
+    content_snippet: Optional[str] = None
+    relevance_score: Optional[float] = None
+
+class ResearchResponse(BaseModel):
+    id: str
+    query: str
+    summary: Optional[str] = None
+    sources: List[Source] = []
+    insights: List[str] = []
+    related_topics: Optional[List[str]] = None
+    status: str  # "completed", "in_progress", "analyzing", "synthesizing", "failed"
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+# Helper functions for simulated research
+def _generate_simulated_sources(query: str, count: int = 5) -> List[Source]:
+    """Generate simulated research sources for testing."""
+    domains = [
+        "wikipedia.org", "britannica.com", "khanacademy.org", 
+        "nature.com", "science.org", "researchgate.net",
+        "academia.edu", "jstor.org", "scholar.google.com",
+        "mit.edu", "stanford.edu", "harvard.edu"
+    ]
     
-    async def start_research(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Start a new research task with DeerFlow
+    sources = []
+    for i in range(count):
+        domain = random.choice(domains)
+        title = f"Research on {query.capitalize()}: Part {i+1}"
+        url = f"https://{domain}/research/{query.replace(' ', '-').lower()}-{i+1}"
         
-        Args:
-            request_data: Dictionary containing research parameters:
-                - query: The research query/question
-                - depth: Research depth ('basic', 'standard', 'deep')
-                - maxSources: Maximum number of sources to retrieve
-                - includeDomains: List of domains to include
-                - excludeDomains: List of domains to exclude
-                - useCache: Whether to use cached results
-                - userContext: Additional context for the research
-                
-        Returns:
-            Dictionary with research task ID and initial status
-        """
-        query = request_data.get('query')
-        if not query:
-            raise ValueError("Research query is required")
-        
-        # Generate a unique ID for this task
-        task_id = f"deerflow-{datetime.now().strftime('%Y%m%d%H%M%S')}-{abs(hash(query)) % 10000}"
-        
-        # Store initial task state
-        self.research_tasks[task_id] = {
-            'id': task_id,
-            'query': query,
-            'status': 'in_progress',
-            'sources': [],
-            'insights': [],
-            'created_at': datetime.now().isoformat()
-        }
-        
-        # Start the research process in the background
-        asyncio.create_task(self._execute_research(task_id, request_data))
-        
-        return {
-            'id': task_id,
-            'status': 'in_progress'
-        }
+        source = Source(
+            title=title,
+            url=url,
+            domain=domain,
+            content_snippet=f"This is a comprehensive analysis of {query}. The research explores various aspects including theoretical frameworks, practical applications, and critical perspectives on the subject matter.",
+            relevance_score=random.uniform(0.7, 0.95)
+        )
+        sources.append(source)
     
-    async def _execute_research(self, task_id: str, request_data: Dict[str, Any]):
-        """
-        Execute the actual research process
-        
-        This is where we would call the actual DeerFlow library.
-        For now, we'll simulate the process with a staged approach.
-        """
-        query = request_data.get('query')
-        depth = request_data.get('depth', 'standard')
-        max_sources = request_data.get('maxSources', 5)
-        
-        try:
-            # 1. Simulate search phase (2 seconds)
-            await asyncio.sleep(2)
-            
-            # 2. Generate simulated sources
-            sources = self._generate_simulated_sources(query, max_sources)
-            self.research_tasks[task_id]['sources'] = sources
-            self.research_tasks[task_id]['status'] = 'analyzing'
-            
-            # 3. Simulate analysis phase (3 seconds)
-            await asyncio.sleep(3)
-            
-            # 4. Generate simulated insights
-            insights = self._generate_simulated_insights(query, sources)
-            self.research_tasks[task_id]['insights'] = insights
-            self.research_tasks[task_id]['status'] = 'synthesizing'
-            
-            # 5. Simulate synthesis phase (3 seconds) 
-            await asyncio.sleep(3)
-            
-            # 6. Generate simulated summary
-            summary = self._generate_simulated_summary(query, sources, insights)
-            self.research_tasks[task_id]['summary'] = summary
-            self.research_tasks[task_id]['status'] = 'completed'
-            self.research_tasks[task_id]['completed_at'] = datetime.now().isoformat()
-            
-            logger.info(f"Research task {task_id} completed successfully")
-        
-        except Exception as e:
-            logger.error(f"Error executing research task {task_id}: {str(e)}")
-            self.research_tasks[task_id]['status'] = 'failed'
-            self.research_tasks[task_id]['error'] = str(e)
+    return sources
+
+def _generate_simulated_insights(query: str, count: int = 3) -> List[str]:
+    """Generate simulated research insights for testing."""
+    insights = [
+        f"Analysis shows that {query} has significant implications for future developments in this field.",
+        f"Research indicates that {query} is influenced by multiple factors, including social, economic, and technological considerations.",
+        f"Comparative studies reveal that {query} exhibits different patterns depending on the context and methodology used.",
+        f"The literature suggests that {query} is an evolving concept with roots in several theoretical traditions.",
+        f"Recent advancements in understanding {query} point to new opportunities for practical applications."
+    ]
     
-    def get_research_status(self, task_id: str) -> Dict[str, Any]:
-        """
-        Get the status and results of a research task
-        
-        Args:
-            task_id: The ID of the research task
-            
-        Returns:
-            Dictionary with current status and any available results
-        """
-        if task_id not in self.research_tasks:
-            raise ValueError(f"Research task with ID {task_id} not found")
-        
-        return self.research_tasks[task_id]
+    return random.sample(insights, min(count, len(insights)))
+
+def _generate_simulated_summary(query: str) -> str:
+    """Generate a simulated research summary for testing."""
+    return f"""
+    This comprehensive analysis of {query} reveals several key insights. The research draws on multiple sources across academic and professional domains, synthesizing diverse perspectives.
     
-    async def run_complete_research(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Run a complete research task synchronously (wait for completion)
-        
-        Args:
-            request_data: Dictionary containing research parameters
-            
-        Returns:
-            Dictionary with complete research results
-        """
-        # Start the research
-        start_result = await self.start_research(request_data)
-        task_id = start_result['id']
-        
-        # Wait for it to complete
-        while True:
-            status = self.get_research_status(task_id)
-            if status['status'] in ['completed', 'failed']:
-                return status
-            await asyncio.sleep(1)
+    The findings indicate that {query} is a complex and multifaceted subject with implications across various contexts. The literature shows both consensus on fundamental aspects and divergent views on specialized applications.
     
-    def _generate_simulated_sources(self, query: str, max_sources: int = 5) -> List[Dict[str, Any]]:
-        """Generate simulated sources for development and testing"""
-        sources = [
-            {
-                "title": f"Comprehensive Guide to {query}",
-                "url": f"https://example.com/guides/{self._safe_url_path(query)}",
-                "domain": "example.com",
-                "contentSnippet": f"This guide explores various aspects of {query} and provides detailed explanations for beginners and experts alike.",
-                "relevanceScore": 0.95
-            },
-            {
-                "title": f"{query} - Wikipedia",
-                "url": f"https://en.wikipedia.org/wiki/{self._safe_url_path(query, '_')}",
-                "domain": "en.wikipedia.org",
-                "contentSnippet": f"{query} refers to a concept in modern research that has applications in various fields including technology and science.",
-                "relevanceScore": 0.90
-            },
-            {
-                "title": f"Recent Developments in {query}",
-                "url": f"https://research-journal.org/articles/{self._safe_url_path(query)}",
-                "domain": "research-journal.org",
-                "contentSnippet": f"This recent paper explores the latest developments and future directions in {query}, highlighting key innovations and opportunities.",
-                "relevanceScore": 0.87
-            },
-            {
-                "title": f"Understanding {query}: A Beginner's Guide",
-                "url": f"https://learnhub.com/beginners-guide/{self._safe_url_path(query)}",
-                "domain": "learnhub.com",
-                "contentSnippet": f"Starting with {query} can be challenging. This guide breaks down the key concepts and provides step-by-step instructions.",
-                "relevanceScore": 0.82
-            },
-            {
-                "title": f"{query} Case Studies and Examples",
-                "url": f"https://practicalexamples.net/case-studies/{self._safe_url_path(query)}",
-                "domain": "practicalexamples.net",
-                "contentSnippet": f"Explore real-world applications of {query} through these detailed case studies from various industries and contexts.",
-                "relevanceScore": 0.78
-            },
-            {
-                "title": f"Critical Analysis of {query} Approaches",
-                "url": f"https://academic-review.edu/analysis/{self._safe_url_path(query)}",
-                "domain": "academic-review.edu",
-                "contentSnippet": f"This critical review examines different approaches to {query}, comparing methodologies and highlighting strengths and limitations.",
-                "relevanceScore": 0.75
-            },
-            {
-                "title": f"The Future of {query}: Trends and Predictions",
-                "url": f"https://future-insights.org/trends/{self._safe_url_path(query)}",
-                "domain": "future-insights.org",
-                "contentSnippet": f"Industry experts predict how {query} will evolve in the coming years, focusing on emerging trends and potential disruptions.",
-                "relevanceScore": 0.73
-            }
-        ]
-        
-        # Return a subset of sources based on maxSources
-        return sources[:min(max_sources, len(sources))]
+    Further research could explore additional dimensions, particularly regarding emerging trends and potential future developments in this area.
+    """
+
+def _generate_simulated_related_topics(query: str, count: int = 5) -> List[str]:
+    """Generate simulated related topics for testing."""
+    base_topics = [
+        "theoretical frameworks", "practical applications", "historical context",
+        "case studies", "comparative analysis", "future trends", "ethical considerations",
+        "economic impact", "social implications", "technological aspects",
+        "research methodologies", "critical perspectives"
+    ]
     
-    def _generate_simulated_insights(self, query: str, sources: List[Dict[str, Any]]) -> List[str]:
-        """Generate simulated insights for development and testing"""
-        return [
-            f"{query} is becoming increasingly important in modern research, with applications across multiple disciplines.",
-            f"Recent studies show that {query} approaches can improve efficiency by approximately 25-30% in typical use cases.",
-            f"The integration of {query} with other methodologies creates synergistic effects that enhance overall outcomes.",
-            f"Experts predict significant growth in {query} adoption over the next 5 years, particularly in emerging markets.",
-            f"Challenges in implementing {query} include technical complexity, resource requirements, and organizational resistance."
-        ]
-    
-    def _generate_simulated_summary(self, query: str, sources: List[Dict[str, Any]], insights: List[str]) -> str:
-        """Generate simulated summary for development and testing"""
-        return f"""
-## Comprehensive Analysis of {query}
+    topics = [f"{query} {topic}" for topic in random.sample(base_topics, min(count, len(base_topics)))]
+    return topics
 
-Based on a review of {len(sources)} authoritative sources, this research provides a detailed examination of {query} and its implications. 
-
-### Key Findings
-
-{chr(10).join([f"- {insight}" for insight in insights])}
-
-### Overview
-
-{query} represents an important area of study with wide-ranging applications. The literature reveals a growing body of evidence supporting its effectiveness and highlighting opportunities for further development.
-
-Multiple sources confirm the significant benefits of {query}, while also acknowledging certain limitations and challenges that need to be addressed. Industry experts and academic researchers continue to explore innovative approaches to overcome these obstacles.
-
-### Conclusion
-
-The current state of research on {query} suggests promising directions for future work, particularly in addressing existing gaps and expanding applications to new domains. Continued investment in this area is likely to yield substantial returns across multiple sectors.
-"""
-    
-    def _safe_url_path(self, text: str, separator: str = '-') -> str:
-        """Convert text to URL-safe path component"""
-        # Simple implementation - in a real system we'd handle more edge cases
-        return text.lower().replace(' ', separator)
-
-# Create a singleton instance
-deerflow_service = DeerFlowService()
-
-# API endpoints for FastAPI integration
+# API Routes
+@app.get("/health")
 async def health_check():
-    """Health check endpoint for the DeerFlow service"""
-    return {"status": "ok", "message": "DeerFlow service is operational"}
+    """Health check endpoint."""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-async def start_research_endpoint(request_data: Dict[str, Any]):
-    """Endpoint to start a new research task"""
-    return await deerflow_service.start_research(request_data)
+@app.post("/research", response_model=Dict[str, str])
+async def start_research(request: ResearchRequest):
+    """Start a new research task."""
+    task_id = str(uuid.uuid4())
+    
+    # Create initial task state
+    research_tasks[task_id] = {
+        "id": task_id,
+        "query": request.query,
+        "status": "in_progress",
+        "created_at": datetime.now().isoformat(),
+        "request": request.dict()
+    }
+    
+    # Start research task in background
+    asyncio.create_task(_process_research_task(task_id))
+    
+    return {"id": task_id, "status": "in_progress"}
 
-async def get_research_status_endpoint(task_id: str):
-    """Endpoint to get the status of a research task"""
-    return deerflow_service.get_research_status(task_id)
+@app.get("/research/{task_id}", response_model=ResearchResponse)
+async def get_research_status(task_id: str):
+    """Get the status of a research task."""
+    if task_id not in research_tasks:
+        raise HTTPException(status_code=404, detail="Research task not found")
+    
+    return research_tasks[task_id]
 
-async def run_complete_research_endpoint(request_data: Dict[str, Any]):
-    """Endpoint to run a complete research task"""
-    return await deerflow_service.run_complete_research(request_data)
+@app.post("/research/complete", response_model=ResearchResponse)
+async def run_complete_research(request: ResearchRequest):
+    """Run a complete research task (start and wait for completion)."""
+    task_id = str(uuid.uuid4())
+    
+    # Create initial task state
+    research_tasks[task_id] = {
+        "id": task_id,
+        "query": request.query,
+        "status": "in_progress",
+        "created_at": datetime.now().isoformat(),
+        "request": request.dict()
+    }
+    
+    # Process research task synchronously
+    await _process_research_task(task_id, True)
+    
+    return research_tasks[task_id]
 
-# If run directly, start a test server
+async def _process_research_task(task_id: str, is_synchronous: bool = False):
+    """Process a research task asynchronously or synchronously."""
+    try:
+        # Get the task
+        task = research_tasks[task_id]
+        request_data = task["request"]
+        query = request_data["query"]
+        max_sources = request_data.get("max_sources", 5)
+        depth = request_data.get("depth", "standard")
+        
+        # Determine processing time based on depth
+        if depth == "basic":
+            process_time = 1  # 1 second for basic
+        elif depth == "deep":
+            process_time = 3  # 3 seconds for deep
+        else:  # standard
+            process_time = 2  # 2 seconds for standard
+            
+        # Update status to analyzing
+        research_tasks[task_id]["status"] = "analyzing"
+        
+        if not is_synchronous:
+            # Simulate analysis time
+            await asyncio.sleep(process_time)
+        else:
+            # For synchronous calls, use a shorter time
+            await asyncio.sleep(min(process_time, 1))
+        
+        # Update status to synthesizing
+        research_tasks[task_id]["status"] = "synthesizing"
+        
+        if not is_synchronous:
+            # Simulate synthesis time
+            await asyncio.sleep(process_time)
+        else:
+            # For synchronous calls, use a shorter time
+            await asyncio.sleep(min(process_time, 1))
+        
+        # Generate results based on depth
+        source_count = 3 if depth == "basic" else (8 if depth == "deep" else 5)
+        source_count = min(source_count, max_sources)
+        
+        insight_count = 2 if depth == "basic" else (5 if depth == "deep" else 3)
+        related_topics_count = 3 if depth == "basic" else (7 if depth == "deep" else 5)
+        
+        # Create results
+        research_tasks[task_id].update({
+            "sources": _generate_simulated_sources(query, source_count),
+            "insights": _generate_simulated_insights(query, insight_count),
+            "summary": _generate_simulated_summary(query),
+            "related_topics": _generate_simulated_related_topics(query, related_topics_count),
+            "status": "completed",
+            "completed_at": datetime.now().isoformat()
+        })
+        
+        logger.info(f"Research task {task_id} completed")
+        
+    except Exception as e:
+        logger.error(f"Error processing research task {task_id}: {str(e)}")
+        research_tasks[task_id].update({
+            "status": "failed",
+            "error": str(e),
+            "completed_at": datetime.now().isoformat()
+        })
+
+# Clean up old tasks periodically
+@app.on_event("startup")
+async def startup_event():
+    """Task to clean up old research tasks."""
+    asyncio.create_task(_clean_old_tasks())
+
+async def _clean_old_tasks():
+    """Clean up old research tasks periodically."""
+    while True:
+        try:
+            now = datetime.now()
+            to_delete = []
+            
+            for task_id, task in research_tasks.items():
+                # Parse the timestamp
+                if "created_at" in task:
+                    created_at = datetime.fromisoformat(task["created_at"])
+                    age_hours = (now - created_at).total_seconds() / 3600
+                    
+                    # Delete tasks older than 24 hours
+                    if age_hours > 24:
+                        to_delete.append(task_id)
+            
+            # Delete old tasks
+            for task_id in to_delete:
+                del research_tasks[task_id]
+                
+            if to_delete:
+                logger.info(f"Cleaned up {len(to_delete)} old research tasks")
+                
+        except Exception as e:
+            logger.error(f"Error cleaning old tasks: {str(e)}")
+            
+        # Check every 1 hour
+        await asyncio.sleep(3600)
+
+# Run the server
 if __name__ == "__main__":
-    import uvicorn
-    from fastapi import FastAPI, HTTPException, Request
-    
-    app = FastAPI(title="DeerFlow Service API")
-    
-    @app.get("/health")
-    async def health():
-        return await health_check()
-    
-    @app.post("/research")
-    async def research(request: Request):
-        data = await request.json()
-        try:
-            return await start_research_endpoint(data)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    
-    @app.get("/research/{task_id}")
-    async def status(task_id: str):
-        try:
-            return get_research_status_endpoint(task_id)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    
-    @app.post("/research/complete")
-    async def complete_research(request: Request):
-        data = await request.json()
-        try:
-            return await run_complete_research_endpoint(data)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    
-    # Start the server
-    print("Starting DeerFlow service on http://localhost:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

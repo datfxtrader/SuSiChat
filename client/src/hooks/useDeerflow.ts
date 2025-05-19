@@ -1,9 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "./useAuth";
-import { useState } from "react";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 
-// Types for DeerFlow research
 export interface ResearchRequest {
   query: string;
   depth?: 'basic' | 'standard' | 'deep';
@@ -25,131 +23,97 @@ export interface Source {
 export interface ResearchResponse {
   id: string;
   query: string;
-  summary: string;
+  summary?: string;
   sources: Source[];
   insights: string[];
   relatedTopics?: string[];
-  status: 'completed' | 'in_progress' | 'failed';
+  status: 'completed' | 'in_progress' | 'analyzing' | 'synthesizing' | 'failed';
   error?: string;
+  createdAt?: string;
+  completedAt?: string;
 }
 
 /**
- * Hook for using DeerFlow deep research capabilities
+ * Custom hook for interacting with the DeerFlow research service
  */
 export function useDeerflow() {
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuth();
-  const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-  // Start a new research task
-  const startResearch = useMutation({
-    mutationFn: async (request: ResearchRequest) => {
-      try {
-        const response = await fetch('/api/deerflow/research', {
+  /**
+   * Check if the DeerFlow service is available
+   */
+  const useServiceHealth = () => {
+    return useQuery({
+      queryKey: ['/api/deerflow/health'],
+      retry: 2,
+      refetchOnWindowFocus: false,
+      refetchInterval: 60000, // Refetch every minute
+    });
+  };
+
+  /**
+   * Start a new research task
+   */
+  const useStartResearch = () => {
+    return useMutation({
+      mutationFn: (request: ResearchRequest) => 
+        apiRequest<{ id: string; status: string }>('/api/deerflow/research', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify(request),
-        });
-        
-        const data = await response.json();
-        console.log("Research started:", data);
-        return data.id;
-      } catch (error) {
-        console.error("Error starting research:", error);
-        throw error;
+        }),
+      onSuccess: (data) => {
+        if (data.id) {
+          setActiveTaskId(data.id);
+        }
       }
-    },
-    onSuccess: (researchId) => {
-      console.log("Setting active research ID:", researchId);
-      setActiveResearchId(researchId);
-    },
-  });
+    });
+  };
 
-  // Get the status and results of a research task
-  const getResearchStatus = useQuery({
-    queryKey: ['/api/deerflow/research', activeResearchId],
-    queryFn: async () => {
-      if (!activeResearchId) return null;
-      
-      try {
-        const response = await fetch(`/api/deerflow/research/${activeResearchId}`);
-        const data = await response.json();
-        console.log("Research status:", data);
-        return data;
-      } catch (error) {
-        console.error("Error getting research status:", error);
-        throw error;
+  /**
+   * Get the status of an ongoing research task
+   */
+  const useResearchStatus = (taskId: string | null) => {
+    return useQuery({
+      queryKey: ['/api/deerflow/research', taskId],
+      enabled: !!taskId,
+      refetchInterval: (data) => {
+        // Refetch frequently while in progress, stop when completed or failed
+        if (!data) return 1000;
+        return data.status === 'completed' || data.status === 'failed' 
+          ? false // Stop polling
+          : 1000; // Poll every second while in progress
       }
-    },
-    enabled: isAuthenticated && !!activeResearchId,
-    refetchInterval: (data) => {
-      // Poll more frequently when research is in progress
-      if (data?.status === 'in_progress' || data?.status === 'analyzing' || data?.status === 'synthesizing') {
-        return 2000; // 2 seconds
-      }
-      return false; // Stop polling when complete or failed
-    },
-  });
+    });
+  };
 
-  // Run a complete research task (start and wait for completion)
-  // This is a long-running operation and should be used with caution
-  const runCompleteResearch = useMutation({
-    mutationFn: async (request: ResearchRequest) => {
-      try {
-        const response = await fetch('/api/deerflow/research/complete', {
+  /**
+   * Run a complete research task (blocks until completion)
+   */
+  const useCompleteResearch = () => {
+    return useMutation({
+      mutationFn: (request: ResearchRequest) => 
+        apiRequest<ResearchResponse>('/api/deerflow/research/complete', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify(request),
-        });
-        
-        const data = await response.json();
-        console.log("Complete research results:", data);
-        return data;
-      } catch (error) {
-        console.error("Error running complete research:", error);
-        throw error;
-      }
-    },
-  });
+        })
+    });
+  };
 
-  // Check if DeerFlow service is available
-  const checkHealth = useQuery({
-    queryKey: ['/api/deerflow/health'],
-    queryFn: async () => {
-      return await apiRequest('/api/deerflow/health');
-    },
-    enabled: isAuthenticated,
-    refetchInterval: 60000, // Check every minute
-  });
+  /**
+   * Helper to cancel tracking of the current research task
+   */
+  const resetActiveTask = () => {
+    setActiveTaskId(null);
+  };
 
   return {
-    // Mutations
-    startResearch,
-    runCompleteResearch,
-    
-    // Queries
-    researchStatus: getResearchStatus.data,
-    isLoadingStatus: getResearchStatus.isLoading,
-    
-    // Service status
-    // During development, set to true to allow testing even without a running server
-    isServiceAvailable: true, // checkHealth.data?.status === 'ok'
-    isLoadingServiceStatus: false, // checkHealth.isLoading
-    
-    // State
-    activeResearchId,
-    setActiveResearchId,
-    
-    // Helper function to check if research is complete
-    isResearchComplete: getResearchStatus.data?.status === 'completed',
-    isResearchInProgress: getResearchStatus.data?.status === 'in_progress' || 
-                         getResearchStatus.data?.status === 'analyzing' || 
-                         getResearchStatus.data?.status === 'synthesizing',
-    isResearchFailed: getResearchStatus.data?.status === 'failed',
+    useServiceHealth,
+    useStartResearch,
+    useResearchStatus,
+    useCompleteResearch,
+    activeTaskId,
+    resetActiveTask,
   };
 }
 
