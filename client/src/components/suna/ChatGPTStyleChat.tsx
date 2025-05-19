@@ -12,7 +12,8 @@ import {
   Loader2Icon,
   MessageSquareIcon,
   UserIcon,
-  Settings
+  Settings,
+  Bot
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -209,13 +210,18 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         </div>
                       ) : (
                         <div className="rounded-full bg-blue-500 w-8 h-8 flex items-center justify-center">
-                          <div className="font-bold text-white">AI</div>
+                          <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
                     </div>
                     
                     <div className="flex-grow max-w-[90%] sm:max-w-3xl overflow-hidden">
-                      <div className="text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800">
+                      <div className={cn(
+                        "text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800",
+                        isUserMessage 
+                          ? "bg-blue-100 rounded-lg p-3" 
+                          : "bg-white border border-gray-200 rounded-lg p-3 shadow-sm"
+                      )}>
                         <ReactMarkdown>
                           {msg.content}
                         </ReactMarkdown>
@@ -234,16 +240,18 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               {isSending && (
                 <div className="px-4 md:px-[10%] py-6 flex w-full items-start bg-gray-50">
                   <div className="flex-shrink-0 mr-4">
-                    <div className="rounded-full bg-[#19c37d] w-8 h-8 flex items-center justify-center">
+                    <div className="rounded-full bg-blue-500 w-8 h-8 flex items-center justify-center">
                       <div className="font-bold text-white">AI</div>
                     </div>
                   </div>
                   
-                  <div className="flex-grow max-w-[90%] sm:max-w-3xl flex items-center">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.3s]"></div>
-                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.15s]"></div>
-                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></div>
+                  <div className="flex-grow max-w-[90%] sm:max-w-3xl">
+                    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
