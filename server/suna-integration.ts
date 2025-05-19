@@ -1042,14 +1042,20 @@ Use the current date and web search information when responding about current ev
         console.log("Adding source details to message metadata:", 
           JSON.stringify(searchMetadata.sourceDetails, null, 2));
         
-        // Format source information in a structured way that's easy to parse by the frontend
-        // Include both title and complete URL for each source
-        const sourceInfo = searchMetadata.sourceDetails.map((source, index) => 
+        // Format source information in a way that's better for the UI
+        // Using a dedicated "Sources:" section at the end rather than inline citations
+        const sourceList = searchMetadata.sourceDetails.map((source, index) => 
           `[${index + 1}] ${source.title}\n${source.url}`).join('\n\n');
-          
+        
+        // Instruct the AI to use a cleaner citation style
+        // Add this instruction to the prompt for better formatting
+        const formattingInstruction = `
+Format citations properly by using superscript numbers like [1] at the end of sentences rather than inserting raw URLs or citation markers in the middle of sentences. Put all sources in a dedicated "Sources" section at the end of your response.
+`;
+        
         // Append source URLs to the bottom of the response for transparency
         if (!aiResponse.includes('Sources:')) {
-          aiResponse += `\n\nSources:\n${sourceInfo}`;
+          aiResponse += `\n\nSources:\n${sourceList}`;
         }
         
         // Make sure sourceDetails is properly structured in the metadata

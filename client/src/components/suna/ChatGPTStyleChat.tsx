@@ -322,17 +322,24 @@ interface ResearchResponseProps {
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources }) => {
   const [expandedSources, setExpandedSources] = useState(false);
   
-  // Function to process content and highlight citations [1], [2], etc.
+  // Improved function to process content and highlight citations [1], [2], etc.
   const renderContentWithCitations = (text: string) => {
-    // Simple regex to find citation markers [1], [2], etc.
-    const parts = text.split(/(\[\d+\])/g);
+    // Extract the main content (everything before "Sources:" section)
+    const [mainContent, sourceSection] = text.split(/Sources:/i);
+    
+    // Only process the main content for citations
+    const contentToProcess = mainContent || text;
+    
+    // Improved regex to find citation markers [1], [2], etc. that aren't part of URLs
+    const parts = contentToProcess.split(/(\[\d+\](?!\)))/g);
     
     if (parts.length <= 1) return <ReactMarkdown>{text}</ReactMarkdown>;
     
     return (
       <>
         {parts.map((part, i) => {
-          const citationMatch = part.match(/\[(\d+)\]/);
+          // Check if this part is a citation marker
+          const citationMatch = part.match(/\[(\d+)\](?!\))/);
           if (citationMatch) {
             const sourceIndex = parseInt(citationMatch[1]) - 1;
             if (sourceIndex >= 0 && sourceIndex < sources.length) {
@@ -342,7 +349,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
                     href={sources[sourceIndex]?.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-blue-600 bg-blue-50 rounded px-1 text-xs font-medium"
+                    className="text-blue-600 bg-blue-50 rounded px-1 text-xs font-medium hover:bg-blue-100"
                   >
                     {part}
                   </a>
@@ -350,8 +357,16 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
               );
             }
           }
-          return <span key={i}>{part.length > 0 ? <ReactMarkdown>{part}</ReactMarkdown> : null}</span>;
+          
+          // Otherwise render as regular markdown
+          return (
+            <span key={i}>
+              {part.length > 0 ? <ReactMarkdown>{part}</ReactMarkdown> : null}
+            </span>
+          );
         })}
+        
+        {/* If there was a Sources section, we don't render it here since we have a dedicated sources section below */}
       </>
     );
   };
