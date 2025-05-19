@@ -642,8 +642,9 @@ export class SunaIntegrationService {
           if (!webSearchResults.error) {
             const searchResults = webSearchResults.results || [];
             
-            // Collect source domains for metadata
+            // Collect source information for metadata
             const sourceDomains: string[] = [];
+            const sourceUrls: {title: string, url: string, domain: string}[] = [];
             const usedSearchEngines: string[] = [];
             
             // Track which search engines were used
@@ -656,14 +657,24 @@ export class SunaIntegrationService {
               }
             }
             
-            // Extract domains from results
+            // Extract source information from results
             searchResults.forEach((result: any) => {
               if (result.url) {
                 try {
                   const domain = new URL(result.url).hostname;
+                  const title = result.title || domain;
+                  
+                  // Add domain to list of unique domains
                   if (!sourceDomains.includes(domain)) {
                     sourceDomains.push(domain);
                   }
+                  
+                  // Add full source information
+                  sourceUrls.push({
+                    title: title,
+                    url: result.url,
+                    domain: domain
+                  });
                 } catch (e) {
                   // Skip invalid URLs
                 }
