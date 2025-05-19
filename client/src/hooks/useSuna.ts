@@ -62,19 +62,23 @@ export function useSuna(initialThreadId?: string) {
       
       setMessages(prev => [...prev, tempUserMessage]);
       
+      // Use existing thread ID or null for a new conversation
+      console.log(`Sending message with threadId: ${threadId || 'new conversation'}`);
+      
       const response = await apiRequest(
         'POST',
         '/api/suna/message',
         {
           message,
-          threadId
+          threadId: threadId // Always pass the current threadId, even if undefined
         }
       );
       
       const data = await response.json();
       
-      // Set the thread ID if this is a new conversation
+      // If we get a thread ID back and don't have one yet, save it
       if (data.threadId && !threadId) {
+        console.log(`Setting new threadId: ${data.threadId}`);
         setThreadId(data.threadId);
       }
       
@@ -83,17 +87,17 @@ export function useSuna(initialThreadId?: string) {
         setMessages(prev => {
           // Remove the temporary message and add both the real user message and assistant message
           const filteredMessages = prev.filter(m => m.id !== tempUserMessage.id);
-          return [...filteredMessages, 
-            // Add the real user message
-            {
-              id: `user-${Date.now()}`,
-              content: message,
-              role: 'user',
-              timestamp: new Date(Date.now() - 1000).toISOString()
-            },
-            // Add the assistant message from the response
-            data.message
-          ];
+          
+          // Create permanent user message with the same ID pattern as the server uses
+          const userMessage: SunaMessage = {
+            id: `user-${Date.now()}`,
+            content: message,
+            role: 'user',
+            timestamp: new Date(Date.now() - 1000).toISOString()
+          };
+          
+          // Add both messages to the conversation
+          return [...filteredMessages, userMessage, data.message];
         });
       }
       

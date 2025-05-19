@@ -297,17 +297,28 @@ export class SunaIntegrationService {
    */
   private async mockSendMessage(data: SunaRequest): Promise<any> {
     console.log('Using enhanced Suna service with DeepSeek for message:', data.query);
+    console.log('Using conversation ID:', data.conversationId);
     
-    // Create conversation if it doesn't exist
-    if (data.conversationId && !mockConversations[data.conversationId]) {
-      await this.mockCreateConversation(data.userId, 'New Conversation');
-      data.conversationId = Object.keys(mockConversations)[0];
-    }
-    
-    // If no conversation ID, create one
+    // If no conversation ID is provided, create a new one
     if (!data.conversationId) {
       const conv = await this.mockCreateConversation(data.userId, 'New Conversation');
       data.conversationId = conv.id;
+      console.log('Created new conversation with ID:', data.conversationId);
+    } 
+    // If conversation ID doesn't exist in our mock storage, create it with that ID
+    else if (!mockConversations[data.conversationId]) {
+      console.log('Recreating conversation with ID:', data.conversationId);
+      const conversationId = data.conversationId;
+      
+      const conversation: SunaConversation = {
+        id: conversationId,
+        title: 'Conversation',
+        messages: [],
+        createdAt: new Date().toISOString(),
+        userId: data.userId
+      };
+      
+      mockConversations[conversationId] = conversation;
     }
     
     const conversation = mockConversations[data.conversationId];
@@ -534,18 +545,23 @@ export const sunaService = new SunaIntegrationService();
 // Express route handlers for Suna integration
 export const sendMessageToSuna = async (req: any, res: Response) => {
   try {
-    const { message, conversationId, threadId } = req.body;
+    const { message, threadId } = req.body;
     const userId = req.user.claims.sub;
 
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
+    
+    console.log(`Processing message in conversation/thread: ${threadId}`);
+
+    // Use threadId as the conversationId for consistency
+    const conversationId = threadId;
 
     const sunaRequest: SunaRequest = {
       query: message,
       userId,
-      conversationId,
-      threadId
+      conversationId: conversationId,
+      threadId: conversationId
     };
 
     const response = await sunaService.sendMessage(sunaRequest);
