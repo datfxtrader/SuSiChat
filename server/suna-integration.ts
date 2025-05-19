@@ -250,6 +250,8 @@ interface SunaRequest {
     disableSearch?: boolean;  // Disable web search for this query
     priority?: 'relevance' | 'freshness'; // Sort by relevance (default) or freshness
     maxResults?: number;      // Maximum number of results to return
+    useDeepResearch?: boolean; // Use DeerFlow deep research capabilities
+    researchDepth?: 'basic' | 'standard' | 'deep'; // Research depth when using DeerFlow
   };
 }
 
