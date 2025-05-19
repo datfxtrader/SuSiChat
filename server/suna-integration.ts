@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
+import { deerflowBridge, ResearchRequest, ResearchResponse } from './deerflow-bridge';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
@@ -322,6 +323,84 @@ export class SunaIntegrationService {
    */
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
+  }
+
+  /**
+   * Determine if a query needs deep research (using DeerFlow)
+   * Analyzes query complexity and research needs
+   */
+  private needsDeepResearch(query: string, messages: any[] = []): boolean {
+    // Research-oriented terms that suggest need for in-depth analysis
+    const researchTerms = [
+      'research', 'analyze', 'analysis', 'in-depth', 'comprehensive', 'deep dive',
+      'literature review', 'synthesize', 'examine', 'investigate', 'explore',
+      'study', 'review', 'evaluate', 'assess', 'critique', 'compare and contrast',
+      'pros and cons', 'advantages and disadvantages', 'benefits and drawbacks',
+      'summarize', 'explain', 'elaborate on', 'provide context', 'background',
+    ];
+
+    // Domain-specific research indicators
+    const academicTerms = [
+      'paper', 'journal', 'publication', 'thesis', 'dissertation', 'academic',
+      'scholarly', 'research paper', 'article', 'citation', 'reference', 'bibliography',
+      'literature', 'theory', 'hypothesis', 'experiment', 'methodology', 'findings',
+      'conclusions', 'implications', 'evidence', 'data', 'analysis', 'results'
+    ];
+
+    // Complex topic indicators
+    const complexTopicTerms = [
+      'philosophy', 'ethics', 'morality', 'epistemology', 'ontology', 'metaphysics',
+      'theoretical', 'conceptual', 'framework', 'paradigm', 'discourse', 'dialectic',
+      'historiography', 'hermeneutics', 'phenomenology', 'existentialism',
+      'quantum', 'relativity', 'consciousness', 'cognitive', 'neuroscience'
+    ];
+
+    // Decision-making/multi-faceted question terms
+    const decisionTerms = [
+      'should i', 'is it better', 'which is best', 'compare', 'versus', 'vs',
+      'advantages of', 'disadvantages of', 'recommend', 'suggest', 'advise',
+      'factors', 'considerations', 'criteria', 'decision', 'choice', 'options',
+      'alternatives', 'tradeoffs', 'what are the'
+    ];
+
+    // Query length - complex questions tend to be longer
+    const isLongQuery = query.split(' ').length > 15;
+    
+    // Check for multiple question marks, indicating multi-part questions
+    const hasMultipleQuestions = (query.match(/\?/g) || []).length > 1;
+    
+    // Pattern matching for questions that require multiple perspectives
+    const requiresMultiplePerspectives = /different (perspectives|views|opinions|approaches|ways)/i.test(query);
+    
+    // "Why" questions often need deeper analysis
+    const isWhyQuestion = /^why\b/i.test(query.trim());
+    
+    // Check if this appears to be a follow-up to a complex question
+    const isComplexFollowUp = messages.length > 0 && 
+      (query.toLowerCase().includes('more about this') || 
+       query.toLowerCase().includes('tell me more') ||
+       query.toLowerCase().includes('explain further'));
+
+    const lowerQuery = query.toLowerCase();
+    
+    // Combine all terms
+    const allTerms = [
+      ...researchTerms,
+      ...academicTerms,
+      ...complexTopicTerms,
+      ...decisionTerms
+    ];
+    
+    // Check for term matches
+    const hasTermMatch = allTerms.some(term => lowerQuery.includes(term));
+    
+    // Determine if deep research is needed based on multiple factors
+    return hasTermMatch || 
+           isLongQuery || 
+           hasMultipleQuestions || 
+           requiresMultiplePerspectives || 
+           isWhyQuestion ||
+           isComplexFollowUp;
   }
 
   /**
