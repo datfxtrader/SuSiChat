@@ -132,7 +132,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           "md:left-0" // Always visible on desktop
         )}
       >
-        <div className="p-2 border-b border-gray-200">
+        <div className="p-2 border-b border-gray-200 space-y-2">
           <Button 
             variant="outline" 
             className="w-full bg-white border border-gray-200 hover:bg-gray-100 text-gray-700" 
@@ -140,6 +140,23 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           >
             <PlusIcon className="mr-2 h-4 w-4" /> New chat
           </Button>
+          
+          <div className="flex items-center space-x-2">
+            <Settings size={16} className="text-gray-500" />
+            <Select 
+              value={currentModel} 
+              onValueChange={(value) => changeModel(value as LLMModel)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deepseek-chat">DeepSeek</SelectItem>
+                <SelectItem value="gemini-1.5-flash">Gemini Flash 2.0</SelectItem>
+                <SelectItem value="gemini-1.0-pro">Gemini 1.5 Pro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto py-2 space-y-0">

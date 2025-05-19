@@ -3,18 +3,20 @@ import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
 
-// Web search functionality using Tavily API
+// Web search functionality using multiple search engines
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const TAVILY_SEARCH_URL = 'https://api.tavily.com/search';
+const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
+const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
 
 /**
  * Perform a web search using Tavily API
  * @param query Search query string
- * @returns Search results from the web
+ * @returns Search results from Tavily
  */
-async function performWebSearch(query: string) {
+async function performTavilySearch(query: string) {
   try {
-    console.log('Performing web search for:', query);
+    console.log('Performing Tavily web search for:', query);
     
     const response = await axios.post(
       TAVILY_SEARCH_URL,
@@ -23,10 +25,10 @@ async function performWebSearch(query: string) {
         search_depth: 'advanced',  // basic or advanced
         include_domains: [],        // optional specific domains to include
         exclude_domains: [],        // optional specific domains to exclude
-        max_results: 8,             // number of results to return
+        max_results: 5,             // number of results to return
         include_answer: true,       // include an AI generated answer
         include_raw_content: false, // include raw content of each search result
-        max_tokens: 1000,          // max tokens in the answer
+        max_tokens: 800,            // max tokens in the answer
       },
       {
         headers: {
@@ -39,13 +41,105 @@ async function performWebSearch(query: string) {
     return response.data;
   } catch (error) {
     console.error('Error with Tavily web search:', error);
+    return { error: 'Failed to perform Tavily web search' };
+  }
+}
+
+/**
+ * Perform a web search using Brave Search API
+ * @param query Search query string
+ * @returns Search results from Brave
+ */
+async function performBraveSearch(query: string) {
+  try {
+    console.log('Performing Brave web search for:', query);
+    
+    const response = await axios.get(
+      BRAVE_SEARCH_URL,
+      {
+        params: {
+          q: query,
+          count: 5,
+          search_lang: 'en',
+          text_decorations: false,
+          freshness: 'day'  // Search for recent content
+        },
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip',
+          'X-Subscription-Token': BRAVE_API_KEY
+        }
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error with Brave web search:', error);
+    return { error: 'Failed to perform Brave web search' };
+  }
+}
+
+/**
+ * Perform a combined web search using multiple search engines
+ * @param query Search query string
+ * @returns Combined search results from multiple sources
+ */
+async function performWebSearch(query: string) {
+  try {
+    console.log('Performing combined web search for:', query);
+    
+    // Run both searches in parallel for faster response
+    const [tavilyResults, braveResults] = await Promise.allSettled([
+      performTavilySearch(query),
+      BRAVE_API_KEY ? performBraveSearch(query) : Promise.resolve({ error: 'Brave API key not configured' })
+    ]);
+    
+    // Process Tavily results
+    const tavilyData = tavilyResults.status === 'fulfilled' ? tavilyResults.value : { error: 'Tavily search failed' };
+    
+    // Process Brave results
+    const braveData = braveResults.status === 'fulfilled' ? braveResults.value : { error: 'Brave search failed' };
+    
+    // Combine the results
+    const combinedResults = {
+      tavilyResults: tavilyData,
+      braveResults: braveData.error ? { error: braveData.error } : braveData,
+      answer: tavilyData.answer || '',
+      results: []
+    };
+    
+    // Add Tavily results
+    if (!tavilyData.error && tavilyData.results) {
+      combinedResults.results = [...tavilyData.results];
+    }
+    
+    // Add Brave results
+    if (!braveData.error && braveData.web && braveData.web.results) {
+      const braveWebResults = braveData.web.results.map((result: any) => ({
+        title: result.title,
+        url: result.url,
+        content: result.description,
+        source: 'brave'
+      }));
+      combinedResults.results = [...combinedResults.results, ...braveWebResults];
+    }
+    
+    return combinedResults;
+  } catch (error) {
+    console.error('Error with combined web search:', error);
     return { error: 'Failed to perform web search' };
   }
 }
 
-// Configuration for the DeepSeek API (used for Suna agent functionality)
+// Configuration for LLM APIs (used for Suna agent functionality)
+// DeepSeek
 const DEEPSEEK_API_ENDPOINT = process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+
+// Gemini
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const SUNA_API_URL = 'integrated'; // Using integrated approach with DeepSeek directly
 
 // In-memory implementation for Suna features
@@ -146,11 +240,92 @@ export class SunaIntegrationService {
   }
 
   /**
-   * Send a message to the Suna agent (directly using DeepSeek API)
+   * Call Gemini API to generate a response
+   * @param messages Array of conversation messages
+   * @param model Gemini model to use
+   * @returns Generated response from Gemini
+   */
+  private async callGeminiAPI(messages: any[], model: string = 'gemini-1.5-flash') {
+    try {
+      console.log(`Calling Gemini API (${model}) for response`);
+      
+      // Convert messages to Gemini format
+      const geminiMessages = messages.map(msg => {
+        if (msg.role === 'system') {
+          // Gemini doesn't support system messages directly, so we convert to user message
+          return {
+            role: 'user',
+            parts: [{text: `${msg.content}\n\nPlease acknowledge these instructions.`}]
+          };
+        } else if (msg.role === 'assistant') {
+          return {
+            role: 'model',
+            parts: [{text: msg.content}]
+          };
+        } else {
+          return {
+            role: 'user',
+            parts: [{text: msg.content}]
+          };
+        }
+      });
+      
+      // Remove the initial acknowledgment from the assistant if it exists
+      if (geminiMessages.length > 1 && geminiMessages[1]?.role === 'model') {
+        geminiMessages.splice(1, 1);
+      }
+      
+      // Call the Gemini API
+      const response = await axios.post(
+        `${GEMINI_API_ENDPOINT}/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          contents: geminiMessages,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+            topP: 0.9,
+            topK: 40,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_ONLY_HIGH"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_ONLY_HIGH"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_ONLY_HIGH"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_ONLY_HIGH"
+            }
+          ]
+        }
+      );
+      
+      // Extract and return the generated text
+      if (response.data.candidates && response.data.candidates.length > 0) {
+        return response.data.candidates[0].content.parts[0].text;
+      }
+      
+      throw new Error('No valid response from Gemini API');
+    } catch (error) {
+      console.error('Error calling Gemini API:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send a message to the Suna agent (using the selected LLM)
    */
   async sendMessage(data: SunaRequest): Promise<any> {
     try {
-      console.log('Processing Suna agent message with DeepSeek:', data.query);
+      const selectedModel = data.model || 'deepseek-chat';
+      console.log(`Processing Suna agent message with model ${selectedModel}:`, data.query);
       
       // If no thread ID is provided, we need to create a new thread
       if (!data.threadId) {
@@ -180,24 +355,29 @@ export class SunaIntegrationService {
       }
       
       // Determine if web search is needed based on the query
-      let webSearchResults = null;
+      let webSearchResults: any = null;
       let webSearchContent = '';
       
-      if (TAVILY_API_KEY && this.needsWebSearch(data.query)) {
+      // Perform web search if needed
+      if ((TAVILY_API_KEY || BRAVE_API_KEY) && this.needsWebSearch(data.query)) {
         try {
           webSearchResults = await performWebSearch(data.query);
           
+          // Format search results only if there's no error
           if (!webSearchResults.error) {
+            const searchResults = webSearchResults.results || [];
+            
             // Format search results for the LLM
             webSearchContent = `
 Web Search Results:
-${webSearchResults.results?.map((result: any, index: number) => 
-  `[${index + 1}] "${result.title}"
-URL: ${result.url}
-Content: ${result.content}
+${searchResults.map((result: any, index: number) => 
+  `[${index + 1}] "${result.title || 'Untitled'}"
+URL: ${result.url || 'No URL available'}
+Content: ${result.content || result.description || 'No content available'}
+${result.source ? `Source: ${result.source}` : ''}
 `).join('\n') || 'No results found'}
 
-Search Answer: ${webSearchResults.answer || 'No answer available'}
+${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
 
 Current Date: ${new Date().toISOString().split('T')[0]}
 `;
@@ -252,9 +432,6 @@ Use the current date and web search information when responding about current ev
         content: data.query
       });
       
-      // Call DeepSeek API directly
-      console.log('Calling DeepSeek API for Suna agent response');
-      
       // Create a user message in the conversation
       const userMessageId = `msg-${uuidv4()}`;
       const userMessage: SunaMessage = {
@@ -266,24 +443,69 @@ Use the current date and web search information when responding about current ev
       
       conversation.messages.push(userMessage);
       
-      const response = await axios.post(
-        DEEPSEEK_API_ENDPOINT,
-        {
-          model: DEEPSEEK_MODEL,
-          messages,
-          temperature: 0.7,
-          max_tokens: 2000
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          }
-        }
-      );
+      // Get response based on selected model
+      let aiResponse = '';
+      let modelUsed = selectedModel;
       
-      // Extract the AI response
-      const aiResponse = response.data.choices[0].message.content;
+      // Try the selected model first
+      try {
+        if (selectedModel.startsWith('gemini')) {
+          // Call Gemini API
+          aiResponse = await this.callGeminiAPI(messages, selectedModel);
+        } else {
+          // Default to DeepSeek API
+          const response = await axios.post(
+            DEEPSEEK_API_ENDPOINT,
+            {
+              model: DEEPSEEK_MODEL,
+              messages,
+              temperature: 0.7,
+              max_tokens: 2000
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+              }
+            }
+          );
+          
+          // Extract the AI response
+          aiResponse = response.data.choices[0].message.content;
+        }
+      } catch (error) {
+        console.error(`Error with ${selectedModel} API:`, error);
+        
+        // Fall back to DeepSeek if Gemini fails
+        if (selectedModel.startsWith('gemini') && DEEPSEEK_API_KEY) {
+          console.log('Falling back to DeepSeek API');
+          try {
+            const fallbackResponse = await axios.post(
+              DEEPSEEK_API_ENDPOINT,
+              {
+                model: DEEPSEEK_MODEL,
+                messages,
+                temperature: 0.7,
+                max_tokens: 2000
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+                }
+              }
+            );
+            
+            aiResponse = fallbackResponse.data.choices[0].message.content;
+            modelUsed = 'deepseek-chat (fallback)';
+          } catch (fallbackError) {
+            console.error('Error with fallback to DeepSeek API:', fallbackError);
+            throw new Error('Failed to generate response with any available model');
+          }
+        } else {
+          throw error;
+        }
+      }
       
       // Create an assistant message
       const runId = `run-${uuidv4()}`;
@@ -313,11 +535,12 @@ Use the current date and web search information when responding about current ev
         threadId: data.threadId,
         runId,
         status: 'completed',
-        webSearchUsed: !!webSearchContent
+        webSearchUsed: !!webSearchContent,
+        modelUsed
       };
     } catch (error) {
-      console.error('Error with DeepSeek API for Suna agent:', error);
-      throw new Error('Failed to generate Suna agent response with DeepSeek API');
+      console.error('Error with LLM API for Suna agent:', error);
+      throw new Error('Failed to generate Suna agent response');
     }
   }
   
