@@ -775,8 +775,12 @@ export class SunaIntegrationService {
             context = previousMessages.map(m => `${m.role}: ${m.content}`).join('\n');
           }
           
-          // Perform deep research with DeerFlow
-          deepResearchResults = await this.performDeepResearch(data.query, context);
+          // Perform deep research with DeerFlow using specified depth
+          deepResearchResults = await this.performDeepResearch(
+            data.query, 
+            context,
+            researchDepth as 'basic' | 'standard' | 'deep'
+          );
           
           if (deepResearchResults) {
             console.log(`Deep research successful, found ${deepResearchResults.sources.length} sources and ${deepResearchResults.insights.length} insights`);

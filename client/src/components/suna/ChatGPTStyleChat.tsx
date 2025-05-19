@@ -815,8 +815,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                           ? "bg-blue-100 border border-blue-200" 
                           : "bg-white border border-gray-200 shadow-sm"
                       )}>
-                        {/* Display with research component when in research mode and not a user message */}
-                        {!isUserMessage && researchMode ? (
+                        {/* Display with research component when in research mode or deep research used */}
+                        {!isUserMessage && (researchMode || msg.searchMetadata?.deepResearchUsed) ? (
                           <ResearchResponse 
                             content={msg.content}
                             sources={getSourcesFromMetadata(msg)}
@@ -829,7 +829,10 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         {/* Show model and search info if it's an assistant message */}
                         {!isUserMessage && msg.modelUsed && (
                           <div className="text-xs text-gray-400 mt-2 italic">
-                            Model: {msg.modelUsed} {msg.webSearchUsed ? '• Web search used' : ''}
+                            Model: {msg.modelUsed} 
+                            {msg.searchMetadata?.deepResearchUsed ? 
+                              ' • Deep research used' : 
+                              msg.webSearchUsed ? ' • Web search used' : ''}
                           </div>
                         )}
                       </div>
