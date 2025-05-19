@@ -16,6 +16,9 @@ const searchCache = new Map<string, CacheEntry>();
 // Cache TTL in milliseconds (5 minutes)
 const CACHE_TTL = 5 * 60 * 1000;
 
+// Maximum cache size (number of entries)
+const MAX_CACHE_SIZE = 50;
+
 // Simple hash function for queries
 function hashQuery(query: string): string {
   return query.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -25,6 +28,37 @@ function hashQuery(query: string): string {
 function isCacheValid(entry: CacheEntry): boolean {
   return Date.now() - entry.timestamp < CACHE_TTL;
 }
+
+// Clean expired entries from cache
+function cleanupCache(): void {
+  const now = Date.now();
+  let expiredCount = 0;
+  
+  // Remove expired entries
+  for (const [key, entry] of searchCache.entries()) {
+    if (now - entry.timestamp > CACHE_TTL) {
+      searchCache.delete(key);
+      expiredCount++;
+    }
+  }
+  
+  // If cache is still too large after removing expired entries,
+  // remove oldest entries until we're under the limit
+  if (searchCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(searchCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+      
+    const toRemove = entries.slice(0, searchCache.size - MAX_CACHE_SIZE);
+    toRemove.forEach(([key]) => searchCache.delete(key));
+    
+    console.log(`Cache cleanup: removed ${expiredCount} expired entries and ${toRemove.length} old entries`);
+  } else if (expiredCount > 0) {
+    console.log(`Cache cleanup: removed ${expiredCount} expired entries`);
+  }
+}
+
+// Run cache cleanup every minute
+setInterval(cleanupCache, 60 * 1000);
 
 // Web search functionality using multiple search engines
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -109,6 +143,24 @@ async function performBraveSearch(query: string) {
  */
 async function performWebSearch(query: string) {
   try {
+    // Normalize query for caching
+    const queryHash = hashQuery(query);
+    
+    // Check cache first
+    if (searchCache.has(queryHash)) {
+      const cacheEntry = searchCache.get(queryHash)!;
+      
+      // If cache is still valid, use it
+      if (isCacheValid(cacheEntry)) {
+        console.log(`Using cached search results for query: "${query}" (originally queried as: "${cacheEntry.queryUsed}")`);
+        return cacheEntry.results;
+      } else {
+        // Remove expired cache entry
+        searchCache.delete(queryHash);
+        console.log(`Cache entry expired for query: "${query}"`);
+      }
+    }
+    
     console.log('Performing combined web search for:', query);
     
     // Run both searches in parallel for faster response
@@ -147,6 +199,14 @@ async function performWebSearch(query: string) {
       combinedResults.results = [...combinedResults.results, ...braveWebResults];
     }
     
+    // Store in cache
+    searchCache.set(queryHash, {
+      results: combinedResults,
+      timestamp: Date.now(),
+      queryUsed: query
+    });
+    
+    console.log(`Web search completed. Cache now has ${searchCache.size} entries`);
     return combinedResults;
   } catch (error) {
     console.error('Error with combined web search:', error);
