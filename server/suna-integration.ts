@@ -4,12 +4,12 @@ import { llmService } from './llm';
 
 // Configuration for Suna API
 const SUNA_API_URL = process.env.SUNA_API_URL || 'http://localhost:8000';
-// Use mock implementation as fallback if Suna backend is not available
-const USE_MOCK_SUNA = true;
+// Now using the real Suna backend
+const USE_MOCK_SUNA = false;
 
 // Logging the Suna configuration on startup
 console.log(`Suna API URL: ${SUNA_API_URL}`);
-console.log(`Using mock Suna: ${USE_MOCK_SUNA}`);
+console.log(`Using real Suna backend at: ${SUNA_API_URL}`);
 
 /**
  * Interface for Suna API requests
@@ -152,12 +152,9 @@ export class SunaIntegrationService {
    * Create a new thread in Suna
    */
   async createThread(userId: string): Promise<any> {
-    if (USE_MOCK_SUNA) {
-      const conv = await this.mockCreateConversation(userId, 'New Conversation');
-      return { threadId: conv.id };
-    }
-    
     try {
+      console.log('Creating a new thread in Suna backend for user:', userId);
+      
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
@@ -176,12 +173,14 @@ export class SunaIntegrationService {
         { headers }
       );
       
+      console.log('Thread created successfully in Suna backend:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error creating thread in Suna:', error);
-      // Fall back to mock implementation
-      const conv = await this.mockCreateConversation(userId, 'New Conversation');
-      return { threadId: conv.id };
+      // Create a fallback thread ID if the API call fails
+      const fallbackThreadId = `thread-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      console.log('Created fallback thread ID:', fallbackThreadId);
+      return { threadId: fallbackThreadId };
     }
   }
 
@@ -189,11 +188,9 @@ export class SunaIntegrationService {
    * Get conversation/thread history from Suna
    */
   async getConversation(userId: string, threadId: string): Promise<any> {
-    if (USE_MOCK_SUNA) {
-      return this.mockGetConversation(userId, threadId);
-    }
-    
     try {
+      console.log('Fetching conversation from Suna backend:', threadId);
+      
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
