@@ -4,7 +4,9 @@ import { llmService } from './llm';
 
 // Configuration for Suna API
 const SUNA_API_URL = process.env.SUNA_API_URL || 'http://localhost:8000';
-const USE_MOCK_SUNA = process.env.USE_MOCK_SUNA === 'true' || !process.env.SUNA_API_URL;
+// By default, we'll try to use the real Suna backend
+// If it's not available, we'll fall back to the mock implementation
+const USE_MOCK_SUNA = process.env.USE_MOCK_SUNA === 'true';
 
 // Logging the Suna configuration on startup
 console.log(`Suna API URL: ${SUNA_API_URL}`);
@@ -118,11 +120,16 @@ export class SunaIntegrationService {
         headers['Authorization'] = `Bearer ${this.apiKey}`;
       }
       
+      console.log(`Sending request to real Suna backend at: ${SUNA_API_URL}/api/agent/run`);
+      console.log('Request payload:', JSON.stringify(requestPayload, null, 2));
+      
       const response = await axios.post(
         `${SUNA_API_URL}/api/agent/run`, 
         requestPayload,
         { headers }
       );
+      
+      console.log('Received response from Suna backend');
       
       // Extract the relevant information from the response
       const agentRunResponse: AgentRunResponse = response.data;
