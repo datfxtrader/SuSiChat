@@ -171,6 +171,48 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     }
   }, [messages]);
 
+  // Extract sources from message metadata for research display
+  const getSourcesFromMetadata = (message: any): Source[] => {
+    if (!message.searchMetadata || !message.webSearchUsed) return [];
+    
+    const sources: Source[] = [];
+    
+    // Extract sources from searchMetadata
+    if (message.searchMetadata?.sources) {
+      message.searchMetadata.sources.forEach((domain: string, index: number) => {
+        sources.push({
+          title: `Source ${index + 1} from ${domain}`,
+          url: `https://${domain}`,
+          domain: domain,
+          publishedDate: new Date().toLocaleDateString() // Would come from actual metadata
+        });
+      });
+    }
+    
+    // If we have search results but no sources in metadata
+    if (sources.length === 0 && message.webSearchUsed) {
+      // Use the actual response to extract potential sources
+      const content = message.content || '';
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const matches = content.match(urlRegex) || [];
+      
+      matches.forEach((url: string, index: number) => {
+        try {
+          const domain = new URL(url).hostname;
+          sources.push({
+            title: `Referenced Source ${index + 1}`,
+            url: url,
+            domain: domain
+          });
+        } catch (e) {
+          // Invalid URL, skip
+        }
+      });
+    }
+    
+    return sources;
+  };
+
   const handleSendMessage = () => {
     if (!message.trim()) return;
     
@@ -323,9 +365,17 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                           ? "bg-blue-100 border border-blue-200" 
                           : "bg-white border border-gray-200 shadow-sm"
                       )}>
-                        <ReactMarkdown>
-                          {msg.content}
-                        </ReactMarkdown>
+                        {/* Display with research component when in research mode and not a user message */}
+                        {!isUserMessage && researchMode ? (
+                          <ResearchResponse 
+                            content={msg.content}
+                            sources={getSourcesFromMetadata(msg)}
+                          />
+                        ) : (
+                          <ReactMarkdown>
+                            {msg.content}
+                          </ReactMarkdown>
+                        )}
                         {/* Show model and search info if it's an assistant message */}
                         {!isUserMessage && msg.modelUsed && (
                           <div className="text-xs text-gray-400 mt-2 italic">
