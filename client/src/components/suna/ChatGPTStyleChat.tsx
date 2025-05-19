@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSuna } from '@/hooks/useSuna';
+import { useSuna, type LLMModel } from '@/hooks/useSuna';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,10 +11,18 @@ import {
   XIcon,
   Loader2Icon,
   MessageSquareIcon,
-  UserIcon
+  UserIcon,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ChatGPTStyleChatProps {
   threadId?: string;
@@ -27,16 +35,20 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isTextareaFocused, setIsTextareaFocused] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   const { 
     messages = [], 
-    allConversations = [],
+    allConversations = [] as any[],
     threadId: currentThreadId,
     isLoadingConversation,
     isLoadingConversations, 
     sendMessage, 
     isSending,
-    selectConversation
+    selectConversation,
+    createNewChat,
+    currentModel,
+    changeModel
   } = useSuna(threadId);
 
   // Auto-resize textarea
@@ -74,7 +86,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   };
 
   const handleNewConversation = () => {
-    selectConversation('');
+    createNewChat();
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }

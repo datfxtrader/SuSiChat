@@ -17,6 +17,8 @@ type SunaConversation = {
   createdAt: string;
 };
 
+export type LLMModel = 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
+
 /**
  * Hook for interacting with the Suna AI Agent
  */
@@ -25,6 +27,7 @@ export function useSuna(initialThreadId?: string) {
   const { user, isAuthenticated } = useAuth();
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
+  const [currentModel, setCurrentModel] = useState<LLMModel>('deepseek-chat');
   
   // Query for all user conversations
   const { data: allConversations, isLoading: isLoadingConversations } = useQuery({
@@ -46,9 +49,15 @@ export function useSuna(initialThreadId?: string) {
     }
   }, [conversation]);
 
+  // Create a new chat (clear current thread and messages)
+  const createNewChat = () => {
+    setThreadId(undefined);
+    setMessages([]);
+  };
+
   // Send a message to Suna
   const { mutate: sendMessage, isPending: isSending } = useMutation({
-    mutationFn: async ({ message }: { message: string }) => {
+    mutationFn: async ({ message, model = currentModel }: { message: string, model?: LLMModel }) => {
       if (!isAuthenticated) {
         throw new Error('You must be logged in to use Suna');
       }
@@ -71,7 +80,8 @@ export function useSuna(initialThreadId?: string) {
         '/api/suna/message',
         {
           message,
-          threadId: threadId // Always pass the current threadId, even if undefined
+          threadId: threadId, // Always pass the current threadId, even if undefined
+          model: model // Pass the selected model
         }
       );
       
@@ -119,15 +129,23 @@ export function useSuna(initialThreadId?: string) {
     setThreadId(selectedThreadId);
   };
 
+  // Function to change the current LLM model
+  const changeModel = (model: LLMModel) => {
+    setCurrentModel(model);
+  };
+
   return {
     conversation,
     allConversations,
     threadId,
     messages,
+    currentModel,
     isLoadingConversation,
     isLoadingConversations,
     sendMessage,
     isSending,
     selectConversation,
+    createNewChat,
+    changeModel
   };
 }
