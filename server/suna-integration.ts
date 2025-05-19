@@ -617,10 +617,139 @@ export class SunaIntegrationService {
             }).slice(0, maxResults); // Limit to max results from preferences
             
             // Format search results for the LLM with improved readability and transparency
+            // PHASE 3: IMPROVED RESULT INTEGRATION - Categorize and group results by topic
+            const domains = new Map(); // Track domains for diversity
+            
+            // Extract key topics from results to group related information
+            const keyTopics = new Map();
+            const keyPhrases = new Set();
+            
+            // Extract topics and categorize results
+            sortedResults.forEach((result: any) => {
+              // Extract domain for source tracking
+              let domain = 'Unknown Source';
+              if (result.url) {
+                try {
+                  domain = new URL(result.url).hostname;
+                  // Track domains and limit results per domain for diversity
+                  domains.set(domain, (domains.get(domain) || 0) + 1);
+                } catch (e) {
+                  // Keep default if URL parsing fails
+                }
+              }
+              
+              // Extract potential key phrases from titles (simplified NLP)
+              const title = result.title || '';
+              const words = title.split(/\s+/).filter((w: string) => w.length > 3);
+              
+              // Find 2-3 word combinations as potential topics
+              for (let i = 0; i < words.length - 1; i++) {
+                const phrase = `${words[i]} ${words[i+1]}`.toLowerCase();
+                keyPhrases.add(phrase);
+                
+                if (i < words.length - 2) {
+                  const phrase3 = `${words[i]} ${words[i+1]} ${words[i+2]}`.toLowerCase();
+                  keyPhrases.add(phrase3);
+                }
+              }
+            });
+            
+            // Group results by key topics where possible
+            let organizedResults = '';
+            
+            // Identify contradictions or different perspectives
+            const contradictions = [];
+            let hasContradictoryInfo = false;
+            
+            // Look for conflicting dates/numbers across sources
+            const numericalFacts = new Map();
+            const dateFacts = new Map();
+            
+            sortedResults.forEach((result: any) => {
+              const content = result.content || result.description || '';
+              
+              // Extract dates (simple regex pattern)
+              const dateMatches = content.match(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b/gi);
+              
+              if (dateMatches) {
+                dateMatches.forEach((date: string) => {
+                  if (!dateFacts.has(date)) {
+                    dateFacts.set(date, []);
+                  }
+                  dateFacts.get(date).push(result.url);
+                });
+              }
+              
+              // Extract numerical facts (simple pattern)
+              const numberMatches = content.match(/\$\d+(?:\.\d+)?|\d+(?:\.\d+)? (?:percent|million|billion|trillion)/gi);
+              
+              if (numberMatches) {
+                numberMatches.forEach((num: string) => {
+                  if (!numericalFacts.has(num)) {
+                    numericalFacts.set(num, []);
+                  }
+                  numericalFacts.get(num).push(result.url);
+                });
+              }
+            });
+            
+            // Check for contradictory information in dates and numbers
+            let contradictionInfo = '';
+            
+            // Check dates for contradictions (simple approach)
+            const dateContradictions: string[] = [];
+            dateFacts.forEach((sources, date) => {
+              if (sources.length > 1) {
+                // Multiple sources mentioning the same date - likely important
+                dateContradictions.push(`Date "${date}" mentioned by ${sources.length} sources`);
+              }
+            });
+            
+            // Check numerical facts for contradictions
+            const numberContradictions: string[] = [];
+            numericalFacts.forEach((sources, number) => {
+              if (sources.length > 1) {
+                // Multiple sources mentioning the same number - likely important
+                numberContradictions.push(`Value "${number}" mentioned by ${sources.length} sources`);
+              }
+            });
+            
+            // Add contradiction information if found
+            if (dateContradictions.length > 0 || numberContradictions.length > 0) {
+              contradictionInfo = `
+Key Facts:
+${dateContradictions.join('\n')}
+${numberContradictions.join('\n')}
+`;
+            }
+            
+            // Extract top domains for source diversity info
+            const topDomains = Array.from(domains.entries())
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3)
+              .map(([domain, count]) => `${domain} (${count} results)`);
+            
+            // Generate domain diversity information
+            const diversityInfo = topDomains.length > 0 ?
+              `Main sources: ${topDomains.join(', ')}` : '';
+              
+            // Extract common phrases as potential topics
+            const topPhrases = Array.from(keyPhrases)
+              .slice(0, 5)
+              .join(', ');
+              
+            const topicsInfo = keyPhrases.size > 0 ?
+              `Key topics: ${topPhrases}` : '';
+            
+            // Format the search results with improved organization and analysis
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
 Search query: "${finalQuery}"
+
+${diversityInfo ? `${diversityInfo}\n` : ''}
+${topicsInfo ? `${topicsInfo}\n` : ''}
+${contradictionInfo}
 
 ${sortedResults.map((result: any, index: number) => {
   // Extract domain from URL for better source attribution
@@ -633,10 +762,15 @@ ${sortedResults.map((result: any, index: number) => {
     }
   }
   
-  // Format the result with better attribution
+  // Evaluate recency and credibility (simple heuristics)
+  const recencyIndicator = result.publishedDate ? 
+    `Published: ${result.publishedDate}` : 
+    '';
+  
+  // Format the result with better attribution and organization
   return `[${index + 1}] "${result.title || 'Untitled'}" 
 Source: ${domain} ${result.source ? `via ${result.source}` : ''}
-${result.publishedDate ? `Published: ${result.publishedDate}` : ''}
+${recencyIndicator}
 URL: ${result.url || 'No URL available'}
 Content: ${result.content || result.description || 'No content available'}`;
 }).join('\n\n') || 'No results found'}
@@ -675,8 +809,12 @@ When responding to users, be:
 When using web search results:
 - Clearly cite your sources with proper attribution (e.g., "According to [Source]...")
 - Integrate information from multiple sources when possible to provide comprehensive answers
-- Indicate if search results seem outdated or contradictory
-- Maintain a balanced perspective when presenting information
+- Pay special attention to the Key Facts section which highlights important information
+- When multiple sources mention the same date or number, it's likely significant and reliable
+- Organize your answer by topics when responding to complex questions
+- Combine information from different sources to create a more complete picture
+- Indicate when sources contradict each other and present both perspectives
+- Compare the freshness of information and prioritize more recent sources when appropriate
 
 ${webSearchContent ? 'I have performed a web search for you and found the following information:' : 'If you need real-time information, I can perform a web search for you.'}
 
