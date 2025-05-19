@@ -665,7 +665,31 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const handleSendMessage = () => {
     if (!message.trim()) return;
     
-    sendMessage({ message, model: currentModel });
+    // Convert UI research depth to the proper research depth string
+    let researchDepthSetting: 'basic' | 'standard' | 'deep' = 'standard';
+    if (researchMode) {
+      if (researchDepth === 1) researchDepthSetting = 'basic';
+      else if (researchDepth === 2) researchDepthSetting = 'standard'; 
+      else if (researchDepth === 3) researchDepthSetting = 'deep';
+    }
+    
+    // Prepare search preferences based on research mode and depth
+    const customSearchPrefs = {
+      useDeepResearch: researchMode,
+      researchDepth: researchDepthSetting
+    };
+    
+    // Start research stage progress animation if in research mode
+    if (researchMode) {
+      setResearchStage(1); // Start at searching stage
+    }
+    
+    sendMessage({ 
+      message, 
+      model: currentModel,
+      customSearchPrefs
+    });
+    
     setMessage('');
     
     // Reset textarea height
@@ -852,15 +876,19 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   
                   <div className="flex-grow max-w-[90%] sm:max-w-3xl">
                     <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                      {researchMode ? (
+                      {researchMode || message.startsWith('/research') || message.startsWith('/deepresearch') ? (
                         <div className="flex flex-col">
                           <ResearchProgress 
                             stage={researchStage || 1} 
                             progress={75}
                             query={message} // Pass the current query for context-aware topics 
                           />
-                          {/* Display the current query for debugging */}
-                          <div className="text-xs text-gray-400 mt-1">Query: {message}</div>
+                          <div className="text-xs text-gray-500 mt-1 flex items-center">
+                            <BookOpen className="w-3 h-3 mr-1" />
+                            {researchDepth === 1 ? 'Basic research' : 
+                             researchDepth === 2 ? 'Standard research' : 
+                             'Deep research'} in progress...
+                          </div>
                         </div>
                       ) : (
                         <div className="flex space-x-2">
