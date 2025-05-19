@@ -161,7 +161,7 @@ const ResearchProgress: React.FC<ResearchProgressProps & { query?: string }> = (
           "Impact on User Experience and Workflow"
         ]
       ];
-    } else if (isHealth) {
+    } else if (/health|medical|disease|symptoms|treatment|doctor|medicine|therapy|diet|nutrition/i.test(searchQuery)) {
       return [
         [
           "Recent Medical Research Findings - Journal Publication",
@@ -438,80 +438,151 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const getSourcesFromMetadata = (message: any): Source[] => {
     if (!message.webSearchUsed) return [];
     
+    // Enhanced source extraction - three-step approach 
     const sources: Source[] = [];
     
     // Debug logs to understand what data we're receiving
     console.log("Source metadata:", JSON.stringify(message.searchMetadata, null, 2));
     
-    // Look for URLs in the message content as our primary source of truth
-    // This will extract complete article URLs from the response
+    // 1. First priority: Extract sources directly from the content "Sources:" section
+    // This pattern matches structured listings like:
+    // [1] Title
+    // https://example.com/article
     const content = message.content || '';
     
-    // Two-step approach to extract URLs:
-    // 1. First look for structured source entries with full URLs on their own line
-    const sourceRegex = /\[(\d+)\]\s+(.*?)[\r\n]+(https?:\/\/[^\s\n]+)/g;
-    const sourceMatches = [...content.matchAll(sourceRegex)];
-    
-    // 2. If that fails, look for any URLs in the content
-    const urlRegex = /(https?:\/\/[^\s\n]+)/g;
-    const urlMatches = sourceMatches.length > 0 ? 
-      sourceMatches.map(match => [match[0], match[3]]) : // Use structured format
-      [...content.matchAll(urlRegex)];     // Fallback to any URLs
-    
-    // If we found URLs in the content, use these as primary source
-    if (urlMatches.length > 0) {
-      console.log("Found URLs in content:", urlMatches);
-      return urlMatches.map((match, index) => {
-        // For structured matches, we have [full match, index, title, url]
-        // For simple matches, we have [full match, url]
-        const isStructured = match.length > 2;
-        const url = isStructured ? match[3] : match[1];
-        let domain = "unknown";
-        let title = isStructured ? match[2] : `Source ${index + 1}`;
+    // Look for a "Sources:" section at the end of the message
+    const sourcesSection = content.match(/Sources:\s*([\s\S]+)$/i);
+    if (sourcesSection && sourcesSection[1]) {
+      console.log("Found sources section:", sourcesSection[1]);
+      
+      // Extract structured sources with format: [index] title + URL on separate line
+      const sourceSectionRegex = /\[(\d+)\]\s+([^\n]+)\s*\n\s*(https?:\/\/[^\s\n]+)/g;
+      const sourceSectionMatches = [...sourcesSection[1].matchAll(sourceSectionRegex)];
+      
+      if (sourceSectionMatches.length > 0) {
+        console.log("Found structured sources in sources section:", sourceSectionMatches);
         
-        try {
-          // Extract domain from URL
-          domain = new URL(url).hostname;
-          
-          // If we don't have a structured match, try to find title in nearby content
-          if (!isStructured) {
-            // Look for title in brackets near the URL
-            const titleRegex = new RegExp(`\\[(\\d+)\\]\\s+([^\\n]+)(?:[\\s\\S]{0,50}${url}|${url}[\\s\\S]{0,50})`, 'i');
-            const titleMatch = content.match(titleRegex);
-            if (titleMatch && titleMatch[2]) {
-              title = titleMatch[2].trim();
-            }
+        const extractedSources = sourceSectionMatches.map((match) => {
+          try {
+            const url = match[3];
+            const domain = new URL(url).hostname;
+            
+            const sourceObj: Source = {
+              title: match[2].trim(),
+              url: url,
+              domain: domain,
+              publishedDate: new Date().toLocaleDateString()
+            };
+            
+            return logSourceInfo(sourceObj);
+          } catch (e) {
+            console.error("Error parsing source URL:", e);
+            return null;
           }
-        } catch (e) {
-          console.error("Error parsing URL:", e);
+        }).filter((source): source is Source => source !== null);
+        
+        if (extractedSources.length > 0) {
+          console.log(`Successfully extracted ${extractedSources.length} sources from sources section`);
+          return extractedSources;
         }
-        
-        const sourceObj = {
-          title: title,
-          url: url,
-          domain: domain,
-          publishedDate: new Date().toLocaleDateString()
-        };
-        
-        return logSourceInfo(sourceObj);
-      });
+      }
     }
     
-    // As a second attempt, use detailed source information if available
-    if (message.searchMetadata?.sourceDetails && Array.isArray(message.searchMetadata.sourceDetails) && message.searchMetadata.sourceDetails.length > 0) {
-      console.log("Using sourceDetails for sources:", message.searchMetadata.sourceDetails);
-      return message.searchMetadata.sourceDetails.map((source: any, index: number) => {
-        // Create properly formatted source object
-        const sourceObj = {
-          title: source.title || `Source ${index + 1} from ${source.domain}`,
-          url: source.url, // This should be the full article URL
-          domain: source.domain,
-          publishedDate: new Date().toLocaleDateString()
-        };
-        
-        // Log source info for debugging
-        return logSourceInfo(sourceObj);
-      });
+    // 2. Second priority: Look for structured sources throughout the content
+    const sourceRegex = /\[(\d+)\]\s+([^\n]+)\s*\n\s*(https?:\/\/[^\s\n]+)/g;
+    const sourceMatches = [...content.matchAll(sourceRegex)];
+    
+    if (sourceMatches.length > 0) {
+      console.log("Found structured sources throughout content:", sourceMatches);
+      
+      const extractedSources = sourceMatches.map((match) => {
+        try {
+          const url = match[3];
+          const domain = new URL(url).hostname;
+          
+          const sourceObj: Source = {
+            title: match[2].trim(),
+            url: url,
+            domain: domain,
+            publishedDate: new Date().toLocaleDateString()
+          };
+          
+          return logSourceInfo(sourceObj);
+        } catch (e) {
+          console.error("Error parsing source URL:", e);
+          return null;
+        }
+      }).filter((source): source is Source => source !== null);
+      
+      if (extractedSources.length > 0) {
+        console.log(`Successfully extracted ${extractedSources.length} structured sources from content`);
+        return extractedSources;
+      }
+    }
+    
+    // 3. Third priority: Use source details from metadata if available
+    if (message.searchMetadata?.sourceDetails && Array.isArray(message.searchMetadata.sourceDetails) 
+        && message.searchMetadata.sourceDetails.length > 0) {
+      console.log("Using sourceDetails from metadata:", message.searchMetadata.sourceDetails);
+      
+      const extractedSources = message.searchMetadata.sourceDetails
+        .map((source: any, index: number) => {
+          if (!source.url) return null;
+          
+          try {
+            // Create properly formatted source object with guaranteed URL
+            const sourceObj: Source = {
+              title: source.title || `Source ${index + 1}`,
+              url: source.url, // This should be the full article URL
+              domain: source.domain || new URL(source.url).hostname,
+              publishedDate: new Date().toLocaleDateString()
+            };
+            
+            // Log source info for debugging
+            return logSourceInfo(sourceObj);
+          } catch (e) {
+            console.error("Error parsing metadata source:", e);
+            return null;
+          }
+        })
+        .filter((source): source is Source => source !== null);
+      
+      if (extractedSources.length > 0) {
+        console.log(`Successfully extracted ${extractedSources.length} sources from metadata`);
+        return extractedSources;
+      }
+    }
+    
+    // 4. Fourth priority: Fallback to any URLs found in the content
+    const urlRegex = /(https?:\/\/[^\s\n]+)/g;
+    const urlMatches = [...content.matchAll(urlRegex)];
+    
+    if (urlMatches.length > 0) {
+      console.log("Falling back to simple URL extraction:", urlMatches);
+      
+      const extractedSources = urlMatches.map((match, index) => {
+        try {
+          const url = match[1];
+          const domain = new URL(url).hostname;
+          
+          const sourceObj: Source = {
+            title: `Source ${index + 1}`,
+            url: url,
+            domain: domain,
+            publishedDate: new Date().toLocaleDateString()
+          };
+          
+          return logSourceInfo(sourceObj);
+        } catch (e) {
+          console.error("Error parsing URL:", e);
+          return null;
+        }
+      }).filter((source): source is Source => source !== null);
+      
+      if (extractedSources.length > 0) {
+        console.log(`Extracted ${extractedSources.length} URLs from content`);
+        return extractedSources;
+      }
     }
     
     // Fallback to basic domain information
