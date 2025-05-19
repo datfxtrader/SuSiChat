@@ -479,23 +479,64 @@ export class SunaIntegrationService {
         };
       }
       
-      // Determine if web search is needed based on the query
+      // Determine if web search is needed based on the query and conversation context
       let webSearchResults: any = null;
       let webSearchContent = '';
       
-      // Perform web search if needed
-      if ((TAVILY_API_KEY || BRAVE_API_KEY) && this.needsWebSearch(data.query)) {
+      // Perform web search if needed - using context-aware detection with conversation history
+      if ((TAVILY_API_KEY || BRAVE_API_KEY) && this.needsWebSearch(data.query, conversation.messages)) {
         try {
-          webSearchResults = await performWebSearch(data.query);
+          // QUERY REFINEMENT: Analyze the query to create a more effective search
+          let refinedQuery = data.query;
+          
+          // Check if this is a follow-up question requiring context from previous conversation
+          const isFollowUp = conversation.messages.length > 0 && 
+            (/^(what|how|when|where|who|why|can|could|would|is|are|was) about/i.test(data.query) || 
+             /^and/i.test(data.query) || 
+             /^what if/i.test(data.query));
+             
+          if (isFollowUp && conversation.messages.length >= 2) {
+            // Get previous user query to add context
+            const previousUserMessages = conversation.messages
+              .filter((msg: SunaMessage) => msg.role === 'user')
+              .slice(-2);
+              
+            if (previousUserMessages.length > 0) {
+              // Combine with previous query for more context
+              const contextWords = previousUserMessages[0].content
+                .split(' ')
+                .filter((word: string) => word.length > 3) // Only use significant words
+                .slice(0, 5); // Take up to 5 key words for context
+              
+              // Create a better search query with context
+              refinedQuery = `${data.query} ${contextWords.join(' ')}`;
+              console.log(`Enhanced follow-up query with context: ${refinedQuery}`);
+            }
+          }
+          
+          // Remove question words and focus on key terms for better search
+          const finalQuery = refinedQuery
+            .replace(/^(what|how|when|where|who|why|can you|could you|would you|tell me|do you know|i need to know|i want to know|please find|search for|look up)/i, '')
+            .trim();
+            
+          console.log(`Web search using refined query: ${finalQuery}`);
+          webSearchResults = await performWebSearch(finalQuery);
           
           // Format search results only if there's no error
           if (!webSearchResults.error) {
             const searchResults = webSearchResults.results || [];
             
+            // Sort results by relevance (if source provides it) or default order
+            const sortedResults = [...searchResults].sort((a: any, b: any) => {
+              // Use score if available, otherwise keep original order
+              if (a.score && b.score) return b.score - a.score;
+              return 0;
+            });
+            
             // Format search results for the LLM with improved readability
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}):
-${searchResults.map((result: any, index: number) => 
+${sortedResults.map((result: any, index: number) => 
   `[${index + 1}] "${result.title || 'Untitled'}" ${result.source ? `(Source: ${result.source})` : '(Source: Tavily)'}
 URL: ${result.url || 'No URL available'}
 Content: ${result.content || result.description || 'No content available'}
@@ -522,7 +563,7 @@ You are currently running in Tongkeeper, a family-oriented assistant platform.
 In your full implementation, you have several powerful capabilities:
 1. Browser automation to navigate websites and extract information
 2. File management for document creation and editing
-3. Web crawling and search capabilities
+3. Web crawling and search capabilities using Tavily and Brave Search
 4. Command-line execution for system tasks
 5. Integration with various APIs and services
 
@@ -531,6 +572,12 @@ When responding to users, be:
 - Capable of solving complex problems with step-by-step reasoning
 - Knowledgeable about a wide range of topics
 - Professional but conversational in tone
+
+When using web search results:
+- Clearly cite your sources with proper attribution (e.g., "According to [Source]...")
+- Integrate information from multiple sources when possible to provide comprehensive answers
+- Indicate if search results seem outdated or contradictory
+- Maintain a balanced perspective when presenting information
 
 ${webSearchContent ? 'I have performed a web search for you and found the following information:' : 'If you need real-time information, I can perform a web search for you.'}
 
