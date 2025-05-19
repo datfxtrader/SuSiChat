@@ -35,16 +35,15 @@ export function useSuna(conversationId?: string) {
         throw new Error('You must be logged in to use Suna');
       }
       
-      return apiRequest('/api/suna/message', {
-        method: 'POST',
-        body: JSON.stringify({
+      const response = await apiRequest(
+        'POST',
+        '/api/suna/message',
+        {
           message,
           conversationId
-        }),
-        headers: {
-          'Content-Type': 'application/json'
         }
-      });
+      );
+      return response.json();
     },
     onSuccess: () => {
       // Invalidate the conversation to get fresh data

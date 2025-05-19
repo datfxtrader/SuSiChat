@@ -26,6 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
     { path: "/", icon: "chat", label: "Chat" },
     { path: "/schedule", icon: "event", label: "Schedule" },
     { path: "/family-room", icon: "groups", label: "Family Room" },
+    { path: "/suna-agent", icon: "smart_toy", label: "Suna Agent" },
     { path: "/profile", icon: "school", label: "Homework Help" },
     { path: "/trip", icon: "flight_takeoff", label: "Trip Planning" },
   ];

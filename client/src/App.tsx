@@ -10,6 +10,7 @@ import Schedule from "@/pages/schedule";
 import FamilyRoom from "@/pages/family-room";
 import FamilyRoomDetail from "@/pages/family-room/[id]";
 import Profile from "@/pages/profile";
+import SunaAgent from "@/pages/suna-agent";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
       <Route path="/family-room" component={FamilyRoom} />
       <Route path="/family-room/:id" component={FamilyRoomDetail} />
       <Route path="/profile" component={Profile} />
+      <Route path="/suna-agent" component={SunaAgent} />
       <Route component={NotFound} />
     </Switch>
   );
