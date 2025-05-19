@@ -292,11 +292,11 @@ export class SunaIntegrationService {
   }
   
   /**
-   * Mock implementation of sending a message to Suna
-   * This uses the existing LLM service to generate responses when Suna backend isn't available
+   * Enhanced mock implementation of Suna with DeepSeek integration
+   * This simulates the functionality of Suna with agent-like capabilities
    */
   private async mockSendMessage(data: SunaRequest): Promise<any> {
-    console.log('Using mock Suna service for message:', data.query);
+    console.log('Using enhanced Suna service with DeepSeek for message:', data.query);
     
     // Create conversation if it doesn't exist
     if (data.conversationId && !mockConversations[data.conversationId]) {
@@ -322,9 +322,22 @@ export class SunaIntegrationService {
     
     conversation.messages.push(userMessage);
     
-    // Generate AI response using the existing LLM service
+    // Generate context from conversation history
+    const conversationContext = this.buildConversationContext(conversation);
+    
+    // Generate AI response using the existing LLM service with enhanced context
     try {
-      const aiResponse = await llmService.generateResponse(data.userId, data.query);
+      const taskPrompt = this.determineTaskType(data.query);
+      const enhancedPrompt = `${taskPrompt}\n\nUser query: ${data.query}\n\nConversation history: ${conversationContext}`;
+      
+      const aiResponse = await llmService.generateResponse(data.userId, enhancedPrompt);
+      
+      // Update the conversation title if this is the first exchange
+      if (conversation.messages.length === 1) {
+        // Generate a title based on the first message
+        const titleLimit = Math.min(data.query.length, 30);
+        conversation.title = data.query.substring(0, titleLimit) + (data.query.length > 30 ? '...' : '');
+      }
       
       // Add AI message
       const assistantMessage: SunaMessage = {
@@ -344,9 +357,81 @@ export class SunaIntegrationService {
         status: 'completed'
       };
     } catch (error) {
-      console.error('Error generating mock Suna response:', error);
+      console.error('Error generating enhanced Suna response:', error);
       throw error;
     }
+  }
+  
+  /**
+   * Build context from conversation history
+   */
+  private buildConversationContext(conversation: SunaConversation): string {
+    // Get the last 5 messages (or fewer if there aren't 5 yet)
+    const recentMessages = conversation.messages.slice(-5);
+    
+    let context = '';
+    for (const msg of recentMessages) {
+      context += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n\n`;
+    }
+    
+    return context;
+  }
+  
+  /**
+   * Determine the type of task the user is asking about and generate
+   * appropriate guidance for how Suna would handle it
+   */
+  private determineTaskType(query: string): string {
+    const lowerQuery = query.toLowerCase();
+    
+    // Web search and research
+    if (lowerQuery.includes('search') || 
+        lowerQuery.includes('find') || 
+        lowerQuery.includes('look up') ||
+        lowerQuery.includes('research')) {
+      return `You are Suna, an advanced AI agent capable of web browsing and research. 
+For this query about "${query}", you would normally use your web search tools to find the most up-to-date information.
+Since those tools aren't currently active, provide the best response based on your knowledge, and explain what additional 
+information you would normally gather using your web search capabilities.`;
+    }
+    
+    // File creation or document processing
+    if (lowerQuery.includes('create file') || 
+        lowerQuery.includes('make a document') || 
+        lowerQuery.includes('write a') ||
+        lowerQuery.includes('generate a') ||
+        lowerQuery.includes('edit')) {
+      return `You are Suna, an advanced AI agent with document creation and editing capabilities.
+For this request to "${query}", you would normally use your file creation and editing tools to produce the requested file.
+Explain how you would approach creating this document, and provide sample content you would include in it.`;
+    }
+    
+    // Data analysis
+    if (lowerQuery.includes('analyze') || 
+        lowerQuery.includes('data') || 
+        lowerQuery.includes('statistics') ||
+        lowerQuery.includes('metrics') ||
+        lowerQuery.includes('trends')) {
+      return `You are Suna, an advanced AI agent with data analysis capabilities.
+For this analysis request about "${query}", you would normally use your data processing tools to analyze the provided information.
+Explain what analysis you would perform, what insights you would look for, and provide a sample analysis based on general knowledge.`;
+    }
+    
+    // Technical tasks
+    if (lowerQuery.includes('code') || 
+        lowerQuery.includes('program') || 
+        lowerQuery.includes('debug') ||
+        lowerQuery.includes('function') ||
+        lowerQuery.includes('script')) {
+      return `You are Suna, an advanced AI agent with coding and programming capabilities.
+For this technical request about "${query}", you would normally use your code execution environment to develop and test solutions.
+Provide a detailed explanation and sample code to address this request.`;
+    }
+    
+    // Default case for general queries
+    return `You are Suna, an advanced AI agent with capabilities for web browsing, file management, data analysis, and code execution.
+For this request about "${query}", decide which of your capabilities would be most helpful and respond accordingly.
+If this would normally require external tools or services, explain what you would do with those tools and then provide your best answer based on existing knowledge.`;
   }
   
   /**
