@@ -1,353 +1,293 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { 
-  ExternalLink, Search, BookOpen, FileText, AlertTriangle, 
-  CheckCircle, Loader2, Brain, Lightbulb, List
-} from 'lucide-react';
-import useDeerflow, { ResearchResponse } from '@/hooks/useDeerflow';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useDeerflow, ResearchResponse } from '@/hooks/useDeerflow';
+import { ExternalLink, Search, BookOpen, List, Info, Link2, RefreshCw } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface DeepResearchProps {
-  onResultsReady?: (results: ResearchResponse) => void;
   initialQuery?: string;
-  autoStart?: boolean;
-  embedded?: boolean;
+  onResearchComplete?: (results: string) => void;
+  isEmbedded?: boolean; // Whether this component is embedded in another UI
 }
 
-export function DeepResearch({ 
-  onResultsReady, 
-  initialQuery = '', 
-  autoStart = false,
-  embedded = false
-}: DeepResearchProps) {
+export const DeepResearch = ({ initialQuery = '', onResearchComplete, isEmbedded = false }: DeepResearchProps) => {
   const [query, setQuery] = useState(initialQuery);
-  const [researchStarted, setResearchStarted] = useState(autoStart);
-  const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [depth, setDepth] = useState<'basic' | 'standard' | 'deep'>('standard');
+  const [activeTab, setActiveTab] = useState('summary');
   
   const {
-    useServiceHealth,
-    useStartResearch,
-    useResearchStatus,
-    useCompleteResearch,
-    activeTaskId,
-    resetActiveTask
+    isAvailable,
+    isCheckingAvailability,
+    startResearch,
+    isStartingResearch,
+    runCompleteResearch,
+    isRunningResearch,
+    researchStatus,
+    isLoadingStatus,
+    activeResearchId,
+    formatResearchResults,
   } = useDeerflow();
-  
-  // Check DeerFlow service availability
-  const { 
-    data: healthData,
-    isLoading: isCheckingHealth,
-    isError: healthCheckFailed
-  } = useServiceHealth();
 
-  // Start research mutation
-  const {
-    mutate: startResearch,
-    isPending: isStartingResearch
-  } = useStartResearch();
-  
-  // Complete research mutation (for direct completion)
-  const {
-    mutate: runCompleteResearch,
-    isPending: isRunningCompleteResearch,
-    data: completeResearchData
-  } = useCompleteResearch();
-  
-  // Research status for polling
-  const {
-    data: researchStatus,
-    isLoading: isLoadingStatus
-  } = useResearchStatus(activeTaskId);
-  
-  // Combine results from either source
-  const results = completeResearchData || researchStatus;
-  
-  // Determine overall loading state
-  const isLoading = isStartingResearch || isRunningCompleteResearch || isLoadingStatus;
-  
-  // Calculate progress for in-progress research
-  const getProgressValue = () => {
-    if (!results) return 0;
-    
-    switch (results.status) {
-      case 'completed':
-        return 100;
-      case 'failed':
-        return 0;
-      case 'analyzing':
-        return 40;
-      case 'synthesizing':
-        return 75;
-      case 'in_progress':
-      default:
-        return 20;
+  // Update the query when the initialQuery prop changes
+  useEffect(() => {
+    if (initialQuery) {
+      setQuery(initialQuery);
     }
-  };
-  
-  // Get status message
-  const getStatusMessage = () => {
-    if (!results) return 'Preparing research...';
-    
-    switch (results.status) {
-      case 'completed':
-        return 'Research complete';
-      case 'failed':
-        return `Research failed: ${results.error || 'Unknown error'}`;
-      case 'analyzing':
-        return 'Analyzing sources...';
-      case 'synthesizing':
-        return 'Synthesizing insights...';
-      case 'in_progress':
-      default:
-        return 'Research in progress...';
+  }, [initialQuery]);
+
+  // Auto-send the formatted research results to the parent component when research is complete
+  useEffect(() => {
+    if (researchStatus?.status === 'completed' && onResearchComplete) {
+      const formattedResults = formatResearchResults(researchStatus);
+      onResearchComplete(formattedResults);
     }
-  };
-  
-  // Start or restart research
-  const handleSearch = () => {
+  }, [researchStatus, onResearchComplete, formatResearchResults]);
+
+  const handleStartResearch = () => {
     if (!query.trim()) return;
     
-    setResearchStarted(true);
-    setIsSearching(true);
-    
-    // Direct approach - complete in one call
-    runCompleteResearch({
+    startResearch({
       query: query.trim(),
-      depth: 'standard',
-      maxSources: 6,
+      depth,
+      maxSources: depth === 'deep' ? 10 : (depth === 'standard' ? 5 : 3),
       useCache: true
     });
   };
-  
-  // Reset research
-  const handleReset = () => {
-    resetActiveTask();
-    setResearchStarted(false);
-    setIsSearching(false);
+
+  const handleRunCompleteResearch = () => {
+    if (!query.trim()) return;
+    
+    runCompleteResearch({
+      query: query.trim(),
+      depth,
+      maxSources: depth === 'deep' ? 10 : (depth === 'standard' ? 5 : 3),
+      useCache: true
+    });
   };
-  
-  // Call the callback when results are ready
-  React.useEffect(() => {
-    if (results && results.status === 'completed' && onResultsReady) {
-      onResultsReady(results);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-500">Completed</Badge>;
+      case 'failed':
+        return <Badge className="bg-red-500">Failed</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-blue-500">In Progress</Badge>;
+      case 'analyzing':
+        return <Badge className="bg-indigo-500">Analyzing</Badge>;
+      case 'synthesizing':
+        return <Badge className="bg-purple-500">Synthesizing</Badge>;
+      default:
+        return <Badge className="bg-gray-500">{status}</Badge>;
     }
-  }, [results, onResultsReady]);
-  
-  // Auto-start research if autoStart is true
-  React.useEffect(() => {
-    if (autoStart && initialQuery && !researchStarted) {
-      setQuery(initialQuery);
-      handleSearch();
-    }
-  }, [autoStart, initialQuery]);
-  
-  // Service health check
-  if (isCheckingHealth) {
+  };
+
+  if (isCheckingAvailability) {
     return (
-      <Alert>
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <AlertTitle>Checking research service...</AlertTitle>
-        <AlertDescription>
-          Please wait while we connect to the research service.
-        </AlertDescription>
-      </Alert>
+      <Card className="p-4 flex items-center justify-center">
+        <Spinner size="sm" /> 
+        <span className="ml-2">Checking research service availability...</span>
+      </Card>
     );
   }
-  
-  if (healthCheckFailed) {
+
+  if (!isAvailable && !isEmbedded) {
     return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Research Service Unavailable</AlertTitle>
-        <AlertDescription>
-          The deep research service is currently unavailable. Please try again later.
-        </AlertDescription>
-      </Alert>
+      <Card className="p-4">
+        <div className="text-center">
+          <Info className="h-8 w-8 text-amber-500 mx-auto mb-2" />
+          <h3 className="text-lg font-semibold">Research Service Unavailable</h3>
+          <p className="text-muted-foreground mb-4">The deep research service is currently unavailable.</p>
+          <Button
+            variant="outline"
+            onClick={() => window.location.reload()}
+            className="flex items-center mx-auto"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" /> Retry
+          </Button>
+        </div>
+      </Card>
     );
   }
-  
+
   return (
-    <div className={embedded ? 'p-0' : 'p-4'}>
-      <Card className="w-full">
-        <CardHeader className={embedded ? 'pb-2' : 'pb-6'}>
-          <CardTitle className="flex items-center gap-2">
-            <Brain size={24} />
-            {embedded ? 'Research Results' : 'Deep Research'}
-          </CardTitle>
-          {!embedded && (
-            <CardDescription>
-              Perform comprehensive research on any topic with our enhanced research capabilities.
-            </CardDescription>
-          )}
-        </CardHeader>
-        
-        {!embedded && (
-          <CardContent className="space-y-4">
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Enter your research query..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                disabled={isSearching}
-                className="flex-1"
-              />
-              <Button 
-                onClick={handleSearch} 
-                disabled={!query.trim() || isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Researching...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" /> Research
-                  </>
-                )}
-              </Button>
+    <Card className={`p-4 ${isEmbedded ? 'border-0 shadow-none' : ''}`}>
+      <div className="mb-4 flex flex-col space-y-2">
+        <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Enter your research query"
+            className="flex-grow"
+          />
+          <Select value={depth} onValueChange={(value: any) => setDepth(value)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Depth" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="basic">Basic</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="deep">Deep</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex space-x-2">
+          <Button 
+            variant="default"
+            onClick={handleStartResearch} 
+            disabled={!query.trim() || isStartingResearch || isRunningResearch}
+            className="flex-grow flex items-center"
+          >
+            {isStartingResearch ? <Spinner size="sm" className="mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+            Start Research
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={handleRunCompleteResearch} 
+            disabled={!query.trim() || isStartingResearch || isRunningResearch}
+            className="flex-grow flex items-center"
+          >
+            {isRunningResearch ? <Spinner size="sm" className="mr-2" /> : <BookOpen className="h-4 w-4 mr-2" />}
+            Complete Research
+          </Button>
+        </div>
+      </div>
+
+      {researchStatus && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold">Research Results</h3>
+            <div className="flex items-center space-x-2">
+              {getStatusBadge(researchStatus.status)}
+              {(researchStatus.status === 'in_progress' || 
+                researchStatus.status === 'analyzing' || 
+                researchStatus.status === 'synthesizing') && (
+                <Spinner size="sm" />
+              )}
             </div>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+            <TabsList className="grid grid-cols-3">
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="sources">Sources</TabsTrigger>
+              <TabsTrigger value="insights">Insights</TabsTrigger>
+            </TabsList>
             
-            {isSearching && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>{getStatusMessage()}</span>
-                  <span>{getProgressValue()}%</span>
+            <TabsContent value="summary" className="min-h-[200px] max-h-[400px] overflow-y-auto">
+              {isLoadingStatus ? (
+                <div className="flex items-center justify-center h-40">
+                  <Spinner />
                 </div>
-                <Progress value={getProgressValue()} className="h-2" />
-              </div>
-            )}
-          </CardContent>
-        )}
-        
-        {results && (
-          <CardContent className={embedded ? 'pt-0' : ''}>
-            <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="sources">Sources</TabsTrigger>
-                <TabsTrigger value="insights">Insights</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview" className="space-y-4 mt-4">
-                {results.summary && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <FileText className="h-5 w-5" /> Summary
-                    </h3>
-                    <p className="text-sm">{results.summary}</p>
-                  </div>
-                )}
-                
-                {results.relatedTopics && results.relatedTopics.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <List className="h-5 w-5" /> Related Topics
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {results.relatedTopics.map((topic, index) => (
-                        <Badge key={index} variant="secondary">{topic}</Badge>
+              ) : (
+                <div className="prose max-w-none dark:prose-invert">
+                  {researchStatus.summary ? (
+                    <ReactMarkdown>{researchStatus.summary}</ReactMarkdown>
+                  ) : (
+                    <p className="text-muted-foreground italic">
+                      {researchStatus.status === 'completed' 
+                        ? 'No summary available.' 
+                        : 'Summary will be available when research is complete.'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="sources" className="min-h-[200px] max-h-[400px] overflow-y-auto">
+              {isLoadingStatus ? (
+                <div className="flex items-center justify-center h-40">
+                  <Spinner />
+                </div>
+              ) : (
+                <div>
+                  {researchStatus.sources && researchStatus.sources.length > 0 ? (
+                    <div className="space-y-3">
+                      {researchStatus.sources.map((source, index) => (
+                        <div key={index} className="border rounded p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-medium text-sm">{source.title}</h4>
+                            <a href={source.url} target="_blank" rel="noopener noreferrer" 
+                              className="text-blue-500 hover:text-blue-700 flex items-center text-xs">
+                              <span className="mr-1">{source.domain}</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {source.contentSnippet || "No content snippet available."}
+                          </p>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="sources" className="space-y-4 mt-4">
-                {results.sources.length > 0 ? (
-                  <div className="space-y-4">
-                    {results.sources.map((source, index) => (
-                      <Card key={index}>
-                        <CardHeader className="py-3">
-                          <CardTitle className="text-md flex items-center justify-between">
-                            <span className="truncate flex-1">{source.title}</span>
-                            <Badge variant="outline" className="ml-2">
-                              {source.domain}
-                            </Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        {source.contentSnippet && (
-                          <CardContent className="py-2">
-                            <p className="text-sm text-muted-foreground">
-                              {source.contentSnippet.substring(0, 150)}
-                              {source.contentSnippet.length > 150 && '...'}
-                            </p>
-                          </CardContent>
-                        )}
-                        <CardFooter className="pt-1 pb-3 flex justify-between">
-                          <Badge variant="secondary">
-                            Source {index + 1}
-                          </Badge>
-                          <a 
-                            href={source.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center"
-                          >
-                            Visit <ExternalLink className="ml-1 h-3 w-3" />
-                          </a>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <BookOpen className="h-8 w-8 mx-auto text-muted-foreground" />
-                    <p className="mt-2 text-muted-foreground">No sources found</p>
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="insights" className="space-y-4 mt-4">
-                {results.insights.length > 0 ? (
-                  <div className="space-y-4">
-                    {results.insights.map((insight, index) => (
-                      <Card key={index}>
-                        <CardContent className="py-4">
-                          <div className="flex">
-                            <Lightbulb className="h-5 w-5 mr-3 flex-shrink-0 text-amber-500" />
-                            <p className="text-sm">{insight}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <Lightbulb className="h-8 w-8 mx-auto text-muted-foreground" />
-                    <p className="mt-2 text-muted-foreground">No insights found</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        )}
-        
-        <CardFooter className={`${embedded ? 'pt-0' : 'pt-2'} flex justify-between`}>
-          {results && results.status === 'completed' && !embedded && (
-            <Button variant="outline" onClick={handleReset}>
-              New Research
-            </Button>
-          )}
-          
-          {results && results.status === 'failed' && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Research Failed</AlertTitle>
-              <AlertDescription>
-                {results.error || 'An unknown error occurred during research.'}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardFooter>
-      </Card>
-    </div>
-  );
-}
+                  ) : (
+                    <p className="text-muted-foreground italic">
+                      {researchStatus.status === 'completed' 
+                        ? 'No sources available.' 
+                        : 'Sources will be available when research is complete.'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="insights" className="min-h-[200px] max-h-[400px] overflow-y-auto">
+              {isLoadingStatus ? (
+                <div className="flex items-center justify-center h-40">
+                  <Spinner />
+                </div>
+              ) : (
+                <div>
+                  {researchStatus.insights && researchStatus.insights.length > 0 ? (
+                    <ul className="space-y-2">
+                      {researchStatus.insights.map((insight, index) => (
+                        <li key={index} className="flex">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground italic">
+                      {researchStatus.status === 'completed' 
+                        ? 'No insights available.' 
+                        : 'Insights will be available when research is complete.'}
+                    </p>
+                  )}
 
-export default DeepResearch;
+                  {researchStatus.relatedTopics && researchStatus.relatedTopics.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-medium mb-2 flex items-center">
+                        <Link2 className="h-4 w-4 mr-1" />
+                        Related Topics
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {researchStatus.relatedTopics.map((topic, index) => (
+                          <Badge key={index} variant="outline" className="cursor-pointer"
+                            onClick={() => setQuery(topic)}>
+                            {topic}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+    </Card>
+  );
+};

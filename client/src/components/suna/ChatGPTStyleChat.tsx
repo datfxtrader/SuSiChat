@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSuna, type LLMModel } from '@/hooks/useSuna';
+import { useDeerflow } from '@/hooks/useDeerflow';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,10 +18,14 @@ import {
   Zap, 
   BookOpen,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { DeepResearch } from '@/components/research/DeepResearch';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Select,
   SelectContent,

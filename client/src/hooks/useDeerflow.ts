@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import axios from 'axios';
 
+// Define types that mirror the server-side interfaces
 export interface ResearchRequest {
   query: string;
   depth?: 'basic' | 'standard' | 'deep';
@@ -34,87 +35,112 @@ export interface ResearchResponse {
 }
 
 /**
- * Custom hook for interacting with the DeerFlow research service
+ * Custom hook for interacting with the DeerFlow research capabilities
  */
 export function useDeerflow() {
   const queryClient = useQueryClient();
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
 
-  /**
-   * Check if the DeerFlow service is available
-   */
-  const useServiceHealth = () => {
-    return useQuery({
-      queryKey: ['/api/deerflow/health'],
-      retry: 2,
-      refetchOnWindowFocus: false,
-      refetchInterval: 60000, // Refetch every minute
-    });
-  };
+  // Check if DeerFlow service is healthy
+  const healthCheck = useQuery({
+    queryKey: ['/api/deerflow/health'],
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
 
-  /**
-   * Start a new research task
-   */
-  const useStartResearch = () => {
-    return useMutation({
-      mutationFn: (request: ResearchRequest) => 
-        apiRequest<{ id: string; status: string }>('/api/deerflow/research', {
-          method: 'POST',
-          body: JSON.stringify(request),
-        }),
-      onSuccess: (data) => {
-        if (data.id) {
-          setActiveTaskId(data.id);
-        }
-      }
-    });
-  };
+  // Start a new research task
+  const startResearch = useMutation({
+    mutationFn: async (request: ResearchRequest) => {
+      const response = await axios.post('/api/deerflow/research/start', request);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setActiveResearchId(data.id);
+    },
+  });
 
-  /**
-   * Get the status of an ongoing research task
-   */
-  const useResearchStatus = (taskId: string | null) => {
-    return useQuery({
-      queryKey: ['/api/deerflow/research', taskId],
-      enabled: !!taskId,
-      refetchInterval: (data) => {
-        // Refetch frequently while in progress, stop when completed or failed
-        if (!data) return 1000;
-        return data.status === 'completed' || data.status === 'failed' 
-          ? false // Stop polling
-          : 1000; // Poll every second while in progress
-      }
-    });
-  };
+  // Get research status for a specific task
+  const getResearchStatus = useQuery({
+    queryKey: ['/api/deerflow/research', activeResearchId],
+    enabled: !!activeResearchId,
+    refetchInterval: (data) => {
+      // Poll more frequently when in progress, stop polling when complete or failed
+      if (!data) return 2000;
+      if (data.status === 'completed' || data.status === 'failed') return false;
+      return 2000; // Poll every 2 seconds while in progress
+    },
+  });
 
-  /**
-   * Run a complete research task (blocks until completion)
-   */
-  const useCompleteResearch = () => {
-    return useMutation({
-      mutationFn: (request: ResearchRequest) => 
-        apiRequest<ResearchResponse>('/api/deerflow/research/complete', {
-          method: 'POST',
-          body: JSON.stringify(request),
-        })
-    });
-  };
+  // Run a complete research task (start and wait for completion)
+  const runCompleteResearch = useMutation({
+    mutationFn: async (request: ResearchRequest) => {
+      const response = await axios.post('/api/deerflow/research/complete', request);
+      return response.data;
+    },
+  });
 
-  /**
-   * Helper to cancel tracking of the current research task
-   */
-  const resetActiveTask = () => {
-    setActiveTaskId(null);
+  // Convenience function to clear the active research
+  const clearActiveResearch = () => {
+    setActiveResearchId(null);
   };
 
   return {
-    useServiceHealth,
-    useStartResearch,
-    useResearchStatus,
-    useCompleteResearch,
-    activeTaskId,
-    resetActiveTask,
+    isAvailable: healthCheck.data?.status === 'ok',
+    isCheckingAvailability: healthCheck.isLoading,
+    
+    startResearch: startResearch.mutate,
+    isStartingResearch: startResearch.isPending,
+    startResearchError: startResearch.error,
+    
+    runCompleteResearch: runCompleteResearch.mutate,
+    isRunningResearch: runCompleteResearch.isPending,
+    completeResearchError: runCompleteResearch.error,
+    completeResearchResult: runCompleteResearch.data,
+    
+    activeResearchId,
+    setActiveResearchId,
+    clearActiveResearch,
+    
+    researchStatus: getResearchStatus.data,
+    isLoadingStatus: getResearchStatus.isLoading,
+    statusError: getResearchStatus.error,
+    
+    // Helper function to format research results into a Markdown string
+    formatResearchResults: (research: ResearchResponse): string => {
+      if (!research) return '';
+      
+      let markdown = `# Research: ${research.query}\n\n`;
+      
+      if (research.summary) {
+        markdown += `## Summary\n${research.summary}\n\n`;
+      }
+      
+      if (research.insights && research.insights.length > 0) {
+        markdown += `## Key Insights\n`;
+        research.insights.forEach(insight => {
+          markdown += `- ${insight}\n`;
+        });
+        markdown += '\n';
+      }
+      
+      if (research.sources && research.sources.length > 0) {
+        markdown += `## Sources\n`;
+        research.sources.forEach((source, index) => {
+          markdown += `### ${index + 1}. [${source.title}](${source.url})\n`;
+          if (source.contentSnippet) {
+            markdown += `${source.contentSnippet}\n\n`;
+          }
+        });
+      }
+      
+      if (research.relatedTopics && research.relatedTopics.length > 0) {
+        markdown += `## Related Topics\n`;
+        research.relatedTopics.forEach(topic => {
+          markdown += `- ${topic}\n`;
+        });
+      }
+      
+      return markdown;
+    }
   };
 }
-
-export default useDeerflow;
