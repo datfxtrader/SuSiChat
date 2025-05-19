@@ -57,6 +57,11 @@ export function DeepResearch() {
     // Log the current research status for debugging
     if (researchStatus) {
       console.log('Current research status:', researchStatus);
+      
+      // If we receive a completed status, make sure to update the UI
+      if (researchStatus.status === 'completed') {
+        console.log('Research completed:', researchStatus);
+      }
     }
   }, [researchStatus]);
 

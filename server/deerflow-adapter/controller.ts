@@ -154,7 +154,7 @@ function simulateResearch(id: string, request: ResearchRequest) {
     status: 'analyzing'
   });
   
-  // Simulate the analysis phase after a delay
+  // Simulate the analysis phase after a delay - use shorter time for development
   setTimeout(() => {
     // Generate insights based on the sources
     const insights = generateSampleInsights(request.query, sources);
@@ -167,7 +167,7 @@ function simulateResearch(id: string, request: ResearchRequest) {
       status: 'synthesizing'
     });
     
-    // Simulate the synthesis phase after a delay
+    // Simulate the synthesis phase after a delay - use shorter time for development
     setTimeout(() => {
       // Generate summary based on the sources and insights
       const summary = generateSampleSummary(request.query, sources, insights);
@@ -181,8 +181,8 @@ function simulateResearch(id: string, request: ResearchRequest) {
         status: 'completed',
         completedAt: new Date().toISOString()
       });
-    }, 3000);
-  }, 3000);
+    }, 2000); // Reduced to 2 seconds for faster testing
+  }, 2000); // Reduced to 2 seconds for faster testing
 }
 
 /**
