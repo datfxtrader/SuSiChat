@@ -225,58 +225,78 @@ export class SunaIntegrationService {
 
   /**
    * Determine if a query needs web search
-   * Improved heuristic to better detect when real-time information is needed
+   * Enhanced heuristic for context-aware search decisions and better query analysis
    */
-  private needsWebSearch(query: string): boolean {
+  private needsWebSearch(query: string, messages: any[] = []): boolean {
     // Standard terms that often require up-to-date information
     const generalWebSearchTerms = [
       'current', 'latest', 'recent', 'news', 'today', 'yesterday', 'tonight',
       'this week', 'this month', 'this year', 'happening', 'live', 'trending',
-      'right now', 'upcoming'
+      'right now', 'upcoming', 'schedule', 'next', 'previous'
     ];
     
     // Sports-related queries
     const sportsTerms = [
       'match', 'game', 'score', 'vs', 'versus', 'tournament', 'championship',
       'league', 'final', 'semifinal', 'quarterfinal', 'standings', 'ranking',
-      'season', 'player', 'team', 'transfer', 'win', 'lose', 'draw', 'result'
+      'season', 'player', 'team', 'transfer', 'win', 'lose', 'draw', 'result',
+      'playoff', 'sports', 'athlete', 'olympics', 'world cup'
     ];
     
     // News, politics, and events
     const newsTerms = [
       'election', 'politics', 'voted', 'presidential', 'government', 'congress',
       'senate', 'house', 'prime minister', 'minister', 'president', 'mayor',
-      'governor', 'announced', 'conference', 'summit', 'meeting', 'speech'
+      'governor', 'announced', 'conference', 'summit', 'meeting', 'speech',
+      'passed away', 'died', 'arrested', 'controversy', 'scandal', 'protest'
     ];
     
     // Financial terms
     const financialTerms = [
       'stock', 'price', 'market', 'index', 'nasdaq', 'nyse', 'dow', 's&p',
       'investment', 'crypto', 'bitcoin', 'ethereum', 'currency', 'exchange rate',
-      'interest rate', 'inflation', 'recession', 'fed', 'federal reserve'
+      'interest rate', 'inflation', 'recession', 'fed', 'federal reserve',
+      'economy', 'economic', 'quarterly', 'earnings', 'financial', 'trading'
     ];
     
     // Weather and natural events
     const weatherTerms = [
       'weather', 'forecast', 'temperature', 'rain', 'snow', 'storm', 'hurricane',
-      'tornado', 'earthquake', 'climate', 'disaster', 'flooding', 'drought'
+      'tornado', 'earthquake', 'climate', 'disaster', 'flooding', 'drought',
+      'celsius', 'fahrenheit', 'conditions', 'sunny', 'cloudy', 'humid'
     ];
     
     // Technology and product releases
     const techTerms = [
       'released', 'announced', 'launch', 'update', 'version', 'upgrade',
-      'device', 'phone', 'iphone', 'android', 'app', 'software', 'hardware'
+      'device', 'phone', 'iphone', 'android', 'app', 'software', 'hardware',
+      'release date', 'tech', 'technology', 'gadget', 'smartphone', 'computer',
+      'laptop', 'tablet', 'ios', 'windows', 'macos', 'beta'
     ];
     
     // Common question formats that often need current data
     const questionPatterns = [
       'who won', 'what happened', 'when is', 'where is', 'how much is',
       'how many', 'why did', 'which', 'whose', 'what is the latest',
-      'is there', 'will there be', 'what are'
+      'is there', 'will there be', 'what are', 'can you find', 'look up',
+      'search for', 'tell me about', 'do you know', 'have you heard',
+      'what does', 'where can', 'who is', 'show me', 'find information'
+    ];
+    
+    // Explicitly indicates search needs
+    const explicitSearchTerms = [
+      'search', 'find', 'look up', 'google', 'search engine', 'browser',
+      'internet', 'web', 'online', 'research', 'information about'
     ];
     
     // Year patterns that might indicate need for current information
     const yearPattern = /202[0-9]/;
+    
+    // Location/place patterns often requiring current info
+    const locationPattern = /(in|at|near|around) [A-Z][a-z]+(,|\.| )/;
+    
+    // Patterns indicating comparison/stats that benefit from search
+    const comparisonPattern = /(compare|versus|vs\.?|comparison|difference between|better than)/i;
     
     // Combine all the term lists
     const allTerms = [
@@ -286,17 +306,61 @@ export class SunaIntegrationService {
       ...financialTerms,
       ...weatherTerms,
       ...techTerms,
-      ...questionPatterns
+      ...questionPatterns,
+      ...explicitSearchTerms
     ];
     
     const lowerQuery = query.toLowerCase();
+    
+    // Context awareness: Check if this appears to be a follow-up question that needs context
+    const isLikelyFollowUp = messages.length > 0 && 
+      (lowerQuery.includes('what about') || 
+       lowerQuery.startsWith('and') || 
+       lowerQuery.startsWith('what if') || 
+       lowerQuery.startsWith('how about'));
+       
+    // If it's a follow-up, check the previous messages for search triggers
+    if (isLikelyFollowUp && messages.length > 0) {
+      // Get the last two messages to establish context
+      const recentMessages = messages.slice(-2).map(m => 
+        typeof m.content === 'string' ? m.content.toLowerCase() : '');
+        
+      // Check if previous messages had search terms
+      const previousMessageHadSearchTerms = recentMessages.some(content => 
+        allTerms.some(term => content.includes(term)));
+        
+      // If previous message triggered search, this follow-up probably needs it too
+      if (previousMessageHadSearchTerms) {
+        return true;
+      }
+    }
     
     // Check for year mentions (like 2023, 2024, 2025)
     if (yearPattern.test(query)) {
       return true;
     }
     
-    // Check for any term matches
+    // Check for location mentions that likely need current info
+    if (locationPattern.test(query)) {
+      return true;
+    }
+    
+    // Check for comparison questions that benefit from search
+    if (comparisonPattern.test(query)) {
+      return true;
+    }
+    
+    // Query refinement: Check if query explicitly asks for facts or details
+    if (/\bfact(s|ual)?\b|\bdetail(s|ed)?\b|\bstatistic(s|al)?\b|\bdata\b|\binformation\b/i.test(query)) {
+      return true;
+    }
+    
+    // Check for explicit search requests
+    if (explicitSearchTerms.some(term => lowerQuery.includes(term))) {
+      return true;
+    }
+    
+    // Check for any other term matches
     return allTerms.some(term => lowerQuery.includes(term));
   }
 
