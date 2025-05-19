@@ -355,7 +355,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="deepseek-chat">DeepSeek</SelectItem>
-                  <SelectItem value="gemini-1.5-flash">Gemini Flash 2.0</SelectItem>
+                  <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
                   <SelectItem value="gemini-1.0-pro">Gemini 1.5 Pro</SelectItem>
                 </SelectContent>
               </Select>

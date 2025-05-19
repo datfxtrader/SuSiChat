@@ -3,6 +3,29 @@ import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
 
+// Simple in-memory cache for web search results
+interface CacheEntry {
+  results: any;
+  timestamp: number;
+  queryUsed: string;
+}
+
+// Map of query hash -> cache entry
+const searchCache = new Map<string, CacheEntry>();
+
+// Cache TTL in milliseconds (5 minutes)
+const CACHE_TTL = 5 * 60 * 1000;
+
+// Simple hash function for queries
+function hashQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Check if cache entry is still valid
+function isCacheValid(entry: CacheEntry): boolean {
+  return Date.now() - entry.timestamp < CACHE_TTL;
+}
+
 // Web search functionality using multiple search engines
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const TAVILY_SEARCH_URL = 'https://api.tavily.com/search';
@@ -856,12 +879,15 @@ Use the current date and web search information when responding about current ev
       // Map API model names to display names
       let modelUsed = selectedModel;
       if (selectedModel === 'gemini-1.5-flash') {
-        modelUsed = 'Gemini Flash 2.0';
+        modelUsed = 'Gemini 1.5 Flash';
       } else if (selectedModel === 'gemini-1.0-pro') {
         modelUsed = 'Gemini 1.5 Pro';
       } else if (selectedModel === 'deepseek-chat') {
         modelUsed = 'DeepSeek';
       }
+      
+      // Log which model we're actually using, for clarity
+      console.log(`Using ${modelUsed} (${selectedModel}) to generate response`);
       
       // Try the selected model first
       try {
