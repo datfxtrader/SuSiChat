@@ -366,13 +366,16 @@ export class SunaIntegrationService {
    * Build context from conversation history
    */
   private buildConversationContext(conversation: SunaConversation): string {
-    // Get the last 5 messages (or fewer if there aren't 5 yet)
-    const recentMessages = conversation.messages.slice(-5);
+    // Get all messages in the conversation for proper context
+    const allMessages = conversation.messages;
     
-    let context = '';
-    for (const msg of recentMessages) {
-      context += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n\n`;
+    let context = 'CONVERSATION HISTORY:\n\n';
+    for (const msg of allMessages) {
+      context += `${msg.role === 'user' ? '👤 User' : '🤖 Assistant'}: ${msg.content}\n\n`;
     }
+    
+    context += 'END OF CONVERSATION HISTORY\n\n';
+    context += 'IMPORTANT: Remember to maintain context awareness between messages. If the user refers to something mentioned earlier in the conversation, make sure to reference that information in your response.\n\n';
     
     return context;
   }
@@ -384,54 +387,110 @@ export class SunaIntegrationService {
   private determineTaskType(query: string): string {
     const lowerQuery = query.toLowerCase();
     
+    // Start with the standard agent persona
+    let taskSpecificPrompt = `You are Suna, an advanced AI agent with multiple capabilities. You have a strong memory and maintain context throughout conversations.
+Always consider the ENTIRE conversation history when responding, especially handling references to previous messages.
+
+Your capabilities include:
+1. Web browsing and internet search
+2. Document creation and editing
+3. Data analysis and visualization
+4. Code writing and execution
+5. Complex problem-solving with multi-step reasoning
+
+Instructions:
+- Be conversational and natural in your responses
+- Provide detailed, thoughtful answers that maintain context
+- If a user refers to previous information, acknowledge and use that context
+- If a request is ambiguous, clarify what the user means by referencing conversation history
+- For complex requests, explain your thought process step by step
+`;
+    
     // Web search and research
     if (lowerQuery.includes('search') || 
         lowerQuery.includes('find') || 
         lowerQuery.includes('look up') ||
         lowerQuery.includes('research')) {
-      return `You are Suna, an advanced AI agent capable of web browsing and research. 
-For this query about "${query}", you would normally use your web search tools to find the most up-to-date information.
-Since those tools aren't currently active, provide the best response based on your knowledge, and explain what additional 
-information you would normally gather using your web search capabilities.`;
+      taskSpecificPrompt += `
+For this web research query about "${query}", you would:
+1. Use your web browsing capabilities to search multiple sources
+2. Extract and synthesize information from websites, news, and databases
+3. Verify information across multiple reliable sources
+4. Compile the findings into a comprehensive answer
+
+Since your web tools aren't currently active, provide your best response based on existing knowledge, and explain what additional information you would normally search for to give a more complete answer.`;
     }
     
     // File creation or document processing
-    if (lowerQuery.includes('create file') || 
+    else if (lowerQuery.includes('create file') || 
         lowerQuery.includes('make a document') || 
         lowerQuery.includes('write a') ||
         lowerQuery.includes('generate a') ||
         lowerQuery.includes('edit')) {
-      return `You are Suna, an advanced AI agent with document creation and editing capabilities.
-For this request to "${query}", you would normally use your file creation and editing tools to produce the requested file.
-Explain how you would approach creating this document, and provide sample content you would include in it.`;
+      taskSpecificPrompt += `
+For this document creation request about "${query}", you would:
+1. Use your file creation and editing tools
+2. Create the requested document with proper formatting
+3. Include relevant sections, headings, and content
+4. Save or export the file in the appropriate format
+
+Even though your document tools aren't currently active, provide sample content you would include and explain how you would structure the document.`;
     }
     
     // Data analysis
-    if (lowerQuery.includes('analyze') || 
+    else if (lowerQuery.includes('analyze') || 
         lowerQuery.includes('data') || 
         lowerQuery.includes('statistics') ||
         lowerQuery.includes('metrics') ||
         lowerQuery.includes('trends')) {
-      return `You are Suna, an advanced AI agent with data analysis capabilities.
-For this analysis request about "${query}", you would normally use your data processing tools to analyze the provided information.
-Explain what analysis you would perform, what insights you would look for, and provide a sample analysis based on general knowledge.`;
+      taskSpecificPrompt += `
+For this data analysis request about "${query}", you would:
+1. Import and clean the data from various sources
+2. Perform statistical analysis and identify patterns
+3. Generate visualizations to illustrate key findings
+4. Provide insights and recommendations based on the analysis
+
+Without direct access to the data, provide a framework for how you would approach this analysis and what insights you might expect to find based on general knowledge.`;
     }
     
     // Technical tasks
-    if (lowerQuery.includes('code') || 
+    else if (lowerQuery.includes('code') || 
         lowerQuery.includes('program') || 
         lowerQuery.includes('debug') ||
         lowerQuery.includes('function') ||
         lowerQuery.includes('script')) {
-      return `You are Suna, an advanced AI agent with coding and programming capabilities.
-For this technical request about "${query}", you would normally use your code execution environment to develop and test solutions.
-Provide a detailed explanation and sample code to address this request.`;
+      taskSpecificPrompt += `
+For this technical request about "${query}", you would:
+1. Set up a coding environment for the appropriate language
+2. Write, test, and debug the code in real-time
+3. Optimize the solution for performance and readability
+4. Provide documentation and explanations alongside the code
+
+Provide a detailed explanation and sample code to address this request, even though you can't execute it directly right now.`;
     }
     
-    // Default case for general queries
-    return `You are Suna, an advanced AI agent with capabilities for web browsing, file management, data analysis, and code execution.
-For this request about "${query}", decide which of your capabilities would be most helpful and respond accordingly.
-If this would normally require external tools or services, explain what you would do with those tools and then provide your best answer based on existing knowledge.`;
+    // For ambiguous or short queries, emphasize context awareness
+    else if (query.length < 15 || query.split(' ').length < 4) {
+      taskSpecificPrompt += `
+This appears to be a short or potentially ambiguous query: "${query}"
+
+IMPORTANT: Pay special attention to the conversation history to understand what the user is referring to. 
+- Look for references to previous messages or topics
+- If they're referring to an earlier part of the conversation, respond directly to that context
+- If still unclear after checking history, politely ask for clarification while suggesting possible interpretations based on the conversation so far`;
+    }
+    
+    // Default case for other general queries
+    else {
+      taskSpecificPrompt += `
+For this request about "${query}", carefully review the conversation history and:
+1. Determine which of your capabilities would be most helpful
+2. Consider any relevant information shared earlier in the conversation
+3. Provide a comprehensive response that addresses the user's need in context
+4. If this would normally require external tools, explain what you would do with those tools and then provide your best answer based on existing knowledge`;
+    }
+    
+    return taskSpecificPrompt;
   }
   
   /**
