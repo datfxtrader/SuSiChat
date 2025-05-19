@@ -14,6 +14,7 @@ import {
   UserIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatGPTStyleChatProps {
   threadId?: string;
@@ -175,13 +176,13 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         !isSidebarOpen && "md:ml-0"
       )}>
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto pb-40">
           {isLoadingConversation ? (
             <div className="flex justify-center items-center h-full">
               <Loader2Icon className="h-6 w-6 animate-spin text-gray-400" />
             </div>
           ) : messages.length > 0 ? (
-            <div>
+            <div className="pb-20">
               {messages.map((msg: any, index: number) => {
                 const isUserMessage = msg.role === 'user';
                 
@@ -205,9 +206,11 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                       )}
                     </div>
                     
-                    <div className="flex-grow max-w-screen-md">
-                      <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
-                        {msg.content}
+                    <div className="flex-grow max-w-screen-md overflow-hidden">
+                      <div className="text-[15px] leading-relaxed prose prose-invert max-w-none prose-headings:my-2 prose-p:my-1">
+                        <ReactMarkdown>
+                          {msg.content}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   </div>
