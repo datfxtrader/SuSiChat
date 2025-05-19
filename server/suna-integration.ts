@@ -158,6 +158,12 @@ interface SunaRequest {
   projectId?: string;
   threadId?: string;
   model?: string;
+  searchPreferences?: {
+    forceSearch?: boolean;    // Force web search even if not detected automatically
+    disableSearch?: boolean;  // Disable web search for this query
+    priority?: 'relevance' | 'freshness'; // Sort by relevance (default) or freshness
+    maxResults?: number;      // Maximum number of results to return
+  };
 }
 
 /**
@@ -170,6 +176,13 @@ interface SunaMessage {
   timestamp: string;
   modelUsed?: string;
   webSearchUsed?: boolean;
+  searchMetadata?: {
+    query?: string;         // The actual search query used
+    sources?: string[];     // List of source domains used
+    resultCount?: number;   // Number of results found
+    searchEngines?: string[]; // Which search engines were used
+    searchTime?: number;    // How long the search took in ms
+  };
 }
 
 /**
@@ -479,21 +492,41 @@ export class SunaIntegrationService {
         };
       }
       
-      // Determine if web search is needed based on the query and conversation context
+      // Determine if web search is needed based on the query, context, and user preferences
       let webSearchResults: any = null;
       let webSearchContent = '';
+      let searchMetadata = null;
       
-      // Perform web search if needed - using context-aware detection with conversation history
-      if ((TAVILY_API_KEY || BRAVE_API_KEY) && this.needsWebSearch(data.query, conversation.messages)) {
+      // Check for explicit search commands in the query (like /search)
+      const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
+      const forceSearch = explicitSearchCommand || (data.searchPreferences?.forceSearch === true);
+      
+      // Honor user preference to disable search if explicitly set
+      const disableSearch = data.searchPreferences?.disableSearch === true;
+      
+      // Get max results from preferences or default to 5
+      const maxResults = data.searchPreferences?.maxResults || 5;
+      
+      // Determine if we should perform web search
+      const shouldSearch = !disableSearch && 
+        ((TAVILY_API_KEY || BRAVE_API_KEY) && 
+         (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
+      
+      if (shouldSearch) {
         try {
-          // QUERY REFINEMENT: Analyze the query to create a more effective search
-          let refinedQuery = data.query;
+          // Track search start time for metrics
+          const searchStartTime = Date.now();
           
+          // If this is an explicit search command, extract the actual query
+          let refinedQuery = explicitSearchCommand ? 
+            explicitSearchCommand[1] : // Use the query part after /search
+            data.query;
+            
           // Check if this is a follow-up question requiring context from previous conversation
-          const isFollowUp = conversation.messages.length > 0 && 
-            (/^(what|how|when|where|who|why|can|could|would|is|are|was) about/i.test(data.query) || 
-             /^and/i.test(data.query) || 
-             /^what if/i.test(data.query));
+          const isFollowUp = !explicitSearchCommand && conversation.messages.length > 0 && 
+            (/^(what|how|when|where|who|why|can|could|would|is|are|was) about/i.test(refinedQuery) || 
+             /^and/i.test(refinedQuery) || 
+             /^what if/i.test(refinedQuery));
              
           if (isFollowUp && conversation.messages.length >= 2) {
             // Get previous user query to add context
@@ -526,21 +559,87 @@ export class SunaIntegrationService {
           if (!webSearchResults.error) {
             const searchResults = webSearchResults.results || [];
             
-            // Sort results by relevance (if source provides it) or default order
-            const sortedResults = [...searchResults].sort((a: any, b: any) => {
-              // Use score if available, otherwise keep original order
-              if (a.score && b.score) return b.score - a.score;
-              return 0;
+            // Collect source domains for metadata
+            const sourceDomains: string[] = [];
+            const usedSearchEngines: string[] = [];
+            
+            // Track which search engines were used
+            if (!webSearchResults.error) {
+              if (webSearchResults.tavilyResults && !webSearchResults.tavilyResults.error) {
+                usedSearchEngines.push('Tavily');
+              }
+              if (webSearchResults.braveResults && !webSearchResults.braveResults.error) {
+                usedSearchEngines.push('Brave');
+              }
+            }
+            
+            // Extract domains from results
+            searchResults.forEach((result: any) => {
+              if (result.url) {
+                try {
+                  const domain = new URL(result.url).hostname;
+                  if (!sourceDomains.includes(domain)) {
+                    sourceDomains.push(domain);
+                  }
+                } catch (e) {
+                  // Skip invalid URLs
+                }
+              }
             });
             
-            // Format search results for the LLM with improved readability
+            // Calculate search time
+            const searchEndTime = Date.now();
+            const searchTimeMs = searchEndTime - searchStartTime;
+            
+            // Create search metadata
+            searchMetadata = {
+              query: finalQuery,
+              sources: sourceDomains,
+              resultCount: searchResults.length,
+              searchEngines: usedSearchEngines,
+              searchTime: searchTimeMs
+            };
+            
+            // Sort results by relevance or freshness based on user preference
+            const sortingStrategy = data.searchPreferences?.priority || 'relevance';
+            
+            const sortedResults = [...searchResults].sort((a: any, b: any) => {
+              if (sortingStrategy === 'freshness') {
+                // Sort by date if available (newer first)
+                if (a.publishedDate && b.publishedDate) {
+                  return new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime();
+                }
+              }
+              
+              // Default to relevance sorting
+              if (a.score && b.score) return b.score - a.score;
+              return 0;
+            }).slice(0, maxResults); // Limit to max results from preferences
+            
+            // Format search results for the LLM with improved readability and transparency
             webSearchContent = `
-Web Search Results (${new Date().toLocaleString()}):
-${sortedResults.map((result: any, index: number) => 
-  `[${index + 1}] "${result.title || 'Untitled'}" ${result.source ? `(Source: ${result.source})` : '(Source: Tavily)'}
+Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
+${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
+Search query: "${finalQuery}"
+
+${sortedResults.map((result: any, index: number) => {
+  // Extract domain from URL for better source attribution
+  let domain = 'Unknown Source';
+  if (result.url) {
+    try {
+      domain = new URL(result.url).hostname;
+    } catch (e) {
+      // Keep default domain if URL parsing fails
+    }
+  }
+  
+  // Format the result with better attribution
+  return `[${index + 1}] "${result.title || 'Untitled'}" 
+Source: ${domain} ${result.source ? `via ${result.source}` : ''}
+${result.publishedDate ? `Published: ${result.publishedDate}` : ''}
 URL: ${result.url || 'No URL available'}
-Content: ${result.content || result.description || 'No content available'}
-`).join('\n\n') || 'No results found'}
+Content: ${result.content || result.description || 'No content available'}`;
+}).join('\n\n') || 'No results found'}
 
 ${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
 
