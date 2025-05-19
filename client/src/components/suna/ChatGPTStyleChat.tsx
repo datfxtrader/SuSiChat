@@ -325,15 +325,15 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
   // Improved function to process content and highlight citations [1], [2], etc.
   const renderContentWithCitations = (text: string) => {
     // Extract the main content (everything before "Sources:" section)
-    const [mainContent, sourceSection] = text.split(/Sources:/i);
+    const [mainContent, _] = text.split(/Sources:/i);
     
-    // Only process the main content for citations
+    // Only process the main content for citations, completely removing the sources section from response
     const contentToProcess = mainContent || text;
     
     // Improved regex to find citation markers [1], [2], etc. that aren't part of URLs
     const parts = contentToProcess.split(/(\[\d+\](?!\)))/g);
     
-    if (parts.length <= 1) return <ReactMarkdown>{text}</ReactMarkdown>;
+    if (parts.length <= 1) return <ReactMarkdown>{contentToProcess}</ReactMarkdown>;
     
     return (
       <>
@@ -365,8 +365,6 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
             </span>
           );
         })}
-        
-        {/* If there was a Sources section, we don't render it here since we have a dedicated sources section below */}
       </>
     );
   };
