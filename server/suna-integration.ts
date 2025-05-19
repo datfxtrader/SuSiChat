@@ -4,13 +4,12 @@ import { llmService } from './llm';
 
 // Configuration for Suna API
 const SUNA_API_URL = process.env.SUNA_API_URL || 'http://localhost:8000';
-// By default, we'll try to use the real Suna backend
-// If it's not available, we'll fall back to the mock implementation
-const USE_MOCK_SUNA = process.env.USE_MOCK_SUNA === 'true';
+// We're now fully using the real Suna backend with DeepSeek
+const USE_MOCK_SUNA = false;
 
 // Logging the Suna configuration on startup
 console.log(`Suna API URL: ${SUNA_API_URL}`);
-console.log(`Using mock Suna: ${USE_MOCK_SUNA}`);
+console.log(`Connected to Suna backend at: ${SUNA_API_URL}`);
 
 /**
  * Interface for Suna API requests
@@ -87,11 +86,6 @@ export class SunaIntegrationService {
    * Send a message to the Suna agent
    */
   async sendMessage(data: SunaRequest): Promise<any> {
-    if (USE_MOCK_SUNA) {
-      console.log('Using mock Suna service for message:', data.query);
-      return this.mockSendMessage(data);
-    }
-    
     try {
       console.log('Sending message to Suna API:', data.query);
       
