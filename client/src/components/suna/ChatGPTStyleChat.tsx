@@ -56,29 +56,94 @@ const ResearchProgress: React.FC<ResearchProgressProps & { query?: string }> = (
   // Generate dynamic topics based on the query
   const getDynamicTopics = () => {
     const searchQuery = query || '';
-    const isFinancial = /gold|stock|market|trading|xauusd|cryptocurrency|bitcoin|finance|economy|economic|invest/i.test(searchQuery);
-    const isTech = /software|hardware|ai|programming|computer|website|app|technology|tech|digital/i.test(searchQuery);
-    const isHealth = /health|medical|disease|treatment|medicine|doctor|hospital|diet|exercise|fitness/i.test(searchQuery);
+    console.log("Current search query for topics:", searchQuery);
     
-    if (isFinancial) {
+    // Extract main entities from the query
+    const extractMainEntity = (query: string) => {
+      // Check for forex pairs
+      const forexMatch = query.match(/([A-Z]{3}\/[A-Z]{3}|[A-Z]{6}|EUR|USD|GBP|JPY|AUD|CAD|CHF|NZD)/i);
+      if (forexMatch) return forexMatch[0].toUpperCase();
+      
+      // Check for cryptocurrencies
+      const cryptoMatch = query.match(/(bitcoin|btc|ethereum|eth|xrp|ripple|litecoin|ltc|dogecoin|doge)/i);
+      if (cryptoMatch) return cryptoMatch[0];
+      
+      // Check for stocks or indices
+      const stockMatch = query.match(/(nasdaq|dow jones|s&p 500|ftse|nikkei|dax|apple|google|microsoft|amazon|tesla)/i);
+      if (stockMatch) return stockMatch[0];
+      
+      // Check for commodities
+      const commodityMatch = query.match(/(gold|xau|silver|xag|oil|gas|commodity)/i);
+      if (commodityMatch) return commodityMatch[0];
+      
+      return '';
+    };
+    
+    const mainEntity = extractMainEntity(searchQuery);
+    console.log("Extracted main entity:", mainEntity);
+    
+    // Currency pair specific topics (GBPUSD, EURUSD, etc.)
+    if (/GBP.*USD|GBPUSD/i.test(searchQuery)) {
       return [
         [
-          "Current Price Trends and Analysis - Market Report",
-          "Technical Analysis and Price Projections - Trading View",
-          "Fundamental Factors Affecting Prices - Financial Analysis"
+          "GBP/USD Price Action - Trading Economics",
+          "Bank of England Policy Impact - Financial Times",
+          "US Dollar Strength vs Pound - Reuters"
         ],
         [
-          "Market Sentiment and Investor Positioning",
-          "Support and Resistance Levels",
-          "Key Price Action Patterns and Indicators"
+          "Technical Support/Resistance Levels for GBP/USD",
+          "UK Economic Data Impact on Pound",
+          "Fed Policy Implications for the Pair"
         ],
         [
-          "Long-term Outlook and Forecast",
-          "Risk Management Strategies",
-          "Global Economic Impact Factors"
+          "GBP/USD Forecast for Coming Weeks",
+          "Brexit Factors on Pound Valuation",
+          "Interest Rate Differential Analysis"
         ]
       ];
-    } else if (isTech) {
+    }
+    // Bitcoin specific topics
+    else if (/bitcoin|btc/i.test(searchQuery)) {
+      return [
+        [
+          "Bitcoin Price Trends - CoinDesk Analysis",
+          "Institutional Adoption Metrics - Glassnode",
+          "Market Sentiment Indicators - CryptoQuant"
+        ],
+        [
+          "On-chain Transaction Volume Analysis",
+          "Hash Rate and Network Security",
+          "Exchange Inflow/Outflow Metrics"
+        ],
+        [
+          "Bitcoin Halving Cycle Analysis",
+          "Regulatory Environment Impact",
+          "Correlation with Traditional Markets"
+        ]
+      ];
+    }
+    // General financial topics
+    else if (/forex|currency|dollar|pound|yen|euro|usd|eur|jpy|gbp|exchange rate|fx|trading/i.test(searchQuery)) {
+      return [
+        [
+          "Current Exchange Rate Analysis - Financial Times",
+          "Central Bank Policy Impact - Bloomberg",
+          "Economic Indicator Effects - Reuters"
+        ],
+        [
+          "Technical Support/Resistance Levels",
+          "Market Sentiment and Positioning Data",
+          "Cross-Currency Correlation Patterns"
+        ],
+        [
+          "Short-term Price Forecast",
+          "Long-term Currency Trend Analysis",
+          "Risk Management Considerations"
+        ]
+      ];
+    }
+    // Technology topics
+    else if (/software|hardware|ai|programming|computer|website|app|technology|tech|digital/i.test(searchQuery)) {
       return [
         [
           "Latest Technology Developments - Tech Report",
@@ -662,6 +727,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                             progress={75}
                             query={message} // Pass the current query for context-aware topics 
                           />
+                          {/* Display the current query for debugging */}
+                          <div className="text-xs text-gray-400 mt-1">Query: {message}</div>
                         </div>
                       ) : (
                         <div className="flex space-x-2">
