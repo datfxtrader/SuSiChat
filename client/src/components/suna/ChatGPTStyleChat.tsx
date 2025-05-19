@@ -1038,11 +1038,14 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 </SelectContent>
               </Select>
               
-              {/* Mode toggle - Quick vs Research */}
+              {/* Mode toggle - Quick vs Research vs Deep Research */}
               <div className="flex items-center border rounded-md overflow-hidden h-7">
                 <button 
-                  className={`px-2 py-1 text-xs ${!researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                  onClick={() => setResearchMode(false)}
+                  className={`px-2 py-1 text-xs ${!researchMode && !showResearchPanel ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => {
+                    setResearchMode(false);
+                    setShowResearchPanel(false);
+                  }}
                 >
                   <div className="flex items-center">
                     <Zap className="w-3 h-3 mr-1" />
@@ -1050,12 +1053,28 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                 </button>
                 <button 
-                  className={`px-2 py-1 text-xs ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                  onClick={() => setResearchMode(true)}
+                  className={`px-2 py-1 text-xs ${researchMode && !showResearchPanel ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => {
+                    setResearchMode(true);
+                    setShowResearchPanel(false);
+                  }}
                 >
                   <div className="flex items-center">
                     <BookOpen className="w-3 h-3 mr-1" />
                     Research
+                  </div>
+                </button>
+                <button 
+                  className={`px-2 py-1 text-xs ${showResearchPanel ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => {
+                    setShowResearchPanel(true);
+                    setResearchMode(false);
+                    setResearchQuery(message);
+                  }}
+                >
+                  <div className="flex items-center">
+                    <Search className="w-3 h-3 mr-1" />
+                    Deep
                   </div>
                 </button>
               </div>
@@ -1087,6 +1106,61 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 : "Uses web search for real-time information"}
             </p>
           </div>
+          
+          {/* Deep Research Panel */}
+          {showResearchPanel && (
+            <div className="max-w-3xl mx-auto px-4 py-4 border-t border-gray-200">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-800 flex items-center">
+                  <Search className="h-4 w-4 mr-2 text-blue-500" />
+                  Deep Research
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setShowResearchPanel(false)}
+                >
+                  <XIcon className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <DeepResearch 
+                initialQuery={message}
+                onResearchComplete={(results) => {
+                  // Add the research results to the chat
+                  setShowResearchPanel(false);
+                  
+                  // First add user message about the research
+                  const userMsg = {
+                    role: 'user',
+                    content: `/deepresearch ${message}`,
+                    timestamp: new Date().toISOString(),
+                    id: Date.now().toString(),
+                  };
+                  
+                  // Then add the AI message with research results
+                  const aiMsg = {
+                    role: 'assistant',
+                    content: results,
+                    timestamp: new Date().toISOString(),
+                    id: (Date.now() + 1).toString(),
+                    searchMetadata: {
+                      deepResearchUsed: true,
+                      isDeepResearchResponse: true
+                    }
+                  };
+                  
+                  addMessage(userMsg);
+                  addMessage(aiMsg);
+                  setMessage(''); // Clear the input
+                  scrollToBottom();
+                }}
+                isEmbedded={true}
+              />
+            </div>
+          )}
+          
           {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
           <div className="h-2"></div>
         </div>
