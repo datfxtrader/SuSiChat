@@ -337,7 +337,7 @@ export class SunaIntegrationService {
    * @param context Optional context from previous messages
    * @returns Research results or null if research failed
    */
-  private async performDeepResearch(query: string, context?: string): Promise<ResearchResponse | null> {
+  private async performDeepResearch(query: string, context?: string, researchDepth: 'basic' | 'standard' | 'deep' = 'standard'): Promise<ResearchResponse | null> {
     if (!USE_DEERFLOW_RESEARCH) {
       console.log('DeerFlow deep research is disabled');
       return null;
@@ -350,16 +350,17 @@ export class SunaIntegrationService {
       // Create research request with appropriate parameters
       const researchRequest: ResearchRequest = {
         query,
-        depth: 'standard',    // Default to standard depth
-        maxSources: 6,        // Reasonable number of sources
-        useCache: true,       // Use cache for efficiency
-        userContext: context  // Add context if available
+        depth: researchDepth,  // Use the specified research depth
+        maxSources: 6,         // Reasonable number of sources
+        useCache: true,        // Use cache for efficiency
+        userContext: context   // Add context if available
       };
       
-      // Determine if this is a complex topic requiring deep analysis
-      if (this.isComplexTopic(query)) {
-        researchRequest.depth = 'deep';
+      // Adjust max sources based on depth
+      if (researchDepth === 'deep') {
         researchRequest.maxSources = 8;
+      } else if (researchDepth === 'basic') {
+        researchRequest.maxSources = 4;
       }
       
       // Run complete research (blocking operation)
@@ -732,12 +733,17 @@ export class SunaIntegrationService {
       let webSearchContent = '';
       let searchMetadata: SunaMessage['searchMetadata'] = undefined;
       
-      // Check if the query needs deep research
-      const needsDeep = USE_DEERFLOW_RESEARCH && this.needsDeepResearch(data.query, conversation.messages);
-      
       // Check for explicit search commands in the query (like /search)
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
       const forceSearch = explicitSearchCommand || (data.searchPreferences?.forceSearch === true);
+      
+      // Check for explicit research commands
+      const explicitResearchCommand = data.query.match(/^\/(deep)?research\s+(.*)/i);
+      const useDeepResearch = explicitResearchCommand || 
+                             (data.searchPreferences?.useDeepResearch === true);
+      
+      // Determine research depth
+      const researchDepth = data.searchPreferences?.researchDepth || 'standard';
       
       // Honor user preference to disable search if explicitly set
       const disableSearch = data.searchPreferences?.disableSearch === true;
@@ -745,13 +751,19 @@ export class SunaIntegrationService {
       // Get max results from preferences or default to 5
       const maxResults = data.searchPreferences?.maxResults || 5;
       
-      // Determine if we should perform web search
+      // Determine if we should perform web search or deep research
+      const shouldUseDeepResearch = useDeepResearch && 
+                                   !disableSearch && 
+                                   USE_DEERFLOW_RESEARCH && 
+                                   (explicitResearchCommand || this.needsDeepResearch(data.query, conversation.messages));
+                                   
       const shouldSearch = !disableSearch && 
-        ((TAVILY_API_KEY || BRAVE_API_KEY) && 
-         (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
+                          !shouldUseDeepResearch && 
+                          ((TAVILY_API_KEY || BRAVE_API_KEY) && 
+                          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
       
       // If the query needs deep research, perform it first
-      if (needsDeep) {
+      if (shouldUseDeepResearch) {
         try {
           console.log("Detected complex query requiring deep research:", data.query);
           
