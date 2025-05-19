@@ -1,15 +1,17 @@
 import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
+import { v4 as uuidv4 } from 'uuid';
 
-// Configuration for Suna API
-const SUNA_API_URL = process.env.SUNA_API_URL || 'http://localhost:8000';
-// Now using the real Suna backend
-const USE_MOCK_SUNA = false;
+// Configuration for the DeepSeek API (used for Suna agent functionality)
+const DEEPSEEK_API_ENDPOINT = process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions';
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const SUNA_API_URL = 'integrated'; // Using integrated approach with DeepSeek directly
 
-// Logging the Suna configuration on startup
-console.log(`Suna API URL: ${SUNA_API_URL}`);
-console.log(`Using real Suna backend at: ${SUNA_API_URL}`);
+// In-memory implementation for Suna features
+const USE_MOCK_SUNA = false; // Always use direct integration
+
+console.log('Using integrated DeepSeek API for Suna agent capabilities');
 
 /**
  * Interface for Suna API requests
@@ -85,11 +87,11 @@ export class SunaIntegrationService {
   }
 
   /**
-   * Send a message to the Suna agent
+   * Send a message to the Suna agent (directly using DeepSeek API)
    */
   async sendMessage(data: SunaRequest): Promise<any> {
     try {
-      console.log('Sending message to Suna API:', data.query);
+      console.log('Processing Suna agent message with DeepSeek:', data.query);
       
       // If no thread ID is provided, we need to create a new thread
       if (!data.threadId) {
@@ -97,89 +99,171 @@ export class SunaIntegrationService {
         const threadResponse = await this.createThread(data.userId);
         data.threadId = threadResponse.threadId;
       }
-      
-      // Create a request payload for Suna
-      const requestPayload = {
-        input: data.query,
-        userId: data.userId, 
-        projectId: this.projectId,
-        threadId: data.threadId,
-        stream: false
-      };
-      
-      // Make the API request to Suna
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (this.apiKey) {
-        headers['Authorization'] = `Bearer ${this.apiKey}`;
+
+      // Ensure threadId is available
+      if (!data.threadId) {
+        data.threadId = `thread-${uuidv4()}`;
+      }
+
+      // Get conversation history
+      let conversation;
+      try {
+        conversation = await this.getConversation(data.userId, data.threadId);
+      } catch (e) {
+        // Initialize new conversation if retrieval fails
+        conversation = {
+          id: data.threadId,
+          title: 'New Conversation',
+          messages: [],
+          createdAt: new Date().toISOString(),
+          userId: data.userId
+        };
       }
       
-      console.log(`Sending request to real Suna backend at: ${SUNA_API_URL}/api/agent/run`);
-      console.log('Request payload:', JSON.stringify(requestPayload, null, 2));
+      // Prepare messages array with system prompt and history
+      const messages = [
+        {
+          role: 'system',
+          content: `You are Suna, an advanced open-source generalist AI agent designed to help accomplish real-world tasks. 
+You are currently running in Tongkeeper, a family-oriented assistant platform.
+
+In your full implementation, you have several powerful capabilities:
+1. Browser automation to navigate websites and extract information
+2. File management for document creation and editing
+3. Web crawling and search capabilities
+4. Command-line execution for system tasks
+5. Integration with various APIs and services
+
+When responding to users, be:
+- Helpful and informative with detailed, accurate responses
+- Capable of solving complex problems with step-by-step reasoning
+- Knowledgeable about a wide range of topics
+- Professional but conversational in tone
+
+If asked about tasks that would normally require your advanced tools (like web search or file creation), explain what capabilities the full Suna agent would use to accomplish the task, then provide the best response you can with your current knowledge.`
+        }
+      ];
+      
+      // Add conversation history (up to 10 previous messages)
+      const historyMessages = conversation.messages
+        .slice(-10)
+        .map((msg: SunaMessage) => ({
+          role: msg.role,
+          content: msg.content
+        }));
+        
+      messages.push(...historyMessages);
+      
+      // Add the current user message
+      messages.push({
+        role: 'user',
+        content: data.query
+      });
+      
+      // Call DeepSeek API directly
+      console.log('Calling DeepSeek API for Suna agent response');
+      
+      // Create a user message in the conversation
+      const userMessageId = `msg-${uuidv4()}`;
+      const userMessage: SunaMessage = {
+        id: userMessageId,
+        content: data.query,
+        role: 'user',
+        timestamp: new Date().toISOString()
+      };
+      
+      conversation.messages.push(userMessage);
       
       const response = await axios.post(
-        `${SUNA_API_URL}/api/agent/run`, 
-        requestPayload,
-        { headers }
+        DEEPSEEK_API_ENDPOINT,
+        {
+          model: DEEPSEEK_MODEL,
+          messages,
+          temperature: 0.7,
+          max_tokens: 2000
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          }
+        }
       );
       
-      console.log('Received response from Suna backend');
+      // Extract the AI response
+      const aiResponse = response.data.choices[0].message.content;
       
-      // Extract the relevant information from the response
-      const agentRunResponse: AgentRunResponse = response.data;
-      
-      // Convert to our internal format
+      // Create an assistant message
+      const runId = `run-${uuidv4()}`;
       const assistantMessage: SunaMessage = {
-        id: agentRunResponse.runId,
-        content: agentRunResponse.output || 'Sorry, I was unable to process your request.',
+        id: runId,
+        content: aiResponse,
         role: 'assistant',
         timestamp: new Date().toISOString()
       };
       
+      // Add to conversation
+      conversation.messages.push(assistantMessage);
+      
+      // Update conversation title if it's the first exchange
+      if (conversation.messages.length === 2) {
+        const titleLimit = Math.min(data.query.length, 30);
+        conversation.title = data.query.substring(0, titleLimit) + (data.query.length > 30 ? '...' : '');
+      }
+      
+      // Store the updated conversation
+      if (data.threadId) {
+        this.storeConversation(data.userId, data.threadId, conversation);
+      }
+      
       return {
         message: assistantMessage,
-        threadId: agentRunResponse.threadId,
-        runId: agentRunResponse.runId,
-        status: agentRunResponse.status
+        threadId: data.threadId,
+        runId,
+        status: 'completed'
       };
     } catch (error) {
-      console.error('Error communicating with Suna API:', error);
-      throw new Error('Failed to communicate with Suna API. Make sure the Suna backend is running.');
+      console.error('Error with DeepSeek API for Suna agent:', error);
+      throw new Error('Failed to generate Suna agent response with DeepSeek API');
     }
+  }
+  
+  /**
+   * Store a conversation in memory
+   */
+  private storeConversation(userId: string, threadId: string, conversation: SunaConversation) {
+    // Store conversation in memory map keyed by threadId
+    const key = `${userId}:${threadId}`;
+    mockConversations[key] = conversation;
   }
 
   /**
-   * Create a new thread in Suna
+   * Create a new thread in Suna (using integrated approach)
    */
   async createThread(userId: string): Promise<any> {
     try {
-      console.log('Creating a new thread in Suna backend for user:', userId);
+      console.log('Creating a new conversation thread for user:', userId);
       
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
+      // Generate a unique thread ID
+      const threadId = `thread-${uuidv4()}`;
+      
+      // Create new conversation object
+      const conversation: SunaConversation = {
+        id: threadId,
+        title: 'New Conversation',
+        messages: [],
+        createdAt: new Date().toISOString(),
+        userId
       };
       
-      if (this.apiKey) {
-        headers['Authorization'] = `Bearer ${this.apiKey}`;
-      }
+      // Store the conversation
+      this.storeConversation(userId, threadId, conversation);
       
-      const response = await axios.post(
-        `${SUNA_API_URL}/api/threads`, 
-        {
-          userId,
-          projectId: this.projectId,
-          title: 'New Conversation'
-        },
-        { headers }
-      );
-      
-      console.log('Thread created successfully in Suna backend:', response.data);
-      return response.data;
+      console.log('Created new conversation thread:', threadId);
+      return { threadId };
     } catch (error) {
-      console.error('Error creating thread in Suna:', error);
-      // Create a fallback thread ID if the API call fails
+      console.error('Error creating thread:', error);
+      // Create a fallback thread ID if there's an error
       const fallbackThreadId = `thread-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       console.log('Created fallback thread ID:', fallbackThreadId);
       return { threadId: fallbackThreadId };
@@ -187,61 +271,32 @@ export class SunaIntegrationService {
   }
 
   /**
-   * Get conversation/thread history from Suna
+   * Get conversation/thread history (from in-memory storage)
    */
   async getConversation(userId: string, threadId: string): Promise<any> {
     try {
-      console.log('Fetching conversation from Suna backend:', threadId);
+      console.log('Fetching conversation:', threadId);
       
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
+      // Get conversation from memory
+      const key = `${userId}:${threadId}`;
+      const conversation = mockConversations[key];
       
-      if (this.apiKey) {
-        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      if (!conversation) {
+        console.log('Conversation not found, creating new empty conversation');
+        
+        // Return empty conversation if not found
+        return {
+          id: threadId,
+          title: 'Conversation',
+          messages: [],
+          createdAt: new Date().toISOString(),
+          userId
+        };
       }
-      
-      // Get thread details
-      const threadResponse = await axios.get(
-        `${SUNA_API_URL}/api/threads/${threadId}`, 
-        {
-          params: { 
-            userId,
-            projectId: this.projectId
-          },
-          headers
-        }
-      );
-      
-      // Get thread messages
-      const messagesResponse = await axios.get(
-        `${SUNA_API_URL}/api/threads/${threadId}/messages`, 
-        {
-          params: { 
-            userId,
-            projectId: this.projectId
-          },
-          headers
-        }
-      );
-      
-      // Convert to our internal format
-      const conversation: SunaConversation = {
-        id: threadId,
-        title: threadResponse.data.title || 'Conversation',
-        messages: messagesResponse.data.map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          role: msg.role,
-          timestamp: msg.createdAt
-        })),
-        createdAt: threadResponse.data.createdAt,
-        userId
-      };
       
       return conversation;
     } catch (error) {
-      console.error('Error retrieving conversation from Suna:', error);
+      console.error('Error retrieving conversation:', error);
       // Return an empty conversation if retrieval fails
       return {
         id: threadId,
@@ -254,83 +309,25 @@ export class SunaIntegrationService {
   }
 
   /**
-   * Get all conversations/threads for a user
+   * Get all conversations/threads for a user (from in-memory storage)
    */
   async getUserConversations(userId: string): Promise<any[]> {
-    if (USE_MOCK_SUNA) {
-      return Object.values(mockConversations).filter(conv => conv.userId === userId);
-    }
-    
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
+      console.log('Getting all conversations for user:', userId);
       
-      if (this.apiKey) {
-        headers['Authorization'] = `Bearer ${this.apiKey}`;
-      }
-      
-      const response = await axios.get(
-        `${SUNA_API_URL}/api/threads`, 
-        {
-          params: { 
-            userId,
-            projectId: this.projectId
-          },
-          headers
-        }
-      );
-      
-      // Convert to our internal format
-      return response.data.map((thread: any) => ({
-        id: thread.id,
-        title: thread.title || 'Conversation',
-        createdAt: thread.createdAt,
-        userId
-      }));
+      // Filter conversations by user ID
+      return Object.values(mockConversations)
+        .filter(conv => conv.userId === userId)
+        .map(conv => ({
+          id: conv.id,
+          title: conv.title,
+          createdAt: conv.createdAt,
+          userId: conv.userId
+        }));
     } catch (error) {
-      console.error('Error retrieving user conversations from Suna:', error);
+      console.error('Error retrieving user conversations:', error);
       // Return an empty array if retrieval fails
       return [];
-    }
-  }
-  
-  /**
-   * Get conversation from the Suna backend
-   */
-  private async getSunaConversation(userId: string, conversationId: string): Promise<SunaConversation> {
-    console.log('Fetching conversation from Suna API:', conversationId);
-    
-    try {
-      // Get the messages for this thread from the Suna API
-      const response = await axios.get(
-        `${SUNA_API_URL}/api/threads/${conversationId}/messages?userId=${userId}`,
-        {
-          headers: this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}
-        }
-      );
-      
-      // Get the thread details
-      const threadResponse = await axios.get(
-        `${SUNA_API_URL}/api/threads/${conversationId}?userId=${userId}`,
-        {
-          headers: this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}
-        }
-      );
-      
-      // Convert to our conversation format
-      const conversation: SunaConversation = {
-        id: conversationId,
-        title: threadResponse.data.title || 'Conversation',
-        messages: response.data || [],
-        createdAt: threadResponse.data.createdAt || new Date().toISOString(),
-        userId
-      };
-      
-      return conversation;
-    } catch (error) {
-      console.error('Error fetching conversation from Suna API:', error);
-      throw new Error('Failed to fetch conversation from Suna API');
     }
   }
 }
