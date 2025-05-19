@@ -25,6 +25,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isTextareaFocused, setIsTextareaFocused] = useState(false);
   
   const { 
     messages = [], 
@@ -118,7 +119,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           "md:left-0" // Always visible on desktop
         )}
       >
-        <div className="p-3 border-b border-gray-700/50">
+        <div className="p-2 border-b border-gray-700/50">
           <Button 
             variant="outline" 
             className="w-full bg-transparent border border-gray-700/50 hover:bg-gray-700/50 text-white" 
@@ -128,16 +129,16 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           </Button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto py-2 space-y-1">
           {allConversations.length > 0 ? (
             allConversations.map((conv: any) => (
               <button
                 key={conv.id}
                 className={cn(
-                  "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center",
+                  "w-full text-left px-3 py-3 transition-colors text-sm flex items-center",
                   currentThreadId === conv.id 
-                    ? "bg-gray-700/50" 
-                    : "hover:bg-gray-700/30"
+                    ? "bg-[#2A2B32] hover:bg-[#2A2B32]" 
+                    : "hover:bg-[#2A2B32]"
                 )}
                 onClick={() => {
                   selectConversation(conv.id);
@@ -146,8 +147,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   }
                 }}
               >
-                <MessageSquareIcon className="mr-2 h-4 w-4 shrink-0" />
-                <span className="truncate">{conv.title || 'New chat'}</span>
+                <MessageSquareIcon className="mr-3 h-4 w-4 shrink-0 text-gray-400" />
+                <span className="truncate text-gray-200">{conv.title || 'New chat'}</span>
               </button>
             ))
           ) : (
@@ -157,13 +158,13 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           )}
         </div>
         
-        <div className="p-3 border-t border-gray-700/50 mt-auto">
+        <div className="p-2 border-t border-gray-700/50 mt-auto">
           <button 
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-700/30 transition-colors text-sm flex items-center"
+            className="w-full text-left px-3 py-3 hover:bg-[#2A2B32] transition-colors text-sm flex items-center"
             onClick={() => window.location.href = '/'}
           >
-            <UserIcon className="mr-2 h-4 w-4" />
-            <span>Home</span>
+            <UserIcon className="mr-3 h-4 w-4 text-gray-400" />
+            <span className="text-gray-200">Home</span>
           </button>
         </div>
       </div>
@@ -188,20 +189,24 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   <div
                     key={msg.id || index}
                     className={cn(
-                      "px-4 md:px-8 py-6 flex items-start",
+                      "px-4 md:px-[10%] py-4 flex w-full items-start",
                       isUserMessage ? "bg-[#343541]" : "bg-[#444654]"
                     )}
                   >
-                    <div className="flex-shrink-0 mr-4 rounded-full bg-[#5436DA] w-8 h-8 flex items-center justify-center">
+                    <div className="flex-shrink-0 mr-4">
                       {isUserMessage ? (
-                        <UserIcon className="h-4 w-4 text-white" />
+                        <div className="rounded-full bg-[#5436DA] w-8 h-8 flex items-center justify-center">
+                          <UserIcon className="h-4 w-4 text-white" />
+                        </div>
                       ) : (
-                        <div className="font-bold text-white">AI</div>
+                        <div className="rounded-full bg-[#19c37d] w-8 h-8 flex items-center justify-center">
+                          <div className="font-bold text-white">AI</div>
+                        </div>
                       )}
                     </div>
                     
-                    <div className="max-w-4xl">
-                      <div className="whitespace-pre-wrap text-sm">
+                    <div className="flex-grow max-w-screen-md">
+                      <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
                         {msg.content}
                       </div>
                     </div>
@@ -210,14 +215,19 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               })}
               
               {isSending && (
-                <div className="px-4 md:px-8 py-6 flex items-start bg-[#444654]">
-                  <div className="flex-shrink-0 mr-4 rounded-full bg-[#5436DA] w-8 h-8 flex items-center justify-center">
-                    <div className="font-bold text-white">AI</div>
+                <div className="px-4 md:px-[10%] py-4 flex w-full items-start bg-[#444654]">
+                  <div className="flex-shrink-0 mr-4">
+                    <div className="rounded-full bg-[#19c37d] w-8 h-8 flex items-center justify-center">
+                      <div className="font-bold text-white">AI</div>
+                    </div>
                   </div>
                   
-                  <div className="flex items-center">
-                    <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
-                    <span className="text-sm text-gray-300">Thinking...</span>
+                  <div className="flex-grow max-w-screen-md flex items-center">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce"></div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -262,27 +272,36 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         </div>
 
         {/* Input area */}
-        <div className="p-3 md:p-4 border-t border-gray-700/50">
-          <div className="max-w-3xl mx-auto relative">
+        <div className="px-2 sm:px-4 pb-2 pt-2 absolute bottom-0 left-0 right-0 bg-[#343541]">
+          <div className="relative max-w-3xl mx-auto">
             <Textarea
               ref={textareaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => setIsTextareaFocused(true)}
+              onBlur={() => setIsTextareaFocused(false)}
               placeholder="Message AI Assistant..."
-              className="min-h-[48px] max-h-[200px] px-3 py-3 pr-10 rounded-md bg-[#40414F] border-none focus:ring-0 focus:border-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder-gray-400 resize-none text-white"
+              className={cn(
+                "min-h-[56px] max-h-[200px] p-3 pr-12 w-full rounded-xl border border-gray-600/50 shadow-xl",
+                "bg-[#40414F] focus:border-gray-400/50 focus-visible:ring-0 focus-visible:ring-offset-0",
+                "placeholder-gray-400 resize-none text-white text-sm transition-all"
+              )}
               disabled={isSending}
               rows={1}
             />
             <Button 
               onClick={handleSendMessage} 
               disabled={!message.trim() || isSending}
-              className="absolute right-2 bottom-1 h-8 w-8 p-0 rounded-md bg-transparent hover:bg-gray-600/50"
+              className={cn(
+                "absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg transition-opacity",
+                !message.trim() && "opacity-40"
+              )}
               variant="ghost"
             >
               {isSending ? 
                 <Loader2Icon className="h-4 w-4 animate-spin text-gray-400" /> : 
-                <SendIcon className="h-4 w-4 text-gray-400" />
+                <SendIcon className="h-4 w-4 text-gray-300" />
               }
             </Button>
           </div>
@@ -291,6 +310,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               AI Assistant may occasionally produce inaccurate information. Not financial advice.
             </p>
           </div>
+          {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
+          <div className="h-8"></div>
         </div>
       </div>
     </div>
