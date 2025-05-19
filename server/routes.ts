@@ -378,10 +378,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
 
   // DeerFlow Research Integration endpoints
-  app.get('/api/deerflow/health', checkDeerflowHealth);
-  app.post('/api/deerflow/research', isAuthenticated, startDeerflowResearch);
-  app.get('/api/deerflow/research/:id', isAuthenticated, getDeerflowResearchStatus);
+  app.get('/api/deerflow/health', isAuthenticated, checkDeerflowHealth);
+  app.post('/api/deerflow/research/start', isAuthenticated, startDeerflowResearch);
+  app.get('/api/deerflow/research/:taskId', isAuthenticated, getDeerflowResearchStatus);
   app.post('/api/deerflow/research/complete', isAuthenticated, runDeerflowCompleteResearch);
+  
+  // Legacy DeerFlow adapter (will be removed in future)
+  app.use('/api/deerflow-adapter', deerflowRoutes);
 
   return httpServer;
 }
