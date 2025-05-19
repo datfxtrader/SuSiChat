@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSuna } from '@/hooks/useSuna';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,12 +14,21 @@ interface SunaChatProps {
 export function SunaChat({ conversationId }: SunaChatProps) {
   const [message, setMessage] = useState('');
   const { user, isAuthenticated } = useAuth();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
   const { 
-    conversation, 
+    messages, 
     isLoadingConversation, 
     sendMessage, 
     isSending 
   } = useSuna(conversationId);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   const handleSendMessage = () => {
     if (!message.trim()) return;
@@ -56,30 +65,33 @@ export function SunaChat({ conversationId }: SunaChatProps) {
           <div className="flex justify-center items-center h-full">
             <p>Loading conversation...</p>
           </div>
-        ) : conversation?.messages?.length ? (
-          conversation.messages.map((msg: any, index: number) => (
-            <div
-              key={msg.id || index}
-              className={`flex ${
-                msg.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              <Card
-                className={`p-3 max-w-[80%] ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
+        ) : messages?.length ? (
+          <>
+            {messages.map((msg: any, index: number) => (
+              <div
+                key={msg.id || index}
+                className={`flex ${
+                  msg.role === 'user' ? 'justify-end' : 'justify-start'
                 }`}
               >
-                <div className="flex flex-col">
-                  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                  <span className="text-xs opacity-70 mt-1">
-                    {formatRelativeTime(new Date(msg.timestamp))}
-                  </span>
-                </div>
-              </Card>
-            </div>
-          ))
+                <Card
+                  className={`p-3 max-w-[80%] ${
+                    msg.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted'
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    <span className="text-xs opacity-70 mt-1">
+                      {formatRelativeTime(new Date(msg.timestamp))}
+                    </span>
+                  </div>
+                </Card>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <h3 className="text-xl font-semibold mb-2">Suna AI Agent</h3>
