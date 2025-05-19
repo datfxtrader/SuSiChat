@@ -45,10 +45,41 @@ interface ResearchProgressProps {
 }
 
 const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress }) => {
+  // Sample headlines that could be discovered during research
+  const sampleTopics = [
+    [
+      "EV Lifecycle Emissions vs Gasoline Vehicles - EPA Report",
+      "Battery Production Environmental Impacts - Science Direct",
+      "Electric Grid Carbon Intensity by Region - DOE Analysis"
+    ],
+    [
+      "Manufacturing Emissions Comparison",
+      "Operational Efficiency & Carbon Footprint",
+      "End-of-Life Recycling Challenges"
+    ],
+    [
+      "Overall Climate Impact Assessment",
+      "Air Quality Benefits in Urban Areas",
+      "Future Technology Pathways"
+    ]
+  ];
+  
   const stages = [
-    { label: "Searching", description: "Finding relevant sources" },
-    { label: "Analyzing", description: "Evaluating information" },
-    { label: "Synthesizing", description: "Creating comprehensive response" }
+    { 
+      label: "Searching", 
+      description: "Finding relevant sources",
+      topics: sampleTopics[0]
+    },
+    { 
+      label: "Analyzing", 
+      description: "Evaluating information",
+      topics: sampleTopics[1]
+    },
+    { 
+      label: "Synthesizing", 
+      description: "Creating comprehensive response",
+      topics: sampleTopics[2]
+    }
   ];
   
   return (
@@ -58,7 +89,7 @@ const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress }) 
         <span className="text-sm font-medium">Research in Progress</span>
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-3">
         {stages.map((s, i) => {
           const stageNumber = i + 1;
           const isActive = stageNumber === stage;
@@ -84,11 +115,40 @@ const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress }) 
               {isActive && (
                 <div className="ml-7">
                   <div className="text-xs text-gray-500 mb-1">{s.description}</div>
+                  
+                  {/* Discovered topics section */}
+                  <div className="mb-2">
+                    {s.topics.map((topic, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`text-xs text-left mb-1 flex items-center
+                          ${idx < Math.ceil(progress * s.topics.length / 100) ? 'text-blue-600' : 'text-gray-400'}`}
+                      >
+                        {idx < Math.ceil(progress * s.topics.length / 100) ? (
+                          <span className="inline-flex items-center">
+                            <span className="mr-1 text-blue-500">•</span> {topic}
+                          </span>
+                        ) : (
+                          <span className="opacity-50">...</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div 
                       className="bg-blue-600 h-1.5 rounded-full" 
                       style={{ width: `${progress}%` }}
                     ></div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show completed topics for completed stages */}
+              {isComplete && (
+                <div className="ml-7">
+                  <div className="text-xs text-gray-500 mb-1">
+                    <span className="text-green-600 font-medium">✓ Completed</span>
                   </div>
                 </div>
               )}
