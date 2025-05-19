@@ -225,21 +225,79 @@ export class SunaIntegrationService {
 
   /**
    * Determine if a query needs web search
-   * This is a simple heuristic - it can be made more sophisticated
+   * Improved heuristic to better detect when real-time information is needed
    */
   private needsWebSearch(query: string): boolean {
-    const webSearchTerms = [
-      'current', 'latest', 'recent', 'news', 'today', 'vs', 'match', 'game',
-      'score', 'weather', 'stock', 'price', 'covid', 'update', 'election',
-      'result', 'data', 'stats', 'statistics', 'event', 'championship',
-      'tournament', 'final', 'semifinal', 'quarterfinal', 
-      'who won', 'what happened', 'when is', 'where is'
+    // Standard terms that often require up-to-date information
+    const generalWebSearchTerms = [
+      'current', 'latest', 'recent', 'news', 'today', 'yesterday', 'tonight',
+      'this week', 'this month', 'this year', 'happening', 'live', 'trending',
+      'right now', 'upcoming'
+    ];
+    
+    // Sports-related queries
+    const sportsTerms = [
+      'match', 'game', 'score', 'vs', 'versus', 'tournament', 'championship',
+      'league', 'final', 'semifinal', 'quarterfinal', 'standings', 'ranking',
+      'season', 'player', 'team', 'transfer', 'win', 'lose', 'draw', 'result'
+    ];
+    
+    // News, politics, and events
+    const newsTerms = [
+      'election', 'politics', 'voted', 'presidential', 'government', 'congress',
+      'senate', 'house', 'prime minister', 'minister', 'president', 'mayor',
+      'governor', 'announced', 'conference', 'summit', 'meeting', 'speech'
+    ];
+    
+    // Financial terms
+    const financialTerms = [
+      'stock', 'price', 'market', 'index', 'nasdaq', 'nyse', 'dow', 's&p',
+      'investment', 'crypto', 'bitcoin', 'ethereum', 'currency', 'exchange rate',
+      'interest rate', 'inflation', 'recession', 'fed', 'federal reserve'
+    ];
+    
+    // Weather and natural events
+    const weatherTerms = [
+      'weather', 'forecast', 'temperature', 'rain', 'snow', 'storm', 'hurricane',
+      'tornado', 'earthquake', 'climate', 'disaster', 'flooding', 'drought'
+    ];
+    
+    // Technology and product releases
+    const techTerms = [
+      'released', 'announced', 'launch', 'update', 'version', 'upgrade',
+      'device', 'phone', 'iphone', 'android', 'app', 'software', 'hardware'
+    ];
+    
+    // Common question formats that often need current data
+    const questionPatterns = [
+      'who won', 'what happened', 'when is', 'where is', 'how much is',
+      'how many', 'why did', 'which', 'whose', 'what is the latest',
+      'is there', 'will there be', 'what are'
+    ];
+    
+    // Year patterns that might indicate need for current information
+    const yearPattern = /202[0-9]/;
+    
+    // Combine all the term lists
+    const allTerms = [
+      ...generalWebSearchTerms,
+      ...sportsTerms,
+      ...newsTerms, 
+      ...financialTerms,
+      ...weatherTerms,
+      ...techTerms,
+      ...questionPatterns
     ];
     
     const lowerQuery = query.toLowerCase();
     
-    // Check if any web search terms are in the query
-    return webSearchTerms.some(term => lowerQuery.includes(term));
+    // Check for year mentions (like 2023, 2024, 2025)
+    if (yearPattern.test(query)) {
+      return true;
+    }
+    
+    // Check for any term matches
+    return allTerms.some(term => lowerQuery.includes(term));
   }
 
   /**
@@ -370,14 +428,14 @@ export class SunaIntegrationService {
           if (!webSearchResults.error) {
             const searchResults = webSearchResults.results || [];
             
-            // Format search results for the LLM
+            // Format search results for the LLM with improved readability
             webSearchContent = `
-Web Search Results:
+Web Search Results (${new Date().toLocaleString()}):
 ${searchResults.map((result: any, index: number) => 
   `[${index + 1}] "${result.title || 'Untitled'}" ${result.source ? `(Source: ${result.source})` : '(Source: Tavily)'}
 URL: ${result.url || 'No URL available'}
 Content: ${result.content || result.description || 'No content available'}
-`).join('\n') || 'No results found'}
+`).join('\n\n') || 'No results found'}
 
 ${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
 

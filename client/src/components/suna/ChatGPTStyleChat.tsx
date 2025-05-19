@@ -174,13 +174,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         </div>
         
         <div className="p-2 border-t border-gray-200 mt-auto">
-          <button 
-            className="w-full text-left px-3 py-3 hover:bg-gray-100 transition-colors text-sm flex items-center"
-            onClick={() => window.location.href = '/'}
-          >
-            <UserIcon className="mr-3 h-4 w-4 text-gray-500" />
-            <span className="text-gray-600">Home</span>
-          </button>
+          {/* Removed home button to focus on Suna functionality */}
         </div>
       </div>
 
@@ -214,7 +208,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                           <UserIcon className="h-4 w-4 text-gray-700" />
                         </div>
                       ) : (
-                        <div className="rounded-full bg-[#19c37d] w-8 h-8 flex items-center justify-center">
+                        <div className="rounded-full bg-blue-500 w-8 h-8 flex items-center justify-center">
                           <div className="font-bold text-white">AI</div>
                         </div>
                       )}
@@ -348,9 +342,9 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 value={currentModel} 
                 onValueChange={(value) => changeModel(value as LLMModel)}
               >
-                <SelectTrigger className="h-7 text-xs px-2 bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50">
+                <SelectTrigger className="h-7 text-xs px-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
                   <div className="flex items-center">
-                    <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center mr-1 text-[10px] font-bold">I</span>
+                    <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center mr-1 text-[10px] font-bold">AI</span>
                     <SelectValue placeholder="Select model" />
                   </div>
                 </SelectTrigger>
@@ -362,7 +356,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               </Select>
             </div>
             <p className="text-[10px] text-gray-500">
-              Tongkeeper can make mistakes. Verify important information.
+              Uses Tavily & Brave Search for real-time information
             </p>
           </div>
           {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
