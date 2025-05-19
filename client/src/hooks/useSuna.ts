@@ -40,7 +40,8 @@ export function useSuna(initialThreadId?: string) {
 
   // Update messages when conversation data changes
   useEffect(() => {
-    if (conversation?.messages && Array.isArray(conversation.messages)) {
+    if (conversation && typeof conversation === 'object' && 
+        'messages' in conversation && Array.isArray(conversation.messages)) {
       setMessages(conversation.messages);
     }
   }, [conversation]);

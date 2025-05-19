@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
-import { ModernSunaChat } from '@/components/suna/ModernSunaChat';
+import { SimpleModernChat } from '@/components/suna/SimpleModernChat';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';

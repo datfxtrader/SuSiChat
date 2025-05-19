@@ -28,7 +28,23 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+// Fix type definitions
+import type { Message } from '@shared/schema';
 import ReactMarkdown from 'react-markdown';
+
+interface SunaMessage {
+  id?: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: string;
+}
+
+interface SunaConversation {
+  id: string;
+  title: string;
+  messages: SunaMessage[];
+  createdAt: string;
+}
 
 interface ModernSunaChatProps {
   threadId?: string;
@@ -43,8 +59,8 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
   
   const { 
-    messages, 
-    allConversations,
+    messages = [], 
+    allConversations = [] as SunaConversation[],
     threadId: currentThreadId,
     isLoadingConversation,
     isLoadingConversations, 
@@ -127,7 +143,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
     );
   }
 
-  const renderMessage = (msg: any, index: number) => {
+  const renderMessage = (msg: { id?: string; role: string; content: string; timestamp: string }, index: number) => {
     const isUserMessage = msg.role === 'user';
     
     return (
@@ -293,7 +309,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
           <div className="flex items-center">
             <h1 className="font-semibold ml-8 md:ml-0">
               {currentThreadId 
-                ? allConversations?.find((c: any) => c.id === currentThreadId)?.title || 'Conversation' 
+                ? allConversations.find((c: {id: string, title?: string}) => c.id === currentThreadId)?.title || 'Conversation' 
                 : 'New Conversation'}
             </h1>
           </div>
