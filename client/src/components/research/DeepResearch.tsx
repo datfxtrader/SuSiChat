@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2Icon, SearchIcon, BookOpenIcon, CheckIcon, AlertCircle } from 'lucide-react';
@@ -52,15 +52,24 @@ export function DeepResearch() {
     });
   };
 
+  // Add a useEffect to poll the research status
+  useEffect(() => {
+    // Log the current research status for debugging
+    if (researchStatus) {
+      console.log('Current research status:', researchStatus);
+    }
+  }, [researchStatus]);
+
   const renderProgressIndicator = () => {
-    if (isResearchInProgress) {
+    if (isResearchInProgress || researchStatus?.status === 'analyzing' || researchStatus?.status === 'synthesizing') {
       let stage = 'Searching';
       let progress = 33;
       
-      if (researchStatus?.insights && researchStatus.insights.length > 0) {
+      if (researchStatus?.status === 'synthesizing') {
         stage = 'Synthesizing';
         progress = 90;
-      } else if (researchStatus?.sources && researchStatus.sources.length > 0) {
+      } else if (researchStatus?.status === 'analyzing' || 
+                (researchStatus?.sources && researchStatus.sources.length > 0)) {
         stage = 'Analyzing';
         progress = 66;
       }
