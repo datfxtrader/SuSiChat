@@ -447,7 +447,15 @@ Use the current date and web search information when responding about current ev
       
       // Get response based on selected model
       let aiResponse = '';
+      // Map API model names to display names
       let modelUsed = selectedModel;
+      if (selectedModel === 'gemini-1.5-flash') {
+        modelUsed = 'Gemini Flash 2.0';
+      } else if (selectedModel === 'gemini-1.0-pro') {
+        modelUsed = 'Gemini 1.5 Pro';
+      } else if (selectedModel === 'deepseek-chat') {
+        modelUsed = 'DeepSeek';
+      }
       
       // Try the selected model first
       try {
