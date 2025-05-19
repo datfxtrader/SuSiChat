@@ -38,6 +38,68 @@ interface Source {
   publishedDate?: string;
 }
 
+// Research progress component to show current search/analysis stage
+interface ResearchProgressProps {
+  stage: number; // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
+  progress: number; // 0-100 percentage for the current stage
+}
+
+const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress }) => {
+  const stages = [
+    { label: "Searching", description: "Finding relevant sources" },
+    { label: "Analyzing", description: "Evaluating information" },
+    { label: "Synthesizing", description: "Creating comprehensive response" }
+  ];
+  
+  return (
+    <div className="flex flex-col bg-gray-50 rounded-lg p-3 my-2 border border-gray-200">
+      <div className="flex items-center space-x-2 mb-2">
+        <BookOpen className="text-blue-500 w-4 h-4" />
+        <span className="text-sm font-medium">Research in Progress</span>
+      </div>
+      
+      <div className="space-y-2">
+        {stages.map((s, i) => {
+          const stageNumber = i + 1;
+          const isActive = stageNumber === stage;
+          const isComplete = stageNumber < stage;
+          
+          return (
+            <div key={i} className="flex flex-col space-y-1">
+              <div className="flex items-center">
+                <div 
+                  className={`w-5 h-5 rounded-full mr-2 flex items-center justify-center text-xs
+                    ${isComplete ? 'bg-green-500 text-white' : 
+                      isActive ? 'bg-blue-500 text-white' : 
+                      'bg-gray-200 text-gray-500'}`}
+                >
+                  {isComplete ? '✓' : stageNumber}
+                </div>
+                <span className={`text-sm ${isActive ? 'font-medium text-blue-700' : 
+                  isComplete ? 'text-green-700' : 'text-gray-500'}`}>
+                  {s.label}
+                </span>
+              </div>
+              
+              {isActive && (
+                <div className="ml-7">
+                  <div className="text-xs text-gray-500 mb-1">{s.description}</div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className="bg-blue-600 h-1.5 rounded-full" 
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // Research response component
 interface ResearchResponseProps {
   content: string;
@@ -141,6 +203,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const [isTextareaFocused, setIsTextareaFocused] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [researchMode, setResearchMode] = useState(false);
+  const [researchDepth, setResearchDepth] = useState(1); // 1-3 scale for research depth
+  const [researchStage, setResearchStage] = useState(0); // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
   
   const { 
     messages = [], 
@@ -398,11 +462,20 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   
                   <div className="flex-grow max-w-[90%] sm:max-w-3xl">
                     <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></div>
-                      </div>
+                      {researchMode ? (
+                        <div className="flex flex-col">
+                          <ResearchProgress 
+                            stage={researchStage || 1} 
+                            progress={75} 
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]"></div>
+                          <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]"></div>
+                          <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
