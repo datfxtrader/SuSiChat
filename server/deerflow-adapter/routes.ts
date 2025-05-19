@@ -3,26 +3,17 @@
  * 
  * This module registers Express routes to interact with the DeerFlow adapter.
  */
-
-import { Router } from 'express';
+import express from 'express';
 import { startResearch, getResearchStatus, runResearch, checkHealth } from './controller';
-import { isAuthenticated } from '../replitAuth';
 
-const router = Router();
+const router = express.Router();
 
-// All DeerFlow routes require authentication
-router.use(isAuthenticated);
-
-// DeerFlow health check
+// Health check endpoint
 router.get('/health', checkHealth);
 
-// Start a new research task
+// Research endpoints
 router.post('/research', startResearch);
-
-// Get research status by ID
 router.get('/research/:id', getResearchStatus);
-
-// Run complete research (start + wait for completion)
 router.post('/research/complete', runResearch);
 
 export default router;

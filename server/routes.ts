@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
+import deerflowRoutes from "./deerflow-adapter/routes";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -374,6 +375,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/suna/message', isAuthenticated, sendMessageToSuna);
   app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
+
+  // DeerFlow Research Integration endpoints
+  app.use('/api/deerflow', deerflowRoutes);
 
   return httpServer;
 }
