@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
+import { checkDeerflowHealth, startDeerflowResearch, getDeerflowResearchStatus, runDeerflowCompleteResearch } from "./deerflow-controller";
 import deerflowRoutes from "./deerflow-adapter/routes";
 
 // WebSocket client connections and their associated rooms
@@ -377,7 +378,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
 
   // DeerFlow Research Integration endpoints
-  app.use('/api/deerflow', deerflowRoutes);
+  app.get('/api/deerflow/health', checkDeerflowHealth);
+  app.post('/api/deerflow/research', isAuthenticated, startDeerflowResearch);
+  app.get('/api/deerflow/research/:id', isAuthenticated, getDeerflowResearchStatus);
+  app.post('/api/deerflow/research/complete', isAuthenticated, runDeerflowCompleteResearch);
 
   return httpServer;
 }
