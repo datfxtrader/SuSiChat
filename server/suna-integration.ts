@@ -1042,10 +1042,10 @@ Use the current date and web search information when responding about current ev
         console.log("Adding source details to message metadata:", 
           JSON.stringify(searchMetadata.sourceDetails, null, 2));
         
-        // Explicitly include source URLs in a format that's easier to parse
-        // This ensures the frontend can extract and display the full article URLs
+        // Format source information in a structured way that's easy to parse by the frontend
+        // Include both title and complete URL for each source
         const sourceInfo = searchMetadata.sourceDetails.map((source, index) => 
-          `[${index + 1}] ${source.title}\nURL: ${source.url}`).join('\n\n');
+          `[${index + 1}] ${source.title}\n${source.url}`).join('\n\n');
           
         // Append source URLs to the bottom of the response for transparency
         if (!aiResponse.includes('Sources:')) {

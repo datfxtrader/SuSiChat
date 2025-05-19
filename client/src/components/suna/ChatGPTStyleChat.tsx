@@ -443,28 +443,44 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     // Debug logs to understand what data we're receiving
     console.log("Source metadata:", JSON.stringify(message.searchMetadata, null, 2));
     
-    // Look for URLs in the message content as a fallback
-    // This helps when metadata doesn't contain the full source details
+    // Look for URLs in the message content as our primary source of truth
+    // This will extract complete article URLs from the response
     const content = message.content || '';
-    const urlRegex = /URL: (https?:\/\/[^\s\n]+)/g;
-    const urlMatches = [...content.matchAll(urlRegex)];
+    
+    // Two-step approach to extract URLs:
+    // 1. First look for structured source entries with full URLs on their own line
+    const sourceRegex = /\[(\d+)\]\s+(.*?)[\r\n]+(https?:\/\/[^\s\n]+)/g;
+    const sourceMatches = [...content.matchAll(sourceRegex)];
+    
+    // 2. If that fails, look for any URLs in the content
+    const urlRegex = /(https?:\/\/[^\s\n]+)/g;
+    const urlMatches = sourceMatches.length > 0 ? 
+      sourceMatches.map(match => [match[0], match[3]]) : // Use structured format
+      [...content.matchAll(urlRegex)];     // Fallback to any URLs
     
     // If we found URLs in the content, use these as primary source
     if (urlMatches.length > 0) {
       console.log("Found URLs in content:", urlMatches);
       return urlMatches.map((match, index) => {
-        const url = match[1]; // The captured URL
+        // For structured matches, we have [full match, index, title, url]
+        // For simple matches, we have [full match, url]
+        const isStructured = match.length > 2;
+        const url = isStructured ? match[3] : match[1];
         let domain = "unknown";
-        let title = `Source ${index + 1}`;
+        let title = isStructured ? match[2] : `Source ${index + 1}`;
         
         try {
           // Extract domain from URL
           domain = new URL(url).hostname;
           
-          // Try to find title in content
-          const titleMatch = content.match(new RegExp(`\\[${index + 1}\\]\\s+(.+?)\\s*\\n`));
-          if (titleMatch && titleMatch[1]) {
-            title = titleMatch[1].trim();
+          // If we don't have a structured match, try to find title in nearby content
+          if (!isStructured) {
+            // Look for title in brackets near the URL
+            const titleRegex = new RegExp(`\\[(\\d+)\\]\\s+([^\\n]+)(?:[\\s\\S]{0,50}${url}|${url}[\\s\\S]{0,50})`, 'i');
+            const titleMatch = content.match(titleRegex);
+            if (titleMatch && titleMatch[2]) {
+              title = titleMatch[2].trim();
+            }
           }
         } catch (e) {
           console.error("Error parsing URL:", e);
