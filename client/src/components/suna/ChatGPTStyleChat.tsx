@@ -348,9 +348,13 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
               return (
                 <span key={i} className="inline-flex items-center">
                   <a 
-                    href={sources[sourceIndex]?.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Open in a new window to prevent navigation issues
+                      window.open(sources[sourceIndex]?.url, '_blank', 'noopener,noreferrer');
+                      return false;
+                    }}
                     className="text-blue-600 bg-blue-50 rounded px-1 text-xs font-medium hover:bg-blue-100"
                   >
                     {part}
@@ -737,7 +741,9 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         
         <div className="flex-1 overflow-y-auto py-2 space-y-0">
           {allConversations.length > 0 ? (
-            allConversations.map((conv: any) => (
+            [...allConversations]
+              .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              .map((conv: any) => (
               <button
                 key={conv.id}
                 className={cn(
