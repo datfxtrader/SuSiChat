@@ -100,11 +100,11 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   }
 
   return (
-    <div className="flex h-full bg-white text-gray-800">
+    <div className="flex h-full bg-black text-white">
       {/* Mobile sidebar toggle */}
       <button 
         className={cn(
-          "md:hidden fixed z-50 top-3 left-3 p-2 bg-gray-100 rounded-md text-gray-600",
+          "md:hidden fixed z-50 top-3 left-3 p-2 bg-gray-900 rounded-md text-gray-300",
           isSidebarOpen ? "left-[260px]" : "left-3"
         )}
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -115,15 +115,15 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       {/* Sidebar */}
       <div 
         className={cn(
-          "w-[260px] bg-gray-50 border-r border-gray-200 h-full flex flex-col transition-all duration-300 fixed md:static z-40",
+          "w-[260px] bg-gray-900 border-r border-gray-800 h-full flex flex-col transition-all duration-300 fixed md:static z-40",
           isSidebarOpen ? "left-0" : "-left-[260px]",
           "md:left-0" // Always visible on desktop
         )}
       >
-        <div className="p-2 border-b border-gray-200">
+        <div className="p-2 border-b border-gray-800">
           <Button 
             variant="outline" 
-            className="w-full bg-white border border-gray-200 hover:bg-gray-100 text-gray-700" 
+            className="w-full bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white" 
             onClick={handleNewConversation}
           >
             <PlusIcon className="mr-2 h-4 w-4" /> New chat
@@ -138,8 +138,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 className={cn(
                   "w-full text-left px-3 py-3 transition-colors text-sm flex items-center",
                   currentThreadId === conv.id 
-                    ? "bg-gray-100 hover:bg-gray-100" 
-                    : "hover:bg-gray-100"
+                    ? "bg-gray-800 hover:bg-gray-800" 
+                    : "hover:bg-gray-800"
                 )}
                 onClick={() => {
                   selectConversation(conv.id);
@@ -148,8 +148,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   }
                 }}
               >
-                <MessageSquareIcon className="mr-3 h-4 w-4 shrink-0 text-gray-500" />
-                <span className="truncate text-gray-600">{conv.title || 'New chat'}</span>
+                <MessageSquareIcon className="mr-3 h-4 w-4 shrink-0 text-gray-300" />
+                <span className="truncate text-gray-300">{conv.title || 'New chat'}</span>
               </button>
             ))
           ) : (
@@ -159,13 +159,13 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           )}
         </div>
         
-        <div className="p-2 border-t border-gray-200 mt-auto">
+        <div className="p-2 border-t border-gray-800 mt-auto">
           <button 
-            className="w-full text-left px-3 py-3 hover:bg-gray-100 transition-colors text-sm flex items-center"
+            className="w-full text-left px-3 py-3 hover:bg-gray-800 transition-colors text-sm flex items-center"
             onClick={() => window.location.href = '/'}
           >
-            <UserIcon className="mr-3 h-4 w-4 text-gray-500" />
-            <span className="text-gray-600">Home</span>
+            <UserIcon className="mr-3 h-4 w-4 text-gray-300" />
+            <span className="text-gray-300">Home</span>
           </button>
         </div>
       </div>
@@ -190,42 +190,49 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   <div
                     key={msg.id || index}
                     className={cn(
-                      "px-4 md:px-[10%] py-6 flex w-full items-start",
-                      isUserMessage ? "bg-white" : "bg-gray-50"
+                      "py-3 flex w-full items-start",
+                      isUserMessage ? "justify-end px-4" : "px-4 md:px-[10%]"
                     )}
                   >
-                    <div className="flex-shrink-0 mr-4">
-                      {isUserMessage ? (
-                        <div className="rounded-full bg-gray-300 w-8 h-8 flex items-center justify-center">
-                          <UserIcon className="h-4 w-4 text-gray-700" />
-                        </div>
-                      ) : (
-                        <div className="rounded-full bg-[#19c37d] w-8 h-8 flex items-center justify-center">
+                    {!isUserMessage && (
+                      <div className="flex-shrink-0 mr-4">
+                        <div className="rounded-full bg-gray-700 w-8 h-8 flex items-center justify-center">
                           <div className="font-bold text-white">AI</div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     
-                    <div className="flex-grow max-w-screen-md overflow-hidden">
-                      <div className="text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800">
+                    <div className={cn(
+                      "max-w-[75%] overflow-hidden rounded-2xl p-3",
+                      isUserMessage ? "bg-[#1e87fe] text-white" : "bg-gray-800 text-white"
+                    )}>
+                      <div className="text-[15px] leading-relaxed prose prose-invert max-w-none prose-headings:my-2 prose-p:my-1">
                         <ReactMarkdown>
                           {msg.content}
                         </ReactMarkdown>
                       </div>
                     </div>
+                    
+                    {isUserMessage && (
+                      <div className="flex-shrink-0 ml-4">
+                        <div className="rounded-full bg-gray-700 w-8 h-8 flex items-center justify-center">
+                          <div className="font-bold text-white">D</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
               
               {isSending && (
-                <div className="px-4 md:px-[10%] py-6 flex w-full items-start bg-gray-50">
+                <div className="px-4 md:px-[10%] py-3 flex w-full items-start">
                   <div className="flex-shrink-0 mr-4">
-                    <div className="rounded-full bg-[#19c37d] w-8 h-8 flex items-center justify-center">
+                    <div className="rounded-full bg-gray-700 w-8 h-8 flex items-center justify-center">
                       <div className="font-bold text-white">AI</div>
                     </div>
                   </div>
                   
-                  <div className="flex-grow max-w-screen-md flex items-center">
+                  <div className="bg-gray-800 rounded-2xl p-3 max-w-[75%]">
                     <div className="flex space-x-2">
                       <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.3s]"></div>
                       <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.15s]"></div>
@@ -275,7 +282,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         </div>
 
         {/* Input area */}
-        <div className="px-2 sm:px-4 pb-2 pt-2 absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+        <div className="px-2 sm:px-4 pb-2 pt-4 absolute bottom-0 left-0 right-0 bg-black border-t border-gray-800">
           <div className="relative max-w-3xl mx-auto">
             <Textarea
               ref={textareaRef}
@@ -284,21 +291,21 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               onKeyDown={handleKeyDown}
               onFocus={() => setIsTextareaFocused(true)}
               onBlur={() => setIsTextareaFocused(false)}
-              placeholder="Ask anything..."
+              placeholder="Message Tongkeeper..."
               className={cn(
-                "min-h-[56px] max-h-[200px] p-3 pr-12 w-full rounded-xl border border-gray-300 shadow-sm",
-                "bg-white focus:border-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0",
-                "placeholder-gray-500 resize-none text-gray-800 text-sm transition-all"
+                "min-h-[56px] max-h-[200px] p-3 pr-12 w-full rounded-full border border-gray-700",
+                "bg-gray-900 focus:border-gray-600 focus-visible:ring-0 focus-visible:ring-offset-0",
+                "placeholder-gray-500 resize-none text-white text-sm transition-all"
               )}
               disabled={isSending}
               rows={1}
             />
-            <div className="absolute right-2 bottom-2 flex gap-2">
+            <div className="absolute right-3 bottom-2.5 flex gap-2">
               <Button 
                 onClick={handleSendMessage} 
                 disabled={!message.trim() || isSending}
                 className={cn(
-                  "h-8 w-8 p-0 rounded-lg bg-black transition-opacity",
+                  "h-8 w-8 p-0 rounded-full bg-[#1e87fe] transition-opacity hover:bg-[#1976d2]",
                   !message.trim() && "opacity-40"
                 )}
                 variant="default"
