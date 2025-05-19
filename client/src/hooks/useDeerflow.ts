@@ -44,13 +44,25 @@ export function useDeerflow() {
   // Start a new research task
   const startResearch = useMutation({
     mutationFn: async (request: ResearchRequest) => {
-      const response = await apiRequest('/api/deerflow/research', {
-        method: 'POST',
-        body: JSON.stringify(request),
-      });
-      return response.id;
+      try {
+        const response = await fetch('/api/deerflow/research', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        });
+        
+        const data = await response.json();
+        console.log("Research started:", data);
+        return data.id;
+      } catch (error) {
+        console.error("Error starting research:", error);
+        throw error;
+      }
     },
     onSuccess: (researchId) => {
+      console.log("Setting active research ID:", researchId);
       setActiveResearchId(researchId);
     },
   });
@@ -61,12 +73,20 @@ export function useDeerflow() {
     queryFn: async () => {
       if (!activeResearchId) return null;
       
-      return await apiRequest(`/api/deerflow/research/${activeResearchId}`);
+      try {
+        const response = await fetch(`/api/deerflow/research/${activeResearchId}`);
+        const data = await response.json();
+        console.log("Research status:", data);
+        return data;
+      } catch (error) {
+        console.error("Error getting research status:", error);
+        throw error;
+      }
     },
     enabled: isAuthenticated && !!activeResearchId,
     refetchInterval: (data) => {
       // Poll more frequently when research is in progress
-      if (data?.status === 'in_progress') {
+      if (data?.status === 'in_progress' || data?.status === 'analyzing' || data?.status === 'synthesizing') {
         return 2000; // 2 seconds
       }
       return false; // Stop polling when complete or failed
@@ -77,10 +97,22 @@ export function useDeerflow() {
   // This is a long-running operation and should be used with caution
   const runCompleteResearch = useMutation({
     mutationFn: async (request: ResearchRequest) => {
-      return await apiRequest('/api/deerflow/research/complete', {
-        method: 'POST',
-        body: JSON.stringify(request),
-      });
+      try {
+        const response = await fetch('/api/deerflow/research/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        });
+        
+        const data = await response.json();
+        console.log("Complete research results:", data);
+        return data;
+      } catch (error) {
+        console.error("Error running complete research:", error);
+        throw error;
+      }
     },
   });
 
