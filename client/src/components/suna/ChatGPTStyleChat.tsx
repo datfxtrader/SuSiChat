@@ -325,7 +325,9 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
   // Improved function to process content and highlight citations [1], [2], etc.
   const renderContentWithCitations = (text: string) => {
     // Extract the main content (everything before "Sources:" section)
-    const [mainContent, _] = text.split(/Sources:/i);
+    // Preserve all content before any sources section
+    const contentSplit = text.split(/Sources:/i);
+    const mainContent = contentSplit[0];
     
     // Only process the main content for citations, completely removing the sources section from response
     const contentToProcess = mainContent || text;
