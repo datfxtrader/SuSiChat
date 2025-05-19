@@ -495,7 +495,7 @@ export class SunaIntegrationService {
       // Determine if web search is needed based on the query, context, and user preferences
       let webSearchResults: any = null;
       let webSearchContent = '';
-      let searchMetadata = null;
+      let searchMetadata: SunaMessage['searchMetadata'] = undefined;
       
       // Check for explicit search commands in the query (like /search)
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
@@ -598,7 +598,7 @@ export class SunaIntegrationService {
               resultCount: searchResults.length,
               searchEngines: usedSearchEngines,
               searchTime: searchTimeMs
-            };
+            } as SunaMessage['searchMetadata'];
             
             // Sort results by relevance or freshness based on user preference
             const sortingStrategy = data.searchPreferences?.priority || 'relevance';
@@ -785,7 +785,7 @@ Use the current date and web search information when responding about current ev
         }
       }
       
-      // Create an assistant message with metadata about model and search
+      // Create an assistant message with enhanced metadata about model and search
       const runId = `run-${uuidv4()}`;
       const assistantMessage: SunaMessage = {
         id: runId,
@@ -793,7 +793,8 @@ Use the current date and web search information when responding about current ev
         role: 'assistant',
         timestamp: new Date().toISOString(),
         modelUsed: modelUsed,
-        webSearchUsed: !!webSearchContent
+        webSearchUsed: !!webSearchContent,
+        searchMetadata: searchMetadata
       };
       
       // Add to conversation

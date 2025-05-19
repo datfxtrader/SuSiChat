@@ -19,6 +19,13 @@ type SunaConversation = {
 
 export type LLMModel = 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
 
+export type SearchPreferences = {
+  forceSearch?: boolean;          // Force web search even if not detected automatically
+  disableSearch?: boolean;        // Disable web search for this query
+  priority?: 'relevance' | 'freshness'; // Sort by relevance (default) or freshness
+  maxResults?: number;            // Maximum number of results to return (default: 5)
+};
+
 /**
  * Hook for interacting with the Suna AI Agent
  */
@@ -28,6 +35,10 @@ export function useSuna(initialThreadId?: string) {
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
   const [currentModel, setCurrentModel] = useState<LLMModel>('deepseek-chat');
+  const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
+    priority: 'relevance',
+    maxResults: 5
+  });
   
   // Query for all user conversations
   const { data: allConversations, isLoading: isLoadingConversations } = useQuery({
@@ -57,15 +68,60 @@ export function useSuna(initialThreadId?: string) {
 
   // Send a message to Suna
   const { mutate: sendMessage, isPending: isSending } = useMutation({
-    mutationFn: async ({ message, model = currentModel }: { message: string, model?: LLMModel }) => {
+    mutationFn: async ({ 
+      message, 
+      model = currentModel,
+      customSearchPrefs 
+    }: { 
+      message: string, 
+      model?: LLMModel,
+      customSearchPrefs?: SearchPreferences
+    }) => {
       if (!isAuthenticated) {
         throw new Error('You must be logged in to use Suna');
+      }
+      
+      // Check for explicit search commands
+      let processedMessage = message;
+      let activeSearchPrefs = {...searchPreferences};
+      
+      // Process special command prefixes
+      if (message.startsWith('/search ')) {
+        // Extract the actual query - remove "/search " prefix
+        processedMessage = message.substring(8);
+        activeSearchPrefs = {
+          ...activeSearchPrefs,
+          forceSearch: true
+        };
+      } else if (message.startsWith('/nosearch ')) {
+        // Extract the actual query - remove "/nosearch " prefix
+        processedMessage = message.substring(10);
+        activeSearchPrefs = {
+          ...activeSearchPrefs,
+          disableSearch: true
+        };
+      } else if (message.startsWith('/fresh ')) {
+        // Extract the actual query - remove "/fresh " prefix
+        processedMessage = message.substring(7);
+        activeSearchPrefs = {
+          ...activeSearchPrefs,
+          priority: 'freshness',
+          forceSearch: true
+        };
+      }
+      
+      // Apply any custom search preferences passed to the function
+      if (customSearchPrefs) {
+        activeSearchPrefs = {
+          ...activeSearchPrefs,
+          ...customSearchPrefs
+        };
       }
       
       // Add the user message immediately for a responsive UI
       const tempUserMessage: SunaMessage = {
         id: `temp-${Date.now()}`,
-        content: message,
+        content: message, // Show original message with commands to user
         role: 'user',
         timestamp: new Date().toISOString()
       };
@@ -79,9 +135,10 @@ export function useSuna(initialThreadId?: string) {
         'POST',
         '/api/suna/message',
         {
-          message,
+          message: processedMessage, // Send processed message without command prefixes
           threadId: threadId, // Always pass the current threadId, even if undefined
-          model: model // Pass the selected model to the API
+          model: model, // Pass the selected model to the API
+          searchPreferences: activeSearchPrefs // Pass search preferences
         }
       );
       
@@ -133,6 +190,32 @@ export function useSuna(initialThreadId?: string) {
   const changeModel = (model: LLMModel) => {
     setCurrentModel(model);
   };
+  
+  // Function to update search preferences
+  const updateSearchPreferences = (newPrefs: Partial<SearchPreferences>) => {
+    setSearchPreferences(prev => ({
+      ...prev,
+      ...newPrefs
+    }));
+  };
+  
+  // Function to toggle search forcing
+  const toggleForceSearch = () => {
+    setSearchPreferences(prev => ({
+      ...prev,
+      forceSearch: !prev.forceSearch,
+      disableSearch: false // Can't have both enabled
+    }));
+  };
+  
+  // Function to toggle search disabling
+  const toggleDisableSearch = () => {
+    setSearchPreferences(prev => ({
+      ...prev,
+      disableSearch: !prev.disableSearch,
+      forceSearch: false // Can't have both enabled
+    }));
+  };
 
   return {
     conversation,
@@ -140,12 +223,16 @@ export function useSuna(initialThreadId?: string) {
     threadId,
     messages,
     currentModel,
+    searchPreferences,
     isLoadingConversation,
     isLoadingConversations,
     sendMessage,
     isSending,
     selectConversation,
     createNewChat,
-    changeModel
+    changeModel,
+    updateSearchPreferences,
+    toggleForceSearch,
+    toggleDisableSearch
   };
 }
