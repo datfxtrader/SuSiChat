@@ -13,7 +13,11 @@ import {
   MessageSquareIcon,
   UserIcon,
   Settings,
-  Bot
+  Bot,
+  Zap, 
+  BookOpen,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -37,6 +41,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isTextareaFocused, setIsTextareaFocused] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [researchMode, setResearchMode] = useState(false);
   
   const { 
     messages = [], 
@@ -359,9 +364,33 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   <SelectItem value="gemini-1.0-pro">Gemini 1.5 Pro</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Mode toggle - Quick vs Research */}
+              <div className="flex items-center border rounded-md overflow-hidden h-7">
+                <button 
+                  className={`px-2 py-1 text-xs ${!researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => setResearchMode(false)}
+                >
+                  <div className="flex items-center">
+                    <Zap className="w-3 h-3 mr-1" />
+                    Quick
+                  </div>
+                </button>
+                <button 
+                  className={`px-2 py-1 text-xs ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => setResearchMode(true)}
+                >
+                  <div className="flex items-center">
+                    <BookOpen className="w-3 h-3 mr-1" />
+                    Research
+                  </div>
+                </button>
+              </div>
             </div>
             <p className="text-[10px] text-gray-500">
-              Uses Tavily & Brave Search for real-time information
+              {researchMode 
+                ? "Comprehensive research with thorough source analysis" 
+                : "Uses Tavily & Brave Search for real-time information"}
             </p>
           </div>
           {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
