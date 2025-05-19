@@ -69,7 +69,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const handleSendMessage = () => {
     if (!message.trim()) return;
     
-    sendMessage({ message });
+    sendMessage({ message, model: currentModel });
     setMessage('');
     
     // Reset textarea height

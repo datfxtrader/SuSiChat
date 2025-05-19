@@ -157,6 +157,7 @@ interface SunaRequest {
   tools?: string[];
   projectId?: string;
   threadId?: string;
+  model?: string;
 }
 
 /**
@@ -654,14 +655,14 @@ export const sunaService = new SunaIntegrationService();
 // Express route handlers for Suna integration
 export const sendMessageToSuna = async (req: any, res: Response) => {
   try {
-    const { message, threadId } = req.body;
+    const { message, threadId, model } = req.body;
     const userId = req.user.claims.sub;
 
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    console.log(`Processing message in conversation/thread: ${threadId}`);
+    console.log(`Processing message in conversation/thread: ${threadId} with model: ${model || 'default'}`);
 
     // Use threadId as the conversationId for consistency
     const conversationId = threadId;
@@ -670,7 +671,8 @@ export const sendMessageToSuna = async (req: any, res: Response) => {
       query: message,
       userId,
       conversationId: conversationId,
-      threadId: conversationId
+      threadId: conversationId,
+      model: model // Pass the selected model to the service
     };
 
     const response = await sunaService.sendMessage(sunaRequest);

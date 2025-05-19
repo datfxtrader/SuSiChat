@@ -73,7 +73,7 @@ export function useSuna(initialThreadId?: string) {
       setMessages(prev => [...prev, tempUserMessage]);
       
       // Use existing thread ID or null for a new conversation
-      console.log(`Sending message with threadId: ${threadId || 'new conversation'}`);
+      console.log(`Sending message with threadId: ${threadId || 'new conversation'} and model: ${model}`);
       
       const response = await apiRequest(
         'POST',
@@ -81,7 +81,7 @@ export function useSuna(initialThreadId?: string) {
         {
           message,
           threadId: threadId, // Always pass the current threadId, even if undefined
-          model: model // Pass the selected model
+          model: model // Pass the selected model to the API
         }
       );
       
