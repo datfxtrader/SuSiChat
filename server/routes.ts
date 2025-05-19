@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
+import { sendMessageToSuna, getSunaConversation } from "./suna-integration";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -368,6 +369,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch preferences" });
     }
   });
+
+  // Suna Integration endpoints
+  app.post('/api/suna/message', isAuthenticated, sendMessageToSuna);
+  app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
 
   return httpServer;
 }
