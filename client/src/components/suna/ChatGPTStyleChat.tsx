@@ -239,35 +239,47 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <h2 className="text-2xl font-semibold mb-6">How can I help you today?</h2>
-              <div className="grid gap-3 md:grid-cols-2 max-w-3xl w-full">
+              <h2 className="text-3xl font-semibold mb-10 text-gray-800">Hello Dat, where should we begin?</h2>
+              <div className="grid gap-4 md:grid-cols-2 max-w-3xl w-full">
                 <button
-                  className="bg-[#3E3F4B] hover:bg-[#4A4B57] text-left p-4 rounded-md transition-colors"
-                  onClick={() => setMessage("What can you help me with?")}
+                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  onClick={() => {
+                    setMessage("What can you help me with?");
+                    handleSendMessage();
+                  }}
                 >
-                  <div className="font-medium mb-1">What can you help me with?</div>
-                  <div className="text-sm text-gray-400">Learn about my capabilities</div>
+                  <div className="font-medium mb-1 text-gray-800">What can you help me with?</div>
+                  <div className="text-sm text-gray-500">Learn about my capabilities</div>
                 </button>
                 <button
-                  className="bg-[#3E3F4B] hover:bg-[#4A4B57] text-left p-4 rounded-md transition-colors"
-                  onClick={() => setMessage("Write a short story about a robot learning to feel emotions")}
+                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  onClick={() => {
+                    setMessage("Write a short story about a robot learning to feel emotions");
+                    handleSendMessage();
+                  }}
                 >
-                  <div className="font-medium mb-1">Write a short story</div>
-                  <div className="text-sm text-gray-400">About a robot learning to feel emotions</div>
+                  <div className="font-medium mb-1 text-gray-800">Write a short story</div>
+                  <div className="text-sm text-gray-500">About a robot learning to feel emotions</div>
                 </button>
                 <button
-                  className="bg-[#3E3F4B] hover:bg-[#4A4B57] text-left p-4 rounded-md transition-colors"
-                  onClick={() => setMessage("How do I create a family room in Tongkeeper?")}
+                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  onClick={() => {
+                    setMessage("How do I create a family room in Tongkeeper?");
+                    handleSendMessage();
+                  }}
                 >
-                  <div className="font-medium mb-1">How do I create a family room?</div>
-                  <div className="text-sm text-gray-400">Learn about Tongkeeper features</div>
+                  <div className="font-medium mb-1 text-gray-800">How do I create a family room?</div>
+                  <div className="text-sm text-gray-500">Learn about Tongkeeper features</div>
                 </button>
                 <button
-                  className="bg-[#3E3F4B] hover:bg-[#4A4B57] text-left p-4 rounded-md transition-colors"
-                  onClick={() => setMessage("Explain artificial intelligence to me like I'm 5 years old")}
+                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  onClick={() => {
+                    setMessage("Explain AI in simple terms a child would understand");
+                    handleSendMessage();
+                  }}
                 >
-                  <div className="font-medium mb-1">Explain AI to me</div>
-                  <div className="text-sm text-gray-400">In simple terms a child would understand</div>
+                  <div className="font-medium mb-1 text-gray-800">Explain AI to me</div>
+                  <div className="text-sm text-gray-500">In simple terms a child would understand</div>
                 </button>
               </div>
             </div>
