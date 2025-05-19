@@ -198,10 +198,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 return (
                   <div
                     key={msg.id || index}
-                    className={cn(
-                      "px-4 md:px-[10%] py-6 flex w-full items-start",
-                      isUserMessage ? "bg-white" : "bg-gray-50"
-                    )}
+                    className="px-4 md:px-[10%] py-6 flex w-full items-start bg-white"
                   >
                     <div className="flex-shrink-0 mr-4">
                       {isUserMessage ? (
@@ -238,7 +235,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               })}
               
               {isSending && (
-                <div className="px-4 md:px-[10%] py-6 flex w-full items-start bg-gray-50">
+                <div className="px-4 md:px-[10%] py-6 flex w-full items-start bg-white">
                   <div className="flex-shrink-0 mr-4">
                     <div className="rounded-full bg-blue-500 w-8 h-8 flex items-center justify-center">
                       <Bot className="h-4 w-4 text-white" />
