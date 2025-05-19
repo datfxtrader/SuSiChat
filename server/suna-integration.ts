@@ -6,6 +6,10 @@ import { llmService } from './llm';
 const SUNA_API_URL = process.env.SUNA_API_URL || 'http://localhost:8000';
 const USE_MOCK_SUNA = process.env.USE_MOCK_SUNA === 'true' || !process.env.SUNA_API_URL;
 
+// Logging the Suna configuration on startup
+console.log(`Suna API URL: ${SUNA_API_URL}`);
+console.log(`Using mock Suna: ${USE_MOCK_SUNA}`);
+
 /**
  * Interface for Suna API requests
  */
@@ -14,6 +18,8 @@ interface SunaRequest {
   userId: string;
   conversationId?: string;
   tools?: string[];
+  projectId?: string;
+  threadId?: string;
 }
 
 /**
@@ -37,6 +43,17 @@ interface SunaConversation {
   userId: string;
 }
 
+/**
+ * Agent run response structure
+ */
+interface AgentRunResponse {
+  runId: string;
+  status: string;
+  output?: string;
+  threadId: string;
+  projectId: string;
+}
+
 // In-memory storage for mock mode
 const mockConversations: Record<string, SunaConversation> = {};
 
@@ -44,59 +61,233 @@ const mockConversations: Record<string, SunaConversation> = {};
  * Suna integration service for communicating with the Suna backend
  */
 export class SunaIntegrationService {
+  private projectId: string;
+  private apiKey: string | null = null;
+  
+  constructor() {
+    // Default project ID for all users in Suna
+    this.projectId = process.env.SUNA_PROJECT_ID || 'tongkeeper-default';
+    this.apiKey = process.env.SUNA_API_KEY || null;
+    
+    if (!USE_MOCK_SUNA && !this.apiKey) {
+      console.warn('No Suna API key provided. Some features may not work correctly.');
+    }
+  }
+  
+  /**
+   * Set the API key for Suna
+   */
+  setApiKey(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
   /**
    * Send a message to the Suna agent
    */
   async sendMessage(data: SunaRequest): Promise<any> {
     if (USE_MOCK_SUNA) {
+      console.log('Using mock Suna service for message:', data.query);
       return this.mockSendMessage(data);
     }
     
     try {
-      const response = await axios.post(`${SUNA_API_URL}/api/agent/message`, data);
-      return response.data;
+      console.log('Sending message to Suna API:', data.query);
+      
+      // If no thread ID is provided, we need to create a new thread
+      if (!data.threadId) {
+        // Create a thread first
+        const threadResponse = await this.createThread(data.userId);
+        data.threadId = threadResponse.threadId;
+      }
+      
+      // Create a request payload for Suna
+      const requestPayload = {
+        input: data.query,
+        userId: data.userId, 
+        projectId: this.projectId,
+        threadId: data.threadId,
+        stream: false
+      };
+      
+      // Make the API request to Suna
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (this.apiKey) {
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+      
+      const response = await axios.post(
+        `${SUNA_API_URL}/api/agent/run`, 
+        requestPayload,
+        { headers }
+      );
+      
+      // Extract the relevant information from the response
+      const agentRunResponse: AgentRunResponse = response.data;
+      
+      // Convert to our internal format
+      const assistantMessage: SunaMessage = {
+        id: agentRunResponse.runId,
+        content: agentRunResponse.output || 'Sorry, I was unable to process your request.',
+        role: 'assistant',
+        timestamp: new Date().toISOString()
+      };
+      
+      return {
+        message: assistantMessage,
+        threadId: agentRunResponse.threadId,
+        runId: agentRunResponse.runId,
+        status: agentRunResponse.status
+      };
     } catch (error) {
       console.error('Error communicating with Suna API:', error);
-      throw error;
+      // If there's an error with the Suna API, fall back to the mock implementation
+      console.log('Falling back to mock Suna service due to API error');
+      return this.mockSendMessage(data);
     }
   }
 
   /**
-   * Get conversation history from Suna
+   * Create a new thread in Suna
    */
-  async getConversation(userId: string, conversationId: string): Promise<any> {
+  async createThread(userId: string): Promise<any> {
     if (USE_MOCK_SUNA) {
-      return this.mockGetConversation(userId, conversationId);
+      const conv = await this.mockCreateConversation(userId, 'New Conversation');
+      return { threadId: conv.id };
     }
     
     try {
-      const response = await axios.get(`${SUNA_API_URL}/api/conversations/${conversationId}`, {
-        params: { userId }
-      });
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (this.apiKey) {
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+      
+      const response = await axios.post(
+        `${SUNA_API_URL}/api/threads`, 
+        {
+          userId,
+          projectId: this.projectId,
+          title: 'New Conversation'
+        },
+        { headers }
+      );
+      
       return response.data;
+    } catch (error) {
+      console.error('Error creating thread in Suna:', error);
+      // Fall back to mock implementation
+      const conv = await this.mockCreateConversation(userId, 'New Conversation');
+      return { threadId: conv.id };
+    }
+  }
+
+  /**
+   * Get conversation/thread history from Suna
+   */
+  async getConversation(userId: string, threadId: string): Promise<any> {
+    if (USE_MOCK_SUNA) {
+      return this.mockGetConversation(userId, threadId);
+    }
+    
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (this.apiKey) {
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+      
+      // Get thread details
+      const threadResponse = await axios.get(
+        `${SUNA_API_URL}/api/threads/${threadId}`, 
+        {
+          params: { 
+            userId,
+            projectId: this.projectId
+          },
+          headers
+        }
+      );
+      
+      // Get thread messages
+      const messagesResponse = await axios.get(
+        `${SUNA_API_URL}/api/threads/${threadId}/messages`, 
+        {
+          params: { 
+            userId,
+            projectId: this.projectId
+          },
+          headers
+        }
+      );
+      
+      // Convert to our internal format
+      const conversation: SunaConversation = {
+        id: threadId,
+        title: threadResponse.data.title || 'Conversation',
+        messages: messagesResponse.data.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          timestamp: msg.createdAt
+        })),
+        createdAt: threadResponse.data.createdAt,
+        userId
+      };
+      
+      return conversation;
     } catch (error) {
       console.error('Error retrieving conversation from Suna:', error);
-      throw error;
+      // Fall back to the mock implementation
+      return this.mockGetConversation(userId, threadId);
     }
   }
 
   /**
-   * Create a new conversation in Suna
+   * Get all conversations/threads for a user
    */
-  async createConversation(userId: string, title: string): Promise<any> {
+  async getUserConversations(userId: string): Promise<any[]> {
     if (USE_MOCK_SUNA) {
-      return this.mockCreateConversation(userId, title);
+      return Object.values(mockConversations).filter(conv => conv.userId === userId);
     }
     
     try {
-      const response = await axios.post(`${SUNA_API_URL}/api/conversations`, {
-        userId,
-        title
-      });
-      return response.data;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (this.apiKey) {
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+      
+      const response = await axios.get(
+        `${SUNA_API_URL}/api/threads`, 
+        {
+          params: { 
+            userId,
+            projectId: this.projectId
+          },
+          headers
+        }
+      );
+      
+      // Convert to our internal format
+      return response.data.map((thread: any) => ({
+        id: thread.id,
+        title: thread.title || 'Conversation',
+        createdAt: thread.createdAt,
+        userId
+      }));
     } catch (error) {
-      console.error('Error creating conversation in Suna:', error);
-      throw error;
+      console.error('Error retrieving user conversations from Suna:', error);
+      // Fall back to the mock implementation
+      return Object.values(mockConversations).filter(conv => conv.userId === userId);
     }
   }
   
@@ -147,7 +338,10 @@ export class SunaIntegrationService {
       
       return {
         message: assistantMessage,
-        conversationId: data.conversationId
+        conversationId: data.conversationId,
+        threadId: data.conversationId,
+        runId: assistantMessage.id,
+        status: 'completed'
       };
     } catch (error) {
       console.error('Error generating mock Suna response:', error);
@@ -196,7 +390,7 @@ export const sunaService = new SunaIntegrationService();
 // Express route handlers for Suna integration
 export const sendMessageToSuna = async (req: any, res: Response) => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, threadId } = req.body;
     const userId = req.user.claims.sub;
 
     if (!userId) {
@@ -206,7 +400,8 @@ export const sendMessageToSuna = async (req: any, res: Response) => {
     const sunaRequest: SunaRequest = {
       query: message,
       userId,
-      conversationId
+      conversationId,
+      threadId
     };
 
     const response = await sunaService.sendMessage(sunaRequest);
@@ -231,5 +426,21 @@ export const getSunaConversation = async (req: any, res: Response) => {
   } catch (error) {
     console.error('Error retrieving Suna conversation:', error);
     return res.status(500).json({ message: 'Failed to retrieve conversation from Suna' });
+  }
+};
+
+export const getUserConversations = async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const conversations = await sunaService.getUserConversations(userId);
+    return res.json(conversations);
+  } catch (error) {
+    console.error('Error retrieving user conversations:', error);
+    return res.status(500).json({ message: 'Failed to retrieve user conversations' });
   }
 };

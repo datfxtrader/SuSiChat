@@ -4,10 +4,13 @@ import { SunaChat } from '@/components/suna/SunaChat';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export default function SunaAgentPage() {
   const { user, isAuthenticated } = useAuth();
-  const [activeConversationId, setActiveConversationId] = useState<string | undefined>(undefined);
+  const [activeThreadId, setActiveThreadId] = useState<string | undefined>(undefined);
+  const isSunaConfigured = process.env.SUNA_API_URL || process.env.USE_MOCK_SUNA === 'true';
 
   return (
     <MainLayout 
@@ -26,7 +29,22 @@ export default function SunaAgentPage() {
               </div>
               
               <TabsContent value="suna" className="flex-1 overflow-hidden m-0 p-0">
-                <SunaChat conversationId={activeConversationId} />
+                {!isAuthenticated ? (
+                  <div className="flex flex-col items-center justify-center p-6 h-96">
+                    <h2 className="text-2xl font-bold mb-4">Please Log In</h2>
+                    <p className="text-muted-foreground mb-4">
+                      You need to log in to use the Suna AI Agent.
+                    </p>
+                    <button 
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+                      onClick={() => window.location.href = '/api/login'}
+                    >
+                      Log In
+                    </button>
+                  </div>
+                ) : (
+                  <SunaChat threadId={activeThreadId} />
+                )}
               </TabsContent>
               
               <TabsContent value="info" className="p-6 overflow-auto">
@@ -58,6 +76,20 @@ export default function SunaAgentPage() {
                   <li>Automate repetitive tasks</li>
                   <li>Solve complex problems through multi-step reasoning</li>
                 </ul>
+                
+                <Alert className="mt-8 bg-amber-50">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Current Integration Status</AlertTitle>
+                  <AlertDescription>
+                    {process.env.SUNA_API_URL ? (
+                      <>Suna Agent is connected to the backend at {process.env.SUNA_API_URL}</>
+                    ) : process.env.USE_MOCK_SUNA === 'true' ? (
+                      <>Suna Agent is currently running in mock mode. Some advanced features may not be available.</>
+                    ) : (
+                      <>Suna Agent is not properly configured. Please make sure to set up the Suna backend.</>
+                    )}
+                  </AlertDescription>
+                </Alert>
               </TabsContent>
             </Tabs>
           </CardContent>

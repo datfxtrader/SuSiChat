@@ -20,21 +20,27 @@ type SunaConversation = {
 /**
  * Hook for interacting with the Suna AI Agent
  */
-export function useSuna(initialConversationId?: string) {
+export function useSuna(initialThreadId?: string) {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
-  const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId);
+  const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
   
-  // Query for existing conversation data
+  // Query for all user conversations
+  const { data: allConversations, isLoading: isLoadingConversations } = useQuery({
+    queryKey: ['/api/suna/conversations'],
+    enabled: isAuthenticated,
+  });
+  
+  // Query for existing conversation data if we have a thread ID
   const { data: conversation, isLoading: isLoadingConversation } = useQuery({
-    queryKey: ['/api/suna/conversations', conversationId],
-    enabled: !!conversationId && isAuthenticated,
+    queryKey: ['/api/suna/conversations', threadId],
+    enabled: !!threadId && isAuthenticated,
   });
 
   // Update messages when conversation data changes
   useEffect(() => {
-    if (conversation?.messages) {
+    if (conversation?.messages && Array.isArray(conversation.messages)) {
       setMessages(conversation.messages);
     }
   }, [conversation]);
@@ -61,31 +67,31 @@ export function useSuna(initialConversationId?: string) {
         '/api/suna/message',
         {
           message,
-          conversationId
+          threadId
         }
       );
       
       const data = await response.json();
       
-      // Set the conversation ID if this is a new conversation
-      if (data.conversationId && !conversationId) {
-        setConversationId(data.conversationId);
+      // Set the thread ID if this is a new conversation
+      if (data.threadId && !threadId) {
+        setThreadId(data.threadId);
       }
       
       // Add the assistant message
       if (data.message) {
         setMessages(prev => {
           // Remove the temporary message and add both the real user message and assistant message
-          // This assumes the API returns only the assistant's message
           const filteredMessages = prev.filter(m => m.id !== tempUserMessage.id);
           return [...filteredMessages, 
-            // This would come from the API in a real implementation
+            // Add the real user message
             {
               id: `user-${Date.now()}`,
               content: message,
               role: 'user',
               timestamp: new Date(Date.now() - 1000).toISOString()
             },
+            // Add the assistant message from the response
             data.message
           ];
         });
@@ -95,18 +101,28 @@ export function useSuna(initialConversationId?: string) {
     },
     onSuccess: (data) => {
       // Invalidate the conversation to get fresh data
-      if (data.conversationId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/suna/conversations', data.conversationId] });
+      if (data.threadId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/suna/conversations', data.threadId] });
       }
+      // Also invalidate all conversations
+      queryClient.invalidateQueries({ queryKey: ['/api/suna/conversations'] });
     }
   });
 
+  // Function to select a conversation
+  const selectConversation = (selectedThreadId: string) => {
+    setThreadId(selectedThreadId);
+  };
+
   return {
     conversation,
-    conversationId,
+    allConversations,
+    threadId,
     messages,
     isLoadingConversation,
+    isLoadingConversations,
     sendMessage,
     isSending,
+    selectConversation,
   };
 }
