@@ -44,41 +44,107 @@ interface ResearchProgressProps {
   progress: number; // 0-100 percentage for the current stage
 }
 
-const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress }) => {
-  // Sample headlines that could be discovered during research
-  const sampleTopics = [
-    [
-      "EV Lifecycle Emissions vs Gasoline Vehicles - EPA Report",
-      "Battery Production Environmental Impacts - Science Direct",
-      "Electric Grid Carbon Intensity by Region - DOE Analysis"
-    ],
-    [
-      "Manufacturing Emissions Comparison",
-      "Operational Efficiency & Carbon Footprint",
-      "End-of-Life Recycling Challenges"
-    ],
-    [
-      "Overall Climate Impact Assessment",
-      "Air Quality Benefits in Urban Areas",
-      "Future Technology Pathways"
-    ]
-  ];
+const ResearchProgress: React.FC<ResearchProgressProps & { query?: string }> = ({ stage, progress, query }) => {
+  // Generate dynamic topics based on the query
+  const getDynamicTopics = () => {
+    const searchQuery = query || '';
+    const isFinancial = /gold|stock|market|trading|xauusd|cryptocurrency|bitcoin|finance|economy|economic|invest/i.test(searchQuery);
+    const isTech = /software|hardware|ai|programming|computer|website|app|technology|tech|digital/i.test(searchQuery);
+    const isHealth = /health|medical|disease|treatment|medicine|doctor|hospital|diet|exercise|fitness/i.test(searchQuery);
+    
+    if (isFinancial) {
+      return [
+        [
+          "Current Price Trends and Analysis - Market Report",
+          "Technical Analysis and Price Projections - Trading View",
+          "Fundamental Factors Affecting Prices - Financial Analysis"
+        ],
+        [
+          "Market Sentiment and Investor Positioning",
+          "Support and Resistance Levels",
+          "Key Price Action Patterns and Indicators"
+        ],
+        [
+          "Long-term Outlook and Forecast",
+          "Risk Management Strategies",
+          "Global Economic Impact Factors"
+        ]
+      ];
+    } else if (isTech) {
+      return [
+        [
+          "Latest Technology Developments - Tech Report",
+          "Industry Leaders and Market Share - Analysis",
+          "User Adoption Rates and Trends - Research Data"
+        ],
+        [
+          "Feature Comparison and Benchmarks",
+          "Implementation Challenges and Solutions",
+          "Technical Specifications and Requirements"
+        ],
+        [
+          "Future Development Roadmap",
+          "Integration with Existing Systems",
+          "Impact on User Experience and Workflow"
+        ]
+      ];
+    } else if (isHealth) {
+      return [
+        [
+          "Recent Medical Research Findings - Journal Publication",
+          "Treatment Approaches and Effectiveness - Clinical Study",
+          "Health Statistics and Trends - Public Health Data"
+        ],
+        [
+          "Prevention Strategies and Best Practices",
+          "Risk Factors and Early Detection",
+          "Patient Outcomes and Quality of Life"
+        ],
+        [
+          "Healthcare Provider Recommendations",
+          "Lifestyle and Environmental Considerations",
+          "Long-term Management and Support Resources"
+        ]
+      ];
+    } else {
+      // Default topics for general queries
+      return [
+        [
+          "Primary Information Sources - Research Database",
+          "Recent Developments and Updates - Current Analysis",
+          "Historical Context and Background - Expert Overview"
+        ],
+        [
+          "Key Concepts and Definitions",
+          "Comparative Analysis of Perspectives",
+          "Evidence Quality Assessment"
+        ],
+        [
+          "Synthesis of Primary Findings",
+          "Practical Applications and Implications",
+          "Further Questions and Considerations"
+        ]
+      ];
+    }
+  };
+  
+  const topicsData = getDynamicTopics();
   
   const stages = [
     { 
       label: "Searching", 
       description: "Finding relevant sources",
-      topics: sampleTopics[0]
+      topics: topicsData[0]
     },
     { 
       label: "Analyzing", 
       description: "Evaluating information",
-      topics: sampleTopics[1]
+      topics: topicsData[1]
     },
     { 
       label: "Synthesizing", 
       description: "Creating comprehensive response",
-      topics: sampleTopics[2]
+      topics: topicsData[2]
     }
   ];
   
@@ -118,7 +184,7 @@ const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress }) 
                   
                   {/* Discovered topics section */}
                   <div className="mb-2">
-                    {s.topics.map((topic, idx) => (
+                    {s.topics.map((topic: string, idx: number) => (
                       <div 
                         key={idx} 
                         className={`text-xs text-left mb-1 flex items-center
@@ -301,18 +367,23 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     
     const sources: Source[] = [];
     
+    // Debug logs to understand what data we're receiving
+    console.log("Source metadata:", JSON.stringify(message.searchMetadata, null, 2));
+    
     // First try to use detailed source information if available
-    if (message.searchMetadata?.sourceDetails && message.searchMetadata.sourceDetails.length > 0) {
+    if (message.searchMetadata?.sourceDetails && Array.isArray(message.searchMetadata.sourceDetails) && message.searchMetadata.sourceDetails.length > 0) {
+      console.log("Using sourceDetails for sources:", message.searchMetadata.sourceDetails);
       return message.searchMetadata.sourceDetails.map((source: any, index: number) => ({
         title: source.title || `Source ${index + 1} from ${source.domain}`,
-        url: source.url,
+        url: source.url, // This should be the full article URL
         domain: source.domain,
-        publishedDate: new Date().toLocaleDateString() // Would come from actual metadata
+        publishedDate: new Date().toLocaleDateString()
       }));
     }
     
     // Fallback to basic domain information
     if (message.searchMetadata?.sources) {
+      console.log("Falling back to basic source domains:", message.searchMetadata.sources);
       message.searchMetadata.sources.forEach((domain: string, index: number) => {
         sources.push({
           title: `Source ${index + 1} from ${domain}`,
@@ -536,7 +607,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <div className="flex flex-col">
                           <ResearchProgress 
                             stage={researchStage || 1} 
-                            progress={75} 
+                            progress={75}
+                            query={message} // Pass the current query for context-aware topics 
                           />
                         </div>
                       ) : (
