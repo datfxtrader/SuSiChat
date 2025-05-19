@@ -141,22 +141,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
             <PlusIcon className="mr-2 h-4 w-4" /> New chat
           </Button>
           
-          <div className="flex items-center space-x-2">
-            <Settings size={16} className="text-gray-500" />
-            <Select 
-              value={currentModel} 
-              onValueChange={(value) => changeModel(value as LLMModel)}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Select model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="deepseek-chat">DeepSeek</SelectItem>
-                <SelectItem value="gemini-1.5-flash">Gemini Flash 2.0</SelectItem>
-                <SelectItem value="gemini-1.0-pro">Gemini 1.5 Pro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Model selection removed from sidebar */}
         </div>
         
         <div className="flex-1 overflow-y-auto py-2 space-y-0">
@@ -357,9 +342,27 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               </Button>
             </div>
           </div>
-          <div className="max-w-3xl mx-auto">
-            <p className="text-[10px] text-center mt-2 text-gray-500">
-              ChatGPT can make mistakes. Consider checking important information.
+          <div className="max-w-3xl mx-auto flex items-center justify-between mt-2">
+            <div className="flex items-center space-x-2">
+              <Select 
+                value={currentModel} 
+                onValueChange={(value) => changeModel(value as LLMModel)}
+              >
+                <SelectTrigger className="h-7 text-xs px-2 bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50">
+                  <div className="flex items-center">
+                    <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center mr-1 text-[10px] font-bold">I</span>
+                    <SelectValue placeholder="Select model" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deepseek-chat">DeepSeek</SelectItem>
+                  <SelectItem value="gemini-1.5-flash">Gemini Flash 2.0</SelectItem>
+                  <SelectItem value="gemini-1.0-pro">Gemini 1.5 Pro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[10px] text-gray-500">
+              Tongkeeper can make mistakes. Verify important information.
             </p>
           </div>
           {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
