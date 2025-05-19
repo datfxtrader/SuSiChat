@@ -58,22 +58,36 @@ const ResearchProgress: React.FC<ResearchProgressProps & { query?: string }> = (
     const searchQuery = query || '';
     console.log("Current search query for topics:", searchQuery);
     
-    // Extract main entities from the query
+    // Extract main entities from the query with enhanced detection
     const extractMainEntity = (query: string) => {
-      // Check for forex pairs
-      const forexMatch = query.match(/([A-Z]{3}\/[A-Z]{3}|[A-Z]{6}|EUR|USD|GBP|JPY|AUD|CAD|CHF|NZD)/i);
-      if (forexMatch) return forexMatch[0].toUpperCase();
+      // More precise forex pair detection using common patterns
+      const forexPairMatch = query.match(/([A-Z]{3}\/[A-Z]{3}|[A-Z]{6}|EUR\/USD|GBP\/USD|USD\/JPY|AUD\/USD|EUR\/GBP)/i);
+      if (forexPairMatch) {
+        // Format currency pair consistently
+        const pair = forexPairMatch[0].toUpperCase();
+        // If it's in XXXYYY format, add a slash for better readability
+        if (pair.length === 6 && !pair.includes('/')) {
+          return `${pair.slice(0,3)}/${pair.slice(3,6)}`;
+        }
+        return pair;
+      }
+      
+      // Check for individual currencies when part of a question about exchange rates
+      if (/exchange rate|forex|currency|trading|strength|weak|strong|convert/i.test(query)) {
+        const currencyMatch = query.match(/(euro|dollar|pound|sterling|yen|franc|aussie|kiwi|loonie|EUR|USD|GBP|JPY|AUD|CAD|CHF|NZD)/i);
+        if (currencyMatch) return currencyMatch[0].toUpperCase();
+      }
       
       // Check for cryptocurrencies
       const cryptoMatch = query.match(/(bitcoin|btc|ethereum|eth|xrp|ripple|litecoin|ltc|dogecoin|doge)/i);
       if (cryptoMatch) return cryptoMatch[0];
       
       // Check for stocks or indices
-      const stockMatch = query.match(/(nasdaq|dow jones|s&p 500|ftse|nikkei|dax|apple|google|microsoft|amazon|tesla)/i);
+      const stockMatch = query.match(/(nasdaq|dow jones|s&p 500|s&p500|sp500|ftse|nikkei|dax|apple|google|microsoft|amazon|tesla)/i);
       if (stockMatch) return stockMatch[0];
       
       // Check for commodities
-      const commodityMatch = query.match(/(gold|xau|silver|xag|oil|gas|commodity)/i);
+      const commodityMatch = query.match(/(gold|xau|silver|xag|oil|crude|brent|wti|gas|natural gas|commodity)/i);
       if (commodityMatch) return commodityMatch[0];
       
       return '';
@@ -83,7 +97,7 @@ const ResearchProgress: React.FC<ResearchProgressProps & { query?: string }> = (
     console.log("Extracted main entity:", mainEntity);
     
     // Currency pair specific topics (GBPUSD, EURUSD, etc.)
-    if (/GBP.*USD|GBPUSD/i.test(searchQuery)) {
+    if (/GBP.*USD|GBPUSD|GBP\/USD/i.test(searchQuery) || mainEntity === 'GBP/USD') {
       return [
         [
           "GBP/USD Price Action - Trading Economics",
@@ -407,7 +421,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   
   const { 
     messages = [], 
-    allConversations = [] as any[],
+    allConversations = [] as { id: string; title: string; createdAt: string }[],
     threadId: currentThreadId,
     isLoadingConversation,
     isLoadingConversations, 
@@ -525,8 +539,14 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         && message.searchMetadata.sourceDetails.length > 0) {
       console.log("Using sourceDetails from metadata:", message.searchMetadata.sourceDetails);
       
+      type SourceDetail = {
+        title?: string;
+        url?: string;
+        domain?: string;
+      };
+      
       const extractedSources = message.searchMetadata.sourceDetails
-        .map((source: any, index: number) => {
+        .map((source: SourceDetail, index: number) => {
           if (!source.url) return null;
           
           try {
