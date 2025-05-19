@@ -442,6 +442,9 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const [researchMode, setResearchMode] = useState(false);
   const [researchDepth, setResearchDepth] = useState(1); // 1-3 scale for research depth
   const [researchStage, setResearchStage] = useState(0); // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
+  // DeerFlow deep research integration
+  const [showResearchPanel, setShowResearchPanel] = useState(false);
+  const [researchQuery, setResearchQuery] = useState('');
   
   const { 
     messages = [], 
@@ -471,6 +474,16 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+  
+  // Function to scroll to bottom of messages
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
+  // Define the DeerFlow hook
+  const deerflow = useDeerflow();
 
   // Extract sources from message metadata or content for research display
   const getSourcesFromMetadata = (message: any): Source[] => {
@@ -1131,30 +1144,25 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   // Add the research results to the chat
                   setShowResearchPanel(false);
                   
-                  // First add user message about the research
-                  const userMsg = {
-                    role: 'user',
-                    content: `/deepresearch ${message}`,
-                    timestamp: new Date().toISOString(),
-                    id: Date.now().toString(),
+                  // Create a custom search preferences object for deep research
+                  const deepResearchPrefs = {
+                    useDeepResearch: true,
+                    researchDepth: 'deep',
+                    useCustomResponse: true,
+                    customResponse: results
                   };
                   
-                  // Then add the AI message with research results
-                  const aiMsg = {
-                    role: 'assistant',
-                    content: results,
-                    timestamp: new Date().toISOString(),
-                    id: (Date.now() + 1).toString(),
-                    searchMetadata: {
-                      deepResearchUsed: true,
-                      isDeepResearchResponse: true
-                    }
-                  };
+                  // Send the message to Suna with the custom response
+                  sendMessage({
+                    message: `/deepresearch ${message}`,
+                    model: currentModel,
+                    customSearchPrefs: deepResearchPrefs
+                  });
                   
-                  addMessage(userMsg);
-                  addMessage(aiMsg);
                   setMessage(''); // Clear the input
-                  scrollToBottom();
+                  
+                  // Scroll to bottom after a short delay to ensure messages are rendered
+                  setTimeout(scrollToBottom, 100);
                 }}
                 isEmbedded={true}
               />
