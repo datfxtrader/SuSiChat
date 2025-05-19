@@ -271,6 +271,7 @@ interface SunaMessage {
     resultCount?: number;   // Number of results found
     searchEngines?: string[]; // Which search engines were used
     searchTime?: number;    // How long the search took in ms
+    deepResearchUsed?: boolean; // Whether DeerFlow deep research was used
     sourceDetails?: {       // Detailed source information
       title: string;        // Article title
       url: string;          // Full article URL
@@ -792,8 +793,9 @@ export class SunaIntegrationService {
               domain: s.domain
             }));
             
-            // Create metadata for the conversation
+            // Create metadata for the conversation with deep research info
             searchMetadata = {
+              deepResearchUsed: true,
               query: data.query,
               sources: deepResearchResults.sources.map(s => s.domain),
               resultCount: deepResearchResults.sources.length,

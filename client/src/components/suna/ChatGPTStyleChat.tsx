@@ -469,7 +469,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
 
   // Extract sources from message metadata or content for research display
   const getSourcesFromMetadata = (message: any): Source[] => {
-    if (!message.webSearchUsed) return [];
+    // Return empty array if no search was used (unless deep research was used)
+    if (!message.webSearchUsed && !message.searchMetadata?.deepResearchUsed) return [];
     
     // Enhanced source extraction - three-step approach 
     const sources: Source[] = [];
@@ -1025,11 +1026,32 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                 </button>
               </div>
+              
+              {/* Research depth selector (only shown in research mode) */}
+              {researchMode && (
+                <Select 
+                  value={String(researchDepth)} 
+                  onValueChange={(value) => setResearchDepth(parseInt(value))}
+                >
+                  <SelectTrigger className="h-7 text-xs w-28 ml-2">
+                    <SelectValue placeholder="Depth" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Basic</SelectItem>
+                    <SelectItem value="2">Standard</SelectItem>
+                    <SelectItem value="3">Deep</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <p className="text-[10px] text-gray-500">
               {researchMode 
-                ? "Comprehensive research with thorough source analysis" 
-                : "Uses Tavily & Brave Search for real-time information"}
+                ? researchDepth === 1 
+                  ? "Basic research with quick source analysis"
+                  : researchDepth === 2
+                  ? "Standard research with thorough source analysis"
+                  : "Deep research with comprehensive source analysis and insights" 
+                : "Uses web search for real-time information"}
             </p>
           </div>
           {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
