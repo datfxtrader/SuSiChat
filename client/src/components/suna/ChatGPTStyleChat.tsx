@@ -301,14 +301,24 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     
     const sources: Source[] = [];
     
-    // Extract sources from searchMetadata
+    // First try to use detailed source information if available
+    if (message.searchMetadata?.sourceDetails && message.searchMetadata.sourceDetails.length > 0) {
+      return message.searchMetadata.sourceDetails.map((source: any, index: number) => ({
+        title: source.title || `Source ${index + 1} from ${source.domain}`,
+        url: source.url,
+        domain: source.domain,
+        publishedDate: new Date().toLocaleDateString() // Would come from actual metadata
+      }));
+    }
+    
+    // Fallback to basic domain information
     if (message.searchMetadata?.sources) {
       message.searchMetadata.sources.forEach((domain: string, index: number) => {
         sources.push({
           title: `Source ${index + 1} from ${domain}`,
           url: `https://${domain}`,
           domain: domain,
-          publishedDate: new Date().toLocaleDateString() // Would come from actual metadata
+          publishedDate: new Date().toLocaleDateString()
         });
       });
     }

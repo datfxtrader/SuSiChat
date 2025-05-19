@@ -265,6 +265,11 @@ interface SunaMessage {
     resultCount?: number;   // Number of results found
     searchEngines?: string[]; // Which search engines were used
     searchTime?: number;    // How long the search took in ms
+    sourceDetails?: {       // Detailed source information
+      title: string;        // Article title
+      url: string;          // Full article URL
+      domain: string;       // Domain name
+    }[];
   };
 }
 
@@ -691,7 +696,8 @@ export class SunaIntegrationService {
               sources: sourceDomains,
               resultCount: searchResults.length,
               searchEngines: usedSearchEngines,
-              searchTime: searchTimeMs
+              searchTime: searchTimeMs,
+              sourceDetails: sourceUrls // Include the full source details with URLs
             } as SunaMessage['searchMetadata'];
             
             // Sort results by relevance or freshness based on user preference
