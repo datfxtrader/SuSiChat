@@ -164,12 +164,16 @@ export function DeepResearch() {
             {renderProgressIndicator()}
             
             {/* Research results */}
-            {isResearchComplete && researchStatus && (
+            {(researchStatus?.status === 'completed' || 
+              (researchStatus?.sources && researchStatus?.sources.length > 0)) && (
               <div className="space-y-6 mt-6 border-t pt-6">
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Research Summary</h3>
                   <div className="prose prose-sm max-w-none">
-                    <ReactMarkdown>{researchStatus.summary}</ReactMarkdown>
+                    {researchStatus.summary ? 
+                      <ReactMarkdown>{researchStatus.summary}</ReactMarkdown> :
+                      <p>Analyzing sources to generate research summary...</p>
+                    }
                   </div>
                 </div>
                 
