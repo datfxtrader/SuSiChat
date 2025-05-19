@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Tongkeeper AI Assistant</title>
+    <meta name="description" content="Tongkeeper is a family-oriented AI assistant that helps with scheduling, homework, family chat, and more." />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <meta property="og:title" content="Tongkeeper AI Assistant" />
+    <meta property="og:description" content="Your family's personal AI assistant for scheduling, homework help, and more." />
+    <meta property="og:type" content="website" />
+    <style>
+      .chat-bubble-ai {
+        border-radius: 18px 18px 18px 4px;
+      }
+      .chat-bubble-user {
+        border-radius: 18px 18px 4px 18px;
+      }
+      .auto-overflow {
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+      }
+      .auto-overflow::-webkit-scrollbar {
+        width: 6px;
+      }
+      .auto-overflow::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .auto-overflow::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.5);
+        border-radius: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+  </body>
+</html>
