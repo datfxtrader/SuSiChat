@@ -144,9 +144,7 @@ export class SunaIntegrationService {
       };
     } catch (error) {
       console.error('Error communicating with Suna API:', error);
-      // If there's an error with the Suna API, fall back to the mock implementation
-      console.log('Falling back to mock Suna service due to API error');
-      return this.mockSendMessage(data);
+      throw new Error('Failed to communicate with Suna API. Make sure the Suna backend is running.');
     }
   }
 
@@ -293,250 +291,42 @@ export class SunaIntegrationService {
   }
   
   /**
-   * Enhanced mock implementation of Suna with DeepSeek integration
-   * This simulates the functionality of Suna with agent-like capabilities
+   * Get conversation from the Suna backend
    */
-  private async mockSendMessage(data: SunaRequest): Promise<any> {
-    console.log('Using enhanced Suna service with DeepSeek for message:', data.query);
-    console.log('Using conversation ID:', data.conversationId);
+  private async getSunaConversation(userId: string, conversationId: string): Promise<SunaConversation> {
+    console.log('Fetching conversation from Suna API:', conversationId);
     
-    // If no conversation ID is provided, create a new one
-    if (!data.conversationId) {
-      const conv = await this.mockCreateConversation(data.userId, 'New Conversation');
-      data.conversationId = conv.id;
-      console.log('Created new conversation with ID:', data.conversationId);
-    } 
-    // If conversation ID doesn't exist in our mock storage, create it with that ID
-    else if (!mockConversations[data.conversationId]) {
-      console.log('Recreating conversation with ID:', data.conversationId);
-      const conversationId = data.conversationId;
+    try {
+      // Get the messages for this thread from the Suna API
+      const response = await axios.get(
+        `${SUNA_API_URL}/api/threads/${conversationId}/messages?userId=${userId}`,
+        {
+          headers: this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}
+        }
+      );
       
+      // Get the thread details
+      const threadResponse = await axios.get(
+        `${SUNA_API_URL}/api/threads/${conversationId}?userId=${userId}`,
+        {
+          headers: this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}
+        }
+      );
+      
+      // Convert to our conversation format
       const conversation: SunaConversation = {
         id: conversationId,
-        title: 'Conversation',
-        messages: [],
-        createdAt: new Date().toISOString(),
-        userId: data.userId
+        title: threadResponse.data.title || 'Conversation',
+        messages: response.data || [],
+        createdAt: threadResponse.data.createdAt || new Date().toISOString(),
+        userId
       };
       
-      mockConversations[conversationId] = conversation;
-    }
-    
-    const conversation = mockConversations[data.conversationId];
-    
-    // Add user message
-    const userMessage: SunaMessage = {
-      id: `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      content: data.query,
-      role: 'user',
-      timestamp: new Date().toISOString()
-    };
-    
-    conversation.messages.push(userMessage);
-    
-    // Generate context from conversation history
-    const conversationContext = this.buildConversationContext(conversation);
-    
-    // Generate AI response using the existing LLM service with enhanced context
-    try {
-      const taskPrompt = this.determineTaskType(data.query);
-      const enhancedPrompt = `${taskPrompt}\n\nUser query: ${data.query}\n\nConversation history: ${conversationContext}`;
-      
-      const aiResponse = await llmService.generateResponse(data.userId, enhancedPrompt);
-      
-      // Update the conversation title if this is the first exchange
-      if (conversation.messages.length === 1) {
-        // Generate a title based on the first message
-        const titleLimit = Math.min(data.query.length, 30);
-        conversation.title = data.query.substring(0, titleLimit) + (data.query.length > 30 ? '...' : '');
-      }
-      
-      // Add AI message
-      const assistantMessage: SunaMessage = {
-        id: `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        content: aiResponse,
-        role: 'assistant',
-        timestamp: new Date().toISOString()
-      };
-      
-      conversation.messages.push(assistantMessage);
-      
-      return {
-        message: assistantMessage,
-        conversationId: data.conversationId,
-        threadId: data.conversationId,
-        runId: assistantMessage.id,
-        status: 'completed'
-      };
+      return conversation;
     } catch (error) {
-      console.error('Error generating enhanced Suna response:', error);
-      throw error;
+      console.error('Error fetching conversation from Suna API:', error);
+      throw new Error('Failed to fetch conversation from Suna API');
     }
-  }
-  
-  /**
-   * Build context from conversation history
-   */
-  private buildConversationContext(conversation: SunaConversation): string {
-    // Get all messages in the conversation for proper context
-    const allMessages = conversation.messages;
-    
-    let context = 'CONVERSATION HISTORY:\n\n';
-    for (const msg of allMessages) {
-      context += `${msg.role === 'user' ? '👤 User' : '🤖 Assistant'}: ${msg.content}\n\n`;
-    }
-    
-    context += 'END OF CONVERSATION HISTORY\n\n';
-    context += 'IMPORTANT: Remember to maintain context awareness between messages. If the user refers to something mentioned earlier in the conversation, make sure to reference that information in your response.\n\n';
-    
-    return context;
-  }
-  
-  /**
-   * Determine the type of task the user is asking about and generate
-   * appropriate guidance for how Suna would handle it
-   */
-  private determineTaskType(query: string): string {
-    const lowerQuery = query.toLowerCase();
-    
-    // Start with the standard agent persona
-    let taskSpecificPrompt = `You are Suna, an advanced AI agent with multiple capabilities. You have a strong memory and maintain context throughout conversations.
-Always consider the ENTIRE conversation history when responding, especially handling references to previous messages.
-
-Your capabilities include:
-1. Web browsing and internet search
-2. Document creation and editing
-3. Data analysis and visualization
-4. Code writing and execution
-5. Complex problem-solving with multi-step reasoning
-
-Instructions:
-- Be conversational and natural in your responses
-- Provide detailed, thoughtful answers that maintain context
-- If a user refers to previous information, acknowledge and use that context
-- If a request is ambiguous, clarify what the user means by referencing conversation history
-- For complex requests, explain your thought process step by step
-`;
-    
-    // Web search and research
-    if (lowerQuery.includes('search') || 
-        lowerQuery.includes('find') || 
-        lowerQuery.includes('look up') ||
-        lowerQuery.includes('research')) {
-      taskSpecificPrompt += `
-For this web research query about "${query}", you would:
-1. Use your web browsing capabilities to search multiple sources
-2. Extract and synthesize information from websites, news, and databases
-3. Verify information across multiple reliable sources
-4. Compile the findings into a comprehensive answer
-
-Since your web tools aren't currently active, provide your best response based on existing knowledge, and explain what additional information you would normally search for to give a more complete answer.`;
-    }
-    
-    // File creation or document processing
-    else if (lowerQuery.includes('create file') || 
-        lowerQuery.includes('make a document') || 
-        lowerQuery.includes('write a') ||
-        lowerQuery.includes('generate a') ||
-        lowerQuery.includes('edit')) {
-      taskSpecificPrompt += `
-For this document creation request about "${query}", you would:
-1. Use your file creation and editing tools
-2. Create the requested document with proper formatting
-3. Include relevant sections, headings, and content
-4. Save or export the file in the appropriate format
-
-Even though your document tools aren't currently active, provide sample content you would include and explain how you would structure the document.`;
-    }
-    
-    // Data analysis
-    else if (lowerQuery.includes('analyze') || 
-        lowerQuery.includes('data') || 
-        lowerQuery.includes('statistics') ||
-        lowerQuery.includes('metrics') ||
-        lowerQuery.includes('trends')) {
-      taskSpecificPrompt += `
-For this data analysis request about "${query}", you would:
-1. Import and clean the data from various sources
-2. Perform statistical analysis and identify patterns
-3. Generate visualizations to illustrate key findings
-4. Provide insights and recommendations based on the analysis
-
-Without direct access to the data, provide a framework for how you would approach this analysis and what insights you might expect to find based on general knowledge.`;
-    }
-    
-    // Technical tasks
-    else if (lowerQuery.includes('code') || 
-        lowerQuery.includes('program') || 
-        lowerQuery.includes('debug') ||
-        lowerQuery.includes('function') ||
-        lowerQuery.includes('script')) {
-      taskSpecificPrompt += `
-For this technical request about "${query}", you would:
-1. Set up a coding environment for the appropriate language
-2. Write, test, and debug the code in real-time
-3. Optimize the solution for performance and readability
-4. Provide documentation and explanations alongside the code
-
-Provide a detailed explanation and sample code to address this request, even though you can't execute it directly right now.`;
-    }
-    
-    // For ambiguous or short queries, emphasize context awareness
-    else if (query.length < 15 || query.split(' ').length < 4) {
-      taskSpecificPrompt += `
-This appears to be a short or potentially ambiguous query: "${query}"
-
-IMPORTANT: Pay special attention to the conversation history to understand what the user is referring to. 
-- Look for references to previous messages or topics
-- If they're referring to an earlier part of the conversation, respond directly to that context
-- If still unclear after checking history, politely ask for clarification while suggesting possible interpretations based on the conversation so far`;
-    }
-    
-    // Default case for other general queries
-    else {
-      taskSpecificPrompt += `
-For this request about "${query}", carefully review the conversation history and:
-1. Determine which of your capabilities would be most helpful
-2. Consider any relevant information shared earlier in the conversation
-3. Provide a comprehensive response that addresses the user's need in context
-4. If this would normally require external tools, explain what you would do with those tools and then provide your best answer based on existing knowledge`;
-    }
-    
-    return taskSpecificPrompt;
-  }
-  
-  /**
-   * Mock implementation of getting a conversation
-   */
-  private async mockGetConversation(userId: string, conversationId: string): Promise<SunaConversation> {
-    console.log('Using mock Suna service for conversation:', conversationId);
-    
-    if (!mockConversations[conversationId]) {
-      throw new Error('Conversation not found');
-    }
-    
-    return mockConversations[conversationId];
-  }
-  
-  /**
-   * Mock implementation of creating a conversation
-   */
-  private async mockCreateConversation(userId: string, title: string): Promise<SunaConversation> {
-    console.log('Using mock Suna service to create conversation');
-    
-    const conversationId = `conv-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
-    const conversation: SunaConversation = {
-      id: conversationId,
-      title: title || 'New Conversation',
-      messages: [],
-      createdAt: new Date().toISOString(),
-      userId
-    };
-    
-    mockConversations[conversationId] = conversation;
-    
-    return conversation;
   }
 }
 
