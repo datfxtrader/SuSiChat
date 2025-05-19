@@ -146,7 +146,9 @@ export function useDeerflow() {
     
     // Helper function to check if research is complete
     isResearchComplete: getResearchStatus.data?.status === 'completed',
-    isResearchInProgress: getResearchStatus.data?.status === 'in_progress',
+    isResearchInProgress: getResearchStatus.data?.status === 'in_progress' || 
+                         getResearchStatus.data?.status === 'analyzing' || 
+                         getResearchStatus.data?.status === 'synthesizing',
     isResearchFailed: getResearchStatus.data?.status === 'failed',
   };
 }
