@@ -3,6 +3,46 @@ import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
 
+// Web search functionality using Tavily API
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
+const TAVILY_SEARCH_URL = 'https://api.tavily.com/search';
+
+/**
+ * Perform a web search using Tavily API
+ * @param query Search query string
+ * @returns Search results from the web
+ */
+async function performWebSearch(query: string) {
+  try {
+    console.log('Performing web search for:', query);
+    
+    const response = await axios.post(
+      TAVILY_SEARCH_URL,
+      {
+        query: query,
+        search_depth: 'advanced',  // basic or advanced
+        include_domains: [],        // optional specific domains to include
+        exclude_domains: [],        // optional specific domains to exclude
+        max_results: 8,             // number of results to return
+        include_answer: true,       // include an AI generated answer
+        include_raw_content: false, // include raw content of each search result
+        max_tokens: 1000,          // max tokens in the answer
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TAVILY_API_KEY}`
+        }
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error with Tavily web search:', error);
+    return { error: 'Failed to perform web search' };
+  }
+}
+
 // Configuration for the DeepSeek API (used for Suna agent functionality)
 const DEEPSEEK_API_ENDPOINT = process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
@@ -87,6 +127,25 @@ export class SunaIntegrationService {
   }
 
   /**
+   * Determine if a query needs web search
+   * This is a simple heuristic - it can be made more sophisticated
+   */
+  private needsWebSearch(query: string): boolean {
+    const webSearchTerms = [
+      'current', 'latest', 'recent', 'news', 'today', 'vs', 'match', 'game',
+      'score', 'weather', 'stock', 'price', 'covid', 'update', 'election',
+      'result', 'data', 'stats', 'statistics', 'event', 'championship',
+      'tournament', 'final', 'semifinal', 'quarterfinal', 
+      'who won', 'what happened', 'when is', 'where is'
+    ];
+    
+    const lowerQuery = query.toLowerCase();
+    
+    // Check if any web search terms are in the query
+    return webSearchTerms.some(term => lowerQuery.includes(term));
+  }
+
+  /**
    * Send a message to the Suna agent (directly using DeepSeek API)
    */
   async sendMessage(data: SunaRequest): Promise<any> {
@@ -120,6 +179,35 @@ export class SunaIntegrationService {
         };
       }
       
+      // Determine if web search is needed based on the query
+      let webSearchResults = null;
+      let webSearchContent = '';
+      
+      if (TAVILY_API_KEY && this.needsWebSearch(data.query)) {
+        try {
+          webSearchResults = await performWebSearch(data.query);
+          
+          if (!webSearchResults.error) {
+            // Format search results for the LLM
+            webSearchContent = `
+Web Search Results:
+${webSearchResults.results?.map((result: any, index: number) => 
+  `[${index + 1}] "${result.title}"
+URL: ${result.url}
+Content: ${result.content}
+`).join('\n') || 'No results found'}
+
+Search Answer: ${webSearchResults.answer || 'No answer available'}
+
+Current Date: ${new Date().toISOString().split('T')[0]}
+`;
+            console.log('Successfully retrieved web search results');
+          }
+        } catch (error) {
+          console.error('Error performing web search:', error);
+        }
+      }
+      
       // Prepare messages array with system prompt and history
       const messages = [
         {
@@ -140,7 +228,11 @@ When responding to users, be:
 - Knowledgeable about a wide range of topics
 - Professional but conversational in tone
 
-If asked about tasks that would normally require your advanced tools (like web search or file creation), explain what capabilities the full Suna agent would use to accomplish the task, then provide the best response you can with your current knowledge.`
+${webSearchContent ? 'I have performed a web search for you and found the following information:' : 'If you need real-time information, I can perform a web search for you.'}
+
+${webSearchContent ? webSearchContent : ''}
+
+Use the current date and web search information when responding about current events, sports, news, or other timely topics. The current date is ${new Date().toISOString().split('T')[0]}.`
         }
       ];
       
@@ -220,7 +312,8 @@ If asked about tasks that would normally require your advanced tools (like web s
         message: assistantMessage,
         threadId: data.threadId,
         runId,
-        status: 'completed'
+        status: 'completed',
+        webSearchUsed: !!webSearchContent
       };
     } catch (error) {
       console.error('Error with DeepSeek API for Suna agent:', error);
