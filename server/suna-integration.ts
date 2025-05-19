@@ -231,6 +231,9 @@ const USE_MOCK_SUNA = false; // Always use direct integration
 
 console.log('Using integrated DeepSeek API for Suna agent capabilities');
 
+// Enable DeerFlow deep research integration
+const USE_DEERFLOW_RESEARCH = true;
+
 /**
  * Interface for Suna API requests
  */
@@ -323,6 +326,68 @@ export class SunaIntegrationService {
    */
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
+  }
+
+  /**
+   * Perform deep research using DeerFlow for complex queries
+   * 
+   * @param query The query to research
+   * @param context Optional context from previous messages
+   * @returns Research results or null if research failed
+   */
+  private async performDeepResearch(query: string, context?: string): Promise<ResearchResponse | null> {
+    if (!USE_DEERFLOW_RESEARCH) {
+      console.log('DeerFlow deep research is disabled');
+      return null;
+    }
+    
+    try {
+      console.log('Performing deep research for query:', query);
+      const startTime = Date.now();
+      
+      // Create research request with appropriate parameters
+      const researchRequest: ResearchRequest = {
+        query,
+        depth: 'standard',    // Default to standard depth
+        maxSources: 6,        // Reasonable number of sources
+        useCache: true,       // Use cache for efficiency
+        userContext: context  // Add context if available
+      };
+      
+      // Determine if this is a complex topic requiring deep analysis
+      if (this.isComplexTopic(query)) {
+        researchRequest.depth = 'deep';
+        researchRequest.maxSources = 8;
+      }
+      
+      // Run complete research (blocking operation)
+      console.log('Starting DeerFlow research with depth:', researchRequest.depth);
+      const researchResult = await deerflowBridge.runCompleteResearch(researchRequest);
+      
+      const duration = Date.now() - startTime;
+      console.log(`Deep research completed in ${duration}ms, found ${researchResult.sources.length} sources`);
+      
+      return researchResult;
+    } catch (error) {
+      console.error('Error performing deep research:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Check if a topic is complex enough to warrant deep research
+   */
+  private isComplexTopic(query: string): boolean {
+    const complexTopics = [
+      'philosophy', 'ethics', 'morality', 'metaphysics', 
+      'quantum', 'relativity', 'climate change', 'artificial intelligence',
+      'geopolitics', 'economics', 'history', 'medicine', 'science',
+      'psychology', 'neuroscience', 'technology', 'education'
+    ];
+    
+    const lowerQuery = query.toLowerCase();
+    return complexTopics.some(topic => lowerQuery.includes(topic)) ||
+           query.length > 100; // Long queries often require deeper analysis
   }
 
   /**
@@ -659,10 +724,14 @@ export class SunaIntegrationService {
         };
       }
       
-      // Determine if web search is needed based on the query, context, and user preferences
+      // Determine if deep research or web search is needed based on the query, context, and user preferences
       let webSearchResults: any = null;
+      let deepResearchResults: ResearchResponse | null = null;
       let webSearchContent = '';
       let searchMetadata: SunaMessage['searchMetadata'] = undefined;
+      
+      // Check if the query needs deep research
+      const needsDeep = USE_DEERFLOW_RESEARCH && this.needsDeepResearch(data.query, conversation.messages);
       
       // Check for explicit search commands in the query (like /search)
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
@@ -679,7 +748,52 @@ export class SunaIntegrationService {
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
       
-      if (shouldSearch) {
+      // If the query needs deep research, perform it first
+      if (needsDeep) {
+        try {
+          console.log("Detected complex query requiring deep research:", data.query);
+          
+          // Get context from previous messages (if any)
+          let context = undefined;
+          if (conversation.messages.length > 0) {
+            // Create context from up to 2 previous exchanges
+            const previousMessages = conversation.messages.slice(-4);
+            context = previousMessages.map(m => `${m.role}: ${m.content}`).join('\n');
+          }
+          
+          // Perform deep research with DeerFlow
+          deepResearchResults = await this.performDeepResearch(data.query, context);
+          
+          if (deepResearchResults) {
+            console.log(`Deep research successful, found ${deepResearchResults.sources.length} sources and ${deepResearchResults.insights.length} insights`);
+            
+            // Create search metadata with deep research results
+            const sourceUrls = deepResearchResults.sources.map(s => ({
+              title: s.title,
+              url: s.url,
+              domain: s.domain
+            }));
+            
+            // Create metadata for the conversation
+            searchMetadata = {
+              query: data.query,
+              sources: deepResearchResults.sources.map(s => s.domain),
+              resultCount: deepResearchResults.sources.length,
+              searchEngines: ['deerflow'],
+              searchTime: 0, // Will be populated after the operation
+              sourceDetails: sourceUrls
+            } as SunaMessage['searchMetadata'];
+          } else {
+            console.log("Deep research failed or returned no results, falling back to regular search");
+          }
+        } catch (error) {
+          console.error("Error performing deep research:", error);
+          // Fall back to regular search
+        }
+      }
+      
+      // Perform regular web search if deep research wasn't performed or failed
+      if ((shouldSearch && !deepResearchResults)) {
         try {
           // Track search start time for metrics
           const searchStartTime = Date.now();
