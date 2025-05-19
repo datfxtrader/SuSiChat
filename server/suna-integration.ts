@@ -68,10 +68,12 @@ export class SunaIntegrationService {
   constructor() {
     // Default project ID for all users in Suna
     this.projectId = process.env.SUNA_PROJECT_ID || 'tongkeeper-default';
-    this.apiKey = process.env.SUNA_API_KEY || null;
+    this.apiKey = process.env.DEEPSEEK_API_KEY || null;
     
     if (!USE_MOCK_SUNA && !this.apiKey) {
-      console.warn('No Suna API key provided. Some features may not work correctly.');
+      console.warn('No DeepSeek API key found. Some features may not work correctly.');
+    } else if (this.apiKey) {
+      console.log('DeepSeek API key detected for Suna integration');
     }
   }
   
