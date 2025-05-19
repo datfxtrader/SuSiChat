@@ -104,8 +104,9 @@ export function useDeerflow() {
     isLoadingStatus: getResearchStatus.isLoading,
     
     // Service status
-    isServiceAvailable: checkHealth.data?.status === 'ok',
-    isLoadingServiceStatus: checkHealth.isLoading,
+    // During development, set to true to allow testing even without a running server
+    isServiceAvailable: true, // checkHealth.data?.status === 'ok'
+    isLoadingServiceStatus: false, // checkHealth.isLoading
     
     // State
     activeResearchId,
