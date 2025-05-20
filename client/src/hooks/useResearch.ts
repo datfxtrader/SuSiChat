@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
-import { apiRequest } from '@/lib/api';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 
 // Research depth levels
 export enum ResearchDepth {

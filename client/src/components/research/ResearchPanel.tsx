@@ -1,170 +1,250 @@
 import React, { useState } from 'react';
-import { ResearchDepthSelector } from './ResearchDepthSelector';
-import { useResearch, ResearchDepth } from '@/hooks/useResearch';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Search, AlertCircle } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Loader2, Search, Sparkles, Database, ArrowUpRight, AlertCircle } from 'lucide-react';
+import { useResearch, ResearchDepth, ResearchResult } from '@/hooks/useResearch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
 
+// Format processing time to a human-readable format
+const formatTime = (ms: number): string => {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+};
+
+// Format date to a human-readable format
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleString();
+};
+
 interface ResearchPanelProps {
-  onResearchComplete?: (report: string) => void;
+  initialQuery?: string;
+  defaultDepth?: ResearchDepth;
 }
 
-export function ResearchPanel({ onResearchComplete }: ResearchPanelProps) {
-  const [query, setQuery] = useState('');
-  const [researchDepth, setResearchDepth] = useState<ResearchDepth>(ResearchDepth.Basic);
+const ResearchPanel: React.FC<ResearchPanelProps> = ({ 
+  initialQuery = '', 
+  defaultDepth = ResearchDepth.Basic 
+}) => {
+  const [query, setQuery] = useState(initialQuery);
+  const [depth, setDepth] = useState<ResearchDepth>(defaultDepth);
   const { performResearch, result, isLoading, error, resetResearch } = useResearch();
+  const { toast } = useToast();
 
+  // Handle research submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
-
+    
+    if (!query.trim()) {
+      toast({
+        title: 'Empty Query',
+        description: 'Please enter a research question',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     performResearch({
-      query,
-      depth: researchDepth,
+      query: query.trim(),
+      depth,
     });
   };
 
-  const handleUseResults = () => {
-    if (result?.report && onResearchComplete) {
-      onResearchComplete(result.report);
-      resetResearch();
-      setQuery('');
+  // Get depth label and icon
+  const getDepthInfo = (level: ResearchDepth) => {
+    switch (level) {
+      case ResearchDepth.Basic:
+        return { label: 'Basic', icon: <Search className="h-4 w-4 mr-2" /> };
+      case ResearchDepth.Enhanced:
+        return { label: 'Enhanced', icon: <Sparkles className="h-4 w-4 mr-2" /> };
+      case ResearchDepth.Deep:
+        return { label: 'Deep', icon: <Database className="h-4 w-4 mr-2" /> };
+      default:
+        return { label: 'Unknown', icon: <Search className="h-4 w-4 mr-2" /> };
     }
   };
 
-  const handleNewSearch = () => {
-    resetResearch();
-  };
-
   return (
-    <div className="flex flex-col h-full">
-      {!result ? (
-        <Card className="flex-1 flex flex-col">
-          <CardHeader>
-            <CardTitle>Research Assistant</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="query" className="text-sm font-medium">Research Question</label>
-                <Textarea
-                  id="query"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="What would you like to research?"
-                  className="min-h-[120px]"
-                  disabled={isLoading}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Research Depth</label>
-                <ResearchDepthSelector
-                  value={researchDepth}
-                  onChange={setResearchDepth}
-                  disabled={isLoading}
-                />
-                {researchDepth === ResearchDepth.Deep && (
-                  <Alert variant="warning" className="mt-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Deep research may take 1-2 minutes to complete as it uses the DeerFlow research engine.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </form>
-          </CardContent>
-          <CardFooter>
-            <Button
-              type="submit"
-              onClick={handleSubmit}
-              disabled={!query.trim() || isLoading}
-              className="w-full"
-            >
+    <div className="w-full max-w-4xl">
+      <div className="flex flex-col space-y-4">
+        {/* Research form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex flex-col space-y-2">
+            <h2 className="text-xl font-semibold">Research</h2>
+            <p className="text-sm text-gray-500">
+              Ask a research question to get comprehensive information from multiple sources
+            </p>
+          </div>
+          
+          {/* Search input and button */}
+          <div className="flex space-x-2">
+            <Input
+              type="text"
+              placeholder="Enter your research question..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1"
+              disabled={isLoading}
+            />
+            <Button type="submit" disabled={isLoading || !query.trim()}>
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Researching...
                 </>
               ) : (
                 <>
-                  <Search className="mr-2 h-4 w-4" />
+                  <Search className="h-4 w-4 mr-2" />
                   Research
                 </>
               )}
             </Button>
-          </CardFooter>
-        </Card>
-      ) : (
-        <Card className="flex-1 flex flex-col">
-          <CardHeader>
-            <CardTitle>Research Results</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <div className="mb-2 text-sm text-muted-foreground">
-              Research depth: <span className="font-medium">{
-                researchDepth === ResearchDepth.Basic ? 'Basic' :
-                researchDepth === ResearchDepth.Enhanced ? 'Enhanced' : 'Deep'
-              }</span>
-              {result.processingTime && (
-                <span className="ml-2">
-                  (completed in {(result.processingTime / 1000).toFixed(1)}s)
-                </span>
-              )}
-            </div>
-            
-            <ScrollArea className="h-[400px] rounded-md border p-4">
-              <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
-                {result.report}
-              </ReactMarkdown>
-              
-              {result.sources && result.sources.length > 0 && (
-                <div className="mt-4 pt-4 border-t">
-                  <h3 className="text-sm font-medium mb-2">Sources</h3>
-                  <ul className="text-sm space-y-1">
-                    {result.sources.map((source, index) => (
-                      <li key={index}>
-                        <a
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {source.title || source.domain}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={handleNewSearch}>
-              New Search
-            </Button>
-            {onResearchComplete && (
-              <Button onClick={handleUseResults}>
-                Use Results
+          </div>
+          
+          {/* Research depth selector */}
+          <div className="flex items-center space-x-4">
+            <span className="text-sm">Research Depth:</span>
+            <div className="flex border rounded-md overflow-hidden">
+              <Button
+                type="button"
+                variant="ghost"
+                className={`px-3 py-1 h-8 rounded-none ${depth === ResearchDepth.Basic ? 'bg-blue-500 text-white' : ''}`}
+                onClick={() => setDepth(ResearchDepth.Basic)}
+                disabled={isLoading}
+              >
+                <Search className="h-3 w-3 mr-1" />1
               </Button>
-            )}
-          </CardFooter>
-        </Card>
-      )}
-      
-      {error && (
-        <Alert variant="destructive" className="mt-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {error instanceof Error ? error.message : 'An error occurred during research'}
-          </AlertDescription>
-        </Alert>
-      )}
+              <Button
+                type="button"
+                variant="ghost"
+                className={`px-3 py-1 h-8 rounded-none ${depth === ResearchDepth.Enhanced ? 'bg-blue-500 text-white' : ''}`}
+                onClick={() => setDepth(ResearchDepth.Enhanced)}
+                disabled={isLoading}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />2
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className={`px-3 py-1 h-8 rounded-none ${depth === ResearchDepth.Deep ? 'bg-blue-500 text-white' : ''}`}
+                onClick={() => setDepth(ResearchDepth.Deep)}
+                disabled={isLoading}
+              >
+                <Database className="h-3 w-3 mr-1" />3
+              </Button>
+            </div>
+            <div className="text-xs text-gray-500">
+              {depth === ResearchDepth.Basic && '5-15 seconds, basic results'}
+              {depth === ResearchDepth.Enhanced && '15-30 seconds, comprehensive analysis'}
+              {depth === ResearchDepth.Deep && '1-2 minutes, deep research with DeerFlow'}
+            </div>
+          </div>
+        </form>
+        
+        {/* Error display */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {error instanceof Error ? error.message : 'An error occurred during research'}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* Research results */}
+        {result && (
+          <Card className="mt-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Research Results</CardTitle>
+                  <CardDescription>
+                    {query} 
+                    <span className="ml-2">
+                      <Badge variant="outline" className="ml-2">
+                        <div className="flex items-center">
+                          {getDepthInfo(result.depth).icon}
+                          {getDepthInfo(result.depth).label} Research
+                        </div>
+                      </Badge>
+                    </span>
+                  </CardDescription>
+                </div>
+                <div className="text-xs text-gray-500">
+                  Processed in {formatTime(result.processingTime)}
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent>
+              <Tabs defaultValue="report">
+                <TabsList>
+                  <TabsTrigger value="report">Report</TabsTrigger>
+                  <TabsTrigger value="sources">Sources ({result.sources.length})</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="report" className="mt-4">
+                  <div className="markdown-content prose prose-sm max-w-none">
+                    <ReactMarkdown className="text-gray-800">
+                      {result.report}
+                    </ReactMarkdown>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="sources" className="mt-4">
+                  {result.sources.length > 0 ? (
+                    <div className="space-y-4">
+                      {result.sources.map((source, index) => (
+                        <div key={index} className="flex border rounded-md p-3">
+                          <Avatar className="h-10 w-10 mr-3">
+                            <AvatarImage src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=64`} alt={source.domain} />
+                            <AvatarFallback>{source.domain.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm">{source.title}</h4>
+                            <p className="text-xs text-gray-500">{source.domain}</p>
+                            {source.content && (
+                              <p className="text-sm mt-1 text-gray-700 line-clamp-2">{source.content}</p>
+                            )}
+                            <a 
+                              href={source.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline mt-2 inline-flex items-center"
+                            >
+                              Visit Source <ArrowUpRight className="ml-1 h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">No sources available</p>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+            
+            <CardFooter className="border-t pt-4 flex justify-between">
+              <Button variant="outline" onClick={resetResearch}>
+                New Research
+              </Button>
+              <div className="text-xs text-gray-500">
+                Made with ❤️ and ☕
+              </div>
+            </CardFooter>
+          </Card>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default ResearchPanel;
