@@ -1,5 +1,6 @@
-// server/performWebSearch.ts
-// Shared web search functionality that can be imported by both suna-integration and deerflow-integration
+/**
+ * Robust web search implementation to handle errors gracefully
+ */
 
 import axios from 'axios';
 
@@ -8,15 +9,14 @@ const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
 
 /**
- * Perform a web search using available search engines
+ * Perform a web search with robust error handling
  */
-export async function performWebSearch(query: string, maxResults: number = 5) {
-  console.log(`Performing web search for: "${query}"`);
+export async function robustWebSearch(query: string, maxResults: number = 5) {
+  console.log(`Performing robust web search for: "${query}"`);
   
-  try {
-    const results: any[] = [];
-    let tavilyResults = null;
-    let braveResults = null;
+  const results: any[] = [];
+  let tavilyResults = null;
+  let braveResults = null;
   
   // Try Tavily first if API key is available
   if (TAVILY_API_KEY) {
@@ -48,11 +48,11 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
         // Add all Tavily results to our collection
         for (const result of response.data.results) {
           results.push({
-            title: result.title,
-            content: result.content,
-            url: result.url,
-            score: result.relevance_score,
-            publishedDate: result.published_date,
+            title: result.title || 'Untitled',
+            content: result.content || '',
+            url: result.url || '',
+            score: result.relevance_score || 1.0,
+            publishedDate: result.published_date || '',
             source: 'Tavily'
           });
         }
@@ -83,9 +83,9 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
         // Add all Brave results
         for (const result of response.data.web.results) {
           results.push({
-            title: result.title,
-            content: result.description,
-            url: result.url,
+            title: result.title || 'Untitled',
+            content: result.description || '',
+            url: result.url || '',
             score: 1.0, // Brave doesn't provide a relevance score
             source: 'Brave'
           });
@@ -125,7 +125,7 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
   const uniqueResults = [];
   
   for (const result of results) {
-    if (!uniqueUrls.has(result.url)) {
+    if (result.url && !uniqueUrls.has(result.url)) {
       uniqueUrls.add(result.url);
       uniqueResults.push(result);
     }
@@ -141,5 +141,5 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
   };
 }
 
-// Make the function available globally to avoid circular imports
-(global as any).performWebSearch = performWebSearch;
+// Make the function available globally
+(global as any).robustWebSearch = robustWebSearch;
