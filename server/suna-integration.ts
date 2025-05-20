@@ -327,17 +327,24 @@ export class SunaIntegrationService {
   }
 
   /**
-   * Determines if a query needs advanced research capabilities from DeerFlow
+   * Determines if a query needs advanced research capabilities
    * Identifies complex questions requiring deeper analysis and research
    */
   private needsDeepResearch(query: string): boolean {
-    // Research-oriented terms that benefit from DeerFlow's advanced capabilities
+    // Check for explicit research command
+    if (query.startsWith('/research3 ') || query.includes('depth level 3')) {
+      return true;
+    }
+    
+    // Research-oriented terms that benefit from advanced research capabilities
     const researchTerms = [
       'analyze', 'research', 'explain in detail', 'comprehensive', 'comparison',
       'compare and contrast', 'deep dive', 'analyze data', 'synthesize',
       'investigate', 'in-depth', 'thorough', 'academic', 'provide evidence',
       'expert analysis', 'examination', 'breakdown', 'elaborate on',
-      'detailed explanation', 'evaluate', 'assess', 'literature review'
+      'detailed explanation', 'evaluate', 'assess', 'literature review',
+      'with sources', 'cite sources', 'referenced', 'bibliography',
+      'academic research', 'scholarly', 'peer-reviewed'
     ];
     
     // Check for research terms
@@ -620,8 +627,14 @@ export class SunaIntegrationService {
       // Check for explicit search commands in the query (like /search)
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
       const explicitResearchCommand = data.query.match(/^\/research\s+(.*)/i);
+      const explicitResearch3Command = data.query.match(/^\/research3\s+(.*)/i);
       const forceSearch = explicitSearchCommand || (data.searchPreferences?.forceSearch === true);
-      const forceResearch = explicitResearchCommand || data.query.toLowerCase().includes('use deep research');
+      const forceResearch = explicitResearchCommand || explicitResearch3Command || data.query.toLowerCase().includes('use deep research');
+      
+      // If research3 command is used, force depth level 3
+      if (explicitResearch3Command) {
+        data.depthLevel = 3;
+      }
       
       // Honor user preference to disable search if explicitly set
       const disableSearch = data.searchPreferences?.disableSearch === true;
@@ -641,72 +654,72 @@ export class SunaIntegrationService {
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
       
-      // Try enhanced research capabilities first for depth level 3
-      if (shouldUseDeepResearch) {
+      // Handle direct /research3 command separately
+      if (explicitResearch3Command) {
+        console.log(`DETECTED /research3 COMMAND: ${data.query}`);
+        
         try {
-          // For depth level 3, preferably use our new enhanced research module
-          if (depthLevel === 3) {
-            try {
-              console.log(`USING ENHANCED RESEARCH MODULE FOR DEPTH LEVEL 3: ${data.query}`);
-              
-              // Extract the actual query if this is an explicit research command
-              const refinedQuery = explicitResearchCommand ? 
-                explicitResearchCommand[1] : data.query;
-              
-              // Import the enhanced research module on demand
-              const { performEnhancedResearch } = await import('./enhanced-research');
-              
-              // Perform the research with our enhanced implementation
-              const researchResults = await performEnhancedResearch({
-                query: refinedQuery,
-                maxDepth: 3,
-                includeSources: true,
-                conversationId: conversation.id
-              });
-              
-              // Process and format the results for the response
-              const searchSources = researchResults.sources.map(source => ({
-                title: source.title,
-                url: source.url,
-                snippet: source.snippet
-              }));
-              
-              // Create the response message with the research results
-              const responseContent = researchResults.result;
-              
-              // Add the results to the conversation
-              const newMsgId = uuidv4();
-              const researchMsg = {
-                id: newMsgId,
-                role: 'assistant',
-                content: responseContent,
-                timestamp: new Date().toISOString(),
-                modelUsed: 'enhanced-research-v1',
-                webSearchUsed: true,
-                searchMetadata: {
-                  query: refinedQuery,
-                  sources: searchSources.map(s => s.url),
-                  resultCount: searchSources.length,
-                  searchEngines: ['tavily', 'brave'],
-                  searchTime: 0,
-                  sourceDetails: searchSources.map(s => ({
-                    title: s.title,
-                    url: s.url,
-                    domain: new URL(s.url).hostname
-                  }))
-                }
-              };
-              
-              // Save the message to the conversation history
-              conversation.messages.push(researchMsg);
-              
-              // Send the response using the res parameter
-              return res.json(researchMsg);
-            } catch (error) {
-              console.error('Error using enhanced research module:', error);
-              // Continue with DeerFlow fallback
+          // Extract the actual query from the command
+          const refinedQuery = explicitResearch3Command[1];
+          console.log(`Using enhanced research for query: ${refinedQuery}`);
+          
+          // Import our enhanced research module
+          const { performEnhancedResearch } = await import('./enhanced-research');
+          
+          // Perform the enhanced research with sources
+          const research = await performEnhancedResearch({
+            query: refinedQuery,
+            maxDepth: 3,
+            includeSources: true,
+            conversationId: conversation.id
+          });
+          
+          // Format the sources for the response
+          const formattedSources = research.sources.map(source => ({
+            title: source.title || 'Untitled Source',
+            url: source.url,
+            snippet: source.snippet || 'No snippet available'
+          }));
+          
+          // Add the new message to the conversation
+          const newMessageId = uuidv4();
+          const researchMessage = {
+            id: newMessageId,
+            role: 'assistant',
+            content: research.result,
+            timestamp: new Date().toISOString(),
+            modelUsed: 'enhanced-research',
+            webSearchUsed: true,
+            searchMetadata: {
+              query: refinedQuery,
+              sources: formattedSources.map(s => s.url),
+              resultCount: formattedSources.length,
+              searchEngines: ['enhanced-research'],
+              searchTime: 0,
+              sourceDetails: formattedSources.map(s => ({
+                title: s.title,
+                url: s.url,
+                domain: new URL(s.url).hostname
+              }))
             }
-          }
+          };
+          
+          // Add to conversation history
+          conversation.messages.push(researchMessage);
+          
+          // Save the conversation
+          this.saveConversation(conversation.userId, conversation);
+          
+          // Return the research message directly to the client
+          return researchMessage;
+        } catch (error) {
+          console.error('Enhanced research error:', error);
+          // We'll fallback to normal flow if the enhanced research fails
+        }
+      }
+      
+      // Try regular deep research capabilities
+      if (shouldUseDeepResearch) {
           
           // Fall back to DeerFlow if enhanced research fails or for other depth levels
           // Check if DeerFlow service is available
