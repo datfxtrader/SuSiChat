@@ -47,10 +47,14 @@ export async function startDeerFlowService(): Promise<boolean> {
     
     try {
       // Spawn the Python process with proper environment
-      deerflowProcess = spawn('python', ['deerflow_service/server.py'], {
+      deerflowProcess = spawn('python', ['run-deerflow-minimal.py'], {
         env: {
           ...process.env,
           PYTHONUNBUFFERED: '1',  // Force unbuffered output for more immediate logs
+          // Ensure API keys are passed to the Python process
+          TAVILY_API_KEY: process.env.TAVILY_API_KEY || '',
+          BRAVE_API_KEY: process.env.BRAVE_API_KEY || '',
+          DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || ''
         },
         stdio: ['ignore', 'pipe', 'pipe']
       });
