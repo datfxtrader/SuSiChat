@@ -2,151 +2,226 @@
 # SPDX-License-Identifier: MIT
 
 """
-Entry point script for the DeerFlow project.
+Enhanced DeerFlow API service for Tongkeeper integration
 """
 
 import argparse
 import asyncio
+import logging
+import os
+from typing import Optional, List, Dict, Any
 
-from InquirerPy import inquirer
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from src.config.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
-from src.workflow import run_agent_workflow_async
+from src.graph.builder import build_graph_with_memory
 
+# Build the graph at startup
+graph = build_graph_with_memory()
 
-def ask(
-    question,
-    debug=False,
-    max_plan_iterations=1,
-    max_step_num=3,
-    enable_background_investigation=True,
-):
-    """Run the agent workflow with the given question.
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    filename="deerflow.log",
+    filemode="a",
+)
 
-    Args:
-        question: The user's query or request
-        debug: If True, enables debug level logging
-        max_plan_iterations: Maximum number of plan iterations
-        max_step_num: Maximum number of steps in a plan
-        enable_background_investigation: If True, performs web search before planning to enhance context
-    """
-    asyncio.run(
-        run_agent_workflow_async(
-            user_input=question,
-            debug=debug,
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="DeerFlow Research API",
+    description="Enhanced research capabilities for Tongkeeper AI",
+    version="0.1.0",
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+@app.get("/")
+async def root():
+    """Root endpoint returning service information."""
+    return {
+        "service": "DeerFlow Research API",
+        "version": "0.1.0",
+        "status": "operational"
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {"status": "healthy"}
+
+class ResearchRequest:
+    def __init__(
+        self,
+        query: str,
+        max_plan_iterations: int = 1,
+        max_step_num: int = 3,
+        enable_background_investigation: bool = True,
+        conversation_id: Optional[str] = None,
+    ):
+        self.query = query
+        self.max_plan_iterations = max_plan_iterations
+        self.max_step_num = max_step_num
+        self.enable_background_investigation = enable_background_investigation
+        self.conversation_id = conversation_id
+
+@app.post("/api/research")
+async def research(request: Request):
+    """Run research on a specific topic or query using DeerFlow."""
+    try:
+        data = await request.json()
+        query = data.get("query")
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query parameter is required")
+        
+        # Extract optional parameters with defaults
+        max_plan_iterations = data.get("max_plan_iterations", 1)
+        max_step_num = data.get("max_step_num", 3)
+        enable_background_investigation = data.get("enable_background_investigation", True)
+        conversation_id = data.get("conversation_id")
+        
+        logger.info(f"Processing research request: {query}")
+        
+        # Create a research request object
+        research_request = ResearchRequest(
+            query=query,
             max_plan_iterations=max_plan_iterations,
             max_step_num=max_step_num,
             enable_background_investigation=enable_background_investigation,
+            conversation_id=conversation_id,
         )
-    )
+        
+        # Process the research asynchronously
+        result = await process_research_request(research_request)
+        
+        return JSONResponse(content=result)
+    except Exception as e:
+        logger.exception(f"Error processing research request: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Research processing error: {str(e)}")
 
-
-def main(
-    debug=False,
-    max_plan_iterations=1,
-    max_step_num=3,
-    enable_background_investigation=True,
-):
-    """Interactive mode with built-in questions.
-
-    Args:
-        enable_background_investigation: If True, performs web search before planning to enhance context
-        debug: If True, enables debug level logging
-        max_plan_iterations: Maximum number of plan iterations
-        max_step_num: Maximum number of steps in a plan
-    """
-    # First select language
-    language = inquirer.select(
-        message="Select language / 选择语言:",
-        choices=["English", "中文"],
-    ).execute()
-
-    # Choose questions based on language
-    questions = (
-        BUILT_IN_QUESTIONS if language == "English" else BUILT_IN_QUESTIONS_ZH_CN
-    )
-    ask_own_option = (
-        "[Ask my own question]" if language == "English" else "[自定义问题]"
-    )
-
-    # Select a question
-    initial_question = inquirer.select(
-        message=(
-            "What do you want to know?" if language == "English" else "您想了解什么?"
-        ),
-        choices=[ask_own_option] + questions,
-    ).execute()
-
-    if initial_question == ask_own_option:
-        initial_question = inquirer.text(
-            message=(
-                "What do you want to know?"
-                if language == "English"
-                else "您想了解什么?"
-            ),
-        ).execute()
-
-    # Pass all parameters to ask function
-    ask(
-        question=initial_question,
-        debug=debug,
-        max_plan_iterations=max_plan_iterations,
-        max_step_num=max_step_num,
-        enable_background_investigation=enable_background_investigation,
-    )
-
+async def process_research_request(request: ResearchRequest) -> Dict[str, Any]:
+    """Process a research request using DeerFlow's agent workflow."""
+    try:
+        # Create a custom collector for the results
+        collected_messages = []
+        final_report = ""
+        sources = []
+        observations = []
+        plan = {}
+        
+        # Setup an event loop for processing
+        async def collect_output():
+            nonlocal final_report, sources, plan, observations
+            
+            # Call DeerFlow's agent workflow with message capturing
+            async for state in graph.astream(
+                input={
+                    "messages": [{"role": "user", "content": request.query}],
+                    "auto_accepted_plan": True,
+                    "enable_background_investigation": request.enable_background_investigation,
+                },
+                config={
+                    "configurable": {
+                        "thread_id": request.conversation_id or "default",
+                        "max_plan_iterations": request.max_plan_iterations,
+                        "max_step_num": request.max_step_num,
+                    },
+                    "recursion_limit": 100,
+                },
+                stream_mode="values"
+            ):
+                # Process each state update
+                if isinstance(state, dict):
+                    # Capture messages
+                    if "messages" in state and state["messages"]:
+                        collected_messages.extend(state["messages"])
+                    
+                    # Capture final report if available
+                    if "final_report" in state:
+                        final_report = state["final_report"]
+                    
+                    # Capture sources if available
+                    if "sources" in state:
+                        sources = state["sources"]
+                    
+                    # Capture plan if available
+                    if "current_plan" in state and state["current_plan"]:
+                        plan = state["current_plan"]
+                    
+                    # Capture observations if available
+                    if "observations" in state:
+                        observations = state["observations"]
+        
+        # Run the collection process
+        await collect_output()
+        
+        # Extract the final result from collected messages
+        if not final_report and collected_messages:
+            # Try to find the last assistant message with content
+            for msg in reversed(collected_messages):
+                if isinstance(msg, dict) and msg.get("role") == "assistant" and msg.get("content"):
+                    final_report = msg["content"]
+                    break
+        
+        # Return the processed result
+        return {
+            "query": request.query,
+            "result": final_report,
+            "sources": sources,
+            "plan": plan,
+            "observations": observations,
+            "conversation_id": request.conversation_id,
+            "collected_messages": collected_messages[-5:] if collected_messages else []  # Return last 5 messages for context
+        }
+    except Exception as e:
+        logger.exception(f"Error in research processing: {str(e)}")
+        return {
+            "query": request.query,
+            "error": str(e),
+            "conversation_id": request.conversation_id,
+        }
 
 if __name__ == "__main__":
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description="Run the Deer")
-    parser.add_argument("query", nargs="*", help="The query to process")
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Run the DeerFlow API server")
     parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode with built-in questions",
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Host to bind the server to (default: 0.0.0.0)",
     )
     parser.add_argument(
-        "--max_plan_iterations",
+        "--port",
         type=int,
-        default=1,
-        help="Maximum number of plan iterations (default: 1)",
+        default=8000,
+        help="Port to bind the server to (default: 8000)",
     )
     parser.add_argument(
-        "--max_step_num",
-        type=int,
-        default=3,
-        help="Maximum number of steps in a plan (default: 3)",
-    )
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument(
-        "--no-background-investigation",
-        action="store_false",
-        dest="enable_background_investigation",
-        help="Disable background investigation before planning",
+        "--log-level",
+        type=str,
+        default="info",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Log level (default: info)",
     )
 
     args = parser.parse_args()
 
-    if args.interactive:
-        # Pass command line arguments to main function
-        main(
-            debug=args.debug,
-            max_plan_iterations=args.max_plan_iterations,
-            max_step_num=args.max_step_num,
-            enable_background_investigation=args.enable_background_investigation,
-        )
-    else:
-        # Parse user input from command line arguments or user input
-        if args.query:
-            user_query = " ".join(args.query)
-        else:
-            user_query = input("Enter your query: ")
-
-        # Run the agent workflow with the provided parameters
-        ask(
-            question=user_query,
-            debug=args.debug,
-            max_plan_iterations=args.max_plan_iterations,
-            max_step_num=args.max_step_num,
-            enable_background_investigation=args.enable_background_investigation,
-        )
+    logger.info("Starting DeerFlow Research API server")
+    uvicorn.run(
+        "main:app",
+        host=args.host,
+        port=args.port,
+        reload=False,
+        log_level=args.log_level,
+    )
