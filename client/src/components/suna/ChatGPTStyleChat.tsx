@@ -739,17 +739,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       try {
         // Check if DeerFlow service is available
         if (deerflow.isAvailable) {
-          // First show an initial response message that DeerFlow is being used
-          sendMessage({
-            message: `Using DeerFlow deep research for: ${currentQuery}`,
-            model: currentModel,
-            customSearchPrefs: {
-              useDeepResearch: true,
-              researchDepth: 'deep' as 'deep',
-              useDeerflow: true
-            }
-          });
-          
+          // Don't show the initial message to avoid duplication
           console.log('Starting DeerFlow deep research');
           
           // Run the complete research (DeerFlow agents)
@@ -764,9 +754,10 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               // Format the results to markdown
               const formattedResults = deerflow.formatResearchResults(data);
               
-              // Send the formatted research results as a new message
+              // Send the formatted research results as the only message
+              // This replaces sending the initial query to prevent duplication
               sendMessage({
-                message: formattedResults,
+                message: currentQuery, 
                 model: currentModel,
                 customSearchPrefs: {
                   useDeepResearch: true,
