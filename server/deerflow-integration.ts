@@ -414,6 +414,14 @@ Your report should:
     try {
       console.log('Performing deep research with DeerFlow service for query:', params.query);
       
+      // Check if this is a financial/forex query that needs specialized handling
+      const isFinancialQuery = /EUR\/USD|USD\/JPY|GBP\/USD|currency|forex|exchange rate|financial market|stock market|trading|investment/i.test(params.query);
+      
+      if (isFinancialQuery) {
+        console.log('Detected financial query, using specialized financial research');
+        return this.performFinancialResearch(params);
+      }
+      
       // Use the deerflowClient that's already imported at the top of the file
       // This fixes the "require is not defined" error
       

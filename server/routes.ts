@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
 import researchRoutes from "./routes/research";
+import financialResearchRoutes from "./routes/financial-research";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -20,6 +21,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Mount research routes
   app.use('/api', researchRoutes);
+  
+  // Mount financial research routes
+  app.use('/api/financial-research', financialResearchRoutes);
   
   const httpServer = createServer(app);
   
