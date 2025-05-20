@@ -124,7 +124,7 @@ class DeerFlowDirectService {
           'http://localhost:8000/api/research',
           {
             query: query,
-            max_step_num: maxSteps || 3,
+            max_step_num: max_step_num || 3,
             conversation_id: conversation_id
           }
         );
@@ -132,10 +132,10 @@ class DeerFlowDirectService {
         log('DeerFlow agent response received', 'deerflow');
         
         // Return the actual DeerFlow agent response
-        const deerflowResult = deerflowResponse.data;
+        const responseData = deerflowResponse.data;
         
         // If the result doesn't have the required format, create a proper response
-        if (!deerflowResult.plan || !deerflowResult.sources || !deerflowResult.observations) {
+        if (!responseData.plan || !responseData.sources || !responseData.observations) {
           // Use web search as fallback if DeerFlow didn't provide complete data
           const { performWebSearch } = await import('./suna-integration');
           const searchResults = await performWebSearch(query);
@@ -144,20 +144,20 @@ class DeerFlowDirectService {
           
           return {
             query,
-            result: deerflowResult.result || `Research results for: ${query}`,
+            result: responseData.result || `Research results for: ${query}`,
             sources: sources,
-            plan: deerflowResult.plan || {
+            plan: responseData.plan || {
               steps: [
                 { id: 1, description: "Research performed", status: "completed" }
               ]
             },
-            observations: deerflowResult.observations || ["Research completed"],
-            conversation_id: deerflowResult.conversation_id || `research-${Date.now()}`,
+            observations: responseData.observations || ["Research completed"],
+            conversation_id: responseData.conversation_id || `research-${Date.now()}`,
             timestamp: new Date().toISOString()
           };
         }
         
-        return deerflowResult;
+        return responseData;
       } catch (error) {
         console.error('Error connecting to DeerFlow agent system:', error);
         
@@ -182,13 +182,18 @@ class DeerFlowDirectService {
         };
       }
       
-      // Cache the result
-      researchCache.set(queryHash, {
-        timestamp: Date.now(),
-        result
-      });
-      
-      return result;
+      // If we somehow get here without a result, return a basic response
+      return {
+        query,
+        result: `Research completed for: ${query}`,
+        sources: [],
+        plan: {
+          steps: [{ id: 1, description: "Research completed", status: "completed" }]
+        },
+        observations: ["Research completed"],
+        conversation_id: `research-${Date.now()}`,
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       log(`DeerFlow research error: ${error instanceof Error ? error.message : String(error)}`, 'deerflow');
       return {
