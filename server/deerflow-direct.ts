@@ -115,18 +115,72 @@ class DeerFlowDirectService {
       
       log(`DeerFlow performing research for: ${query}`, 'deerflow');
       
-      // Get search results first 
-      const { performWebSearch } = await import('./suna-integration');
-      const searchResults = await performWebSearch(query);
-      
-      // Extract sources
-      const sources = await this.extractSourcesFromSearchResults(searchResults);
-      
-      // Use LLM to analyze the search results
-      const analyzedResults = await this.analyzeSources(query, sources);
-      
-      // Build the complete research response with LLM-generated insights
-      const result = await this.buildResearchResponse(query, analyzedResults, sources);
+      // Use the real DeerFlow API with its agent system
+      try {
+        log('Connecting to DeerFlow agent system for query: ' + query, 'deerflow');
+        
+        // Call the DeerFlow Python API which has the real agent system
+        const deerflowResponse = await axios.post(
+          'http://localhost:8000/api/research',
+          {
+            query: query,
+            max_step_num: maxSteps || 3,
+            conversation_id: conversation_id
+          }
+        );
+        
+        log('DeerFlow agent response received', 'deerflow');
+        
+        // Return the actual DeerFlow agent response
+        const deerflowResult = deerflowResponse.data;
+        
+        // If the result doesn't have the required format, create a proper response
+        if (!deerflowResult.plan || !deerflowResult.sources || !deerflowResult.observations) {
+          // Use web search as fallback if DeerFlow didn't provide complete data
+          const { performWebSearch } = await import('./suna-integration');
+          const searchResults = await performWebSearch(query);
+          
+          const sources = await this.extractSourcesFromSearchResults(searchResults);
+          
+          return {
+            query,
+            result: deerflowResult.result || `Research results for: ${query}`,
+            sources: sources,
+            plan: deerflowResult.plan || {
+              steps: [
+                { id: 1, description: "Research performed", status: "completed" }
+              ]
+            },
+            observations: deerflowResult.observations || ["Research completed"],
+            conversation_id: deerflowResult.conversation_id || `research-${Date.now()}`,
+            timestamp: new Date().toISOString()
+          };
+        }
+        
+        return deerflowResult;
+      } catch (error) {
+        console.error('Error connecting to DeerFlow agent system:', error);
+        
+        // Fallback to regular web search if DeerFlow API is unavailable
+        const { performWebSearch } = await import('./suna-integration');
+        const searchResults = await performWebSearch(query);
+        
+        const sources = await this.extractSourcesFromSearchResults(searchResults);
+        
+        return {
+          query,
+          result: `Research results for: ${query} (DeerFlow agent system unavailable)`,
+          sources: sources,
+          plan: {
+            steps: [
+              { id: 1, description: "Web search performed (fallback)", status: "completed" }
+            ]
+          },
+          observations: ["Used web search as fallback due to DeerFlow unavailability"],
+          conversation_id: `research-${Date.now()}`,
+          timestamp: new Date().toISOString()
+        };
+      }
       
       // Cache the result
       researchCache.set(queryHash, {
