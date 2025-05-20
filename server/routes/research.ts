@@ -1,72 +1,67 @@
-// server/routes/research.ts
+/**
+ * Research API routes
+ */
 import { Router } from 'express';
 import { isAuthenticated } from '../replitAuth';
-import { researchService, ResearchDepth } from '../deerflow-integration';
+import { ResearchDepth, researchService } from '../deerflow-integration';
+import { z } from 'zod';
 
 const router = Router();
 
+// Schema for research request validation
+const researchRequestSchema = z.object({
+  query: z.string().min(3).max(500),
+  depth: z.number().int().min(1).max(3).optional(),
+  modelId: z.string().optional(),
+  includeMarketData: z.boolean().optional(),
+  includeNews: z.boolean().optional(),
+});
+
 /**
- * Endpoint to perform research at different depth levels
- * POST /api/research
+ * Perform research at different depth levels
  */
-router.post('/', isAuthenticated, async (req: any, res) => {
+router.post('/research', isAuthenticated, async (req, res) => {
   try {
-    const { query, depth = 1, modelId, includeMarketData, includeNews } = req.body;
-    
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({ error: 'Research query is required' });
+    // Validate request
+    const validationResult = researchRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: 'Invalid request data',
+        details: validationResult.error.format()
+      });
     }
     
-    // Validate depth
-    const researchDepth = Number(depth);
-    if (isNaN(researchDepth) || researchDepth < 1 || researchDepth > 3) {
-      return res.status(400).json({ error: 'Invalid research depth. Must be 1, 2, or 3.' });
-    }
+    // Extract validated data
+    const { query, depth = ResearchDepth.Basic, modelId, includeMarketData, includeNews } = validationResult.data;
     
-    // Perform research at the specified depth
+    // Log the research request
+    console.log(`Research requested by user ${req.user?.claims?.sub} at depth ${depth}: "${query}"`);
+    
+    // Perform research
     const result = await researchService.performResearch({
       query,
-      depth: researchDepth as ResearchDepth,
+      depth,
       modelId,
       includeMarketData,
       includeNews
     });
     
-    res.json(result);
+    // Add timestamp to the result
+    const timestamp = new Date().toISOString();
+    
+    // Return the research result
+    return res.json({
+      ...result,
+      timestamp,
+      searchQuery: query
+    });
   } catch (error) {
-    console.error('Research error:', error);
-    res.status(500).json({ error: 'Failed to perform research' });
+    console.error('Error processing research request:', error);
+    return res.status(500).json({
+      error: 'Failed to perform research',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
-});
-
-/**
- * Get research depth info
- * GET /api/research/depth-info
- */
-router.get('/depth-info', async (req, res) => {
-  // Provide information about research depth levels
-  res.json({
-    depths: [
-      {
-        level: 1,
-        name: "Basic",
-        description: "Quick web search with essential information",
-        estimatedTime: "5-15 seconds"
-      },
-      {
-        level: 2,
-        name: "Enhanced",
-        description: "Comprehensive web search with better processing",
-        estimatedTime: "15-30 seconds"
-      },
-      {
-        level: 3,
-        name: "Deep",
-        description: "In-depth research with comprehensive report generation",
-        estimatedTime: "1-2 minutes"
-      }
-    ]
-  });
 });
 
 export default router;
