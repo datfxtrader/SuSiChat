@@ -114,7 +114,7 @@ export default function DeerflowTestPage() {
             <CardHeader className="pb-2">
               <CardTitle>Research Results</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-h-[60vh] overflow-y-auto">
               <div className="prose dark:prose-invert max-w-none">
                 <MarkdownRenderer content={result} />
               </div>
