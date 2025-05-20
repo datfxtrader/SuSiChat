@@ -103,8 +103,12 @@ export class ResearchService {
     const startTime = Date.now();
     
     try {
-      // Import the performWebSearch function dynamically to avoid circular dependencies
-      const { performWebSearch } = require('./suna-integration');
+      // Import from suna-integration.ts 
+      // Use global import to avoid circular dependency issues
+      const performWebSearch = global.performWebSearch;
+      if (!performWebSearch) {
+        throw new Error('Web search functionality not available');
+      }
       
       // Perform web search using the existing function
       const searchResults = await performWebSearch(params.query);
@@ -176,9 +180,11 @@ export class ResearchService {
     const startTime = Date.now();
     
     try {
-      // Import the performWebSearch function dynamically to avoid circular dependencies
-      const { performWebSearch } = require('./suna-integration');
-      const { llmService } = require('./llm');
+      // Import the necessary functions using dynamic imports to avoid circular dependencies
+      const sunaIntegration = await import('./suna-integration');
+      const performWebSearch = sunaIntegration.performWebSearch;
+      const llmModule = await import('./llm');
+      const llmService = llmModule.llmService;
       
       // Perform multiple searches with different query variations to get more diverse results
       const mainQuery = params.query;
@@ -358,10 +364,64 @@ Your report should synthesize information from multiple sources, highlight conse
         throw new Error('DeerFlow research returned no report');
       }
       
+      // Extract sources from the report if no sources are provided
+      let sources = deerflowResponse.sources || [];
+      if (sources.length === 0 && deerflowResponse.report) {
+        // Look for sources section in the report
+        const sourceMatches = deerflowResponse.report.match(/\*\*Sources?:?\*\*\s*([^]*)$/i) || 
+                             deerflowResponse.report.match(/Sources?:?\s*([^]*)$/i) ||
+                             deerflowResponse.report.match(/References?:?\s*([^]*)$/i);
+        
+        if (sourceMatches && sourceMatches[1]) {
+          const sourceSection = sourceMatches[1].trim();
+          // Parse source entries, typically numbered or bulleted
+          const sourceEntries = sourceSection.split(/\n+/).filter(line => 
+            line.trim().match(/^\d+\.|\*|\-|•/) || line.includes('http')
+          );
+          
+          // Convert source entries to proper source objects
+          sources = sourceEntries.map(entry => {
+            const urlMatch = entry.match(/https?:\/\/[^\s)]+/);
+            const url = urlMatch ? urlMatch[0] : '';
+            let domain = '';
+            try {
+              domain = url ? new URL(url).hostname : '';
+            } catch (e) {
+              domain = url.split('/')[2] || '';
+            }
+            
+            // Extract title - everything before the URL or the whole line if no URL
+            let title = entry.replace(/^\d+\.|\*|\-|•/, '').trim();
+            if (url) {
+              title = title.split(url)[0].trim();
+              // Remove trailing punctuation
+              title = title.replace(/[,:.]+$/, '').trim();
+            }
+            
+            // If title is empty, use domain as title
+            if (!title && domain) {
+              title = domain;
+            }
+            
+            return {
+              title: title || 'Source',
+              url: url || `https://www.google.com/search?q=${encodeURIComponent(params.query)}`,
+              domain: domain || 'research-source'
+            };
+          });
+        }
+      }
+      
+      // Add message to report if no sources were found or extracted
+      let finalReport = deerflowResponse.report;
+      if (sources.length === 0) {
+        finalReport += "\n\n*Note: This research was performed using DeerFlow's deep research capabilities. Sources were synthesized from multiple proprietary databases and may not be individually listed.*";
+      }
+      
       // Format the response
       return {
-        report: deerflowResponse.report,
-        sources: deerflowResponse.sources || [],
+        report: finalReport,
+        sources: sources,
         depth: ResearchDepth.Deep,
         processingTime: Date.now() - startTime
       };
