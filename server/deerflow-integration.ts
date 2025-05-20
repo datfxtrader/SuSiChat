@@ -334,91 +334,129 @@ Your report should synthesize information from multiple sources, highlight conse
   }
   
   /**
-   * Perform deep research using DeerFlow
+   * Perform deep research using DeepSeek for comprehensive analysis
    */
   private async performDeepResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
     
     try {
-      console.log('Performing deep research with DeerFlow...');
+      console.log('Performing deep research for query:', params.query);
       
-      // Prepare DeerFlow research parameters
-      const deerflowParams: DeerFlowResearchParams = {
-        research_question: params.query,
-        model_id: params.modelId || 'deepseek-v3',
-        include_market_data: params.includeMarketData !== undefined ? params.includeMarketData : true,
-        include_news: params.includeNews !== undefined ? params.includeNews : true
-      };
+      // Import necessary functions directly
+      const { performWebSearch } = require('./performWebSearch');
+      const { llmService } = require('./llm');
       
-      // Call DeerFlow API
-      const deerflowResponse: DeerFlowResearchResponse = await deerflowClient.performResearch(deerflowParams);
+      // For deep research, use a multi-faceted approach with multiple query variants
+      const queryVariants = [
+        params.query,                                      // Original query
+        `latest research on ${params.query}`,             // Latest findings
+        `detailed analysis of ${params.query}`,           // Analytical perspective
+        `${params.query} statistics and data`,            // Data-focused
+        `${params.query} expert opinions`,                // Expert views
+        `${params.query} case studies`,                   // Real-world examples
+        `${params.query} comprehensive overview`,         // Overview
+        `${params.query} future trends and projections`   // Forward-looking
+      ];
       
-      // Process the response
-      if (!deerflowResponse.report) {
-        throw new Error('DeerFlow research returned no report');
-      }
+      // Get more results per query for comprehensive data
+      const searchPromises = queryVariants.map(q => performWebSearch(q, 10));
+      const searchResultsArray = await Promise.all(searchPromises);
       
-      // Extract sources from the report if no sources are provided
-      let sources = deerflowResponse.sources || [];
-      if (sources.length === 0 && deerflowResponse.report) {
-        // Look for sources section in the report
-        const sourceMatches = deerflowResponse.report.match(/\*\*Sources?:?\*\*\s*([^]*)$/i) || 
-                             deerflowResponse.report.match(/Sources?:?\s*([^]*)$/i) ||
-                             deerflowResponse.report.match(/References?:?\s*([^]*)$/i);
-        
-        if (sourceMatches && sourceMatches[1]) {
-          const sourceSection = sourceMatches[1].trim();
-          // Parse source entries, typically numbered or bulleted
-          const sourceEntries = sourceSection.split(/\n+/).filter(line => 
-            line.trim().match(/^\d+\.|\*|\-|•/) || line.includes('http')
-          );
-          
-          // Convert source entries to proper source objects
-          sources = sourceEntries.map(entry => {
-            const urlMatch = entry.match(/https?:\/\/[^\s)]+/);
-            const url = urlMatch ? urlMatch[0] : '';
-            let domain = '';
-            try {
-              domain = url ? new URL(url).hostname : '';
-            } catch (e) {
-              domain = url.split('/')[2] || '';
+      // Combine all search results and remove duplicates
+      const allResults: any[] = [];
+      const urlSet = new Set();
+      
+      searchResultsArray.forEach((searchResult, index) => {
+        if (searchResult.results && Array.isArray(searchResult.results)) {
+          searchResult.results.forEach((result: any) => {
+            if (result.url && !urlSet.has(result.url)) {
+              urlSet.add(result.url);
+              allResults.push({
+                ...result,
+                queryVariant: queryVariants[index] // Track which query variant found this result
+              });
             }
-            
-            // Extract title - everything before the URL or the whole line if no URL
-            let title = entry.replace(/^\d+\.|\*|\-|•/, '').trim();
-            if (url) {
-              title = title.split(url)[0].trim();
-              // Remove trailing punctuation
-              title = title.replace(/[,:.]+$/, '').trim();
-            }
-            
-            // If title is empty, use domain as title
-            if (!title && domain) {
-              title = domain;
-            }
-            
-            return {
-              title: title || 'Source',
-              url: url || `https://www.google.com/search?q=${encodeURIComponent(params.query)}`,
-              domain: domain || 'research-source'
-            };
           });
         }
+      });
+      
+      // Convert search results to properly formatted sources for our unified format
+      const sources = allResults.map(result => {
+        let domain = 'Unknown';
+        try {
+          domain = new URL(result.url).hostname;
+        } catch {
+          domain = result.url.split('/')[2] || 'Unknown';
+        }
+        
+        return {
+          title: result.title || 'Untitled',
+          url: result.url,
+          domain: domain,
+          content: result.content || result.description
+        };
+      });
+      
+      // Create a prompt for the LLM to synthesize a comprehensive report
+      const sourcesText = allResults.map((result, index) => {
+        return `Source ${index + 1}: ${result.title || 'Untitled'} (${result.url})
+Content: ${result.content || result.description || 'No content available'}
+Found via query: "${result.queryVariant}"
+`;
+      }).join('\n\n');
+      
+      // Create a prompt for the LLM to generate a comprehensive research report
+      const prompt = `You are a research assistant tasked with creating a comprehensive research report.
+      
+TOPIC: ${params.query}
+
+I have gathered information from multiple sources using various search queries to get diverse perspectives.
+Please analyze the following sources and create a well-structured, comprehensive research report.
+
+${sourcesText}
+
+Your report should:
+1. Include a clear and informative title
+2. Begin with an executive summary highlighting key findings
+3. Organize information into logical sections with appropriate headings
+4. Synthesize information from different sources, noting agreements and contradictions
+5. Include key data points, statistics, and expert opinions when available
+6. End with conclusions and implications
+7. Properly cite sources throughout using footnotes or inline citations
+8. Include a "Sources" section at the end with numbered references
+
+Format the report in Markdown, but make it readable and professional. Aim for depth and comprehensive coverage.`;
+
+      // Use the LLM to generate the comprehensive research report
+      const llmResponse = await llmService.generateResponse([
+        { role: 'system', content: 'You are a research expert that creates comprehensive, fact-based reports.' },
+        { role: 'user', content: prompt }
+      ]);
+      
+      // Ensure the report has a sources section if not already present
+      let report = llmResponse.trim();
+      if (!report.toLowerCase().includes('sources:') && !report.toLowerCase().includes('references:')) {
+        report += '\n\n## Sources\n\n';
+        allResults.forEach((result, index) => {
+          report += `${index + 1}. [${result.title || 'Source ' + (index + 1)}](${result.url})\n`;
+        });
       }
       
-      // Add message to report if no sources were found or extracted
-      let finalReport = deerflowResponse.report;
-      if (sources.length === 0) {
-        finalReport += "\n\n*Note: This research was performed using DeerFlow's deep research capabilities. Sources were synthesized from multiple proprietary databases and may not be individually listed.*";
-      }
-      
-      // Format the response
+      // Return the finished deep research result
       return {
-        report: finalReport,
+        report: report,
         sources: sources,
         depth: ResearchDepth.Deep,
         processingTime: Date.now() - startTime
       };
+    } catch (error) {
+      console.error('Error performing deep research:', error);
+      
+      // Fall back to enhanced research in case of an error
+      console.log('Falling back to enhanced research...');
+      return this.performEnhancedResearch(params);
+    }
+  }
     } catch (error) {
       console.error('DeerFlow research error:', error);
       throw error; // Let the main performResearch method handle the fallback
