@@ -1069,33 +1069,62 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                 </div>
                 
-                {/* Research Depth selector, exactly matching reference image */}
+                {/* Research Depth selector */}
                 <div className="flex items-center ml-2">
                   <div className="flex border rounded-md overflow-hidden">
-                    {[1, 2, 3].map((level) => (
-                      <TooltipProvider key={level}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`w-12 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                              onClick={() => setResearchDepth(level)}
-                            >
-                              <div className="flex items-center justify-center">
-                                {level === 1 ? <Search className="w-3 h-3 mr-1" /> : 
-                                 level === 2 ? <Sparkles className="w-3 h-3 mr-1" /> : 
-                                 <Database className="w-3 h-3 mr-1" />}
-                                {level}
-                              </div>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            {level === 1 && "Basic research (5-15s)"}
-                            {level === 2 && "Enhanced research (15-30s)"}
-                            {level === 3 && "Deep research with DeerFlow (1-2m)"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ))}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`px-4 py-1.5 ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                            onClick={() => setResearchDepth(1)}
+                          >
+                            <div className="flex items-center justify-center">
+                              <Search className="w-3 h-3 mr-1" />1
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Basic research (5-15s)
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`px-4 py-1.5 ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                            onClick={() => setResearchDepth(2)}
+                          >
+                            <div className="flex items-center justify-center">
+                              <Sparkles className="w-3 h-3 mr-1" />2
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Enhanced research (15-30s)
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`px-4 py-1.5 ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                            onClick={() => setResearchDepth(3)}
+                          >
+                            <div className="flex items-center justify-center">
+                              <Database className="w-3 h-3 mr-1" />3
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Deep research with DeerFlow (1-2m)
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               </div>
