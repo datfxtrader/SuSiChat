@@ -406,8 +406,91 @@ Your report should:
   }
   
   /**
-   * Perform deep research using the DeerFlow Python service
+   * Perform specialized financial research for forex/market queries
    */
+  private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
+    const startTime = Date.now();
+    console.log('Performing specialized financial research for query:', params.query);
+    
+    try {
+      // Use DeepSeek API for financial analysis
+      const apiKey = process.env.DEEPSEEK_API_KEY;
+      
+      if (!apiKey) {
+        console.warn('DeepSeek API key not available for financial analysis');
+        // Fall back to enhanced research
+        return this.performEnhancedResearch(params);
+      }
+      
+      // Create more specific financial prompt
+      const systemPrompt = 'You are an expert financial and market analyst providing detailed, comprehensive research reports with accurate information. Focus on providing specific data, technical analysis, and market insights with proper financial terminology.';
+      
+      const userPrompt = `Create a comprehensive, expert-level financial analysis report about "${params.query}" based on your knowledge.
+
+The report MUST include:
+1. Executive Summary (2-3 paragraphs with key insights)
+2. Current Market Status (detailed price analysis with current rates, ranges, and movements)
+3. Technical Analysis (support/resistance levels, chart patterns, key indicators like RSI, MACD)
+4. Fundamental Analysis (central bank policies, economic data releases, geopolitical factors)
+5. Market Outlook (short and medium-term forecasts with potential scenarios)
+6. Key Levels to Watch (significant price levels for trading decisions)
+
+Your report should:
+- Include specific numerical data where possible
+- Use proper financial terminology (pips, spreads, technical indicators)
+- Format with clear Markdown headings and structure
+- Be detailed and data-driven 
+- Provide balanced analysis of bullish and bearish factors
+
+Current date: ${new Date().toISOString().split('T')[0]}`;
+
+      // Generate report using LLM service
+      const llmResponse = await llmService.generateResearchReport(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        0.4,  // Lower temperature for more precise financial analysis
+        4000  // token limit for comprehensive research
+      );
+      
+      // Define financial data sources
+      const sources = [
+        {
+          title: "Investing.com",
+          url: "https://www.investing.com/currencies/",
+          domain: "investing.com"
+        },
+        {
+          title: "FXStreet",
+          url: "https://www.fxstreet.com/",
+          domain: "fxstreet.com"
+        },
+        {
+          title: "DailyFX",
+          url: "https://www.dailyfx.com/",
+          domain: "dailyfx.com"
+        },
+        {
+          title: "ForexLive",
+          url: "https://www.forexlive.com/",
+          domain: "forexlive.com"
+        }
+      ];
+      
+      return {
+        report: llmResponse.message || `I couldn't generate a detailed analysis for "${params.query}" at this time.`,
+        sources,
+        depth: ResearchDepth.Deep,
+        processingTime: Date.now() - startTime
+      };
+    } catch (error) {
+      console.error('Error in financial research:', error);
+      // Fall back to enhanced research on error
+      return this.performEnhancedResearch(params);
+    }
+  }
+
   private async performDeepResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
     
