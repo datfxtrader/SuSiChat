@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
+import { researchService, ResearchDepth } from './deerflow-integration';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
@@ -241,6 +242,7 @@ interface SunaRequest {
   projectId?: string;
   threadId?: string;
   model?: string;
+  researchDepth?: number;     // 1-3 scale for research depth level
   searchPreferences?: {
     forceSearch?: boolean;    // Force web search even if not detected automatically
     disableSearch?: boolean;  // Disable web search for this query
