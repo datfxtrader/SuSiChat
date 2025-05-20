@@ -51,6 +51,43 @@ function logSourceInfo(source: Source) {
   return source;
 }
 
+// Helper to handle DeerFlow research responses
+function processDeerflowResponse(research: any) {
+  if (!research) return '';
+  
+  // Format the research results into a structured markdown response
+  try {
+    let markdown = `# Research: ${research.query}\n\n`;
+    
+    if (research.summary) {
+      markdown += `## Summary\n${research.summary}\n\n`;
+    }
+    
+    if (research.insights && research.insights.length > 0) {
+      markdown += `## Key Insights\n`;
+      research.insights.forEach((insight: string) => {
+        markdown += `- ${insight}\n`;
+      });
+      markdown += '\n';
+    }
+    
+    if (research.sources && research.sources.length > 0) {
+      markdown += `## Sources\n`;
+      research.sources.forEach((source: any, index: number) => {
+        markdown += `### ${index + 1}. [${source.title}](${source.url})\n`;
+        if (source.contentSnippet) {
+          markdown += `${source.contentSnippet}\n\n`;
+        }
+      });
+    }
+    
+    return markdown;
+  } catch (error) {
+    console.error('Error formatting DeerFlow research:', error);
+    return 'Error processing research results';
+  }
+}
+
 // Research progress component to show current search/analysis stage
 interface ResearchProgressProps {
   stage: number; // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
@@ -442,6 +479,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const [researchMode, setResearchMode] = useState(false);
   const [researchDepth, setResearchDepth] = useState(1); // 1-3 scale for research depth
   const [researchStage, setResearchStage] = useState(0); // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
+  const [processingResearch, setProcessingResearch] = useState(false); // State for research processing
   // DeerFlow deep research integration
   const [showResearchPanel, setShowResearchPanel] = useState(false);
   const [researchQuery, setResearchQuery] = useState('');
@@ -680,7 +718,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     return sources;
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim()) return;
     
     // Convert UI research depth to the proper research depth string
@@ -691,22 +729,75 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       else if (researchDepth === 3) researchDepthSetting = 'deep';
     }
     
-    // Prepare search preferences based on research mode and depth
-    const customSearchPrefs = {
-      useDeepResearch: researchMode,
-      researchDepth: researchDepthSetting
-    };
-    
-    // Start research stage progress animation if in research mode
-    if (researchMode) {
-      setResearchStage(1); // Start at searching stage
+    // If using research mode with depth 3, use DeerFlow for deep research
+    if (researchMode && researchDepth === 3) {
+      // Show the loading state
+      setResearchStage(1);
+      setProcessingResearch(true);
+      
+      try {
+        // Use DeerFlow to get comprehensive research results
+        const currentQuery = message.trim();
+        
+        // Check if DeerFlow service is available
+        if (deerflow.isAvailable) {
+          // Use the complete research function from DeerFlow
+          deerflow.runCompleteResearch({
+            query: currentQuery,
+            depth: 'deep',
+            maxSources: 10,
+            useCache: true
+          });
+        }
+        
+        // Prepare research preferences
+        const deepResearchPrefs = {
+          useDeepResearch: true,
+          researchDepth: 'deep' as 'deep',
+          useDeerflow: true
+        };
+        
+        // Send message with deep research preferences
+        sendMessage({ 
+          message: currentQuery, 
+          model: currentModel,
+          customSearchPrefs: deepResearchPrefs
+        });
+      } catch (error) {
+        console.error('Error with DeerFlow research:', error);
+        
+        // Fallback to regular search if DeerFlow fails
+        const customSearchPrefs = {
+          useDeepResearch: true,
+          researchDepth: 'deep' as 'deep'
+        };
+        
+        sendMessage({ 
+          message, 
+          model: currentModel,
+          customSearchPrefs
+        });
+      } finally {
+        setProcessingResearch(false);
+      }
+    } else {
+      // Regular search with standard or basic depth
+      const customSearchPrefs = {
+        useDeepResearch: researchMode,
+        researchDepth: researchDepthSetting
+      };
+      
+      // Start research stage progress animation if in research mode
+      if (researchMode) {
+        setResearchStage(1); // Start at searching stage
+      }
+      
+      sendMessage({ 
+        message, 
+        model: currentModel,
+        customSearchPrefs
+      });
     }
-    
-    sendMessage({ 
-      message, 
-      model: currentModel,
-      customSearchPrefs
-    });
     
     setMessage('');
     
@@ -1114,7 +1205,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   ? "Basic research with quick source analysis"
                   : researchDepth === 2
                   ? "Standard research with thorough source analysis"
-                  : "Deep research with comprehensive source analysis and insights" 
+                  : "Deep research with comprehensive analysis, multiple sources, and insights" 
                 : "Uses web search for real-time information"}
             </p>
           </div>
