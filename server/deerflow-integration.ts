@@ -413,6 +413,47 @@ Your report should:
     console.log('Performing specialized financial research for query:', params.query);
     
     try {
+      // Extract currency pair if present (e.g., EUR/USD, GBP/USD)
+      const currencyPairMatch = params.query.match(/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)\/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)/i);
+      const currencyPair = currencyPairMatch ? currencyPairMatch[0].toUpperCase() : null;
+      
+      if (currencyPair) {
+        // For currency pairs, use the forex API
+        try {
+          const response = await fetch('/api/forex/analyze', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              currencyPair,
+              timeframe: 'daily'
+            })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Format sources
+            const sources: ResearchSource[] = (data.sources || []).map((source: any) => ({
+              title: source.title,
+              url: source.url,
+              domain: source.domain
+            }));
+            
+            return {
+              report: data.analysis || `Analysis for ${currencyPair} not available.`,
+              sources,
+              depth: ResearchDepth.Deep,
+              processingTime: data.processingTime || (Date.now() - startTime)
+            };
+          }
+        } catch (forexError) {
+          console.error('Error using forex API:', forexError);
+          // Continue to general financial research on error
+        }
+      }
+      
       // Use the specialized financial research module
       const financialResearch = require('./financial-research');
       
