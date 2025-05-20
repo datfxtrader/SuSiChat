@@ -734,51 +734,110 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       // Show the loading state
       setResearchStage(1);
       setProcessingResearch(true);
+      const currentQuery = message.trim();
       
       try {
-        // Use DeerFlow to get comprehensive research results
-        const currentQuery = message.trim();
-        
         // Check if DeerFlow service is available
         if (deerflow.isAvailable) {
-          // Use the complete research function from DeerFlow
+          // First show an initial response message that DeerFlow is being used
+          sendMessage({
+            message: `Using DeerFlow deep research for: ${currentQuery}`,
+            model: currentModel,
+            customSearchPrefs: {
+              useDeepResearch: true,
+              researchDepth: 'deep' as 'deep',
+              useDeerflow: true
+            }
+          });
+          
+          console.log('Starting DeerFlow deep research');
+          
+          // Run the complete research (DeerFlow agents)
           deerflow.runCompleteResearch({
             query: currentQuery,
             depth: 'deep',
             maxSources: 10,
             useCache: true
+          }, {
+            onSuccess: (data) => {
+              console.log('DeerFlow research completed successfully');
+              // Format the results to markdown
+              const formattedResults = deerflow.formatResearchResults(data);
+              
+              // Send the formatted research results as a new message
+              sendMessage({
+                message: formattedResults,
+                model: currentModel,
+                customSearchPrefs: {
+                  useDeepResearch: true,
+                  researchDepth: 'deep' as 'deep',
+                  useDeerflow: true,
+                  deerflowResults: data
+                }
+              });
+              
+              // Reset the processing state
+              setProcessingResearch(false);
+              setResearchStage(0);
+            },
+            onError: (error) => {
+              console.error('Error with DeerFlow research:', error);
+              // Send an error message
+              sendMessage({
+                message: `Error performing deep research: ${error.message}. Falling back to standard search.`,
+                model: currentModel
+              });
+              
+              // Fallback to standard search
+              sendMessage({
+                message: currentQuery,
+                model: currentModel,
+                customSearchPrefs: {
+                  useDeepResearch: true,
+                  researchDepth: 'standard'
+                }
+              });
+              
+              // Reset the processing state
+              setProcessingResearch(false);
+              setResearchStage(0);
+            }
           });
+        } else {
+          // DeerFlow is not available, use standard research instead
+          console.log('DeerFlow service is not available, using regular search');
+          const customSearchPrefs = {
+            useDeepResearch: true,
+            researchDepth: 'deep' as 'deep'
+          };
+          
+          // Send message with deep research preferences but without DeerFlow
+          sendMessage({ 
+            message: currentQuery, 
+            model: currentModel,
+            customSearchPrefs
+          });
+          
+          setProcessingResearch(false);
         }
-        
-        // Prepare research preferences
-        const deepResearchPrefs = {
-          useDeepResearch: true,
-          researchDepth: 'deep' as 'deep',
-          useDeerflow: true
-        };
-        
-        // Send message with deep research preferences
-        sendMessage({ 
-          message: currentQuery, 
-          model: currentModel,
-          customSearchPrefs: deepResearchPrefs
-        });
       } catch (error) {
-        console.error('Error with DeerFlow research:', error);
+        console.error('Unexpected error with DeerFlow integration:', error);
         
-        // Fallback to regular search if DeerFlow fails
+        // Fallback to regular search if there's any exception
         const customSearchPrefs = {
           useDeepResearch: true,
           researchDepth: 'deep' as 'deep'
         };
         
+        // Send message with standard research
         sendMessage({ 
-          message, 
+          message: currentQuery, 
           model: currentModel,
           customSearchPrefs
         });
-      } finally {
+        
         setProcessingResearch(false);
+        setResearchStage(0);
       }
     } else {
       // Regular search with standard or basic depth
