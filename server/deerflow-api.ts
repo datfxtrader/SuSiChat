@@ -3,7 +3,7 @@
  */
 
 import { Request, Response } from 'express';
-import { deerflowService } from './deerflow-simplified';
+import { performEnhancedResearch } from './enhanced-research';
 import { log } from './logging';
 
 /**
@@ -17,13 +17,13 @@ export async function handleDirectResearchRequest(req: Request, res: Response) {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
     
-    log(`DeerFlow API: Processing direct research request for query: ${query}`, 'deerflow');
+    log(`Processing direct research request for query: ${query}`, 'deerflow');
     
-    // Perform research using our enhanced implementation
-    const result = await deerflowService.performResearch({
+    // Perform research using our enhanced research implementation
+    const result = await performEnhancedResearch({
       query,
-      maxSteps: 3,
-      enableBackgroundInvestigation: true,
+      maxDepth: 3,
+      includeSources: true,
       conversationId: threadId
     });
     
@@ -32,7 +32,7 @@ export async function handleDirectResearchRequest(req: Request, res: Response) {
       research: result
     });
   } catch (error) {
-    console.error('Error handling DeerFlow research request:', error);
+    console.error('Error handling research request:', error);
     return res.status(500).json({ 
       success: false,
       error: error instanceof Error ? error.message : String(error)
