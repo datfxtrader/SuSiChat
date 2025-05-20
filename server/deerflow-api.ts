@@ -3,8 +3,8 @@
  */
 
 import { Request, Response } from 'express';
-import { deerflowDirectService } from './deerflow-direct';
-import { log } from './vite';
+import { deerflowService } from './deerflow-simplified';
+import { log } from './logging';
 
 /**
  * Express handler for direct DeerFlow research requests 
@@ -19,12 +19,12 @@ export async function handleDirectResearchRequest(req: Request, res: Response) {
     
     log(`DeerFlow API: Processing direct research request for query: ${query}`, 'deerflow');
     
-    // Perform research using our direct implementation
-    const result = await deerflowDirectService.performResearch({
+    // Perform research using our enhanced implementation
+    const result = await deerflowService.performResearch({
       query,
-      conversation_id: threadId,
-      max_step_num: 3,
-      enable_background_investigation: true
+      maxSteps: 3,
+      enableBackgroundInvestigation: true,
+      conversationId: threadId
     });
     
     return res.json({
