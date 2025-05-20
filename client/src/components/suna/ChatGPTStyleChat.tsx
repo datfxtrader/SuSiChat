@@ -1076,12 +1076,12 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 {/* Research Depth selector - only shown when Research mode is active */}
                 {researchMode && (
                   <div className="flex items-center ml-2">
-                    <div className="flex border rounded-md overflow-hidden">
+                    <div className="flex border rounded-md overflow-hidden h-7">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`px-3 py-1 ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              className={`px-2 py-0 ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
                               onClick={() => setResearchDepth(1)}
                             >
                               <div className="flex items-center justify-center">
@@ -1099,7 +1099,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`px-3 py-1 ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              className={`px-2 py-0 ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
                               onClick={() => setResearchDepth(2)}
                             >
                               <div className="flex items-center justify-center">
@@ -1117,7 +1117,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`px-3 py-1 ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              className={`px-2 py-0 ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
                               onClick={() => setResearchDepth(3)}
                             >
                               <div className="flex items-center justify-center">
