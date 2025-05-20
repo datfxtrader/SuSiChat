@@ -112,6 +112,44 @@ Always prioritize providing accurate, helpful information while maintaining a ba
     }
   }
   
+  /**
+   * Generate a comprehensive research report from web sources
+   */
+  async generateResearchReport(
+    messages: DeepSeekMessage[],
+    temperature: number = 0.7,
+    maxTokens: number = 4000
+  ): Promise<{message: string}> {
+    try {
+      // Call DeepSeek API for research report
+      const response = await axios.post(
+        this.apiEndpoint,
+        {
+          model: this.model,
+          messages,
+          temperature,
+          max_tokens: maxTokens
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          }
+        }
+      );
+      
+      if (response.data.choices && response.data.choices[0]) {
+        return { message: response.data.choices[0].message.content };
+      } else {
+        console.error('Unexpected DeepSeek API response format:', response.data);
+        return { message: 'I encountered an issue generating a detailed research report.' };
+      }
+    } catch (error) {
+      console.error('Error generating research report with LLM:', error);
+      return { message: 'I apologize, but I encountered an error while trying to generate a detailed research report.' };
+    }
+  }
+  
   private async extractAndStoreMemory(userId: string, userMessage: string, aiResponse: string) {
     // This is a simplified logic to extract potential memory items
     // In a production system, this would use more sophisticated NLP techniques

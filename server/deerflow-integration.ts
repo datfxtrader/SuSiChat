@@ -272,10 +272,13 @@ export class ResearchService {
         // Use only the top sources to avoid overwhelming the LLM
         const topSources = sources.slice(0, 7);
         
-        // Extract key content from sources
-        const sourceContent = topSources.map((source, index) => 
-          `Source ${index + 1} (${source.title} - ${source.domain}): ${source.content}`
-        ).join('\n\n');
+        // Extract key content from sources - include full content for better analysis
+        const sourceContent = topSources.map((source, index) => {
+          // Get the most substantial content possible from each source
+          const content = source.content || '';
+          // Format with clear separation between sources for better LLM comprehension
+          return `Source ${index + 1} (${source.title} - ${source.domain}):\n${content}`;
+        }).join('\n\n---\n\n');
         
         // Use LLM to synthesize findings
         try {
@@ -293,11 +296,64 @@ ${sourceContent}
 
 Your report should synthesize information from multiple sources, highlight consensus and disagreements, and provide a balanced view. Cite sources in your analysis where appropriate using [Source X] notation.`;
 
-          // Use imported llmService from the top of the file
-          const llmResponse = await llmService.generateResponse(
+          // Create a detailed prompt with source content
+          const systemPrompt = 'You are an expert financial and market analyst providing detailed, comprehensive reports with accurate information. Your reports should include specific data, trends, technical analysis, and market insights.';
+          
+          // Check if this is a financial/forex query
+          const isFinancialQuery = /EUR\/USD|USD\/JPY|GBP\/USD|currency|forex|exchange rate|financial market|stock market|trading|investment/i.test(mainQuery);
+          
+          let userPrompt = '';
+          
+          if (isFinancialQuery) {
+            userPrompt = `Create a comprehensive, expert-level financial analysis report about "${mainQuery}" using the following sources.
+
+The report MUST include:
+1. Executive Summary (2-3 paragraphs with specific numerical insights)
+2. Current Market Status (detailed price analysis with EXACT current rates, ranges, and percentage movements)
+3. Technical Analysis (identify support/resistance levels with precise numbers, chart patterns, key indicators like RSI, MACD, moving averages)
+4. Fundamental Analysis (economic indicators, central bank policies, geopolitical factors with dates and data)
+5. Expert Forecasts (include specific price targets, timeframes, and divergent opinions)
+6. Risk Assessment (volatility measures, potential scenarios with probability estimates)
+7. Trading Recommendations (entry/exit points with specific price levels)
+
+SOURCES:
+${sourceContent}
+
+Your report MUST:
+- Include ALL available numerical data (EXACT prices, percentages, dates, ranges) from the sources
+- Cite sources using [Source X] notation for EVERY significant data point or claim
+- Use proper financial terminology (pips, spreads, liquidity, etc.)
+- Format with clear Markdown headings, bullet points, and tables where appropriate
+- Be extremely detailed and data-driven with NO generic statements
+- Include any conflicting viewpoints or predictions from different sources`;
+          } else {
+            userPrompt = `Create a comprehensive, well-organized research report about "${mainQuery}" using the following sources.
+
+The report should include:
+1. Executive Summary (2-3 paragraphs with key insights)
+2. Current Situation Analysis (detailed examination with facts, figures, and specific data points)
+3. Key Factors and Trends (identify 3-5 important influences with supporting evidence)
+4. Detailed Analysis (explore critical aspects in depth)
+5. Expert Perspectives (include varied viewpoints and quotes when available)
+6. Future Outlook (likely scenarios based on current evidence)
+
+SOURCES:
+${sourceContent}
+
+Your report should:
+- Include exact numerical data and specific facts from the sources
+- Cite sources using [Source X] notation throughout the analysis
+- Use proper terminology relevant to the topic
+- Format with clear Markdown headings, bullet points, and emphasis
+- Be highly detailed and data-driven rather than general
+- Acknowledge any limitations in the available information`;
+          }
+
+          // Use LLM service to generate detailed report
+          const llmResponse = await llmService.generateResearchReport(
             [
-              { role: 'system', content: 'You are an expert research analyst providing accurate, comprehensive reports.' },
-              { role: 'user', content: prompt }
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
             ],
             0.7,  // temperature for balanced creativity and accuracy
             4000  // token limit for comprehensive research
