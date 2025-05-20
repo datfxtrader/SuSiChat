@@ -1,6 +1,6 @@
 /**
- * DeerFlow integration service for enhanced research capabilities
- * This service provides an interface between our Node.js application and the DeerFlow Python microservice
+ * DeerFlow integration service for enhanced research capabilities with Suna
+ * This service provides advanced research capabilities to complement Suna's existing features
  */
 
 import axios from 'axios';
