@@ -19,6 +19,9 @@ type SunaConversation = {
 
 export type LLMModel = 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
 
+// Research depth level type
+export type ResearchDepthLevel = 1 | 2 | 3; // 1=standard, 2=enhanced, 3=deep research with DeerFlow
+
 export type SearchPreferences = {
   forceSearch?: boolean;          // Force web search even if not detected automatically
   disableSearch?: boolean;        // Disable web search for this query
@@ -35,6 +38,7 @@ export function useSuna(initialThreadId?: string) {
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
   const [currentModel, setCurrentModel] = useState<LLMModel>('deepseek-chat');
+  const [depthLevel, setDepthLevel] = useState<ResearchDepthLevel>(1); // Default to standard level
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
     priority: 'relevance',
     maxResults: 5
@@ -71,11 +75,13 @@ export function useSuna(initialThreadId?: string) {
     mutationFn: async ({ 
       message, 
       model = currentModel,
-      customSearchPrefs 
+      customSearchPrefs,
+      researchDepth = depthLevel
     }: { 
       message: string, 
       model?: LLMModel,
-      customSearchPrefs?: SearchPreferences
+      customSearchPrefs?: SearchPreferences,
+      researchDepth?: ResearchDepthLevel
     }) => {
       if (!isAuthenticated) {
         throw new Error('You must be logged in to use Suna');
@@ -138,6 +144,7 @@ export function useSuna(initialThreadId?: string) {
           message: processedMessage, // Send processed message without command prefixes
           threadId: threadId, // Always pass the current threadId, even if undefined
           model: model, // Pass the selected model to the API
+          depthLevel: researchDepth, // Pass the research depth level (3 will trigger DeerFlow)
           searchPreferences: activeSearchPrefs // Pass search preferences
         }
       );
@@ -216,6 +223,11 @@ export function useSuna(initialThreadId?: string) {
       forceSearch: false // Can't have both enabled
     }));
   };
+  
+  // Function to set the research depth level
+  const setResearchDepth = (level: ResearchDepthLevel) => {
+    setDepthLevel(level);
+  };
 
   return {
     conversation,
@@ -223,6 +235,7 @@ export function useSuna(initialThreadId?: string) {
     threadId,
     messages,
     currentModel,
+    depthLevel,
     searchPreferences,
     isLoadingConversation,
     isLoadingConversations,
@@ -231,6 +244,7 @@ export function useSuna(initialThreadId?: string) {
     selectConversation,
     createNewChat,
     changeModel,
+    setResearchDepth,
     updateSearchPreferences,
     toggleForceSearch,
     toggleDisableSearch

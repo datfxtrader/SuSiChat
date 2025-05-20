@@ -242,6 +242,7 @@ interface SunaRequest {
   projectId?: string;
   threadId?: string;
   model?: string;
+  depthLevel?: 1 | 2 | 3;     // Research depth level: 1=standard, 2=enhanced, 3=deep research
   searchPreferences?: {
     forceSearch?: boolean;    // Force web search even if not detected automatically
     disableSearch?: boolean;  // Disable web search for this query
@@ -628,9 +629,9 @@ export class SunaIntegrationService {
       // Get max results from preferences or default to 5
       const maxResults = data.searchPreferences?.maxResults || 5;
       
-      // Determine if we should perform deep research using DeerFlow
+      // Determine if we should perform deep research using DeerFlow based on the depth level
       const shouldUseDeepResearch = !disableSearch && 
-                                    (forceResearch || this.needsDeepResearch(data.query));
+                                   (forceResearch || data.depthLevel === 3);
       
       // Determine if we should perform standard web search
       let shouldPerformSearch = !disableSearch && !shouldUseDeepResearch && 
