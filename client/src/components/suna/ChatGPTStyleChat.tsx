@@ -1150,8 +1150,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               </Button>
             </div>
           </div>
-          <div className="max-w-3xl mx-auto flex items-center justify-between mt-2">
-            <div className="flex items-center space-x-2">
+          <div className="max-w-3xl mx-auto mt-2">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <Select 
                 value={currentModel} 
                 onValueChange={(value) => changeModel(value as LLMModel)}
@@ -1170,7 +1170,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               </Select>
               
               {/* Mode toggle - Quick vs Research */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center">
                 <div className="inline-flex h-7 items-center rounded-md border border-gray-200 overflow-hidden">
                   <button 
                     className={`px-2 py-1 text-xs ${!researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
@@ -1226,15 +1226,17 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 </div>
               )}
             </div>
-            <p className="text-[10px] text-gray-500">
-              {researchMode 
-                ? researchDepth === 1 
-                  ? "Basic research with quick source analysis"
-                  : researchDepth === 2
-                  ? "Standard research with thorough source analysis"
-                  : "Deep research with comprehensive analysis, multiple sources, and insights" 
-                : "Uses web search for real-time information"}
-            </p>
+            <div className="w-full">
+              <p className="text-[10px] text-gray-500 ml-2">
+                {researchMode 
+                  ? researchDepth === 1 
+                    ? "Basic research with quick source analysis"
+                    : researchDepth === 2
+                    ? "Standard research with thorough source analysis"
+                    : "Deep research with comprehensive analysis, multiple sources, and insights" 
+                  : "Uses web search for real-time information"}
+              </p>
+            </div>
           </div>
           
           {/* We'll handle deep research through the regular research mode with depth 3 */}
