@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# DeerFlow server startup script
+# DeerFlow server startup script - simplified version
 PORT=${1:-8765}
 DEERFLOW_DIR="deerflow"
 LOG_FILE="deerflow.log"
 PID_FILE=".deerflow.pid"
 
-echo "Starting DeerFlow server on port $PORT..."
+echo "Starting DeerFlow Research server on port $PORT..."
 
 # Check if we have a previously running instance and stop it
 if [ -f "$PID_FILE" ]; then
@@ -19,12 +19,12 @@ if [ -f "$PID_FILE" ]; then
   rm -f $PID_FILE
 fi
 
-# Start DeerFlow server
+# Start simplified DeerFlow server
 cd $DEERFLOW_DIR
-nohup python3.12 server.py --port $PORT > ../$LOG_FILE 2>&1 &
+nohup python3 simple_server.py --port $PORT > ../$LOG_FILE 2>&1 &
 
 # Save PID for later management
 echo $! > ../$PID_FILE
 
-echo "DeerFlow server started (PID: $(cat ../$PID_FILE))"
+echo "DeerFlow Research server started (PID: $(cat ../$PID_FILE))"
 echo "Logs available in: $LOG_FILE"
