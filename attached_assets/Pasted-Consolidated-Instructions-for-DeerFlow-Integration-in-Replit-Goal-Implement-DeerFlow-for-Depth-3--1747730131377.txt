@@ -1,0 +1,498 @@
+Consolidated Instructions for DeerFlow Integration in Replit
+
+Goal: Implement DeerFlow for "Depth 3" research within Suna Chat. The Node.js backend will dynamically start, manage, and communicate with a Python FastAPI service running DeerFlow.
+
+Assumed Project Structure:
+
+/your-replit-project-root
+├── node_modules/
+├── public/
+├── src/                     # React frontend
+├── server/                  # Node.js backend
+│   ├── index.ts
+│   ├── suna-integration.ts
+│   └── deerflow-manager.ts  # Manages DeerFlow Python process
+├── deerflow_service/        # Python DeerFlow service
+│   ├── server.py            # FastAPI server for DeerFlow
+│   └── requirements.txt     # Python dependencies
+├── package.json
+├── tsconfig.json
+├── .replit
+└── replit.nix
+Use code with caution.
+Phase 1: Setting up the Python DeerFlow Service
+
+Configure Replit Environment (replit.nix):
+
+Open replit.nix.
+
+Ensure Python 3.12 and pip are included in deps:
+
+{ pkgs }: {
+  deps = [
+    pkgs.nodejs_20  # Or your Node.js version
+    pkgs.nodePackages.typescript
+    pkgs.nodePackages.pnpm # Or yarn/npm
+    pkgs.python312
+    pkgs.python312Packages.pip
+    # Add any other system-level dependencies if DeerFlow needs them
+  ];
+}
+Use code with caution.
+Nix
+Reload the Replit environment if prompted (or use kill 1 in Shell).
+
+Create DeerFlow Service Directory:
+
+In your project root, create: mkdir deerflow_service
+
+Define Python Dependencies (deerflow_service/requirements.txt):
+
+Create deerflow_service/requirements.txt with the following:
+
+fastapi
+uvicorn[standard]
+pydantic
+requests
+# Install DeerFlow directly from GitHub
+git+https://github.com/bytedance/deer-flow.git
+
+# DeerFlow should pull its own dependencies (openai, tavily-python, etc.)
+# If you find missing ones during runtime, add them here explicitly.
+Use code with caution.
+Txt
+Install Python Dependencies:
+
+Open Replit Shell.
+
+Navigate: cd deerflow_service
+
+Install: python3.12 -m pip install -r requirements.txt
+
+Navigate back: cd ..
+
+Create Python FastAPI Server (deerflow_service/server.py):
+
+Create deerflow_service/server.py with the following code:
+
+# deerflow_service/server.py
+import os
+import asyncio
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+import uvicorn
+from typing import Optional, List, Dict, Any
+
+from deerflow import DeerFlowResearcher # Import from installed DeerFlow package
+
+app = FastAPI()
+
+class ResearchRequest(BaseModel):
+    research_question: str
+    model_id: Optional[str] = "deepseek-v3"
+    include_market_data: Optional[bool] = True
+    include_news: Optional[bool] = True
+    # external_context: Optional[List[Dict[str, Any]]] = None # Future use
+
+class ResearchResponse(BaseModel):
+    status: Optional[Dict[str, Any]] = None
+    report: Optional[str] = None
+    visualization_path: Optional[str] = None
+    timestamp: Optional[str] = None # Consider datetime if precise typing needed
+    sources: Optional[List[Dict[str, Any]]] = None
+    service_process_log: Optional[List[str]] = Field(default_factory=list)
+
+researcher: Optional[DeerFlowResearcher] = None
+DEFAULT_MODEL_ID_FOR_INIT = "deepseek-v3" # Used if DeerFlowResearcher requires a model at init
+
+@app.on_event("startup")
+async def startup_event():
+    global researcher
+    print("Initializing DeerFlow Researcher...")
+    # Ensure API keys (from Replit Secrets, passed by Node.js) are in os.environ
+    # DeerFlow's internal configs should pick these up.
+    # Example check (for your debugging):
+    # print(f"OPENAI_API_KEY available: {'OPENAI_API_KEY' in os.environ}")
+    # print(f"TAVILY_API_KEY available: {'TAVILY_API_KEY' in os.environ}")
+    try:
+        # Initialize DeerFlowResearcher.
+        # The model_id here might be a default; complete_research can override it.
+        researcher = DeerFlowResearcher(model_id=DEFAULT_MODEL_ID_FOR_INIT)
+        print(f"DeerFlow Researcher initialized successfully with default model: {DEFAULT_MODEL_ID_FOR_INIT}.")
+    except Exception as e:
+        print(f"CRITICAL: Error initializing DeerFlow Researcher: {e}")
+        researcher = None # Important: mark as not initialized
+
+@app.get("/health")
+async def health_check():
+    if researcher:
+        return {"status": "ok", "message": "DeerFlow service is healthy and researcher is initialized."}
+    else:
+        return {"status": "error", "message": "DeerFlow researcher NOT INITIALIZED."}
+
+@app.post("/research", response_model=ResearchResponse)
+async def perform_research_endpoint(request: ResearchRequest):
+    service_log = [f"Received research request for: '{request.research_question}'"]
+    if not researcher:
+        error_msg = "Failed: DeerFlow researcher not initialized."
+        print(error_msg)
+        service_log.append(error_msg)
+        return ResearchResponse(report="Error: DeerFlow researcher not initialized.", service_process_log=service_log)
+
+    service_log.append(f"Processing with DeerFlow. Model: {request.model_id}, Market Data: {request.include_market_data}, News: {request.include_news}")
+    print(f"Processing with DeerFlow. Question: '{request.research_question}', Model: {request.model_id}")
+
+    try:
+        loop = asyncio.get_event_loop()
+        research_args = {
+            "research_question": request.research_question,
+            "model_id": request.model_id or DEFAULT_MODEL_ID_FOR_INIT,
+            "include_market_data": request.include_market_data,
+            "include_news": request.include_news,
+        }
+        service_log.append(f"Calling DeerFlow's complete_research with args: {research_args}")
+
+        # Run synchronous, CPU-bound DeerFlow task in a thread pool executor
+        deerflow_output_dict = await loop.run_in_executor(
+            None, # Default ThreadPoolExecutor
+            lambda: researcher.complete_research(**research_args)
+        )
+        
+        service_log.append("DeerFlow complete_research finished.")
+        print(f"DeerFlow raw output (first 200 chars): {str(deerflow_output_dict)[:200]}")
+
+        response_data = {
+            "status": deerflow_output_dict.get("status"),
+            "report": deerflow_output_dict.get("report"),
+            "visualization_path": deerflow_output_dict.get("visualization_path"),
+            "timestamp": deerflow_output_dict.get("timestamp"),
+            "sources": deerflow_output_dict.get("sources"),
+            "service_process_log": service_log
+        }
+        return ResearchResponse(**response_data)
+
+    except Exception as e:
+        error_message = f"Error during DeerFlow research execution: {type(e).__name__} - {e}"
+        print(error_message)
+        # import traceback # For more detailed logs if needed
+        # service_log.append(traceback.format_exc())
+        service_log.append(error_message)
+        return ResearchResponse(report=f"An error occurred: {error_message}", service_process_log=service_log)
+
+if __name__ == "__main__":
+    print("Starting DeerFlow FastAPI server on port 8765...")
+    uvicorn.run(app, host="0.0.0.0", port=8765, log_level="info")
+Use code with caution.
+Python
+Manual Test (Python Service):
+
+In Replit Shell: cd deerflow_service
+
+Run: python3.12 server.py
+
+Observe console for initialization messages or errors.
+
+In a new Shell tab: curl http://localhost:8765/health
+
+Expected: {"status":"ok","message":"DeerFlow service is healthy and researcher is initialized."} (or error if init failed).
+
+Stop the server (Ctrl+C). cd ..
+
+Phase 2: Integrating with Node.js Backend
+
+Create DeerFlow Process Manager (server/deerflow-manager.ts):
+
+Create server/deerflow-manager.ts (if it doesn't exist) or update it:
+
+// server/deerflow-manager.ts
+import { spawn, ChildProcess } from 'child_process';
+import axios from 'axios';
+import path from 'path';
+
+const DEERFLOW_PORT = 8765;
+const DEERFLOW_URL = `http://localhost:${DEERFLOW_PORT}`;
+let deerflowProcess: ChildProcess | null = null;
+let isStarting = false;
+
+const pythonExecutable = 'python3.12';
+const deerflowScriptPath = path.join(process.cwd(), 'deerflow_service', 'server.py');
+const deerflowCwd = path.join(process.cwd(), 'deerflow_service');
+
+export async function checkDeerFlowService(): Promise<boolean> {
+  if (isStarting) return false;
+  try {
+    const response = await axios.get(`${DEERFLOW_URL}/health`, { timeout: 1000 });
+    return response.status === 200 && response.data.status === 'ok';
+  } catch (error) {
+    return false;
+  }
+}
+
+export async function startDeerFlowService(): Promise<boolean> {
+  if (await checkDeerFlowService()) {
+    console.log('DeerFlow service already running.');
+    return true;
+  }
+  if (isStarting) {
+    console.log('DeerFlow service startup already in progress.');
+    return false;
+  }
+  isStarting = true;
+  console.log('Attempting to start DeerFlow service...');
+
+  return new Promise((resolve, reject) => {
+    try {
+      deerflowProcess = spawn(pythonExecutable, [deerflowScriptPath], {
+        cwd: deerflowCwd,
+        env: { 
+            ...process.env, // CRITICAL: Passes Replit Secrets & other env vars to Python
+            PYTHONUNBUFFERED: "1", // For immediate Python print output
+        },
+        stdio: ['ignore', 'pipe', 'pipe'], // stdin, stdout, stderr
+      });
+
+      deerflowProcess.stdout?.on('data', (data: Buffer) => console.log(`DeerFlow STDOUT: ${data.toString().trim()}`));
+      deerflowProcess.stderr?.on('data', (data: Buffer) => console.error(`DeerFlow STDERR: ${data.toString().trim()}`));
+      deerflowProcess.on('error', (err) => {
+        console.error('Failed to start DeerFlow subprocess.', err);
+        isStarting = false;
+        deerflowProcess = null;
+        reject(err);
+      });
+      deerflowProcess.on('exit', (code, signal) => {
+        console.log(`DeerFlow process exited with code ${code} signal ${signal}`);
+        if (isStarting) { // If it exits while we are trying to start it
+            isStarting = false;
+            // The interval check below will handle rejecting the promise
+        }
+        deerflowProcess = null;
+      });
+
+      let retries = 0;
+      const maxRetries = 20; // Increased retries for potentially slow startup
+      const checkInterval = setInterval(async () => {
+        if (await checkDeerFlowService()) {
+          clearInterval(checkInterval);
+          console.log('DeerFlow service started successfully.');
+          isStarting = false;
+          resolve(true);
+        } else if (retries >= maxRetries || !deerflowProcess && isStarting) { // also check if process died
+          clearInterval(checkInterval);
+          const errorMessage = deerflowProcess ? 'Health check timeout.' : 'Process died during startup.';
+          console.error('Failed to start DeerFlow service:', errorMessage);
+          isStarting = false;
+          if(deerflowProcess) deerflowProcess.kill();
+          deerflowProcess = null;
+          reject(new Error(`Failed to start DeerFlow service: ${errorMessage}`));
+        }
+        retries++;
+      }, 1500); // Check every 1.5 seconds
+    } catch (error) {
+      console.error("Error spawning DeerFlow service:", error);
+      isStarting = false;
+      reject(error);
+    }
+  });
+}
+
+export function stopDeerFlowService(): void {
+  if (deerflowProcess) {
+    console.log('Stopping DeerFlow service...');
+    deerflowProcess.kill('SIGTERM');
+    deerflowProcess = null;
+  }
+  isStarting = false;
+}
+// Graceful shutdown
+process.on('exit', stopDeerFlowService);
+process.on('SIGINT', () => { stopDeerFlowService(); process.exit(); });
+process.on('SIGTERM', () => { stopDeerFlowService(); process.exit(); });
+Use code with caution.
+TypeScript
+Update Suna Integration Logic (server/suna-integration.ts):
+
+Modify performResearch and add/update callDeerFlowAPI.
+
+// server/suna-integration.ts
+import { checkDeerFlowService, startDeerFlowService } from './deerflow-manager';
+import axios from 'axios';
+
+// Dummy implementations for Basic/Enhanced search - replace with your actual ones
+async function performBasicSearch(query: string): Promise<any> { /* ... */ return { result: `Basic: ${query}`, sources: [] }; }
+async function performEnhancedSearch(query: string): Promise<any> { /* ... */ return { result: `Enhanced: ${query}`, sources: [] }; }
+
+interface DeerFlowApiParams {
+  research_question: string;
+  model_id?: string;
+  include_market_data?: boolean;
+  include_news?: boolean;
+}
+
+interface DeerFlowApiResponse { // Matches ResearchResponse in Python
+    status?: any;
+    report?: string;
+    visualization_path?: string;
+    timestamp?: string;
+    sources?: any[];
+    service_process_log?: string[];
+}
+
+async function callDeerFlowAPI(params: DeerFlowApiParams): Promise<DeerFlowApiResponse> {
+  const DEERFLOW_API_URL = 'http://localhost:8765/research';
+  console.log(`Calling DeerFlow API with params:`, params);
+  try {
+    // Increased timeout for potentially long research tasks (e.g., 3 minutes)
+    const response = await axios.post<DeerFlowApiResponse>(DEERFLOW_API_URL, params, { timeout: 180000 });
+    return response.data;
+  } catch (error) {
+    console.error("Error calling DeerFlow API:", (error as any).response?.data || (error as any).message);
+    throw error;
+  }
+}
+
+export async function performResearch(
+    query: string, 
+    depth: number = 1, 
+    options?: { llm_model_id?: string } // Suna might pass specific model for DeerFlow
+): Promise<any> {
+  if (depth === 1) return await performBasicSearch(query);
+  if (depth === 2) return await performEnhancedSearch(query);
+  
+  if (depth === 3) {
+    console.log("Depth 3 research: Engaging DeerFlow...");
+    try {
+      let isRunning = await checkDeerFlowService();
+      if (!isRunning) {
+        console.log("DeerFlow service not running. Attempting to start...");
+        const started = await startDeerFlowService();
+        if (!started) {
+          console.error("Failed to start DeerFlow. Falling back to enhanced search.");
+          return await performEnhancedSearch(query);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2500)); // Wait for service to stabilize
+        isRunning = await checkDeerFlowService();
+        if (!isRunning) {
+            console.error("DeerFlow started but not healthy. Falling back.");
+            return await performEnhancedSearch(query);
+        }
+      }
+      
+      console.log("DeerFlow service ready. Sending research request...");
+      const deerFlowParams: DeerFlowApiParams = {
+        research_question: query,
+        model_id: options?.llm_model_id || "deepseek-v3", // Use Suna's choice or default
+        include_market_data: true, // Configure as needed
+        include_news: true,        // Configure as needed
+      };
+
+      const dfResponse = await callDeerFlowAPI(deerFlowParams);
+      
+      // Map DeerFlow's response to Suna's expected format
+      return {
+        result: dfResponse.report || "No report generated by DeerFlow.",
+        sources: dfResponse.sources || [],
+        // Pass through additional DeerFlow info if Suna UI can use it
+        deerflow_status: dfResponse.status,
+        deerflow_visualization_path: dfResponse.visualization_path,
+        deerflow_timestamp: dfResponse.timestamp,
+        deerflow_service_log: dfResponse.service_process_log, // For debugging
+      };
+
+    } catch (error) {
+      console.error("DeerFlow research pipeline failed:", error);
+      console.log("Falling back to enhanced search.");
+      return await performEnhancedSearch(query);
+    }
+  }
+  
+  console.warn(`Unknown research depth: ${depth}. Defaulting to basic search.`);
+  return await performBasicSearch(query);
+}
+Use code with caution.
+TypeScript
+Install Node.js Dependencies:
+
+In Replit Shell (project root): npm install axios (or yarn add axios / pnpm add axios).
+
+Phase 3: Configuration and Replit Setup
+
+Replit Secrets (CRITICAL):
+
+Go to the "Secrets" tab (padlock icon) in Replit.
+
+Add all API keys that DeerFlow (and its underlying tools/LLMs) will need. Refer to DeerFlow documentation for the exact environment variable names it expects. Examples:
+
+OPENAI_API_KEY
+
+ANTHROPIC_API_KEY
+
+GEMINI_API_KEY (or GOOGLE_API_KEY)
+
+DEEPSEEK_API_KEY
+
+TAVILY_API_KEY
+
+BRAVE_API_KEY
+
+SERPER_API_KEY
+
+Any other keys for market data, specific tools, etc.
+
+These secrets will be available as process.env.YOUR_KEY_NAME in Node.js and automatically passed to the Python environment via the spawn command in deerflow-manager.ts.
+
+Replit Run Command (.replit file):
+
+Ensure your .replit file's run command starts your main Node.js backend server (e.g., server/index.ts).
+
+# Example .replit
+language = "typescript" # or nodejs
+entrypoint = "server/index.ts" # Adjust to your main backend file
+run = "node --loader ts-node/esm server/index.ts" # Adjust if using different runner/build step
+
+[nix]
+channel = "stable-23_11" # Or your preferred channel
+Use code with caution.
+Toml
+Phase 4: Testing the Full Flow
+
+Initial Python Service Test (as in Phase 1, Step 6):
+
+Verify DeerFlow initializes correctly and /health works.
+
+Try a curl POST to /research (see Phase 1, Step 6 of previous response) to isolate DeerFlow issues.
+
+Full Stack Test:
+
+Click "Run" in Replit to start your Node.js backend.
+
+From your Suna Chat UI, submit a query that triggers "Depth 3" research.
+
+Observe Logs (Node.js Console):
+
+deerflow-manager.ts: Logs for starting/checking the Python service.
+
+DeerFlow STDOUT/STDERR: Output from the Python server.py (initialization, request processing, DeerFlow's own logs).
+
+suna-integration.ts: Logs for API calls and response handling.
+
+Verify Functionality:
+
+Does research complete? Is the report content sensible?
+
+Are sources cited correctly?
+
+Does fallback to "Depth 2" occur if DeerFlow fails to start or errors out?
+
+Test multiple Depth 3 requests (second one should find service already running).
+
+Important Considerations:
+
+DeerFlow State/Cache: DeerFlow might create local cache files (e.g., in deerflow_service/.cache/). This is fine for Replit development; these files will persist within your Repl.
+
+visualization_path: The path returned by DeerFlow will be local to the Replit container. To display these visualizations, you'd need to serve them (e.g., add a static file route in FastAPI or Node.js).
+
+Error Handling & Reporting: Refine how errors from DeerFlow (via status or the report itself) are presented to the Suna user.
+
+Long Runtimes: complete_research can be time-consuming. The current HTTP timeout is 3 minutes. If longer times are common, a more complex asynchronous pattern (task queues, WebSockets for progress) would be needed for production.
+
+Resource Usage: Monitor Replit resource usage, as deep research can be intensive.

@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+requests
+httpx
+
+# Install DeerFlow directly from GitHub
+git+https://github.com/bytedance/deer-flow.git
+
+# Core dependencies that might be needed by DeerFlow
+openai
+tavily-python
+langchain
+langgraph
+rich
