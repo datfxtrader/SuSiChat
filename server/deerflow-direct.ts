@@ -10,6 +10,7 @@ import { Request, Response } from 'express';
 // Research request parameters
 interface ResearchRequest {
   query: string;
+  max_plan_iterations?: number; // Added to match parameter passed from Suna
   max_step_num?: number;
   enable_background_investigation?: boolean;
   conversation_id?: string;

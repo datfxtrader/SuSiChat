@@ -633,6 +633,8 @@ export class SunaIntegrationService {
       const shouldUseDeepResearch = !disableSearch && 
                                    (forceResearch || data.depthLevel === 3);
       
+      console.log(`Research depth level: ${data.depthLevel}, shouldUseDeepResearch: ${shouldUseDeepResearch}`);
+      
       // Determine if we should perform standard web search
       let shouldPerformSearch = !disableSearch && !shouldUseDeepResearch && 
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
@@ -643,9 +645,11 @@ export class SunaIntegrationService {
         try {
           // Check if DeerFlow service is available
           const isAvailable = await deerflowService.checkServiceAvailability();
+          console.log(`DeerFlow availability check: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'}`);
           
           if (isAvailable) {
-            console.log(`Using DeerFlow for advanced research on: ${data.query}`);
+            console.log(`USING DEERFLOW FOR ADVANCED RESEARCH ON: ${data.query}`);
+            console.log(`Research depth level: ${data.depthLevel}, Using direct implementation: true`);
             
             // Extract the actual query if this is an explicit research command
             const refinedQuery = explicitResearchCommand ? 
@@ -653,10 +657,12 @@ export class SunaIntegrationService {
             
             // Perform deep research using DeerFlow
             const researchStartTime = Date.now();
+            
+            // For direct implementation
+            console.log(`Sending request to DeerFlow direct implementation with query: ${refinedQuery}`);
             const researchResults = await deerflowService.performResearch({
               query: refinedQuery,
               conversation_id: data.threadId,
-              max_plan_iterations: 1,
               max_step_num: 3,
               enable_background_investigation: true
             });
