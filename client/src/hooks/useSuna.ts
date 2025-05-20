@@ -71,11 +71,13 @@ export function useSuna(initialThreadId?: string) {
     mutationFn: async ({ 
       message, 
       model = currentModel,
-      customSearchPrefs 
+      customSearchPrefs,
+      researchDepth
     }: { 
       message: string, 
       model?: LLMModel,
-      customSearchPrefs?: SearchPreferences
+      customSearchPrefs?: SearchPreferences,
+      researchDepth?: number
     }) => {
       if (!isAuthenticated) {
         throw new Error('You must be logged in to use Suna');
@@ -138,7 +140,8 @@ export function useSuna(initialThreadId?: string) {
           message: processedMessage, // Send processed message without command prefixes
           threadId: threadId, // Always pass the current threadId, even if undefined
           model: model, // Pass the selected model to the API
-          searchPreferences: activeSearchPrefs // Pass search preferences
+          searchPreferences: activeSearchPrefs, // Pass search preferences
+          researchDepth: researchDepth // Pass research depth level if provided
         }
       );
       
