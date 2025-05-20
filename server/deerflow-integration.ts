@@ -428,30 +428,51 @@ Your report should synthesize information from multiple sources, highlight conse
       // Format the response
       const report = deerflowResponse.report || 'No research report was generated.';
       
-      // Format sources from DeerFlow response with improved logging
+      // Format sources from DeerFlow response with improved logging and fallback
       console.log('Processing DeerFlow sources:', JSON.stringify(deerflowResponse.sources || []));
-      const sources: ResearchSource[] = (deerflowResponse.sources || [])
-        .map((source: any) => {
-          if (!source) return null;
-          try {
-            const formattedSource: ResearchSource = {
-              title: source.title || 'Untitled',
-              url: source.url || '',
-              domain: source.domain || (source.url ? new URL(source.url).hostname : 'unknown'),
-              content: source.content || ''
-            };
-            return formattedSource;
-          } catch (error) {
-            console.error('Error formatting source:', error, 'Source:', source);
-            return {
-              title: source.title || 'Untitled',
-              url: source.url || '',
-              domain: 'unknown',
-              content: source.content || ''
-            };
-          }
-        })
-        .filter((source): source is ResearchSource => source !== null);
+      let sources: ResearchSource[] = [];
+      
+      // If DeerFlow provided sources, use them
+      if (deerflowResponse.sources && deerflowResponse.sources.length > 0) {
+        sources = (deerflowResponse.sources || [])
+          .map((source: any) => {
+            if (!source) return null;
+            try {
+              const formattedSource: ResearchSource = {
+                title: source.title || 'Untitled',
+                url: source.url || '',
+                domain: source.domain || (source.url ? new URL(source.url).hostname : 'unknown'),
+                content: source.content || ''
+              };
+              return formattedSource;
+            } catch (error) {
+              console.error('Error formatting source:', error, 'Source:', source);
+              return {
+                title: source.title || 'Untitled',
+                url: source.url || '',
+                domain: 'unknown',
+                content: source.content || ''
+              };
+            }
+          })
+          .filter((source): source is ResearchSource => source !== null);
+      } 
+      // If no sources from DeerFlow, use web search as fallback
+      else {
+        console.log('No sources from DeerFlow, using web search as fallback');
+        // Use the global performWebSearch function
+        try {
+          const webSearch = await (global as any).performWebSearch(params.query, 8);
+          sources = (webSearch.results || []).map((result: any) => ({
+            title: result.title || 'Untitled',
+            url: result.url || '',
+            domain: result.source || (result.url ? new URL(result.url).hostname : 'unknown'),
+            content: result.content || ''
+          }));
+        } catch (searchError) {
+          console.error('Error performing fallback web search:', searchError);
+        }
+      }
       
       console.log('Formatted sources count:', sources.length);
       
