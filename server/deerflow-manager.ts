@@ -8,7 +8,7 @@ const DEERFLOW_URL = `http://localhost:${DEERFLOW_PORT}`;
 let deerflowProcess: ChildProcess | null = null;
 let isStarting = false;
 
-const pythonExecutable = 'python3.12';
+const pythonExecutable = 'python3';
 const deerflowScriptPath = path.join(process.cwd(), 'deerflow_service', 'server.py');
 const deerflowCwd = path.join(process.cwd(), 'deerflow_service');
 

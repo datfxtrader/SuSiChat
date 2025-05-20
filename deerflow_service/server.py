@@ -35,7 +35,7 @@ async def startup_event():
     global researcher
     print("DeerFlow Service starting up...")
     print("Checking for required environment variables:")
-    required_keys = ["OPENAI_API_KEY", "TAVILY_API_KEY", "DEEPSEEK_API_KEY"]
+    required_keys = ["TAVILY_API_KEY", "DEEPSEEK_API_KEY"]
     for key in required_keys:
         print(f"  - {key}: {'Available' if key in os.environ else 'MISSING'}")
     

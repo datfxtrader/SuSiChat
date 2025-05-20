@@ -43,20 +43,33 @@ export function useResearch() {
   // Mutation for performing research
   const mutation = useMutation({
     mutationFn: async (params: ResearchParams): Promise<ResearchResult> => {
-      const response = await apiRequest(
-        'POST',
-        '/api/research',
-        params
-      );
-      const data = await response.json();
-      
-      // Add query info to the result for history tracking
-      const resultWithQuery = {
-        ...data,
-        searchQuery: params.query
-      } as ResearchResult;
-      
-      return resultWithQuery;
+      try {
+        const response = await apiRequest(
+          'POST',
+          '/api/research',
+          params
+        );
+        const data = await response.json();
+        
+        // Add query info to the result for history tracking
+        const resultWithQuery = {
+          ...data,
+          searchQuery: params.query,
+          timestamp: data.timestamp || new Date().toISOString()
+        } as ResearchResult;
+        
+        return resultWithQuery;
+      } catch (error) {
+        // If there's an error with the DeerFlow service, try with depth 2
+        if (params.depth === ResearchDepth.Deep) {
+          console.log('Falling back to depth 2 due to service error');
+          return await mutation.mutateAsync({
+            ...params,
+            depth: ResearchDepth.Enhanced
+          });
+        }
+        throw error;
+      }
     },
     onSuccess: (data) => {
       // Update current research
