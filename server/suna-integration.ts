@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
+import { deerflowService } from './deerflow-simplified';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
@@ -640,9 +641,75 @@ export class SunaIntegrationService {
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
       
-      // Try DeerFlow's advanced research capabilities first if needed
+      // Try enhanced research capabilities first for depth level 3
       if (shouldUseDeepResearch) {
         try {
+          // For depth level 3, preferably use our new enhanced research module
+          if (depthLevel === 3) {
+            try {
+              console.log(`USING ENHANCED RESEARCH MODULE FOR DEPTH LEVEL 3: ${data.query}`);
+              
+              // Extract the actual query if this is an explicit research command
+              const refinedQuery = explicitResearchCommand ? 
+                explicitResearchCommand[1] : data.query;
+              
+              // Import the enhanced research module on demand
+              const { performEnhancedResearch } = await import('./enhanced-research');
+              
+              // Perform the research with our enhanced implementation
+              const researchResults = await performEnhancedResearch({
+                query: refinedQuery,
+                maxDepth: 3,
+                includeSources: true,
+                conversationId: conversation.id
+              });
+              
+              // Process and format the results for the response
+              const searchSources = researchResults.sources.map(source => ({
+                title: source.title,
+                url: source.url,
+                snippet: source.snippet
+              }));
+              
+              // Create the response message with the research results
+              const responseContent = researchResults.result;
+              
+              // Add the results to the conversation
+              const newMsgId = uuidv4();
+              const researchMsg: SunaMessage = {
+                id: newMsgId,
+                role: 'assistant',
+                content: responseContent,
+                timestamp: new Date().toISOString(),
+                modelUsed: 'enhanced-research-v1',
+                webSearchUsed: true,
+                searchMetadata: {
+                  query: refinedQuery,
+                  sources: searchSources.map(s => s.url),
+                  resultCount: searchSources.length,
+                  searchEngines: ['tavily', 'brave'],
+                  searchTime: 0,
+                  sourceDetails: searchSources.map(s => ({
+                    title: s.title,
+                    url: s.url,
+                    domain: new URL(s.url).hostname
+                  }))
+                }
+              };
+              
+              // Save the message to the conversation
+              conversation.messages.push(researchMsg);
+              
+              // Return the response directly
+              res.json(researchMsg);
+              return;
+            } catch (error) {
+              console.error('Error using enhanced research module:', error);
+              // Continue with DeerFlow fallback
+            }
+          }
+          
+          // Fall back to DeerFlow if enhanced research fails or for other depth levels
           // Check if DeerFlow service is available
           const isAvailable = await deerflowService.checkServiceAvailability();
           console.log(`DeerFlow availability check: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'}`);
