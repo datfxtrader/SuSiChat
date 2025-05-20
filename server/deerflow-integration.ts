@@ -11,16 +11,21 @@ export enum ResearchDepth {
 }
 
 /**
+ * Research source interface
+ */
+export interface ResearchSource {
+  title: string;
+  url: string;
+  domain: string;
+  content?: string;
+}
+
+/**
  * Research result interface
  */
 export interface ResearchResult {
   report: string;
-  sources: Array<{
-    title: string;
-    url: string;
-    domain: string;
-    content?: string;
-  }>;
+  sources: ResearchSource[];
   depth: ResearchDepth;
   processingTime: number;
 }
@@ -117,8 +122,9 @@ export class ResearchService {
       const results = searchResults.results || [];
       
       // Format sources
-      const sources = results.map((result: any) => {
+      const sources: ResearchSource[] = results.map((result: any) => {
         try {
+          if (!result || !result.url) return null;
           const domain = new URL(result.url).hostname;
           return {
             title: result.title || domain,
@@ -129,7 +135,7 @@ export class ResearchService {
         } catch (e) {
           return null;
         }
-      }).filter((source: any) => source !== null);
+      }).filter((source): source is ResearchSource => source !== null);
       
       // Generate a report from results
       let report = '';
@@ -241,8 +247,9 @@ export class ResearchService {
       });
       
       // Format sources
-      const sources = allResults.map((result: any) => {
+      const sources: ResearchSource[] = allResults.map((result: any) => {
         try {
+          if (!result || !result.url) return null;
           const domain = new URL(result.url).hostname;
           return {
             title: result.title || domain,
@@ -253,7 +260,7 @@ export class ResearchService {
         } catch (e) {
           return null;
         }
-      }).filter((source: any) => source !== null);
+      }).filter((source): source is ResearchSource => source !== null);
       
       // Generate a comprehensive report using LLM to synthesize findings
       let report = '';
@@ -363,18 +370,72 @@ Your report should synthesize information from multiple sources, highlight conse
         throw new Error(`DeerFlow service error: ${deerflowResponse.status.message}`);
       }
       
+      // Handle processing state - if the response is still processing, wait for completion
+      if (deerflowResponse.status?.status === 'processing' && deerflowResponse.status?.id) {
+        console.log('Research is processing, waiting for completion...');
+        
+        // Wait for research to be completed (with timeout)
+        const maxAttempts = 10;
+        const delayBetweenAttempts = 3000; // 3 seconds
+        let attempt = 0;
+        
+        while (attempt < maxAttempts) {
+          // Wait before checking again
+          await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
+          
+          // Check status
+          try {
+            const statusResponse = await deerflowClient.checkResearchStatus(deerflowResponse.status.id);
+            
+            // If completed, use this response instead
+            if (statusResponse.status?.status === 'completed') {
+              console.log('Research completed successfully');
+              return {
+                report: statusResponse.report || 'No research report was generated.',
+                sources: (statusResponse.sources || []).map((source: any) => ({
+                  title: source.title || 'Untitled',
+                  url: source.url,
+                  domain: source.domain || 'unknown',
+                  content: source.content
+                })),
+                depth: ResearchDepth.Deep,
+                processingTime: Date.now() - startTime
+              };
+            }
+            
+            // If error, throw
+            if (statusResponse.status?.status === 'error') {
+              throw new Error(`Research failed: ${statusResponse.status.message}`);
+            }
+            
+            console.log(`Research still in progress (attempt ${attempt + 1}/${maxAttempts})...`);
+          } catch (statusError) {
+            console.error('Error checking research status:', statusError);
+          }
+          
+          attempt++;
+        }
+        
+        // If we've waited too long, fall back to enhanced research
+        console.log('Research taking too long, falling back to enhanced research');
+        return this.performEnhancedResearch(params);
+      }
+      
       // Format the response
       const report = deerflowResponse.report || 'No research report was generated.';
       
       // Format sources from DeerFlow response
-      const sources = (deerflowResponse.sources || []).map(source => {
-        return {
-          title: source.title || 'Untitled',
-          url: source.url,
-          domain: source.domain || 'unknown',
-          content: source.content
-        };
-      });
+      const sources: ResearchSource[] = (deerflowResponse.sources || [])
+        .map((source: any) => {
+          if (!source) return null;
+          return {
+            title: source.title || 'Untitled',
+            url: source.url || '',
+            domain: source.domain || 'unknown',
+            content: source.content || ''
+          };
+        })
+        .filter((source): source is ResearchSource => source !== null);
       
       // Log service process info
       if (deerflowResponse.service_process_log && deerflowResponse.service_process_log.length > 0) {
