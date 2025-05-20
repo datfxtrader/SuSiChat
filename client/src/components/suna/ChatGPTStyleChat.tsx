@@ -1067,7 +1067,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 </SelectContent>
               </Select>
               
-              {/* Simple mode toggle and depth selector */}
+              {/* Simple mode toggle */}
               <div className="flex items-center">
                 {/* Quick toggle */}
                 <div 
@@ -1081,12 +1081,12 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   {!researchMode && <div className="w-8 bg-blue-500"></div>}
                 </div>
                 
-                {/* Research toggle */}
+                {/* Research toggle - matched to reference image */}
                 <div 
                   className="flex items-center rounded-md overflow-hidden h-7 border cursor-pointer mr-2"
                   onClick={() => setResearchMode(true)}
                 >
-                  <div className="w-28 py-1 text-xs flex items-center justify-center"
+                  <div className="py-1 text-xs flex items-center justify-center w-28"
                     style={{ 
                       backgroundColor: researchMode ? '#3b82f6' : 'white',
                       color: researchMode ? 'white' : '#374151'
@@ -1095,37 +1095,40 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     <BookOpen className="w-3 h-3 mr-1" />
                     Research
                   </div>
-                  {researchMode && <div className="w-8 bg-blue-500"></div>}
                 </div>
-              </div>
-              
-              {/* Research depth selector */}
-              {researchMode && (
-                <div className="flex items-center ml-2 mt-2">
-                  <span className="text-sm text-gray-700 mr-2">Research Depth:</span>
-                  <div className="flex border rounded-md overflow-hidden">
-                    {[1, 2, 3].map((level) => (
-                      <TooltipProvider key={level}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`w-12 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                              onClick={() => setResearchDepth(level)}
-                            >
-                              {level}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            {level === 1 && "Basic research (5-15s)"}
-                            {level === 2 && "Enhanced research (15-30s)"}
-                            {level === 3 && "Deep research with DeerFlow (1-2m)"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ))}
+                
+                {/* Research Depth selector without label - in reference image style */}
+                {researchMode && (
+                  <div className="flex items-center ml-2">
+                    <div className="flex border rounded-md overflow-hidden">
+                      {[1, 2, 3].map((level) => (
+                        <TooltipProvider key={level}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className={`w-12 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                                onClick={() => setResearchDepth(level)}
+                              >
+                                <div className="flex items-center justify-center">
+                                  {level === 1 ? <Search className="w-3 h-3 mr-1" /> : 
+                                   level === 2 ? <Sparkles className="w-3 h-3 mr-1" /> : 
+                                   <Database className="w-3 h-3 mr-1" />}
+                                  {level}
+                                </div>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {level === 1 && "Basic research (5-15s)"}
+                              {level === 2 && "Enhanced research (15-30s)"}
+                              {level === 3 && "Deep research with DeerFlow (1-2m)"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             <p className="text-[10px] text-gray-500 flex items-center justify-center">
               Made with <span className="mx-1 text-red-500"><HeartIcon className="h-3 w-3 inline" /></span> and <span className="mx-1"><Coffee className="h-3 w-3 inline text-amber-700" /></span>
