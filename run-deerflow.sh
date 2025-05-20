@@ -7,27 +7,20 @@ set -e
 
 echo "Starting DeerFlow Research Microservice..."
 
-# Create a python virtual environment if it doesn't exist
-if [ ! -d "deerflow-venv" ]; then
-  echo "Creating Python virtual environment for DeerFlow..."
-  python3 -m venv deerflow-venv
+# Make sure Python 3 is available
+if ! command -v python3 &>/dev/null; then
+    echo "Python 3 is required but not found. Please install Python 3."
+    exit 1
 fi
 
-# Activate the virtual environment
-source deerflow-venv/bin/activate
-
-# Install dependencies if needed
-if [ ! -f "deerflow-venv/.initialized" ]; then
-  echo "Installing DeerFlow dependencies..."
-  cd deerflow-service
-  pip install -e .
-  touch ../deerflow-venv/.initialized
-  cd ..
-fi
-
-# Export environment variables
+# Export environment variables for the service
 export PYTHONPATH=$PYTHONPATH:./deerflow-service
 
+# Install required packages directly
+echo "Installing basic required packages..."
+pip install fastapi uvicorn httpx langgraph langchain-core
+
 # Start the DeerFlow service
+echo "Starting DeerFlow service on port 8000..."
 cd deerflow-service
-python main.py --host 0.0.0.0 --port 8000
+python3 main.py --host 0.0.0.0 --port 8000

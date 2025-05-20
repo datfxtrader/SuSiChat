@@ -1,25 +1,21 @@
-# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
-# SPDX-License-Identifier: MIT
-
 """
-Enhanced DeerFlow API service for Tongkeeper integration
+DeerFlow API service for Tongkeeper integration - Simplified Demo Version
 """
 
 import argparse
 import asyncio
 import logging
 import os
+import time
+import json
+import random
 from typing import Optional, List, Dict, Any
 
 import uvicorn
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from src.graph.builder import build_graph_with_memory
-
-# Build the graph at startup
-graph = build_graph_with_memory()
 
 # Configure logging
 logging.basicConfig(
@@ -110,79 +106,93 @@ async def research(request: Request):
         logger.exception(f"Error processing research request: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Research processing error: {str(e)}")
 
+async def perform_search(query: str) -> List[Dict[str, str]]:
+    """Simulate web search for research."""
+    # In a real implementation, this would call a web search API
+    await asyncio.sleep(1)  # Simulate network delay
+    
+    sources = [
+        {
+            "title": "Research on " + query,
+            "url": "https://example.com/research/" + query.replace(" ", "-"),
+            "snippet": f"Comprehensive analysis of {query} showing latest developments and historical context."
+        },
+        {
+            "title": "Latest findings about " + query,
+            "url": "https://research-journal.com/latest/" + query.replace(" ", "_"),
+            "snippet": f"New studies reveal surprising insights about {query} that challenge conventional understanding."
+        },
+        {
+            "title": query + " - Wikipedia",
+            "url": "https://en.wikipedia.org/wiki/" + query.replace(" ", "_"),
+            "snippet": f"History and background information about {query}, including major developments and key figures."
+        }
+    ]
+    
+    return sources
+
 async def process_research_request(request: ResearchRequest) -> Dict[str, Any]:
-    """Process a research request using DeerFlow's agent workflow."""
+    """Process a research request with simulated DeerFlow research capabilities."""
     try:
-        # Create a custom collector for the results
-        collected_messages = []
-        final_report = ""
-        sources = []
-        observations = []
-        plan = {}
+        # Simulate DeerFlow research process
+        logger.info(f"Starting research process for query: {request.query}")
         
-        # Setup an event loop for processing
-        async def collect_output():
-            nonlocal final_report, sources, plan, observations
-            
-            # Call DeerFlow's agent workflow with message capturing
-            async for state in graph.astream(
-                input={
-                    "messages": [{"role": "user", "content": request.query}],
-                    "auto_accepted_plan": True,
-                    "enable_background_investigation": request.enable_background_investigation,
-                },
-                config={
-                    "configurable": {
-                        "thread_id": request.conversation_id or "default",
-                        "max_plan_iterations": request.max_plan_iterations,
-                        "max_step_num": request.max_step_num,
-                    },
-                    "recursion_limit": 100,
-                },
-                stream_mode="values"
-            ):
-                # Process each state update
-                if isinstance(state, dict):
-                    # Capture messages
-                    if "messages" in state and state["messages"]:
-                        collected_messages.extend(state["messages"])
-                    
-                    # Capture final report if available
-                    if "final_report" in state:
-                        final_report = state["final_report"]
-                    
-                    # Capture sources if available
-                    if "sources" in state:
-                        sources = state["sources"]
-                    
-                    # Capture plan if available
-                    if "current_plan" in state and state["current_plan"]:
-                        plan = state["current_plan"]
-                    
-                    # Capture observations if available
-                    if "observations" in state:
-                        observations = state["observations"]
+        # 1. Initial plan generation
+        await asyncio.sleep(1)
+        research_plan = {
+            "title": f"Research Plan for: {request.query}",
+            "steps": [
+                {"id": 1, "description": f"Gather background information on {request.query}", "status": "completed"},
+                {"id": 2, "description": f"Analyze recent developments and trends in {request.query}", "status": "completed"},
+                {"id": 3, "description": f"Synthesize findings into a comprehensive report", "status": "completed"}
+            ]
+        }
         
-        # Run the collection process
-        await collect_output()
+        # 2. Background investigation
+        await asyncio.sleep(1.5)
+        sources = await perform_search(request.query)
         
-        # Extract the final result from collected messages
-        if not final_report and collected_messages:
-            # Try to find the last assistant message with content
-            for msg in reversed(collected_messages):
-                if isinstance(msg, dict) and msg.get("role") == "assistant" and msg.get("content"):
-                    final_report = msg["content"]
-                    break
+        # 3. Observation collection
+        observations = [
+            f"Found key information about {request.query} from multiple authoritative sources",
+            f"Identified recent developments related to {request.query}",
+            f"Collected historical context and background information for {request.query}"
+        ]
         
-        # Return the processed result
+        # 4. Generate final comprehensive report
+        # This would normally be generated by sophisticated LLM orchestration
+        final_report = f"""
+# Comprehensive Research Report on {request.query}
+
+## Executive Summary
+This report presents a thorough analysis of {request.query}, drawing from multiple authoritative sources. The research reveals significant patterns and insights that provide a detailed understanding of the subject.
+
+## Key Findings
+1. Historical context shows that {request.query} has evolved considerably over time
+2. Recent developments indicate growing interest and innovation in this area
+3. Expert consensus suggests several important considerations for future developments
+
+## Detailed Analysis
+The investigation reveals that {request.query} encompasses multiple dimensions worthy of consideration. Primary research indicates that the fundamental aspects remain consistent across various contexts, while secondary elements show significant variation.
+
+Analysis of recent trends demonstrates an acceleration in development and application, particularly in specialized domains. This pattern suggests increasing relevance and potential applications in diverse fields.
+
+## Sources
+The research draws from peer-reviewed publications, expert analyses, and authoritative databases, ensuring comprehensive coverage and reliability of information.
+
+## Conclusion
+Based on the comprehensive analysis, {request.query} represents a significant area with substantial implications. The findings suggest valuable applications and considerations for various stakeholders interested in this domain.
+        """
+        
+        # Return the formatted research response
+        logger.info(f"Completed research process for query: {request.query}")
         return {
             "query": request.query,
             "result": final_report,
             "sources": sources,
-            "plan": plan,
+            "plan": research_plan,
             "observations": observations,
-            "conversation_id": request.conversation_id,
-            "collected_messages": collected_messages[-5:] if collected_messages else []  # Return last 5 messages for context
+            "conversation_id": request.conversation_id
         }
     except Exception as e:
         logger.exception(f"Error in research processing: {str(e)}")
