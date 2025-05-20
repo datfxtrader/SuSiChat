@@ -950,35 +950,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         {/* Input area */}
         <div className="px-2 sm:px-4 pb-4 pt-4 absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-md">
           <div className="relative max-w-3xl mx-auto">
-            {/* Research depth controls - only shown in research mode - styled like reference image */}
-            {researchMode && (
-              <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <span className="text-sm font-medium text-gray-700 mr-3">Research Depth:</span>
-                  <div className="flex border rounded-md overflow-hidden bg-white">
-                    {[1, 2, 3].map((level) => (
-                      <TooltipProvider key={level}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`px-6 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                              onClick={() => setResearchDepth(level)}
-                            >
-                              {level}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            {level === 1 && "Basic web search (5-15 seconds)"}
-                            {level === 2 && "Enhanced research (15-30 seconds)"}
-                            {level === 3 && "Deep DeerFlow research (1-2 minutes)"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Research depth controls removed from here to avoid duplication */}
             
             <Textarea
               ref={textareaRef}
@@ -1097,37 +1069,35 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                 </div>
                 
-                {/* Research Depth selector without label - in reference image style */}
-                {researchMode && (
-                  <div className="flex items-center ml-2">
-                    <div className="flex border rounded-md overflow-hidden">
-                      {[1, 2, 3].map((level) => (
-                        <TooltipProvider key={level}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                className={`w-12 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                                onClick={() => setResearchDepth(level)}
-                              >
-                                <div className="flex items-center justify-center">
-                                  {level === 1 ? <Search className="w-3 h-3 mr-1" /> : 
-                                   level === 2 ? <Sparkles className="w-3 h-3 mr-1" /> : 
-                                   <Database className="w-3 h-3 mr-1" />}
-                                  {level}
-                                </div>
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {level === 1 && "Basic research (5-15s)"}
-                              {level === 2 && "Enhanced research (15-30s)"}
-                              {level === 3 && "Deep research with DeerFlow (1-2m)"}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ))}
-                    </div>
+                {/* Research Depth selector, exactly matching reference image */}
+                <div className="flex items-center ml-2">
+                  <div className="flex border rounded-md overflow-hidden">
+                    {[1, 2, 3].map((level) => (
+                      <TooltipProvider key={level}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`w-12 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              onClick={() => setResearchDepth(level)}
+                            >
+                              <div className="flex items-center justify-center">
+                                {level === 1 ? <Search className="w-3 h-3 mr-1" /> : 
+                                 level === 2 ? <Sparkles className="w-3 h-3 mr-1" /> : 
+                                 <Database className="w-3 h-3 mr-1" />}
+                                {level}
+                              </div>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {level === 1 && "Basic research (5-15s)"}
+                            {level === 2 && "Enhanced research (15-30s)"}
+                            {level === 3 && "Deep research with DeerFlow (1-2m)"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             </div>
             <p className="text-[10px] text-gray-500 flex items-center justify-center">
