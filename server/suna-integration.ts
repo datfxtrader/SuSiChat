@@ -676,7 +676,7 @@ export class SunaIntegrationService {
               
               // Add the results to the conversation
               const newMsgId = uuidv4();
-              const researchMsg: SunaMessage = {
+              const researchMsg = {
                 id: newMsgId,
                 role: 'assistant',
                 content: responseContent,
@@ -697,12 +697,11 @@ export class SunaIntegrationService {
                 }
               };
               
-              // Save the message to the conversation
+              // Save the message to the conversation history
               conversation.messages.push(researchMsg);
               
-              // Return the response directly
-              res.json(researchMsg);
-              return;
+              // Send the response using the res parameter
+              return res.json(researchMsg);
             } catch (error) {
               console.error('Error using enhanced research module:', error);
               // Continue with DeerFlow fallback
