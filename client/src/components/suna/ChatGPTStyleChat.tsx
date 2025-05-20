@@ -1067,10 +1067,10 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 </SelectContent>
               </Select>
               
-              {/* Mode toggle - Quick vs Research */}
+              {/* Mode toggle - Quick vs Research - matched to reference image */}
               <div className="flex items-center rounded-md overflow-hidden h-7 border">
                 <button 
-                  className={`px-6 py-1 text-xs flex-1 ${!researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  className={`w-20 py-1 text-xs ${!researchMode ? 'bg-white text-gray-700' : 'bg-white text-gray-700'}`}
                   onClick={() => setResearchMode(false)}
                 >
                   <div className="flex items-center justify-center">
@@ -1078,18 +1078,47 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     Quick
                   </div>
                 </button>
-                <button 
-                  className={`px-6 py-1 text-xs flex-1 ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                  onClick={() => setResearchMode(true)}
-                >
-                  <div className="flex items-center justify-center">
-                    <BookOpen className="w-3 h-3 mr-1" />
-                    Research
-                  </div>
-                </button>
+                {!researchMode && <div className="w-8 bg-blue-500"></div>}
+                {researchMode && (
+                  <button 
+                    className={`w-28 py-1 text-xs ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                    onClick={() => setResearchMode(true)}
+                  >
+                    <div className="flex items-center justify-center">
+                      <BookOpen className="w-3 h-3 mr-1" />
+                      Research
+                    </div>
+                  </button>
+                )}
               </div>
               
-              {/* Removed duplicate research depth selector */}
+              {/* Research depth selector */}
+              {researchMode && (
+                <div className="flex items-center ml-2">
+                  <span className="text-sm text-gray-700 mr-2">Research Depth:</span>
+                  <div className="flex border rounded-md overflow-hidden">
+                    {[1, 2, 3].map((level) => (
+                      <TooltipProvider key={level}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`w-12 py-1.5 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              onClick={() => setResearchDepth(level)}
+                            >
+                              {level}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {level === 1 && "Basic research (5-15s)"}
+                            {level === 2 && "Enhanced research (15-30s)"}
+                            {level === 3 && "Deep research with DeerFlow (1-2m)"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <p className="text-[10px] text-gray-500 flex items-center justify-center">
               Made with <span className="mx-1 text-red-500"><HeartIcon className="h-3 w-3 inline" /></span> and <span className="mx-1"><Coffee className="h-3 w-3 inline text-amber-700" /></span>
