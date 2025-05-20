@@ -18,6 +18,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
   
+  // Mount research routes
+  app.use('/api', researchRoutes);
+  
   const httpServer = createServer(app);
   
   // Set up WebSocket server for real-time chat
