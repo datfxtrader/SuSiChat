@@ -103,14 +103,10 @@ export class ResearchService {
     const startTime = Date.now();
     
     try {
-      // Import from suna-integration.ts 
-      // Use global import to avoid circular dependency issues
-      const performWebSearch = global.performWebSearch;
-      if (!performWebSearch) {
-        throw new Error('Web search functionality not available');
-      }
+      // Direct import to avoid global object issues
+      const { performWebSearch } = require('./performWebSearch');
       
-      // Perform web search using the existing function
+      // Perform web search using the function
       const searchResults = await performWebSearch(params.query);
       
       if (searchResults.error) {
@@ -180,11 +176,9 @@ export class ResearchService {
     const startTime = Date.now();
     
     try {
-      // Import the necessary functions using dynamic imports to avoid circular dependencies
-      const sunaIntegration = await import('./suna-integration');
-      const performWebSearch = sunaIntegration.performWebSearch;
-      const llmModule = await import('./llm');
-      const llmService = llmModule.llmService;
+      // Direct import to avoid circular dependency issues
+      const { performWebSearch } = require('./performWebSearch');
+      const { llmService } = require('./llm');
       
       // Perform multiple searches with different query variations to get more diverse results
       const mainQuery = params.query;
