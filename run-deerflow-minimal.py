@@ -39,6 +39,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Check for API keys
+if not os.environ.get("TAVILY_API_KEY") and not os.environ.get("BRAVE_API_KEY"):
+    logger.warning("No search API keys detected! Add TAVILY_API_KEY or BRAVE_API_KEY to your environment variables for web search capabilities.")
+    
+if not os.environ.get("DEEPSEEK_API_KEY"):
+    logger.warning("No DEEPSEEK_API_KEY detected! Add it to your environment variables for advanced LLM capabilities.")
+
 # Define request/response models
 class ResearchRequest(BaseModel):
     research_question: str
