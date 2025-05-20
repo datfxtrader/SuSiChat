@@ -100,6 +100,8 @@ Current date: ${new Date().toISOString().split('T')[0]}`
  * Get default forex data sources for a specific currency pair
  */
 function getDefaultForexSources(currencyPair: string) {
+  // Format for different sites requires different formats
+  const pairSlash = currencyPair.toUpperCase();
   const pair = currencyPair.replace('/', '').toLowerCase();
   
   return [

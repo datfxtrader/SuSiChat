@@ -420,19 +420,15 @@ Your report should:
       if (currencyPair) {
         // For currency pairs, use the forex API
         try {
-          const response = await fetch('/api/forex/analyze', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              currencyPair,
-              timeframe: 'daily'
-            })
+          // Use axios for server-side requests instead of fetch
+          const axios = require('axios');
+          const response = await axios.post('http://localhost:5000/api/forex/analyze', {
+            currencyPair,
+            timeframe: 'daily'
           });
           
-          if (response.ok) {
-            const data = await response.json();
+          if (response.status === 200) {
+            const data = response.data;
             
             // Format sources
             const sources: ResearchSource[] = (data.sources || []).map((source: any) => ({
