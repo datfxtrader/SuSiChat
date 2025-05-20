@@ -7,8 +7,8 @@ import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
 import researchRoutes from "./routes/research";
 import financialResearchRoutes from "./routes/financial-research";
-import webSearchRoutes from "./routes/web-search";
-import forexDataRoutes from "./routes/forex-data";
+import webSearchRoutes from "./routes/webSearch";
+import forexDataRoutes from "./routes/forexData";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
