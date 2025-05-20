@@ -1,27 +1,30 @@
-// server/deerflow-manager.ts
+/**
+ * DeerFlow Service Manager
+ * 
+ * This module handles starting, stopping, and checking the status of the DeerFlow Python service.
+ */
+
 import { spawn, ChildProcess } from 'child_process';
 import axios from 'axios';
-import path from 'path';
 
-const DEERFLOW_PORT = 8765;
+// Configuration
+const DEERFLOW_PORT = 8000;
 const DEERFLOW_URL = `http://localhost:${DEERFLOW_PORT}`;
-let deerflowProcess: ChildProcess | null = null;
-let isStarting = false;
+const MAX_STARTUP_RETRIES = 5;
+const RETRY_INTERVAL_MS = 2000;
 
-const pythonExecutable = 'python3';
-const deerflowScriptPath = path.join(process.cwd(), 'deerflow_service', 'server.py');
-const deerflowCwd = path.join(process.cwd(), 'deerflow_service');
+// Global state
+let deerflowProcess: ChildProcess | null = null;
 
 /**
  * Check if the DeerFlow service is healthy and running
  */
 export async function checkDeerFlowService(): Promise<boolean> {
-  if (isStarting) return false;
   try {
-    const response = await axios.get(`${DEERFLOW_URL}/health`, { timeout: 2000 });
-    return response.status === 200 && response.data.status === 'ok';
+    const response = await axios.get(`${DEERFLOW_URL}/health`, { timeout: 3000 });
+    return response.status === 200 && response.data?.status === 'ok';
   } catch (error) {
-    console.log('DeerFlow health check failed:', error.message);
+    console.log('DeerFlow health check failed:', error);
     return false;
   }
 }
@@ -30,95 +33,65 @@ export async function checkDeerFlowService(): Promise<boolean> {
  * Start the DeerFlow Python service if it's not already running
  */
 export async function startDeerFlowService(): Promise<boolean> {
+  console.log('Attempting to start DeerFlow service...');
+  
+  // Check if already running
   if (await checkDeerFlowService()) {
-    console.log('DeerFlow service already running.');
+    console.log('DeerFlow service is already running');
     return true;
   }
   
-  if (isStarting) {
-    console.log('DeerFlow service startup already in progress.');
-    return false;
-  }
-  
-  isStarting = true;
-  console.log('Starting DeerFlow service...');
-
-  return new Promise((resolve, reject) => {
+  // Start the process if it's not already started
+  if (!deerflowProcess) {
+    console.log('Spawning new DeerFlow process...');
+    
     try {
-      // Forward all environment variables to the Python process, including API keys
-      deerflowProcess = spawn(pythonExecutable, [deerflowScriptPath], {
-        cwd: deerflowCwd,
-        env: { 
+      // Spawn the Python process with proper environment
+      deerflowProcess = spawn('python', ['deerflow_service/server.py'], {
+        env: {
           ...process.env,
-          PYTHONUNBUFFERED: "1" // Ensures Python prints output immediately
+          PYTHONUNBUFFERED: '1',  // Force unbuffered output for more immediate logs
         },
         stdio: ['ignore', 'pipe', 'pipe']
       });
-
-      // Handle process output for logging
+      
+      // Handle process output
       deerflowProcess.stdout?.on('data', (data: Buffer) => {
-        console.log(`DeerFlow: ${data.toString().trim()}`);
+        console.log(`DeerFlow stdout: ${data.toString().trim()}`);
       });
-
+      
       deerflowProcess.stderr?.on('data', (data: Buffer) => {
-        console.error(`DeerFlow Error: ${data.toString().trim()}`);
+        console.error(`DeerFlow stderr: ${data.toString().trim()}`);
       });
-
-      // Handle process errors
-      deerflowProcess.on('error', (err) => {
-        console.error('Failed to start DeerFlow subprocess:', err);
-        isStarting = false;
-        deerflowProcess = null;
-        reject(err);
-      });
-
+      
       // Handle process exit
-      deerflowProcess.on('exit', (code, signal) => {
-        console.log(`DeerFlow process exited with code ${code} signal ${signal}`);
+      deerflowProcess.on('exit', (code) => {
+        console.log(`DeerFlow process exited with code ${code}`);
         deerflowProcess = null;
-        
-        if (isStarting) {
-          isStarting = false;
-          // The health check interval will handle rejecting the promise
-        }
       });
-
-      // Check if service has started properly
-      let retries = 0;
-      const maxRetries = 30; // Increased for potentially slow startup
-      const checkInterval = setInterval(async () => {
-        const isRunning = await checkDeerFlowService();
-        
-        if (isRunning) {
-          clearInterval(checkInterval);
-          console.log('DeerFlow service started successfully.');
-          isStarting = false;
-          resolve(true);
-        } else if (retries >= maxRetries || (!deerflowProcess && isStarting)) {
-          clearInterval(checkInterval);
-          const errorMessage = deerflowProcess 
-            ? 'Health check timeout.' 
-            : 'Process died during startup.';
-          
-          console.error('Failed to start DeerFlow service:', errorMessage);
-          isStarting = false;
-          
-          if (deerflowProcess) {
-            deerflowProcess.kill();
-            deerflowProcess = null;
-          }
-          
-          reject(new Error(`Failed to start DeerFlow service: ${errorMessage}`));
+      
+      // Check if service starts properly
+      for (let i = 0; i < MAX_STARTUP_RETRIES; i++) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL_MS));
+        if (await checkDeerFlowService()) {
+          console.log('DeerFlow service successfully started');
+          return true;
         }
-        
-        retries++;
-      }, 2000); // Check every 2 seconds
-    } catch (error) {
-      console.error("Error spawning DeerFlow service:", error);
-      isStarting = false;
-      reject(error);
+        console.log(`Waiting for DeerFlow service to start (attempt ${i + 1}/${MAX_STARTUP_RETRIES})...`);
+      }
+      
+      // If we reach here, service failed to start
+      console.error('Failed to start DeerFlow service after multiple attempts');
+      stopDeerFlowService();
+      return false;
+    } catch (err) {
+      console.error('Error starting DeerFlow service:', err);
+      stopDeerFlowService();
+      return false;
     }
-  });
+  }
+  
+  return false;
 }
 
 /**
@@ -127,13 +100,14 @@ export async function startDeerFlowService(): Promise<boolean> {
 export function stopDeerFlowService(): void {
   if (deerflowProcess) {
     console.log('Stopping DeerFlow service...');
-    deerflowProcess.kill('SIGTERM');
+    deerflowProcess.kill();
     deerflowProcess = null;
   }
-  isStarting = false;
 }
 
-// Ensure proper cleanup on application shutdown
-process.on('exit', stopDeerFlowService);
-process.on('SIGINT', () => { stopDeerFlowService(); process.exit(); });
-process.on('SIGTERM', () => { stopDeerFlowService(); process.exit(); });
+/**
+ * Get the URL to the DeerFlow service
+ */
+export function getDeerFlowServiceUrl(): string {
+  return DEERFLOW_URL;
+}
