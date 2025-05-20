@@ -19,9 +19,6 @@ type SunaConversation = {
 
 export type LLMModel = 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
 
-// Research depth level type
-export type ResearchDepthLevel = 1 | 2 | 3; // 1=standard, 2=enhanced, 3=deep research with DeerFlow
-
 export type SearchPreferences = {
   forceSearch?: boolean;          // Force web search even if not detected automatically
   disableSearch?: boolean;        // Disable web search for this query
@@ -38,7 +35,6 @@ export function useSuna(initialThreadId?: string) {
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
   const [currentModel, setCurrentModel] = useState<LLMModel>('deepseek-chat');
-  const [depthLevel, setDepthLevel] = useState<ResearchDepthLevel>(1); // Default to standard level
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
     priority: 'relevance',
     maxResults: 5
@@ -75,13 +71,11 @@ export function useSuna(initialThreadId?: string) {
     mutationFn: async ({ 
       message, 
       model = currentModel,
-      customSearchPrefs,
-      researchDepth = depthLevel
+      customSearchPrefs 
     }: { 
       message: string, 
       model?: LLMModel,
-      customSearchPrefs?: SearchPreferences,
-      researchDepth?: ResearchDepthLevel
+      customSearchPrefs?: SearchPreferences
     }) => {
       if (!isAuthenticated) {
         throw new Error('You must be logged in to use Suna');
@@ -137,76 +131,13 @@ export function useSuna(initialThreadId?: string) {
       // Use existing thread ID or null for a new conversation
       console.log(`Sending message with threadId: ${threadId || 'new conversation'} and model: ${model}`);
       
-      // Use the direct DeerFlow research API for depth level 3
-      let response;
-      
-      if (researchDepth === 3) {
-        console.log("Using direct DeerFlow research API for depth level 3");
-        
-        // First try the dedicated DeerFlow endpoint
-        try {
-          const deerflowResponse = await apiRequest(
-            'POST',
-            '/api/deerflow/research',
-            {
-              query: processedMessage,
-              threadId: threadId
-            }
-          );
-          
-          if (deerflowResponse.ok) {
-            const deerflowData = await deerflowResponse.json();
-            
-            if (deerflowData.success && deerflowData.research) {
-              // Format the response to match what the standard endpoint would return
-              // but with clear indication it's from DeerFlow
-              
-              const research = deerflowData.research;
-              
-              // Create a special message format for DeerFlow research
-              let formattedContent = `## Advanced Research: ${research.query}\n\n`;
-              formattedContent += research.result;
-              
-              // Add sources if available
-              if (research.sources && research.sources.length > 0) {
-                formattedContent += "\n\n### Sources\n";
-                research.sources.forEach((source: any, index: number) => {
-                  formattedContent += `${index + 1}. [${source.title || 'Source'}](${source.url})\n`;
-                });
-              }
-              
-              // Create a response structure that matches what the standard API returns
-              return {
-                ok: true,
-                json: async () => ({
-                  threadId: threadId || research.conversation_id,
-                  message: {
-                    id: `assistant-${Date.now()}`,
-                    content: formattedContent,
-                    role: 'assistant',
-                    timestamp: new Date().toISOString(),
-                    modelUsed: "DeerFlow Advanced Research",
-                    webSearchUsed: true
-                  }
-                })
-              };
-            }
-          }
-        } catch (error) {
-          console.error("Error with DeerFlow research, falling back to standard API:", error);
-          // Continue with standard API as fallback
-        }
-      }
-      
-      // For normal queries or as fallback for depth level 3
-      response = await apiRequest(
+      const response = await apiRequest(
         'POST',
         '/api/suna/message',
         {
           message: processedMessage, // Send processed message without command prefixes
           threadId: threadId, // Always pass the current threadId, even if undefined
           model: model, // Pass the selected model to the API
-          depthLevel: researchDepth, // Pass the research depth level
           searchPreferences: activeSearchPrefs // Pass search preferences
         }
       );
@@ -285,11 +216,6 @@ export function useSuna(initialThreadId?: string) {
       forceSearch: false // Can't have both enabled
     }));
   };
-  
-  // Function to set the research depth level
-  const setResearchDepth = (level: ResearchDepthLevel) => {
-    setDepthLevel(level);
-  };
 
   return {
     conversation,
@@ -297,7 +223,6 @@ export function useSuna(initialThreadId?: string) {
     threadId,
     messages,
     currentModel,
-    depthLevel,
     searchPreferences,
     isLoadingConversation,
     isLoadingConversations,
@@ -306,7 +231,6 @@ export function useSuna(initialThreadId?: string) {
     selectConversation,
     createNewChat,
     changeModel,
-    setResearchDepth,
     updateSearchPreferences,
     toggleForceSearch,
     toggleDisableSearch

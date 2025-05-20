@@ -5,10 +5,6 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
-// Use the simplified DeerFlow implementation for enhanced research
-import { handleResearchRequest, deerflowService } from "./deerflow-simplified";
-import { handleDirectResearchRequest } from "./deerflow-api";
-import { handleSunaResearchRequest } from './suna-research-integration';
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -378,26 +374,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/suna/message', isAuthenticated, sendMessageToSuna);
   app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
-  
-  // Add Suna research integration for depth level 3
-  app.post('/api/suna/research', isAuthenticated, handleSunaResearchRequest);
-
-  // DeerFlow Research Integration endpoints
-  app.post('/api/research', isAuthenticated, handleResearchRequest);
-  
-  // Direct DeerFlow research endpoint - For advanced depth level 3 research
-  app.post('/api/deerflow/research', isAuthenticated, handleDirectResearchRequest);
-  
-  // Check DeerFlow service availability
-  app.get('/api/research/status', isAuthenticated, async (req, res) => {
-    try {
-      const isAvailable = await deerflowService.checkServiceAvailability();
-      res.json({ available: isAvailable });
-    } catch (error) {
-      console.error("Error checking research service:", error);
-      res.status(500).json({ message: "Failed to check research service status" });
-    }
-  });
 
   return httpServer;
 }

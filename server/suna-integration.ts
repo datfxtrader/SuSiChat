@@ -2,7 +2,6 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
-import { deerflowService } from './deerflow-simplified';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
@@ -142,7 +141,7 @@ async function performBraveSearch(query: string) {
  * @param query Search query string
  * @returns Combined search results from multiple sources
  */
-export async function performWebSearch(query: string) {
+async function performWebSearch(query: string) {
   try {
     // Normalize query for caching
     const queryHash = hashQuery(query);
@@ -242,7 +241,6 @@ interface SunaRequest {
   projectId?: string;
   threadId?: string;
   model?: string;
-  depthLevel?: 1 | 2 | 3;     // Research depth level: 1=standard, 2=enhanced, 3=deep research
   searchPreferences?: {
     forceSearch?: boolean;    // Force web search even if not detected automatically
     disableSearch?: boolean;  // Disable web search for this query
@@ -324,41 +322,6 @@ export class SunaIntegrationService {
    */
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
-  }
-
-  /**
-   * Determines if a query needs advanced research capabilities
-   * Identifies complex questions requiring deeper analysis and research
-   */
-  private needsDeepResearch(query: string): boolean {
-    // Check for explicit research command
-    if (query.startsWith('/research3 ') || query.includes('depth level 3')) {
-      return true;
-    }
-    
-    // Research-oriented terms that benefit from advanced research capabilities
-    const researchTerms = [
-      'analyze', 'research', 'explain in detail', 'comprehensive', 'comparison',
-      'compare and contrast', 'deep dive', 'analyze data', 'synthesize',
-      'investigate', 'in-depth', 'thorough', 'academic', 'provide evidence',
-      'expert analysis', 'examination', 'breakdown', 'elaborate on',
-      'detailed explanation', 'evaluate', 'assess', 'literature review',
-      'with sources', 'cite sources', 'referenced', 'bibliography',
-      'academic research', 'scholarly', 'peer-reviewed'
-    ];
-    
-    // Check for research terms
-    const lowerQuery = query.toLowerCase();
-    const containsResearchTerms = researchTerms.some(term => lowerQuery.includes(term));
-    
-    // Check if query is likely a complex research question (longer queries tend to be more complex)
-    const isLengthyQuery = query.split(' ').length > 15;
-    
-    // Check if the query has complex syntax patterns suggesting research needs
-    const hasComplexSyntax = /why.*when|how.*affects|what factors|relationship between|implications of|significance of/i.test(query);
-    
-    // Return true if any of the research indicators are present
-    return containsResearchTerms || (isLengthyQuery && hasComplexSyntax);
   }
 
   /**
@@ -617,24 +580,14 @@ export class SunaIntegrationService {
         };
       }
       
-      // Determine if web search or deep research is needed based on the query
+      // Determine if web search is needed based on the query, context, and user preferences
       let webSearchResults: any = null;
-      let deepResearchResults: any = null;
       let webSearchContent = '';
-      let deepResearchContent = '';
       let searchMetadata: SunaMessage['searchMetadata'] = undefined;
       
       // Check for explicit search commands in the query (like /search)
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
-      const explicitResearchCommand = data.query.match(/^\/research\s+(.*)/i);
-      const explicitResearch3Command = data.query.match(/^\/research3\s+(.*)/i);
       const forceSearch = explicitSearchCommand || (data.searchPreferences?.forceSearch === true);
-      const forceResearch = explicitResearchCommand || explicitResearch3Command || data.query.toLowerCase().includes('use deep research');
-      
-      // If research3 command is used, force depth level 3
-      if (explicitResearch3Command) {
-        data.depthLevel = 3;
-      }
       
       // Honor user preference to disable search if explicitly set
       const disableSearch = data.searchPreferences?.disableSearch === true;
@@ -642,167 +595,12 @@ export class SunaIntegrationService {
       // Get max results from preferences or default to 5
       const maxResults = data.searchPreferences?.maxResults || 5;
       
-      // Determine if we should perform deep research using DeerFlow based on the depth level
-      const depthLevel = data.depthLevel ? parseInt(data.depthLevel.toString(), 10) : 1;
-      const shouldUseDeepResearch = !disableSearch && 
-                                   (forceResearch || depthLevel === 3);
-      
-      console.log(`Research depth level: ${depthLevel} (raw: ${data.depthLevel}), shouldUseDeepResearch: ${shouldUseDeepResearch}`);
-      
-      // Determine if we should perform standard web search
-      let shouldPerformSearch = !disableSearch && !shouldUseDeepResearch && 
+      // Determine if we should perform web search
+      const shouldSearch = !disableSearch && 
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
       
-      // Handle direct /research3 command separately
-      if (explicitResearch3Command) {
-        console.log(`DETECTED /research3 COMMAND: ${data.query}`);
-        
-        try {
-          // Extract the actual query from the command
-          const refinedQuery = explicitResearch3Command[1];
-          console.log(`Using enhanced research for query: ${refinedQuery}`);
-          
-          // Import our enhanced research module
-          const { performEnhancedResearch } = await import('./enhanced-research');
-          
-          // Perform the enhanced research with sources
-          const research = await performEnhancedResearch({
-            query: refinedQuery,
-            maxDepth: 3,
-            includeSources: true,
-            conversationId: conversation.id
-          });
-          
-          // Format the sources for the response
-          const formattedSources = research.sources.map(source => ({
-            title: source.title || 'Untitled Source',
-            url: source.url,
-            snippet: source.snippet || 'No snippet available'
-          }));
-          
-          // Add the new message to the conversation
-          const newMessageId = uuidv4();
-          const researchMessage = {
-            id: newMessageId,
-            role: 'assistant',
-            content: research.result,
-            timestamp: new Date().toISOString(),
-            modelUsed: 'enhanced-research',
-            webSearchUsed: true,
-            searchMetadata: {
-              query: refinedQuery,
-              sources: formattedSources.map(s => s.url),
-              resultCount: formattedSources.length,
-              searchEngines: ['enhanced-research'],
-              searchTime: 0,
-              sourceDetails: formattedSources.map(s => ({
-                title: s.title,
-                url: s.url,
-                domain: new URL(s.url).hostname
-              }))
-            }
-          };
-          
-          // Add to conversation history
-          conversation.messages.push(researchMessage);
-          
-          // Save the conversation
-          this.saveConversation(conversation.userId, conversation);
-          
-          // Return the research message directly to the client
-          return researchMessage;
-        } catch (error) {
-          console.error('Enhanced research error:', error);
-          // We'll fallback to normal flow if the enhanced research fails
-        }
-      }
-      
-      // Try regular deep research capabilities
-      if (shouldUseDeepResearch) {
-          
-          // Fall back to DeerFlow if enhanced research fails or for other depth levels
-          // Check if DeerFlow service is available
-          const isAvailable = await deerflowService.checkServiceAvailability();
-          console.log(`DeerFlow availability check: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'}`);
-          
-          if (isAvailable) {
-            console.log(`USING DEERFLOW FOR ADVANCED RESEARCH ON: ${data.query}`);
-            console.log(`Research depth level: ${data.depthLevel}, Using direct implementation: true`);
-            
-            // Extract the actual query if this is an explicit research command
-            const refinedQuery = explicitResearchCommand ? 
-              explicitResearchCommand[1] : data.query;
-            
-            // Perform deep research using DeerFlow
-            const researchStartTime = Date.now();
-            
-            // For direct implementation
-            console.log(`Sending request to DeerFlow direct implementation with query: ${refinedQuery}`);
-            const researchResults = await deerflowService.performResearch({
-              query: refinedQuery,
-              conversation_id: data.threadId,
-              max_step_num: 3,
-              enable_background_investigation: true
-            });
-            
-            const researchEndTime = Date.now();
-            
-            if (!researchResults.error) {
-              deepResearchResults = researchResults;
-              
-              // Format the research content for inclusion in the prompt
-              deepResearchContent = `[Deep Research Results]\n${researchResults.result}\n\n`;
-              
-              // If there are sources, include them
-              if (researchResults.sources && researchResults.sources.length > 0) {
-                deepResearchContent += "Sources:\n";
-                researchResults.sources.forEach((source: any, index: number) => {
-                  deepResearchContent += `${index + 1}. ${source.title || 'Unnamed Source'}: ${source.url}\n`;
-                });
-                deepResearchContent += "\n";
-              }
-              
-              // Setup search metadata for the response
-              searchMetadata = {
-                query: refinedQuery,
-                sources: researchResults.sources?.map((s: any) => s.url) || [],
-                resultCount: researchResults.sources?.length || 0,
-                searchEngines: ['DeerFlow Advanced Research'],
-                searchTime: researchEndTime - researchStartTime,
-                sourceDetails: researchResults.sources?.map((s: any) => ({
-                  title: s.title || 'Unnamed Source',
-                  url: s.url || '',
-                  domain: s.domain || (s.url ? new URL(s.url).hostname : '')
-                })) || []
-              };
-              
-              console.log(`Advanced research completed in ${searchMetadata.searchTime}ms`);
-            } else {
-              console.warn('DeerFlow advanced research failed, falling back to standard web search');
-              // If deep research fails, fall back to standard web search
-              shouldPerformSearch = !disableSearch && 
-                ((TAVILY_API_KEY || BRAVE_API_KEY) && 
-                 (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
-            }
-          } else {
-            console.warn('DeerFlow service is unavailable, falling back to standard web search');
-            // If DeerFlow service is unavailable, fall back to standard web search
-            shouldPerformSearch = !disableSearch && 
-              ((TAVILY_API_KEY || BRAVE_API_KEY) && 
-               (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
-          }
-        } catch (error) {
-          console.error('Error using DeerFlow for research:', error);
-          // Fall back to standard web search on error
-          shouldPerformSearch = !disableSearch && 
-            ((TAVILY_API_KEY || BRAVE_API_KEY) && 
-             (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
-        }
-      }
-      
-      // Fall back to standard web search if needed
-      if (shouldPerformSearch) {
+      if (shouldSearch) {
         try {
           // Track search start time for metrics
           const searchStartTime = Date.now();
@@ -1126,11 +924,9 @@ When using web search results:
 - Indicate when sources contradict each other and present both perspectives
 - Compare the freshness of information and prioritize more recent sources when appropriate
 
-${deepResearchContent ? 'I have performed in-depth research on your query:' : 
-  webSearchContent ? 'I have performed a web search for you and found the following information:' : 
-  'If you need real-time information or in-depth research, I can help with that.'}
+${webSearchContent ? 'I have performed a web search for you and found the following information:' : 'If you need real-time information, I can perform a web search for you.'}
 
-${deepResearchContent ? deepResearchContent : webSearchContent ? webSearchContent : ''}
+${webSearchContent ? webSearchContent : ''}
 
 Use the current date and web search information when responding about current events, sports, news, or other timely topics. The current date is ${new Date().toISOString().split('T')[0]}.`
         }

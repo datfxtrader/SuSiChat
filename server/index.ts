@@ -1,7 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { ensureDeerflow } from "./startDeerflow";
 
 const app = express();
 app.use(express.json());
@@ -38,12 +37,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Auto-start the DeerFlow Python service
-  log('Ensuring DeerFlow Python service is running...', 'deerflow');
-  ensureDeerflow().catch(err => {
-    log(`Failed to ensure DeerFlow service: ${err}`, 'deerflow');
-  });
-  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
