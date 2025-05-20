@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
+import researchRoutes from "./routes/research";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
