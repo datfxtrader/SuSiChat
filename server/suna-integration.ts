@@ -2,7 +2,6 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
-import { deerflowBridge, ResearchRequest, ResearchResponse } from './deerflow-bridge';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
@@ -231,9 +230,6 @@ const USE_MOCK_SUNA = false; // Always use direct integration
 
 console.log('Using integrated DeepSeek API for Suna agent capabilities');
 
-// Enable DeerFlow deep research integration
-const USE_DEERFLOW_RESEARCH = true;
-
 /**
  * Interface for Suna API requests
  */
@@ -250,8 +246,6 @@ interface SunaRequest {
     disableSearch?: boolean;  // Disable web search for this query
     priority?: 'relevance' | 'freshness'; // Sort by relevance (default) or freshness
     maxResults?: number;      // Maximum number of results to return
-    useDeepResearch?: boolean; // Use DeerFlow deep research capabilities
-    researchDepth?: 'basic' | 'standard' | 'deep'; // Research depth when using DeerFlow
   };
 }
 
@@ -271,7 +265,6 @@ interface SunaMessage {
     resultCount?: number;   // Number of results found
     searchEngines?: string[]; // Which search engines were used
     searchTime?: number;    // How long the search took in ms
-    deepResearchUsed?: boolean; // Whether DeerFlow deep research was used
     sourceDetails?: {       // Detailed source information
       title: string;        // Article title
       url: string;          // Full article URL
@@ -329,147 +322,6 @@ export class SunaIntegrationService {
    */
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
-  }
-
-  /**
-   * Perform deep research using DeerFlow for complex queries
-   * 
-   * @param query The query to research
-   * @param context Optional context from previous messages
-   * @returns Research results or null if research failed
-   */
-  private async performDeepResearch(query: string, context?: string, researchDepth: 'basic' | 'standard' | 'deep' = 'standard'): Promise<ResearchResponse | null> {
-    if (!USE_DEERFLOW_RESEARCH) {
-      console.log('DeerFlow deep research is disabled');
-      return null;
-    }
-    
-    try {
-      console.log('Performing deep research for query:', query);
-      const startTime = Date.now();
-      
-      // Create research request with appropriate parameters
-      const researchRequest: ResearchRequest = {
-        query,
-        depth: researchDepth,  // Use the specified research depth
-        maxSources: 6,         // Reasonable number of sources
-        useCache: true,        // Use cache for efficiency
-        userContext: context   // Add context if available
-      };
-      
-      // Adjust max sources based on depth
-      if (researchDepth === 'deep') {
-        researchRequest.maxSources = 8;
-      } else if (researchDepth === 'basic') {
-        researchRequest.maxSources = 4;
-      }
-      
-      // Run complete research (blocking operation)
-      console.log('Starting DeerFlow research with depth:', researchRequest.depth);
-      const researchResult = await deerflowBridge.runCompleteResearch(researchRequest);
-      
-      const duration = Date.now() - startTime;
-      console.log(`Deep research completed in ${duration}ms, found ${researchResult.sources.length} sources`);
-      
-      return researchResult;
-    } catch (error) {
-      console.error('Error performing deep research:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Check if a topic is complex enough to warrant deep research
-   */
-  private isComplexTopic(query: string): boolean {
-    const complexTopics = [
-      'philosophy', 'ethics', 'morality', 'metaphysics', 
-      'quantum', 'relativity', 'climate change', 'artificial intelligence',
-      'geopolitics', 'economics', 'history', 'medicine', 'science',
-      'psychology', 'neuroscience', 'technology', 'education'
-    ];
-    
-    const lowerQuery = query.toLowerCase();
-    return complexTopics.some(topic => lowerQuery.includes(topic)) ||
-           query.length > 100; // Long queries often require deeper analysis
-  }
-
-  /**
-   * Determine if a query needs deep research (using DeerFlow)
-   * Analyzes query complexity and research needs
-   */
-  private needsDeepResearch(query: string, messages: any[] = []): boolean {
-    // Research-oriented terms that suggest need for in-depth analysis
-    const researchTerms = [
-      'research', 'analyze', 'analysis', 'in-depth', 'comprehensive', 'deep dive',
-      'literature review', 'synthesize', 'examine', 'investigate', 'explore',
-      'study', 'review', 'evaluate', 'assess', 'critique', 'compare and contrast',
-      'pros and cons', 'advantages and disadvantages', 'benefits and drawbacks',
-      'summarize', 'explain', 'elaborate on', 'provide context', 'background',
-    ];
-
-    // Domain-specific research indicators
-    const academicTerms = [
-      'paper', 'journal', 'publication', 'thesis', 'dissertation', 'academic',
-      'scholarly', 'research paper', 'article', 'citation', 'reference', 'bibliography',
-      'literature', 'theory', 'hypothesis', 'experiment', 'methodology', 'findings',
-      'conclusions', 'implications', 'evidence', 'data', 'analysis', 'results'
-    ];
-
-    // Complex topic indicators
-    const complexTopicTerms = [
-      'philosophy', 'ethics', 'morality', 'epistemology', 'ontology', 'metaphysics',
-      'theoretical', 'conceptual', 'framework', 'paradigm', 'discourse', 'dialectic',
-      'historiography', 'hermeneutics', 'phenomenology', 'existentialism',
-      'quantum', 'relativity', 'consciousness', 'cognitive', 'neuroscience'
-    ];
-
-    // Decision-making/multi-faceted question terms
-    const decisionTerms = [
-      'should i', 'is it better', 'which is best', 'compare', 'versus', 'vs',
-      'advantages of', 'disadvantages of', 'recommend', 'suggest', 'advise',
-      'factors', 'considerations', 'criteria', 'decision', 'choice', 'options',
-      'alternatives', 'tradeoffs', 'what are the'
-    ];
-
-    // Query length - complex questions tend to be longer
-    const isLongQuery = query.split(' ').length > 15;
-    
-    // Check for multiple question marks, indicating multi-part questions
-    const hasMultipleQuestions = (query.match(/\?/g) || []).length > 1;
-    
-    // Pattern matching for questions that require multiple perspectives
-    const requiresMultiplePerspectives = /different (perspectives|views|opinions|approaches|ways)/i.test(query);
-    
-    // "Why" questions often need deeper analysis
-    const isWhyQuestion = /^why\b/i.test(query.trim());
-    
-    // Check if this appears to be a follow-up to a complex question
-    const isComplexFollowUp = messages.length > 0 && 
-      (query.toLowerCase().includes('more about this') || 
-       query.toLowerCase().includes('tell me more') ||
-       query.toLowerCase().includes('explain further'));
-
-    const lowerQuery = query.toLowerCase();
-    
-    // Combine all terms
-    const allTerms = [
-      ...researchTerms,
-      ...academicTerms,
-      ...complexTopicTerms,
-      ...decisionTerms
-    ];
-    
-    // Check for term matches
-    const hasTermMatch = allTerms.some(term => lowerQuery.includes(term));
-    
-    // Determine if deep research is needed based on multiple factors
-    return hasTermMatch || 
-           isLongQuery || 
-           hasMultipleQuestions || 
-           requiresMultiplePerspectives || 
-           isWhyQuestion ||
-           isComplexFollowUp;
   }
 
   /**
@@ -728,9 +580,8 @@ export class SunaIntegrationService {
         };
       }
       
-      // Determine if deep research or web search is needed based on the query, context, and user preferences
+      // Determine if web search is needed based on the query, context, and user preferences
       let webSearchResults: any = null;
-      let deepResearchResults: ResearchResponse | null = null;
       let webSearchContent = '';
       let searchMetadata: SunaMessage['searchMetadata'] = undefined;
       
@@ -738,82 +589,18 @@ export class SunaIntegrationService {
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
       const forceSearch = explicitSearchCommand || (data.searchPreferences?.forceSearch === true);
       
-      // Check for explicit research commands
-      const explicitResearchCommand = data.query.match(/^\/(deep)?research\s+(.*)/i);
-      const useDeepResearch = explicitResearchCommand || 
-                             (data.searchPreferences?.useDeepResearch === true);
-      
-      // Determine research depth
-      const researchDepth = data.searchPreferences?.researchDepth || 'standard';
-      
       // Honor user preference to disable search if explicitly set
       const disableSearch = data.searchPreferences?.disableSearch === true;
       
       // Get max results from preferences or default to 5
       const maxResults = data.searchPreferences?.maxResults || 5;
       
-      // Determine if we should perform web search or deep research
-      const shouldUseDeepResearch = useDeepResearch && 
-                                   !disableSearch && 
-                                   USE_DEERFLOW_RESEARCH && 
-                                   (explicitResearchCommand || this.needsDeepResearch(data.query, conversation.messages));
-                                   
+      // Determine if we should perform web search
       const shouldSearch = !disableSearch && 
-                          !shouldUseDeepResearch && 
-                          ((TAVILY_API_KEY || BRAVE_API_KEY) && 
-                          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
+        ((TAVILY_API_KEY || BRAVE_API_KEY) && 
+         (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
       
-      // If the query needs deep research, perform it first
-      if (shouldUseDeepResearch) {
-        try {
-          console.log("Detected complex query requiring deep research:", data.query);
-          
-          // Get context from previous messages (if any)
-          let context = undefined;
-          if (conversation.messages.length > 0) {
-            // Create context from up to 2 previous exchanges
-            const previousMessages = conversation.messages.slice(-4);
-            context = previousMessages.map(m => `${m.role}: ${m.content}`).join('\n');
-          }
-          
-          // Perform deep research with DeerFlow using specified depth
-          deepResearchResults = await this.performDeepResearch(
-            data.query, 
-            context,
-            researchDepth as 'basic' | 'standard' | 'deep'
-          );
-          
-          if (deepResearchResults) {
-            console.log(`Deep research successful, found ${deepResearchResults.sources.length} sources and ${deepResearchResults.insights.length} insights`);
-            
-            // Create search metadata with deep research results
-            const sourceUrls = deepResearchResults.sources.map(s => ({
-              title: s.title,
-              url: s.url,
-              domain: s.domain
-            }));
-            
-            // Create metadata for the conversation with deep research info
-            searchMetadata = {
-              deepResearchUsed: true,
-              query: data.query,
-              sources: deepResearchResults.sources.map(s => s.domain),
-              resultCount: deepResearchResults.sources.length,
-              searchEngines: ['deerflow'],
-              searchTime: 0, // Will be populated after the operation
-              sourceDetails: sourceUrls
-            } as SunaMessage['searchMetadata'];
-          } else {
-            console.log("Deep research failed or returned no results, falling back to regular search");
-          }
-        } catch (error) {
-          console.error("Error performing deep research:", error);
-          // Fall back to regular search
-        }
-      }
-      
-      // Perform regular web search if deep research wasn't performed or failed
-      if ((shouldSearch && !deepResearchResults)) {
+      if (shouldSearch) {
         try {
           // Track search start time for metrics
           const searchStartTime = Date.now();

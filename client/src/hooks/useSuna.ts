@@ -24,8 +24,6 @@ export type SearchPreferences = {
   disableSearch?: boolean;        // Disable web search for this query
   priority?: 'relevance' | 'freshness'; // Sort by relevance (default) or freshness
   maxResults?: number;            // Maximum number of results to return (default: 5)
-  useDeepResearch?: boolean;      // Use DeerFlow deep research for complex queries
-  researchDepth?: 'basic' | 'standard' | 'deep'; // Depth of research when using DeerFlow
 };
 
 /**
@@ -39,9 +37,7 @@ export function useSuna(initialThreadId?: string) {
   const [currentModel, setCurrentModel] = useState<LLMModel>('deepseek-chat');
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
     priority: 'relevance',
-    maxResults: 5,
-    useDeepResearch: true,
-    researchDepth: 'standard'
+    maxResults: 5
   });
   
   // Query for all user conversations
@@ -96,22 +92,6 @@ export function useSuna(initialThreadId?: string) {
         activeSearchPrefs = {
           ...activeSearchPrefs,
           forceSearch: true
-        };
-      } else if (message.startsWith('/research ')) {
-        // Extract the actual query - remove "/research " prefix
-        processedMessage = message.substring(10);
-        activeSearchPrefs = {
-          ...activeSearchPrefs,
-          useDeepResearch: true,
-          researchDepth: 'standard'
-        };
-      } else if (message.startsWith('/deepresearch ')) {
-        // Extract the actual query - remove "/deepresearch " prefix
-        processedMessage = message.substring(14);
-        activeSearchPrefs = {
-          ...activeSearchPrefs,
-          useDeepResearch: true,
-          researchDepth: 'deep'
         };
       } else if (message.startsWith('/nosearch ')) {
         // Extract the actual query - remove "/nosearch " prefix

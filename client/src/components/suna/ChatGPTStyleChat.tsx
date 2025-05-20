@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSuna, type LLMModel } from '@/hooks/useSuna';
-import { useDeerflow } from '@/hooks/useDeerflow';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,14 +17,10 @@ import {
   Zap, 
   BookOpen,
   ChevronDown,
-  ChevronUp,
-  Search,
-  Info
+  ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
-import { DeepResearch } from '@/components/research/DeepResearch';
-import { Spinner } from '@/components/ui/spinner';
 import {
   Select,
   SelectContent,
@@ -49,43 +44,6 @@ function logSourceInfo(source: Source) {
   console.log(`URL: ${source.url}`);
   console.log(`Domain: ${source.domain}`);
   return source;
-}
-
-// Helper to handle DeerFlow research responses
-function processDeerflowResponse(research: any) {
-  if (!research) return '';
-  
-  // Format the research results into a structured markdown response
-  try {
-    let markdown = `# Research: ${research.query}\n\n`;
-    
-    if (research.summary) {
-      markdown += `## Summary\n${research.summary}\n\n`;
-    }
-    
-    if (research.insights && research.insights.length > 0) {
-      markdown += `## Key Insights\n`;
-      research.insights.forEach((insight: string) => {
-        markdown += `- ${insight}\n`;
-      });
-      markdown += '\n';
-    }
-    
-    if (research.sources && research.sources.length > 0) {
-      markdown += `## Sources\n`;
-      research.sources.forEach((source: any, index: number) => {
-        markdown += `### ${index + 1}. [${source.title}](${source.url})\n`;
-        if (source.contentSnippet) {
-          markdown += `${source.contentSnippet}\n\n`;
-        }
-      });
-    }
-    
-    return markdown;
-  } catch (error) {
-    console.error('Error formatting DeerFlow research:', error);
-    return 'Error processing research results';
-  }
 }
 
 // Research progress component to show current search/analysis stage
@@ -479,10 +437,6 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const [researchMode, setResearchMode] = useState(false);
   const [researchDepth, setResearchDepth] = useState(1); // 1-3 scale for research depth
   const [researchStage, setResearchStage] = useState(0); // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
-  const [processingResearch, setProcessingResearch] = useState(false); // State for research processing
-  // DeerFlow deep research integration
-  const [showResearchPanel, setShowResearchPanel] = useState(false);
-  const [researchQuery, setResearchQuery] = useState('');
   
   const { 
     messages = [], 
@@ -512,21 +466,10 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
-  
-  // Function to scroll to bottom of messages
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-  
-  // Define the DeerFlow hook
-  const deerflow = useDeerflow();
 
   // Extract sources from message metadata or content for research display
   const getSourcesFromMetadata = (message: any): Source[] => {
-    // Return empty array if no search was used (unless deep research was used)
-    if (!message.webSearchUsed && !message.searchMetadata?.deepResearchUsed) return [];
+    if (!message.webSearchUsed) return [];
     
     // Enhanced source extraction - three-step approach 
     const sources: Source[] = [];
@@ -718,137 +661,10 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
     return sources;
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (!message.trim()) return;
     
-    // Convert UI research depth to the proper research depth string
-    let researchDepthSetting: 'basic' | 'standard' | 'deep' = 'standard';
-    if (researchMode) {
-      if (researchDepth === 1) researchDepthSetting = 'basic';
-      else if (researchDepth === 2) researchDepthSetting = 'standard'; 
-      else if (researchDepth === 3) researchDepthSetting = 'deep';
-    }
-    
-    // If using research mode with depth 3, use DeerFlow for deep research
-    if (researchMode && researchDepth === 3) {
-      // Show the loading state
-      setResearchStage(1);
-      setProcessingResearch(true);
-      const currentQuery = message.trim();
-      
-      try {
-        // Check if DeerFlow service is available
-        if (deerflow.isAvailable) {
-          // Don't show the initial message to avoid duplication
-          console.log('Starting DeerFlow deep research');
-          
-          // Run the complete research (DeerFlow agents)
-          deerflow.runCompleteResearch({
-            query: currentQuery,
-            depth: 'deep',
-            maxSources: 10,
-            useCache: true
-          }, {
-            onSuccess: (data) => {
-              console.log('DeerFlow research completed successfully');
-              // Format the results to markdown
-              const formattedResults = deerflow.formatResearchResults(data);
-              
-              // Send the formatted research results as the only message
-              // This replaces sending the initial query to prevent duplication
-              sendMessage({
-                message: currentQuery, 
-                model: currentModel,
-                customSearchPrefs: {
-                  useDeepResearch: true,
-                  researchDepth: 'deep' as 'deep',
-                  useDeerflow: true,
-                  deerflowResults: data
-                }
-              });
-              
-              // Reset the processing state
-              setProcessingResearch(false);
-              setResearchStage(0);
-            },
-            onError: (error) => {
-              console.error('Error with DeerFlow research:', error);
-              // Send an error message
-              sendMessage({
-                message: `Error performing deep research: ${error.message}. Falling back to standard search.`,
-                model: currentModel
-              });
-              
-              // Fallback to standard search
-              sendMessage({
-                message: currentQuery,
-                model: currentModel,
-                customSearchPrefs: {
-                  useDeepResearch: true,
-                  researchDepth: 'standard'
-                }
-              });
-              
-              // Reset the processing state
-              setProcessingResearch(false);
-              setResearchStage(0);
-            }
-          });
-        } else {
-          // DeerFlow is not available, use standard research instead
-          console.log('DeerFlow service is not available, using regular search');
-          const customSearchPrefs = {
-            useDeepResearch: true,
-            researchDepth: 'deep' as 'deep'
-          };
-          
-          // Send message with deep research preferences but without DeerFlow
-          sendMessage({ 
-            message: currentQuery, 
-            model: currentModel,
-            customSearchPrefs
-          });
-          
-          setProcessingResearch(false);
-        }
-      } catch (error) {
-        console.error('Unexpected error with DeerFlow integration:', error);
-        
-        // Fallback to regular search if there's any exception
-        const customSearchPrefs = {
-          useDeepResearch: true,
-          researchDepth: 'deep' as 'deep'
-        };
-        
-        // Send message with standard research
-        sendMessage({ 
-          message: currentQuery, 
-          model: currentModel,
-          customSearchPrefs
-        });
-        
-        setProcessingResearch(false);
-        setResearchStage(0);
-      }
-    } else {
-      // Regular search with standard or basic depth
-      const customSearchPrefs = {
-        useDeepResearch: researchMode,
-        researchDepth: researchDepthSetting
-      };
-      
-      // Start research stage progress animation if in research mode
-      if (researchMode) {
-        setResearchStage(1); // Start at searching stage
-      }
-      
-      sendMessage({ 
-        message, 
-        model: currentModel,
-        customSearchPrefs
-      });
-    }
-    
+    sendMessage({ message, model: currentModel });
     setMessage('');
     
     // Reset textarea height
@@ -999,8 +815,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                           ? "bg-blue-100 border border-blue-200" 
                           : "bg-white border border-gray-200 shadow-sm"
                       )}>
-                        {/* Display with research component when in research mode or deep research used */}
-                        {!isUserMessage && (researchMode || msg.searchMetadata?.deepResearchUsed) ? (
+                        {/* Display with research component when in research mode and not a user message */}
+                        {!isUserMessage && researchMode ? (
                           <ResearchResponse 
                             content={msg.content}
                             sources={getSourcesFromMetadata(msg)}
@@ -1013,10 +829,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         {/* Show model and search info if it's an assistant message */}
                         {!isUserMessage && msg.modelUsed && (
                           <div className="text-xs text-gray-400 mt-2 italic">
-                            Model: {msg.modelUsed} 
-                            {msg.searchMetadata?.deepResearchUsed ? 
-                              ' • Deep research used' : 
-                              msg.webSearchUsed ? ' • Web search used' : ''}
+                            Model: {msg.modelUsed} {msg.webSearchUsed ? '• Web search used' : ''}
                           </div>
                         )}
                       </div>
@@ -1035,19 +848,15 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   
                   <div className="flex-grow max-w-[90%] sm:max-w-3xl">
                     <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                      {researchMode || message.startsWith('/research') || message.startsWith('/deepresearch') ? (
+                      {researchMode ? (
                         <div className="flex flex-col">
                           <ResearchProgress 
                             stage={researchStage || 1} 
                             progress={75}
                             query={message} // Pass the current query for context-aware topics 
                           />
-                          <div className="text-xs text-gray-500 mt-1 flex items-center">
-                            <BookOpen className="w-3 h-3 mr-1" />
-                            {researchDepth === 1 ? 'Basic research' : 
-                             researchDepth === 2 ? 'Standard research' : 
-                             'Deep research'} in progress...
-                          </div>
+                          {/* Display the current query for debugging */}
+                          <div className="text-xs text-gray-400 mt-1">Query: {message}</div>
                         </div>
                       ) : (
                         <div className="flex space-x-2">
@@ -1115,7 +924,30 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         {/* Input area */}
         <div className="px-2 sm:px-4 pb-4 pt-4 absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-md">
           <div className="relative max-w-3xl mx-auto">
-            {/* Research controls now moved next to the Research toggle button */}
+            {/* Research depth controls - only shown in research mode */}
+            {researchMode && (
+              <div className="mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className="text-xs font-medium text-gray-700 mr-2">Research Depth:</span>
+                  <div className="flex border rounded-md overflow-hidden">
+                    {[1, 2, 3].map((level) => (
+                      <button
+                        key={level}
+                        className={`px-3 py-1 text-xs ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                        onClick={() => setResearchDepth(level)}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 ml-3">
+                  {researchDepth === 1 && "Basic facts and quick overview"}
+                  {researchDepth === 2 && "Balanced depth and analysis"}
+                  {researchDepth === 3 && "Comprehensive with more sources"}
+                </div>
+              </div>
+            )}
             
             <Textarea
               ref={textareaRef}
@@ -1150,8 +982,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               </Button>
             </div>
           </div>
-          <div className="max-w-3xl mx-auto mt-2">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
+          <div className="max-w-3xl mx-auto flex items-center justify-between mt-2">
+            <div className="flex items-center space-x-2">
               <Select 
                 value={currentModel} 
                 onValueChange={(value) => changeModel(value as LLMModel)}
@@ -1170,77 +1002,33 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               </Select>
               
               {/* Mode toggle - Quick vs Research */}
-              <div className="flex items-center">
-                <div className="inline-flex h-7 items-center rounded-md border border-gray-200 overflow-hidden">
-                  <button 
-                    className={`px-2 py-1 text-xs ${!researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                    onClick={() => {
-                      setResearchMode(false);
-                      setShowResearchPanel(false);
-                    }}
-                  >
-                    <div className="flex items-center">
-                      <Zap className="w-3 h-3 mr-1" />
-                      Quick
-                    </div>
-                  </button>
-                  <button 
-                    className={`px-2 py-1 text-xs ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                    onClick={() => {
-                      setResearchMode(true);
-                      setShowResearchPanel(false);
-                    }}
-                  >
-                    <div className="flex items-center">
-                      <BookOpen className="w-3 h-3 mr-1" />
-                      Research
-                    </div>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Research depth selector (only shown in research mode) */}
-              {researchMode && (
-                <div className="flex items-center">
-                  <span className="text-xs text-gray-600 mr-2">Research Depth:</span>
-                  <div className="inline-flex h-7 items-center rounded-md border border-gray-200 overflow-hidden">
-                    <button 
-                      className={`w-8 h-full text-xs ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                      onClick={() => setResearchDepth(1)}
-                    >
-                      1
-                    </button>
-                    <button 
-                      className={`w-8 h-full text-xs ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                      onClick={() => setResearchDepth(2)}
-                    >
-                      2
-                    </button>
-                    <button 
-                      className={`w-8 h-full text-xs ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                      onClick={() => setResearchDepth(3)}
-                    >
-                      3
-                    </button>
+              <div className="flex items-center border rounded-md overflow-hidden h-7">
+                <button 
+                  className={`px-2 py-1 text-xs ${!researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => setResearchMode(false)}
+                >
+                  <div className="flex items-center">
+                    <Zap className="w-3 h-3 mr-1" />
+                    Quick
                   </div>
-                </div>
-              )}
+                </button>
+                <button 
+                  className={`px-2 py-1 text-xs ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  onClick={() => setResearchMode(true)}
+                >
+                  <div className="flex items-center">
+                    <BookOpen className="w-3 h-3 mr-1" />
+                    Research
+                  </div>
+                </button>
+              </div>
             </div>
-            <div className="w-full">
-              <p className="text-[10px] text-gray-500 ml-2">
-                {researchMode 
-                  ? researchDepth === 1 
-                    ? "Basic research with quick source analysis"
-                    : researchDepth === 2
-                    ? "Standard research with thorough source analysis"
-                    : "Deep research with comprehensive analysis, multiple sources, and insights" 
-                  : "Uses web search for real-time information"}
-              </p>
-            </div>
+            <p className="text-[10px] text-gray-500">
+              {researchMode 
+                ? "Comprehensive research with thorough source analysis" 
+                : "Uses Tavily & Brave Search for real-time information"}
+            </p>
           </div>
-          
-          {/* We'll handle deep research through the regular research mode with depth 3 */}
-          
           {/* Add extra padding at bottom to ensure content isn't hidden behind input */}
           <div className="h-2"></div>
         </div>
