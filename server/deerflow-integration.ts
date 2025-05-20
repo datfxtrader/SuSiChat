@@ -457,11 +457,6 @@ Format the report in Markdown, but make it readable and professional. Aim for de
       return this.performEnhancedResearch(params);
     }
   }
-    } catch (error) {
-      console.error('DeerFlow research error:', error);
-      throw error; // Let the main performResearch method handle the fallback
-    }
-  }
 }
 
 // Export singleton instance
