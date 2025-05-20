@@ -2,7 +2,6 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
-import { deerflowDirectService as deerflowService } from './deerflow-direct';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
@@ -142,7 +141,7 @@ async function performBraveSearch(query: string) {
  * @param query Search query string
  * @returns Combined search results from multiple sources
  */
-async function performWebSearch(query: string) {
+export async function performWebSearch(query: string) {
   try {
     // Normalize query for caching
     const queryHash = hashQuery(query);

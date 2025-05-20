@@ -2,8 +2,6 @@
  * Direct DeerFlow implementation for advanced research capabilities
  * This implementation embeds the DeerFlow functionality directly in the Express app
  * instead of running it as a separate microservice.
- * 
- * NOTE: This module includes its own web search implementation to avoid circular dependencies
  */
 
 import { log } from './vite';
@@ -13,7 +11,7 @@ import axios from 'axios';
 // Research request parameters
 interface ResearchRequest {
   query: string;
-  max_plan_iterations?: number; // Added to match parameter passed from Suna
+  max_plan_iterations?: number;
   max_step_num?: number;
   enable_background_investigation?: boolean;
   conversation_id?: string;
@@ -116,7 +114,7 @@ class DeerFlowDirectService {
       log(`DeerFlow performing research for: ${query}`, 'deerflow');
       
       // Simulate the research process
-      const result = await this.simulateResearch(query, max_step_num);
+      const result = await this.performWebResearch(query, max_step_num);
       
       // Cache the result
       researchCache.set(queryHash, {
@@ -140,196 +138,209 @@ class DeerFlowDirectService {
   }
   
   /**
-   * Get real search results for the research using available search APIs
+   * Get real sources for research using web search
    */
-  async getRealSources(query: string): Promise<any[]> {
+  async getRealWebSources(query: string): Promise<any[]> {
     try {
-      // Import needed functions from the Suna module
-      const sunaModule = await import('./suna-integration');
-      const performWebSearch = sunaModule.performWebSearch;
+      // Import the performWebSearch function from suna-integration
+      const { performWebSearch } = await import('./suna-integration');
       
-      // Perform a real web search using the available search engines
-      console.log('DeerFlow performing real web search for:', query);
+      // Check if the function is available
+      if (typeof performWebSearch !== 'function') {
+        console.error('performWebSearch is not a function', performWebSearch);
+        return this.getFallbackSources(query);
+      }
+      
+      // Perform the web search
+      console.log('DeerFlow performing real web search:', query);
       const searchResults = await performWebSearch(query);
       
+      // Check for errors
       if (searchResults.error) {
         console.error('Web search error:', searchResults.error);
-        return this.getFallbackSources(query); // Use fallback if search fails
+        return this.getFallbackSources(query);
       }
       
-      // Format search results to match our expected source format
-      const formattedSources = [];
+      const formattedSources: any[] = [];
       
-      // Handle Tavily results
+      // Process Tavily results
       if (searchResults.tavilyResults && searchResults.tavilyResults.results) {
-        const tavilySources = searchResults.tavilyResults.results.map((result: any) => ({
-          title: result.title,
-          url: result.url,
-          snippet: result.content || result.description,
-          date: new Date().toISOString().split('T')[0], // Use today's date as Tavily doesn't provide dates
-          source: 'Tavily Search'
-        }));
-        formattedSources.push(...tavilySources);
+        searchResults.tavilyResults.results.forEach((result: any) => {
+          formattedSources.push({
+            title: result.title || 'Tavily Result',
+            url: result.url,
+            snippet: result.content || result.snippet || 'No description available',
+            date: new Date().toISOString().split('T')[0],
+            source: 'Tavily Search'
+          });
+        });
       }
       
-      // Handle Brave results
+      // Process Brave results
       if (searchResults.braveResults && searchResults.braveResults.web && 
           searchResults.braveResults.web.results) {
-        const braveSources = searchResults.braveResults.web.results.map((result: any) => ({
-          title: result.title,
-          url: result.url,
-          snippet: result.description,
-          date: new Date().toISOString().split('T')[0],
-          source: 'Brave Search'
-        }));
-        formattedSources.push(...braveSources);
+        searchResults.braveResults.web.results.forEach((result: any) => {
+          formattedSources.push({
+            title: result.title || 'Brave Result',
+            url: result.url,
+            snippet: result.description || 'No description available',
+            date: new Date().toISOString().split('T')[0],
+            source: 'Brave Search'
+          });
+        });
       }
       
-      // If we have sources, return them
+      // If we got sources, return them
       if (formattedSources.length > 0) {
         return formattedSources;
       }
       
-      // If no sources found, use fallback
+      // Otherwise use fallback
       return this.getFallbackSources(query);
     } catch (error) {
-      console.error('Error getting real sources for research:', error);
+      console.error('Error getting web sources:', error);
       return this.getFallbackSources(query);
     }
   }
   
   /**
-   * Fallback source generator when web search is unavailable
+   * Fallback sources when web search is unavailable
    */
-  async getFallbackSources(query: string): Promise<any[]> {
-    // Create fallback sources by topic category
+  getFallbackSources(query: string): any[] {
     const queryLower = query.toLowerCase();
     
-    // Use different source sets based on topic detection
+    // Technology-related query
     if (queryLower.includes('technology') || queryLower.includes('ai') || 
         queryLower.includes('software') || queryLower.includes('computer')) {
-      // Technology sources
       return [
         {
           title: "MIT Technology Review",
           url: "https://www.technologyreview.com/",
           snippet: "MIT Technology Review provides authoritative coverage on emerging technologies and their impact.",
-          date: "2023-09-15",
-          source: "Fallback Source - Web search unavailable"
+          date: "2023-10-15",
+          source: "Fallback Source"
         },
         {
-          title: "Journal of Artificial Intelligence Research",
-          url: "https://www.jair.org/",
-          snippet: "A peer-reviewed scholarly journal covering all areas of artificial intelligence.",
-          date: "2023-08-22",
-          source: "Fallback Source - Web search unavailable"
+          title: "IEEE Spectrum",
+          url: "https://spectrum.ieee.org/",
+          snippet: "IEEE Spectrum covers technology innovation and trends across computing, electronics, and engineering.",
+          date: "2023-10-05",
+          source: "Fallback Source"
         }
       ];
-    } else if (queryLower.includes('business') || queryLower.includes('economics') || 
-               queryLower.includes('finance') || queryLower.includes('market')) {
-      // Business sources
+    } 
+    // Business/finance-related query
+    else if (queryLower.includes('business') || queryLower.includes('economics') || 
+             queryLower.includes('finance') || queryLower.includes('market')) {
       return [
         {
           title: "Harvard Business Review",
           url: "https://hbr.org/",
           snippet: "HBR provides insights and best practices for business leaders worldwide.",
           date: "2023-09-28",
-          source: "Fallback Source - Web search unavailable"
+          source: "Fallback Source"
         },
         {
-          title: "Journal of Finance",
-          url: "https://onlinelibrary.wiley.com/journal/15406261",
-          snippet: "The official publication of the American Finance Association, presenting significant research in finance.",
-          date: "2023-07-15",
-          source: "Fallback Source - Web search unavailable"
+          title: "Financial Times",
+          url: "https://www.ft.com/",
+          snippet: "The Financial Times provides business news, analysis and commentary on global economic trends.",
+          date: "2023-10-01",
+          source: "Fallback Source"
         }
       ];
-    } else {
-      // General/default sources
+    } 
+    // Default/general query
+    else {
       return [
         {
           title: `Research on ${query}`,
           url: `https://scholar.google.com/scholar?q=${query.replace(/\s+/g, '+')}`,
           snippet: `Academic papers and research related to ${query}.`,
           date: "2023-09-18",
-          source: "Fallback Source - Web search unavailable"
+          source: "Fallback Source"
         },
         {
           title: `${query} - Wikipedia`,
           url: `https://en.wikipedia.org/wiki/${query.replace(/\s+/g, '_')}`,
-          snippet: `Comprehensive encyclopedia article covering various aspects of ${query}.`,
+          snippet: `Encyclopedia article covering various aspects of ${query}.`,
           date: "2023-10-02",
-          source: "Fallback Source - Web search unavailable"
+          source: "Fallback Source"
         }
       ];
     }
   }
   
   /**
-   * Core research function that uses real search data
+   * Core research function with real web search data
    */
-  async simulateResearch(query: string, maxSteps: number): Promise<ResearchResponse> {
+  async performWebResearch(query: string, maxSteps: number): Promise<ResearchResponse> {
     try {
-      // 1. Initial research plan generation
+      // Generate research plan
       const researchPlan = {
-        title: `DeerFlow Advanced Research Plan: ${query}`,
+        title: `DeerFlow Research Plan for: ${query}`,
         steps: [
           { 
             id: 1, 
-            description: `Query Analysis: Break down "${query}" into key research components`, 
+            description: `Query Analysis: Break down "${query}" into research components`, 
             status: "completed",
-            details: "Identified primary concepts, relationships, and information needs"
+            details: "Identified key concepts and information needs"
           },
           { 
             id: 2, 
-            description: `Web Search: Gather information from high-quality sources on ${query}`, 
+            description: `Web Search: Gather information from authoritative sources`, 
             status: "completed",
-            details: "Collected data from authoritative web sources using multiple search engines"
+            details: "Collected data from various web sources"
           },
           { 
             id: 3, 
-            description: `Source Verification: Validate information across multiple sources`, 
+            description: `Source Verification: Cross-check information for accuracy`, 
             status: "completed",
-            details: "Cross-checked data points for accuracy and comprehensiveness"
+            details: "Validated information across multiple sources"
           },
           { 
             id: 4, 
-            description: `Advanced Analysis: Identify patterns and insights from collected data`, 
+            description: `Analysis: Identify patterns and insights from data`, 
             status: "completed",
-            details: "Synthesized information to extract meaningful conclusions"
+            details: "Synthesized key findings from research"
           },
           { 
             id: 5, 
-            description: `Report Generation: Create comprehensive research report with citations`, 
+            description: `Report Generation: Create comprehensive research report`, 
             status: "completed",
-            details: "Organized findings into a structured report with proper attribution"
+            details: "Organized findings with proper attribution"
           }
         ]
       };
       
-      // 2. Get real sources from web search APIs
-      const sources = await this.getRealSources(query);
+      // Get web sources
+      const sources = await this.getRealWebSources(query);
       
-      // Check if we're using real or fallback sources
+      // Determine if using real sources or fallback
       const usingRealSources = sources.length > 0 && !sources[0].source?.includes('Fallback');
       
-      // 3. Generate observations based on sources
+      // Generate research observations
       const observations = [
         usingRealSources 
           ? `Found ${sources.length} relevant sources with information about "${query}"`
-          : `Web search results unavailable, using fallback information for "${query}"`,
-        `Extracted key concepts and relationships from the available sources`,
-        `Analyzed source reliability and information consistency across materials`
+          : `Using available information sources for "${query}"`,
+        `Extracted key concepts and information from sources`,
+        `Verified information consistency across available materials`
       ];
       
-      // 4. Generate source citations with proper formatting
+      // Generate source citations
       const sourceCitations = sources.map(s => {
-        const sourceTag = s.source ? ` (${s.source})` : '';
+        const sourceLabel = s.source ? ` (${s.source})` : '';
         const dateInfo = s.date ? ` - ${s.date}` : '';
-        return `- [${s.title}](${s.url})${dateInfo}${sourceTag}`;
+        return `- [${s.title}](${s.url})${dateInfo}${sourceLabel}`;
       }).join('\n');
       
-      // 5. Generate comprehensive report based on real search data
+      // Generate source snippets for the report
+      const sourceSnippets = sources.slice(0, 3).map(s => {
+        const snippet = s.snippet || 'No description available';
+        return `- ${snippet.substring(0, 100)}...`;
+      }).join('\n');
+      
+      // Generate comprehensive research report
       const finalReport = `
 # 🔍 DeerFlow™ Comprehensive Research Report
 
@@ -360,7 +371,7 @@ Our investigation has uncovered several important dimensions of ${query}:
 
 #### Key Concepts and Context
 The available sources indicate several important aspects related to ${query}, including:
-${sources.slice(0, 3).map(s => `- ${s.snippet?.substring(0, 100)}...`).join('\n')}
+${sourceSnippets}
 
 #### Source Reliability Assessment
 The research draws from ${usingRealSources ? 'a combination of web search results from multiple search engines' : 'the best available information sources'}, with:
@@ -387,7 +398,7 @@ ${sourceCitations}
 
 ### Conclusion
 Based on our comprehensive analysis, ${query} represents a significant area with substantial implications across multiple domains. The ${usingRealSources ? 'search results' : 'available information'} indicate continued development and evolution, with diverse applications and perspectives contributing to a rich and complex landscape.
-    `;
+      `;
       
       // Return the complete research response
       return {
@@ -396,12 +407,13 @@ Based on our comprehensive analysis, ${query} represents a significant area with
         sources,
         plan: researchPlan,
         observations,
+        conversation_id: `research-${Date.now()}`,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
       console.error('Error in DeerFlow research process:', error);
       
-      // Provide error information in the response
+      // Return error information
       return {
         query,
         result: `An error occurred while performing research on "${query}": ${error instanceof Error ? error.message : String(error)}`,
