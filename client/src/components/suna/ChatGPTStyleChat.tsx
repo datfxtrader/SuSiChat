@@ -20,7 +20,9 @@ import {
   ChevronUp,
   Search,
   Database,
-  Sparkles
+  Sparkles,
+  Paperclip,
+  File
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -446,6 +448,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [researchMode, setResearchMode] = useState(false);
   const [researchDepth, setResearchDepth] = useState(1); // 1-3 scale for research depth
+  const [showFileUpload, setShowFileUpload] = useState(false);
   const [researchStage, setResearchStage] = useState(0); // 0: not started, 1: searching, 2: analyzing, 3: synthesizing
   
   const { 
@@ -947,25 +950,20 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
           <div className="relative max-w-3xl mx-auto">
             {/* Research depth controls - only shown in research mode */}
             {researchMode && (
-              <div className="mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+              <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-center">
-                  <span className="text-xs font-medium text-gray-700 mr-2">Research Depth:</span>
+                  <span className="text-sm font-medium text-gray-700 mr-2">Research Depth:</span>
                   <div className="flex border rounded-md overflow-hidden">
                     {[1, 2, 3].map((level) => (
                       <button
                         key={level}
-                        className={`px-3 py-1 text-xs ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                        className={`px-4 py-1 ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
                         onClick={() => setResearchDepth(level)}
                       >
                         {level}
                       </button>
                     ))}
                   </div>
-                </div>
-                <div className="text-xs text-gray-500 ml-3">
-                  {researchDepth === 1 && "Basic facts and quick overview"}
-                  {researchDepth === 2 && "Balanced depth and analysis"}
-                  {researchDepth === 3 && "Comprehensive with more sources"}
                 </div>
               </div>
             )}
@@ -987,6 +985,17 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               rows={1}
             />
             <div className="absolute right-3 bottom-3 flex gap-2 items-center">
+              {/* File attachment button */}
+              <Button
+                onClick={() => setShowFileUpload(!showFileUpload)}
+                className="h-8 w-8 p-0 rounded-full bg-transparent hover:bg-gray-100 text-gray-500"
+                variant="ghost"
+                type="button"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              
+              {/* Send button */}
               <Button 
                 onClick={handleSendMessage} 
                 disabled={!message.trim() || isSending}
@@ -1002,6 +1011,30 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 }
               </Button>
             </div>
+            
+            {/* File upload area (can be expanded later) */}
+            {showFileUpload && (
+              <div className="absolute bottom-14 right-3 bg-white border rounded-lg shadow-lg p-3 w-64">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="text-sm font-medium">Attach Files</h4>
+                  <Button
+                    onClick={() => setShowFileUpload(false)}
+                    className="h-6 w-6 p-0 rounded-full"
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <XIcon className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="border-2 border-dashed rounded-md p-4 text-center">
+                  <File className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-xs text-gray-500">Drag and drop files here or click to browse</p>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  Supported formats: PDF, DOC, TXT, images
+                </div>
+              </div>
+            )}
           </div>
           <div className="max-w-3xl mx-auto flex items-center justify-between mt-2">
             <div className="flex items-center space-x-2">
