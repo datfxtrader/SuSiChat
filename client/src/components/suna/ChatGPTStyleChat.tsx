@@ -1065,30 +1065,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         {/* Input area */}
         <div className="px-2 sm:px-4 pb-4 pt-4 absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-md">
           <div className="relative max-w-3xl mx-auto">
-            {/* Research depth controls - only shown in research mode */}
-            {researchMode && (
-              <div className="mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="text-xs font-medium text-gray-700 mr-2">Research Depth:</span>
-                  <div className="flex border rounded-md overflow-hidden">
-                    {[1, 2, 3].map((level) => (
-                      <button
-                        key={level}
-                        className={`px-3 py-1 text-xs ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                        onClick={() => setResearchDepth(level)}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 ml-3">
-                  {researchDepth === 1 && "Basic facts and quick overview"}
-                  {researchDepth === 2 && "Balanced depth and analysis"}
-                  {researchDepth === 3 && "Comprehensive with more sources"}
-                </div>
-              </div>
-            )}
+            {/* Research controls now moved next to the Research toggle button */}
             
             <Textarea
               ref={textareaRef}
