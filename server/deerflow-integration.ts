@@ -126,12 +126,13 @@ export class ResearchService {
         try {
           if (!result || !result.url) return null;
           const domain = new URL(result.url).hostname;
-          return {
+          const source: ResearchSource = {
             title: result.title || domain,
             url: result.url,
             domain: domain,
             content: result.content || result.snippet || ''
           };
+          return source;
         } catch (e) {
           return null;
         }
@@ -166,8 +167,9 @@ export class ResearchService {
       };
     } catch (error) {
       console.error('Basic research error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return {
-        report: `I encountered an error while performing basic research: ${error.message}`,
+        report: `I encountered an error while performing basic research: ${errorMessage}`,
         sources: [],
         depth: ResearchDepth.Basic,
         processingTime: Date.now() - startTime
@@ -251,12 +253,13 @@ export class ResearchService {
         try {
           if (!result || !result.url) return null;
           const domain = new URL(result.url).hostname;
-          return {
+          const source: ResearchSource = {
             title: result.title || domain,
             url: result.url,
             domain: domain,
             content: result.content || result.snippet || ''
           };
+          return source;
         } catch (e) {
           return null;
         }
@@ -331,8 +334,9 @@ Your report should synthesize information from multiple sources, highlight conse
       };
     } catch (error) {
       console.error('Enhanced research error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return {
-        report: `I encountered an error while performing enhanced research: ${error.message}`,
+        report: `I encountered an error while performing enhanced research: ${errorMessage}`,
         sources: [],
         depth: ResearchDepth.Enhanced,
         processingTime: Date.now() - startTime
@@ -428,12 +432,13 @@ Your report should synthesize information from multiple sources, highlight conse
       const sources: ResearchSource[] = (deerflowResponse.sources || [])
         .map((source: any) => {
           if (!source) return null;
-          return {
+          const formattedSource: ResearchSource = {
             title: source.title || 'Untitled',
             url: source.url || '',
             domain: source.domain || 'unknown',
             content: source.content || ''
           };
+          return formattedSource;
         })
         .filter((source): source is ResearchSource => source !== null);
       
