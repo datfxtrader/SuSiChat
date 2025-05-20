@@ -481,7 +481,8 @@ Your report should synthesize information from multiple sources, highlight conse
         console.log('DeerFlow service process log:', deerflowResponse.service_process_log.join('\n'));
       }
       
-      // Return the research result
+      // Return the research result, always labeling as Deep research even if we used fallback
+      // This ensures consistent user experience
       return {
         report,
         sources,
