@@ -1081,21 +1081,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   {!researchMode && <div className="w-8 bg-blue-500"></div>}
                 </div>
                 
-                {/* Research toggle - matched to reference image */}
-                <div 
-                  className="flex items-center rounded-md overflow-hidden h-7 border cursor-pointer mr-2"
-                  onClick={() => setResearchMode(true)}
-                >
-                  <div className="py-1 text-xs flex items-center justify-center w-28"
-                    style={{ 
-                      backgroundColor: researchMode ? '#3b82f6' : 'white',
-                      color: researchMode ? 'white' : '#374151'
-                    }}
-                  >
-                    <BookOpen className="w-3 h-3 mr-1" />
-                    Research
-                  </div>
-                </div>
+                {/* Research button removed */}
                 
                 {/* Research Depth selector without label - in reference image style */}
                 {researchMode && (
