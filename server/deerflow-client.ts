@@ -77,7 +77,8 @@ export class DeerFlowClient {
   async checkResearchStatus(researchId: string): Promise<any> {
     try {
       const serviceUrl = getDeerFlowServiceUrl();
-      const response = await axios.get(`${serviceUrl}/research/${researchId}/status`, {
+      // Updated endpoint path to match our Python service implementation
+      const response = await axios.get(`${serviceUrl}/research/${researchId}`, {
         timeout: 5000,
       });
       
