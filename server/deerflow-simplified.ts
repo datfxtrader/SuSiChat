@@ -55,6 +55,9 @@ class DeerFlowSimplifiedService {
     
     // Clean cache every 15 minutes
     setInterval(() => this.cleanCache(), 15 * 60 * 1000);
+    
+    // Check service availability every 30 seconds
+    setInterval(() => this.checkServiceAvailability(), 30 * 1000);
   }
   
   /**
