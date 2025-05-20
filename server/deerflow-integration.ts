@@ -428,19 +428,32 @@ Your report should synthesize information from multiple sources, highlight conse
       // Format the response
       const report = deerflowResponse.report || 'No research report was generated.';
       
-      // Format sources from DeerFlow response
+      // Format sources from DeerFlow response with improved logging
+      console.log('Processing DeerFlow sources:', JSON.stringify(deerflowResponse.sources || []));
       const sources: ResearchSource[] = (deerflowResponse.sources || [])
         .map((source: any) => {
           if (!source) return null;
-          const formattedSource: ResearchSource = {
-            title: source.title || 'Untitled',
-            url: source.url || '',
-            domain: source.domain || 'unknown',
-            content: source.content || ''
-          };
-          return formattedSource;
+          try {
+            const formattedSource: ResearchSource = {
+              title: source.title || 'Untitled',
+              url: source.url || '',
+              domain: source.domain || (source.url ? new URL(source.url).hostname : 'unknown'),
+              content: source.content || ''
+            };
+            return formattedSource;
+          } catch (error) {
+            console.error('Error formatting source:', error, 'Source:', source);
+            return {
+              title: source.title || 'Untitled',
+              url: source.url || '',
+              domain: 'unknown',
+              content: source.content || ''
+            };
+          }
         })
         .filter((source): source is ResearchSource => source !== null);
+      
+      console.log('Formatted sources count:', sources.length);
       
       // Log service process info
       if (deerflowResponse.service_process_log && deerflowResponse.service_process_log.length > 0) {

@@ -21,7 +21,13 @@ let deerflowProcess: ChildProcess | null = null;
  */
 export async function checkDeerFlowService(): Promise<boolean> {
   try {
-    const response = await axios.get(`${DEERFLOW_URL}/health`, { timeout: 3000 });
+    console.log(`Checking DeerFlow health at ${DEERFLOW_URL}/health`);
+    const response = await axios.get(`${DEERFLOW_URL}/health`, { 
+      timeout: 3000,
+      validateStatus: () => true // Accept any status code to better diagnose issues
+    });
+    
+    console.log('DeerFlow health check response:', response.status, response.data);
     return response.status === 200 && response.data?.status === 'ok';
   } catch (error) {
     console.log('DeerFlow health check failed:', error);
