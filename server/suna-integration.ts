@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
-import { deerflowService } from './deerflow-integration';
+import { deerflowDirectService as deerflowService } from './deerflow-direct';
 
 // Simple in-memory cache for web search results
 interface CacheEntry {
