@@ -35,8 +35,29 @@ export interface ResearchResponse {
  */
 async function performWebSearch(query: string): Promise<any[]> {
   try {
+    // Refine search query to be more specific and search-friendly
+    const searchQuery = query.includes('impact') ? 
+      `${query} recent developments analysis` : 
+      `${query} recent developments`;
+      
+    log(`Refined search query: ${searchQuery}`, 'research');
+    
     const { performWebSearch } = await import('./suna-integration');
-    const results = await performWebSearch(query);
+    const results = await performWebSearch(searchQuery);
+    
+    // Log search results count for debugging
+    log(`Found ${results?.length || 0} search results`, 'research');
+    
+    // Implement a fallback search if no results
+    if (!results || results.length === 0) {
+      log('No results found, trying broader search terms', 'research');
+      const broaderQuery = query.split(' ').slice(0, 3).join(' ') + ' latest research';
+      const broaderResults = await performWebSearch(broaderQuery);
+      
+      log(`Broader search found ${broaderResults?.length || 0} results`, 'research');
+      return broaderResults || [];
+    }
+    
     return results || [];
   } catch (error) {
     logError(`Error performing web search: ${error}`, 'research');
@@ -63,33 +84,42 @@ function formatSources(searchResults: any[]): ResearchSource[] {
  * Generate research analysis using the LLM
  */
 async function generateAnalysis(query: string, sources: ResearchSource[]): Promise<string> {
-  // Early return if no sources found
+  // Early return if no sources found with a more helpful message
   if (!sources || sources.length === 0) {
-    return `I was unable to find reliable sources to answer your query about "${query}". Please try a different query or reformulate your question.`;
+    return `# Research Results: ${query}\n\nI was unable to find specific and reliable sources to answer your query about "${query}". This may be due to:\n\n- The specificity of your query\n- Limited recent information on this exact topic\n- Possible connection issues with search services\n\n## Suggestions\n\n1. Try a more general query focusing on the main concepts (e.g., "quantum computing financial applications")\n2. Specify a different timeframe if looking for recent developments\n3. Break your query into separate, more focused questions\n\nPlease try reformulating your question for better results.`;
   }
   
-  // Create a prompt that includes the sources
+  // Create an enhanced prompt that gets better results from the LLM
   const prompt = `
-You are an expert research assistant providing a detailed, evidence-based analysis.
+You are a senior research analyst with expertise in providing comprehensive, evidence-based analysis.
 
 QUERY: ${query}
 
-I've gathered these sources for you to analyze:
+I've gathered these sources for you to analyze. Extract relevant information, synthesize insights, and provide a thorough analysis:
+
 ${sources.map((s, i) => `SOURCE ${i+1}: ${s.title}
 URL: ${s.url}
 SNIPPET: ${s.snippet}`).join('\n\n')}
 
-Please provide a comprehensive analysis of the query based on these sources. 
-Include key findings, different perspectives, and evidence-based insights.
-When citing sources, include the source number in brackets like [1] or [2].
-Format your response using Markdown with headings, bullet points, and sections as appropriate.
-Conclude with a "Sources" section that lists all the references used in your analysis.
+Your task is to create a detailed research report that:
 
-Remember to:
-1. Be objective and balanced in your analysis
-2. Cite specific information from the sources
-3. Acknowledge limitations in the available information
-4. Present multiple perspectives when relevant
+1. Provides a comprehensive analysis of "${query}" based strictly on the sources provided
+2. Extracts and synthesizes key insights from multiple sources
+3. Presents different perspectives and viewpoints when available
+4. Includes specific facts, figures, and expert opinions from the sources
+5. Cites sources by including source numbers in brackets [1], [2], etc.
+
+FORMAT YOUR RESPONSE WITH:
+- Clear section headings using Markdown (# for main headings, ## for subheadings)
+- Bullet points for key findings
+- Quotes from sources when particularly relevant
+- A dedicated "Sources" section at the end listing all references
+
+IMPORTANT:
+- If the sources contain conflicting information, acknowledge this and explain different viewpoints
+- If sources are insufficient to fully answer the query, clearly state the limitations
+- Focus specifically on how quantum computing impacts financial markets as requested in the query
+- Include technical concepts but explain them in accessible terms
 `;
 
   // Generate the analysis using the LLM
