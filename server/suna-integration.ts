@@ -630,10 +630,11 @@ export class SunaIntegrationService {
       const maxResults = data.searchPreferences?.maxResults || 5;
       
       // Determine if we should perform deep research using DeerFlow based on the depth level
+      const depthLevel = data.depthLevel ? parseInt(data.depthLevel.toString(), 10) : 1;
       const shouldUseDeepResearch = !disableSearch && 
-                                   (forceResearch || data.depthLevel === 3);
+                                   (forceResearch || depthLevel === 3);
       
-      console.log(`Research depth level: ${data.depthLevel}, shouldUseDeepResearch: ${shouldUseDeepResearch}`);
+      console.log(`Research depth level: ${depthLevel} (raw: ${data.depthLevel}), shouldUseDeepResearch: ${shouldUseDeepResearch}`);
       
       // Determine if we should perform standard web search
       let shouldPerformSearch = !disableSearch && !shouldUseDeepResearch && 

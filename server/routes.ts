@@ -7,6 +7,7 @@ import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
 // Use the direct DeerFlow implementation instead of the microservice
 import { handleResearchRequest, deerflowDirectService } from "./deerflow-direct";
+import { handleDirectResearchRequest } from "./deerflow-api";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -379,6 +380,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // DeerFlow Research Integration endpoints
   app.post('/api/research', isAuthenticated, handleResearchRequest);
+  
+  // Direct DeerFlow research endpoint - For advanced depth level 3 research
+  app.post('/api/deerflow/research', isAuthenticated, handleDirectResearchRequest);
   
   // Check DeerFlow service availability
   app.get('/api/research/status', isAuthenticated, async (req, res) => {

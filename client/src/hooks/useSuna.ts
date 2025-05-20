@@ -137,14 +137,76 @@ export function useSuna(initialThreadId?: string) {
       // Use existing thread ID or null for a new conversation
       console.log(`Sending message with threadId: ${threadId || 'new conversation'} and model: ${model}`);
       
-      const response = await apiRequest(
+      // Use the direct DeerFlow research API for depth level 3
+      let response;
+      
+      if (researchDepth === 3) {
+        console.log("Using direct DeerFlow research API for depth level 3");
+        
+        // First try the dedicated DeerFlow endpoint
+        try {
+          const deerflowResponse = await apiRequest(
+            'POST',
+            '/api/deerflow/research',
+            {
+              query: processedMessage,
+              threadId: threadId
+            }
+          );
+          
+          if (deerflowResponse.ok) {
+            const deerflowData = await deerflowResponse.json();
+            
+            if (deerflowData.success && deerflowData.research) {
+              // Format the response to match what the standard endpoint would return
+              // but with clear indication it's from DeerFlow
+              
+              const research = deerflowData.research;
+              
+              // Create a special message format for DeerFlow research
+              let formattedContent = `## Advanced Research: ${research.query}\n\n`;
+              formattedContent += research.result;
+              
+              // Add sources if available
+              if (research.sources && research.sources.length > 0) {
+                formattedContent += "\n\n### Sources\n";
+                research.sources.forEach((source: any, index: number) => {
+                  formattedContent += `${index + 1}. [${source.title || 'Source'}](${source.url})\n`;
+                });
+              }
+              
+              // Create a response structure that matches what the standard API returns
+              return {
+                ok: true,
+                json: async () => ({
+                  threadId: threadId || research.conversation_id,
+                  message: {
+                    id: `assistant-${Date.now()}`,
+                    content: formattedContent,
+                    role: 'assistant',
+                    timestamp: new Date().toISOString(),
+                    modelUsed: "DeerFlow Advanced Research",
+                    webSearchUsed: true
+                  }
+                })
+              };
+            }
+          }
+        } catch (error) {
+          console.error("Error with DeerFlow research, falling back to standard API:", error);
+          // Continue with standard API as fallback
+        }
+      }
+      
+      // For normal queries or as fallback for depth level 3
+      response = await apiRequest(
         'POST',
         '/api/suna/message',
         {
           message: processedMessage, // Send processed message without command prefixes
           threadId: threadId, // Always pass the current threadId, even if undefined
           model: model, // Pass the selected model to the API
-          depthLevel: researchDepth, // Pass the research depth level (3 will trigger DeerFlow)
+          depthLevel: researchDepth, // Pass the research depth level
           searchPreferences: activeSearchPrefs // Pass search preferences
         }
       );
