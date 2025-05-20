@@ -1067,28 +1067,48 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 </SelectContent>
               </Select>
               
-              {/* Mode toggle - Quick vs Research - matched to reference image */}
-              <div className="flex items-center rounded-md overflow-hidden h-7 border">
-                <button 
-                  className={`w-20 py-1 text-xs ${!researchMode ? 'bg-white text-gray-700' : 'bg-white text-gray-700'}`}
-                  onClick={() => setResearchMode(false)}
-                >
-                  <div className="flex items-center justify-center">
-                    <Zap className="w-3 h-3 mr-1" />
-                    Quick
+              {/* Mode toggle - Quick vs Research - exact match to reference image */}
+              <div className="flex items-center space-x-2">
+                {!researchMode ? (
+                  <div className="flex items-center rounded-md overflow-hidden h-7 border">
+                    <button 
+                      className="w-20 py-1 text-xs bg-white text-gray-700"
+                      onClick={() => setResearchMode(false)}
+                    >
+                      <div className="flex items-center justify-center">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Quick
+                      </div>
+                    </button>
+                    <div className="w-8 bg-blue-500"></div>
                   </div>
-                </button>
-                {!researchMode && <div className="w-8 bg-blue-500"></div>}
+                ) : (
+                  <div className="flex items-center rounded-md overflow-hidden h-7 border">
+                    <button 
+                      className="w-20 py-1 text-xs bg-white text-gray-700"
+                      onClick={() => setResearchMode(false)}
+                    >
+                      <div className="flex items-center justify-center">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Quick
+                      </div>
+                    </button>
+                  </div>
+                )}
+                
                 {researchMode && (
-                  <button 
-                    className={`w-28 py-1 text-xs ${researchMode ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                    onClick={() => setResearchMode(true)}
-                  >
-                    <div className="flex items-center justify-center">
-                      <BookOpen className="w-3 h-3 mr-1" />
-                      Research
-                    </div>
-                  </button>
+                  <div className="flex items-center rounded-md overflow-hidden h-7 border">
+                    <button 
+                      className="w-28 py-1 text-xs bg-blue-500 text-white"
+                      onClick={() => setResearchMode(true)}
+                    >
+                      <div className="flex items-center justify-center">
+                        <BookOpen className="w-3 h-3 mr-1" />
+                        Research
+                      </div>
+                    </button>
+                    <div className="w-8 bg-blue-500"></div>
+                  </div>
                 )}
               </div>
               
