@@ -1,5 +1,6 @@
 // server/deerflow-integration.ts
 import { deerflowClient, DeerFlowResearchParams, DeerFlowResearchResponse } from './deerflow-client';
+import { llmService } from './llm';
 
 /**
  * Research depth levels
@@ -184,9 +185,8 @@ export class ResearchService {
     const startTime = Date.now();
     
     try {
-      // Direct import to avoid circular dependency issues
-      const { performWebSearch } = require('./performWebSearch');
-      const { llmService } = require('./llm');
+      // Access performWebSearch from global to avoid circular dependency issues
+      const performWebSearch = (global as any).performWebSearch;
       
       // Perform multiple searches with different query variations to get more diverse results
       const mainQuery = params.query;
@@ -293,10 +293,15 @@ ${sourceContent}
 
 Your report should synthesize information from multiple sources, highlight consensus and disagreements, and provide a balanced view. Cite sources in your analysis where appropriate using [Source X] notation.`;
 
-          const llmResponse = await llmService.generateResponse([
-            { role: 'system', content: 'You are an expert research analyst providing accurate, comprehensive reports.' },
-            { role: 'user', content: prompt }
-          ]);
+          // Use imported llmService from the top of the file
+          const llmResponse = await llmService.generateResponse(
+            [
+              { role: 'system', content: 'You are an expert research analyst providing accurate, comprehensive reports.' },
+              { role: 'user', content: prompt }
+            ],
+            0.7,  // temperature for balanced creativity and accuracy
+            4000  // token limit for comprehensive research
+          );
           
           report = llmResponse.message || '';
           
@@ -353,8 +358,8 @@ Your report should synthesize information from multiple sources, highlight conse
     try {
       console.log('Performing deep research with DeerFlow service for query:', params.query);
       
-      // Import DeerFlow client
-      const { deerflowClient } = require('./deerflow-client');
+      // Use the deerflowClient that's already imported at the top of the file
+      // This fixes the "require is not defined" error
       
       // Prepare request parameters for DeerFlow service
       const deerflowParams = {
