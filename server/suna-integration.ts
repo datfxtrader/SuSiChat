@@ -641,9 +641,70 @@ export class SunaIntegrationService {
           const finalQuery = refinedQuery
             .replace(/^(what|how|when|where|who|why|can you|could you|would you|tell me|do you know|i need to know|i want to know|please find|search for|look up)/i, '')
             .trim();
+          
+          // Get the research depth level (default to 1 if not specified)
+          const researchDepth = data.researchDepth || 1;
+          
+          // For depth level 3, use DeerFlow research service
+          if (researchDepth === 3) {
+            console.log(`Using DeerFlow for deep research (level 3) on: "${finalQuery}"`);
             
-          console.log(`Web search using refined query: ${finalQuery}`);
-          webSearchResults = await performWebSearch(finalQuery);
+            try {
+              // Determine model ID based on the selected LLM
+              const modelId = data.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : 
+                             data.model === 'gemini-1.0-pro' ? 'gemini-1.5-pro' : 'deepseek-v3';
+              
+              // Call DeerFlow research service via the research service
+              const deerflowResult = await researchService.performResearch({
+                query: finalQuery,
+                depth: ResearchDepth.Deep,
+                modelId: modelId
+              });
+              
+              if (deerflowResult && deerflowResult.report) {
+                // Use DeerFlow results directly
+                webSearchContent = `I'll help answer your question based on deep research:\n\n${deerflowResult.report}`;
+                
+                // Format source metadata
+                const searchEndTime = Date.now();
+                const sourceDomains: string[] = [];
+                const sourceDetails: any[] = [];
+                
+                if (deerflowResult.sources && deerflowResult.sources.length > 0) {
+                  deerflowResult.sources.forEach((source: any) => {
+                    if (source.domain) sourceDomains.push(source.domain);
+                    sourceDetails.push({
+                      title: source.title || 'Source',
+                      url: source.url || '',
+                      domain: source.domain || ''
+                    });
+                  });
+                }
+                
+                searchMetadata = {
+                  query: finalQuery,
+                  sources: sourceDomains,
+                  resultCount: sourceDetails.length,
+                  searchEngines: ['DeerFlow'],
+                  searchTime: searchEndTime - searchStartTime,
+                  sourceDetails
+                };
+              } else {
+                // Fall back to regular search if DeerFlow returns no results
+                console.log('DeerFlow research returned no results, falling back to regular search');
+                webSearchResults = await performWebSearch(finalQuery);
+              }
+            } catch (error) {
+              console.error('Error using DeerFlow research:', error);
+              // Fall back to regular search on error
+              console.log('Falling back to regular web search due to DeerFlow error');
+              webSearchResults = await performWebSearch(finalQuery);
+            }
+          } else {
+            // Use regular web search for depth levels 1 and 2
+            console.log(`Web search using refined query: ${finalQuery}`);
+            webSearchResults = await performWebSearch(finalQuery);
+          }
           
           // Format search results only if there's no error
           if (!webSearchResults.error) {
@@ -1220,14 +1281,14 @@ export const sunaService = new SunaIntegrationService();
 // Express route handlers for Suna integration
 export const sendMessageToSuna = async (req: any, res: Response) => {
   try {
-    const { message, threadId, model } = req.body;
+    const { message, threadId, model, researchDepth, searchPreferences } = req.body;
     const userId = req.user.claims.sub;
 
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    console.log(`Processing message in conversation/thread: ${threadId} with model: ${model || 'default'}`);
+    console.log(`Processing message in conversation/thread: ${threadId} with model: ${model || 'default'}, research depth: ${researchDepth || 1}`);
 
     // Use threadId as the conversationId for consistency
     const conversationId = threadId;
@@ -1237,7 +1298,9 @@ export const sendMessageToSuna = async (req: any, res: Response) => {
       userId,
       conversationId: conversationId,
       threadId: conversationId,
-      model: model // Pass the selected model to the service
+      model: model, // Pass the selected model to the service
+      researchDepth: researchDepth || 1, // Default to basic research if not specified
+      searchPreferences: searchPreferences // Pass search preferences
     };
 
     const response = await sunaService.sendMessage(sunaRequest);

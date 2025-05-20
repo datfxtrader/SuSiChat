@@ -664,7 +664,18 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const handleSendMessage = () => {
     if (!message.trim()) return;
     
-    sendMessage({ message, model: currentModel });
+    // Include research depth if research mode is enabled
+    if (researchMode) {
+      console.log(`Sending message with research depth: ${researchDepth}`);
+      sendMessage({ 
+        message, 
+        model: currentModel,
+        researchDepth: researchDepth 
+      });
+    } else {
+      sendMessage({ message, model: currentModel });
+    }
+    
     setMessage('');
     
     // Reset textarea height
