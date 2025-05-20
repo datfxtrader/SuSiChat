@@ -5,7 +5,8 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
-import { handleResearchRequest, deerflowService } from "./deerflow-integration";
+// Use the direct DeerFlow implementation instead of the microservice
+import { handleResearchRequest, deerflowDirectService } from "./deerflow-direct";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -382,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check DeerFlow service availability
   app.get('/api/research/status', isAuthenticated, async (req, res) => {
     try {
-      const isAvailable = await deerflowService.checkServiceAvailability();
+      const isAvailable = await deerflowDirectService.checkServiceAvailability();
       res.json({ available: isAvailable });
     } catch (error) {
       console.error("Error checking research service:", error);
