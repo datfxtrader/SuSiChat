@@ -664,7 +664,13 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   const handleSendMessage = () => {
     if (!message.trim()) return;
     
-    sendMessage({ message, model: currentModel });
+    // Include research depth level when sending the message
+    // When depth level is 3, it will trigger DeerFlow's deep research capabilities
+    sendMessage({ 
+      message, 
+      model: currentModel,
+      researchDepth: researchMode ? researchDepth : undefined  // Only include depth when research mode is on
+    });
     setMessage('');
     
     // Reset textarea height
