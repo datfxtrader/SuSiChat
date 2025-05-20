@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const { llmService } = require('./llm');
 
 // API endpoint for financial research
 router.post('/generate', async (req, res) => {
