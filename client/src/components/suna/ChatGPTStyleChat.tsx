@@ -17,7 +17,10 @@ import {
   Zap, 
   BookOpen,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search,
+  Database,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -28,6 +31,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ResearchDepthSelector } from '@/components/research/ResearchDepthSelector';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Mock source structure for research mode responses
 interface Source {
@@ -1033,10 +1043,44 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                 </button>
               </div>
+              
+              {/* Research depth selector */}
+              {researchMode && (
+                <div className="flex items-center ml-2">
+                  <div className="flex items-center border rounded-md overflow-hidden h-7">
+                    {[1, 2, 3].map(level => (
+                      <TooltipProvider key={level}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`px-2 py-1 text-xs flex items-center ${researchDepth === level ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              onClick={() => setResearchDepth(level)}
+                            >
+                              {level === 1 ? <Search className="w-3 h-3 mr-1" /> : 
+                               level === 2 ? <Sparkles className="w-3 h-3 mr-1" /> : 
+                               <Database className="w-3 h-3 mr-1" />}
+                              {level}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {level === 1 && "Basic web search (5-15 seconds)"}
+                            {level === 2 && "Enhanced research with better processing (15-30 seconds)"}
+                            {level === 3 && "Deep DeerFlow research with comprehensive analysis (1-2 minutes)"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <p className="text-[10px] text-gray-500">
               {researchMode 
-                ? "Comprehensive research with thorough source analysis" 
+                ? researchDepth === 3 
+                  ? "Deep research with DeerFlow technology for comprehensive analysis" 
+                  : researchDepth === 2
+                    ? "Enhanced research with improved source processing"
+                    : "Basic web search with essential information"
                 : "Uses Tavily & Brave Search for real-time information"}
             </p>
           </div>
