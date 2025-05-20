@@ -34,7 +34,15 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({
 }) => {
   const [query, setQuery] = useState(initialQuery);
   const [depth, setDepth] = useState<ResearchDepth>(defaultDepth);
-  const { performResearch, result, isLoading, error, resetResearch } = useResearch();
+  const { 
+    performResearch, 
+    result, 
+    researchHistory,
+    selectFromHistory,
+    isLoading, 
+    error, 
+    resetResearch 
+  } = useResearch();
   const { toast } = useToast();
 
   // Handle research submission
@@ -188,11 +196,25 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({
                 <TabsList>
                   <TabsTrigger value="report">Report</TabsTrigger>
                   <TabsTrigger value="sources">Sources ({result.sources.length})</TabsTrigger>
+                  {researchHistory.length > 1 && (
+                    <TabsTrigger value="history">History ({researchHistory.length})</TabsTrigger>
+                  )}
                 </TabsList>
                 
                 <TabsContent value="report" className="mt-4">
                   <div className="markdown-content prose prose-sm max-w-none">
-                    <ReactMarkdown>
+                    <ReactMarkdown
+                      components={{
+                        a: ({ node, ...props }) => (
+                          <a 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                            {...props}
+                          />
+                        ),
+                      }}
+                    >
                       {result.report}
                     </ReactMarkdown>
                   </div>
@@ -227,6 +249,45 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({
                     </div>
                   ) : (
                     <p className="text-gray-500 text-center py-4">No sources available</p>
+                  )}
+                </TabsContent>
+                
+                {/* History Tab */}
+                <TabsContent value="history" className="mt-4">
+                  {researchHistory.length > 0 ? (
+                    <div className="space-y-2">
+                      {researchHistory.map((historyItem, index) => (
+                        <div 
+                          key={index} 
+                          className="border rounded-md p-3 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => {
+                            selectFromHistory(index);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm">{historyItem.searchQuery || 'Unknown query'}</h4>
+                              <div className="flex items-center mt-1">
+                                <Badge variant="outline" className="mr-2">
+                                  <div className="flex items-center">
+                                    {getDepthInfo(historyItem.depth).icon}
+                                    {getDepthInfo(historyItem.depth).label}
+                                  </div>
+                                </Badge>
+                                <span className="text-xs text-gray-500">
+                                  {historyItem.timestamp ? formatDate(historyItem.timestamp) : 'Unknown time'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {historyItem.sources.length} sources
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">No research history available</p>
                   )}
                 </TabsContent>
               </Tabs>

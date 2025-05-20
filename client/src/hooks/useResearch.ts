@@ -29,6 +29,8 @@ export interface ResearchResult {
   }>;
   depth: ResearchDepth;
   processingTime: number;
+  timestamp?: string;
+  searchQuery?: string;
 }
 
 /**
@@ -36,6 +38,7 @@ export interface ResearchResult {
  */
 export function useResearch() {
   const [currentResearch, setCurrentResearch] = useState<ResearchResult | null>(null);
+  const [researchHistory, setResearchHistory] = useState<ResearchResult[]>([]);
   
   // Mutation for performing research
   const mutation = useMutation({
@@ -46,10 +49,35 @@ export function useResearch() {
         params
       );
       const data = await response.json();
-      return data as ResearchResult;
+      
+      // Add query info to the result for history tracking
+      const resultWithQuery = {
+        ...data,
+        searchQuery: params.query
+      } as ResearchResult;
+      
+      return resultWithQuery;
     },
     onSuccess: (data) => {
+      // Update current research
       setCurrentResearch(data);
+      
+      // Add to history, keeping the most recent ones first
+      setResearchHistory(prev => {
+        // Add timestamp if not present
+        const newData = {
+          ...data,
+          timestamp: data.timestamp || new Date().toISOString()
+        };
+        
+        // Create new history array with new item at the beginning
+        const newHistory = [newData, ...prev];
+        
+        // Limit history to 10 items
+        return newHistory.slice(0, 10);
+      });
+      
+      // Invalidate query cache
       queryClient.invalidateQueries({ queryKey: ['/api/research'] });
     },
   });
@@ -58,6 +86,13 @@ export function useResearch() {
     performResearch: mutation.mutate,
     resetResearch: () => setCurrentResearch(null),
     result: currentResearch,
+    researchHistory,
+    clearHistory: () => setResearchHistory([]),
+    selectFromHistory: (index: number) => {
+      if (index >= 0 && index < researchHistory.length) {
+        setCurrentResearch(researchHistory[index]);
+      }
+    },
     isLoading: mutation.isPending,
     error: mutation.error,
   };
