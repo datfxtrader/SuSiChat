@@ -1046,11 +1046,15 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   className="flex items-center rounded-md overflow-hidden h-7 border cursor-pointer mr-2"
                   onClick={() => setResearchMode(false)}
                 >
-                  <div className="w-20 py-1 text-xs bg-white text-gray-700 flex items-center justify-center">
+                  <div className="py-1 text-xs flex items-center justify-center w-20"
+                    style={{ 
+                      backgroundColor: !researchMode ? '#3b82f6' : 'white',
+                      color: !researchMode ? 'white' : '#374151'
+                    }}
+                  >
                     <Zap className="w-3 h-3 mr-1" />
                     Quick
                   </div>
-                  {!researchMode && <div className="w-8 bg-blue-500"></div>}
                 </div>
                 
                 {/* Research toggle - matched to reference image */}
@@ -1069,64 +1073,66 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                 </div>
                 
-                {/* Research Depth selector */}
-                <div className="flex items-center ml-2">
-                  <div className="flex border rounded-md overflow-hidden">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            className={`px-4 py-1.5 ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                            onClick={() => setResearchDepth(1)}
-                          >
-                            <div className="flex items-center justify-center">
-                              <Search className="w-3 h-3 mr-1" />1
-                            </div>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          Basic research (5-15s)
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            className={`px-4 py-1.5 ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                            onClick={() => setResearchDepth(2)}
-                          >
-                            <div className="flex items-center justify-center">
-                              <Sparkles className="w-3 h-3 mr-1" />2
-                            </div>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          Enhanced research (15-30s)
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            className={`px-4 py-1.5 ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                            onClick={() => setResearchDepth(3)}
-                          >
-                            <div className="flex items-center justify-center">
-                              <Database className="w-3 h-3 mr-1" />3
-                            </div>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          Deep research with DeerFlow (1-2m)
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                {/* Research Depth selector - only shown when Research mode is active */}
+                {researchMode && (
+                  <div className="flex items-center ml-2">
+                    <div className="flex border rounded-md overflow-hidden">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`px-3 py-1 ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              onClick={() => setResearchDepth(1)}
+                            >
+                              <div className="flex items-center justify-center">
+                                <Search className="w-3 h-3 mr-1" />1
+                              </div>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Basic research (5-15s)
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`px-3 py-1 ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              onClick={() => setResearchDepth(2)}
+                            >
+                              <div className="flex items-center justify-center">
+                                <Sparkles className="w-3 h-3 mr-1" />2
+                              </div>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Enhanced research (15-30s)
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`px-3 py-1 ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              onClick={() => setResearchDepth(3)}
+                            >
+                              <div className="flex items-center justify-center">
+                                <Database className="w-3 h-3 mr-1" />3
+                              </div>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Deep research with DeerFlow (1-2m)
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
             <p className="text-[10px] text-gray-500 flex items-center justify-center">
