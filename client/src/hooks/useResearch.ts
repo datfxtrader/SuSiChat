@@ -40,11 +40,13 @@ export function useResearch() {
   // Mutation for performing research
   const mutation = useMutation({
     mutationFn: async (params: ResearchParams): Promise<ResearchResult> => {
-      const response = await apiRequest<ResearchResult>('/api/research', {
-        method: 'POST',
-        data: params,
-      });
-      return response;
+      const response = await apiRequest(
+        'POST',
+        '/api/research',
+        params
+      );
+      const data = await response.json();
+      return data as ResearchResult;
     },
     onSuccess: (data) => {
       setCurrentResearch(data);

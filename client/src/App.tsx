@@ -12,6 +12,7 @@ import FamilyRoomDetail from "@/pages/family-room/[id]";
 import Profile from "@/pages/profile";
 import SunaAgent from "@/pages/suna-agent";
 import TripPlanning from "@/pages/trip";
+import Research from "@/pages/research";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
       <Route path="/profile" component={Profile} />
       <Route path="/suna-agent" component={SunaAgent} />
       <Route path="/trip" component={TripPlanning} />
+      <Route path="/research" component={Research} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -192,7 +192,7 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({
                 
                 <TabsContent value="report" className="mt-4">
                   <div className="markdown-content prose prose-sm max-w-none">
-                    <ReactMarkdown className="text-gray-800">
+                    <ReactMarkdown>
                       {result.report}
                     </ReactMarkdown>
                   </div>
