@@ -376,5 +376,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
 
+  // Research endpoints with DeerFlow integration
+  app.use('/api/research', researchRoutes);
+
   return httpServer;
 }
