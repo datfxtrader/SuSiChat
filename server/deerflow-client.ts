@@ -111,7 +111,7 @@ export class DeerFlowClient {
       console.log('Making request to DeerFlow service:', params);
       const serviceUrl = getDeerFlowServiceUrl();
       const response = await axios.post(`${serviceUrl}/research`, params, {
-        timeout: 60000, // 60 second timeout for research requests
+        timeout: 180000, // 3 minute timeout for comprehensive research
       });
       
       return response.data;
