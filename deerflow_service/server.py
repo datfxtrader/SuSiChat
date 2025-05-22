@@ -2,6 +2,7 @@
 DeerFlow Research Service
 
 This service provides a FastAPI server to handle deep research requests using DeerFlow.
+Enhanced with intelligent agent capabilities for advanced planning and reasoning.
 """
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,9 @@ import json
 import logging
 import time
 import datetime
+
+# Import the new agent core
+from agent_core import agent_core, TaskStatus
 
 # Configure logging
 logging.basicConfig(
