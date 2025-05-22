@@ -17,8 +17,13 @@ import logging
 import time
 import datetime
 
-# Import the new agent core
+# Import the new agent core and learning system
 from agent_core import agent_core, TaskStatus
+try:
+    from learning_system import learning_system, UserFeedback, FeedbackType
+    LEARNING_AVAILABLE = True
+except ImportError:
+    LEARNING_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(
@@ -462,6 +467,127 @@ async def cleanup_agent_tasks(max_age_hours: int = 24):
         
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
+        return {"error": str(e)}
+
+# Learning System Endpoints (Phase 3)
+
+class FeedbackRequest(BaseModel):
+    task_id: str
+    feedback_type: str  # "accuracy", "relevance", "completeness", "timeliness", "overall"
+    rating: float  # 1-5 scale
+    comments: Optional[str] = None
+    improvement_suggestions: Optional[List[str]] = None
+
+@app.post("/agent/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Submit user feedback for learning and improvement"""
+    if not LEARNING_AVAILABLE:
+        return {"error": "Learning system not available"}
+    
+    try:
+        # Convert string to FeedbackType enum
+        feedback_type_map = {
+            "accuracy": FeedbackType.ACCURACY,
+            "relevance": FeedbackType.RELEVANCE,
+            "completeness": FeedbackType.COMPLETENESS,
+            "timeliness": FeedbackType.TIMELINESS,
+            "overall": FeedbackType.OVERALL
+        }
+        
+        feedback_type = feedback_type_map.get(request.feedback_type, FeedbackType.OVERALL)
+        
+        # Create feedback object
+        feedback = UserFeedback(
+            task_id=request.task_id,
+            feedback_type=feedback_type,
+            rating=request.rating,
+            comments=request.comments,
+            improvement_suggestions=request.improvement_suggestions or [],
+            timestamp=time.time()
+        )
+        
+        # Process feedback through learning system
+        learning_results = learning_system.feedback_processor.process_feedback(feedback)
+        
+        return {
+            "message": "Feedback processed successfully",
+            "learning_insights": learning_results,
+            "thank_you": "Your feedback helps us improve!"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing feedback: {e}")
+        return {"error": str(e)}
+
+@app.get("/agent/learning/summary")
+async def get_learning_summary():
+    """Get comprehensive learning system summary"""
+    if not LEARNING_AVAILABLE:
+        return {"error": "Learning system not available"}
+    
+    try:
+        summary = learning_system.get_learning_summary()
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Error getting learning summary: {e}")
+        return {"error": str(e)}
+
+@app.get("/agent/learning/insights")
+async def get_learning_insights():
+    """Get actionable insights from the learning system"""
+    if not LEARNING_AVAILABLE:
+        return {"error": "Learning system not available"}
+    
+    try:
+        insights = {
+            "strategy_performance": learning_system.strategy_optimizer.get_strategy_insights(),
+            "feedback_trends": learning_system.feedback_processor.get_feedback_summary(),
+            "performance_health": learning_system.performance_monitor.get_performance_insights(),
+            "recommendations": learning_system.performance_monitor.suggest_optimizations()
+        }
+        
+        return insights
+        
+    except Exception as e:
+        logger.error(f"Error getting learning insights: {e}")
+        return {"error": str(e)}
+
+@app.post("/agent/learning/optimize")
+async def optimize_strategies():
+    """Trigger strategy optimization based on learning data"""
+    if not LEARNING_AVAILABLE:
+        return {"error": "Learning system not available"}
+    
+    try:
+        # Get current strategy insights
+        insights = learning_system.strategy_optimizer.get_strategy_insights()
+        
+        # Generate optimization recommendations
+        recommendations = []
+        
+        if insights.get("strategy_rankings"):
+            best_strategies = insights["strategy_rankings"][:3]
+            recommendations.append(f"Top performing strategies: {', '.join(s['strategy'] for s in best_strategies)}")
+            
+            # Check if any strategies are underperforming
+            poor_strategies = [s for s in insights["strategy_rankings"] if s["success_rate"] < 0.6]
+            if poor_strategies:
+                recommendations.append(f"Consider improving: {', '.join(s['strategy'] for s in poor_strategies)}")
+        
+        return {
+            "message": "Strategy optimization completed",
+            "current_insights": insights,
+            "optimization_recommendations": recommendations,
+            "next_steps": [
+                "Continue collecting feedback for better optimization",
+                "Monitor strategy performance trends",
+                "Adjust exploration/exploitation balance as needed"
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during strategy optimization: {e}")
         return {"error": str(e)}
 
 if __name__ == "__main__":

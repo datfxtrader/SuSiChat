@@ -22,7 +22,13 @@ try:
     ADVANCED_REASONING_AVAILABLE = True
 except ImportError:
     ADVANCED_REASONING_AVAILABLE = False
-    logger.warning("Advanced reasoning components not available")
+
+# Import learning system for Phase 3
+try:
+    from learning_system import learning_system, UserFeedback, FeedbackType
+    LEARNING_SYSTEM_AVAILABLE = True
+except ImportError:
+    LEARNING_SYSTEM_AVAILABLE = False
 
 logger = logging.getLogger("agent_core")
 
