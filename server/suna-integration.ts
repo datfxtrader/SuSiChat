@@ -654,11 +654,14 @@ export class SunaIntegrationService {
               const modelId = data.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : 
                              data.model === 'gemini-1.0-pro' ? 'gemini-1.5-pro' : 'deepseek-v3';
               
-              // Call DeerFlow research service via the research service
+              // Call DeerFlow research service with comprehensive settings
               const deerflowResult = await researchService.performResearch({
                 query: finalQuery,
                 depth: ResearchDepth.Deep,
-                modelId: modelId
+                modelId: modelId,
+                researchLength: 'comprehensive',
+                researchTone: 'analytical',
+                minWordCount: 1500
               });
               
               if (deerflowResult && deerflowResult.report) {

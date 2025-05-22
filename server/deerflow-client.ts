@@ -13,6 +13,9 @@ export interface DeerFlowResearchParams {
   model_id?: string;
   include_market_data?: boolean;
   include_news?: boolean;
+  research_length?: string;
+  research_tone?: string;
+  min_word_count?: number;
 }
 
 /**
