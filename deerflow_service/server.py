@@ -25,6 +25,13 @@ try:
 except ImportError:
     LEARNING_AVAILABLE = False
 
+# Import full DeerFlow agent system
+try:
+    from full_agent_system import full_agent_system
+    FULL_DEERFLOW_AVAILABLE = True
+except ImportError:
+    FULL_DEERFLOW_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -588,6 +595,105 @@ async def optimize_strategies():
         
     except Exception as e:
         logger.error(f"Error during strategy optimization: {e}")
+        return {"error": str(e)}
+
+# Full DeerFlow Agent System Endpoints
+
+class FullAgentResearchRequest(BaseModel):
+    research_question: str
+    user_id: str
+    complexity: Optional[str] = "auto"
+    enable_multi_agent: Optional[bool] = True
+    enable_reasoning: Optional[bool] = True
+    preferences: Optional[Dict[str, Any]] = None
+
+@app.post("/deerflow/full-research")
+async def full_deerflow_research(request: FullAgentResearchRequest):
+    """Execute research using the complete DeerFlow agent system"""
+    if not FULL_DEERFLOW_AVAILABLE:
+        return {"error": "Full DeerFlow agent system not available"}
+    
+    try:
+        logger.info(f"Full DeerFlow research request: {request.research_question}")
+        
+        # Execute with full agent capabilities
+        result = await full_agent_system.process_complex_research(
+            query=request.research_question,
+            user_id=request.user_id,
+            preferences=request.preferences
+        )
+        
+        return {
+            "message": "Full DeerFlow agent research completed",
+            "capabilities": [
+                "Multi-agent orchestration",
+                "Advanced reasoning engine", 
+                "Domain expertise",
+                "Tool use and integration",
+                "Continuous learning"
+            ],
+            "result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Full DeerFlow research error: {e}")
+        return {"error": str(e)}
+
+@app.get("/deerflow/capabilities")
+async def get_deerflow_capabilities():
+    """Get information about available DeerFlow capabilities"""
+    
+    capabilities = {
+        "basic_research": True,
+        "agent_planning": True,
+        "domain_expertise": True,
+        "reasoning_engine": True,
+        "learning_system": LEARNING_AVAILABLE,
+        "full_agent_system": FULL_DEERFLOW_AVAILABLE
+    }
+    
+    if FULL_DEERFLOW_AVAILABLE:
+        capabilities.update({
+            "multi_agent_orchestration": True,
+            "tool_registry": True,
+            "advanced_planning": True,
+            "memory_persistence": True,
+            "cross_session_learning": True
+        })
+    
+    return {
+        "service": "DeerFlow Advanced Agent System",
+        "version": "1.0.0",
+        "capabilities": capabilities,
+        "status": "Full agent system active" if FULL_DEERFLOW_AVAILABLE else "Basic agent system active"
+    }
+
+@app.get("/deerflow/tools")
+async def list_available_tools():
+    """List all tools available to DeerFlow agents"""
+    if not FULL_DEERFLOW_AVAILABLE:
+        return {"error": "Full DeerFlow agent system not available"}
+    
+    try:
+        tools_info = {}
+        tool_registry = full_agent_system.orchestrator.tool_registry
+        
+        for tool_name, tool in tool_registry.tools.items():
+            tools_info[tool_name] = {
+                "name": tool.name,
+                "description": tool.description,
+                "category": tool.category,
+                "parameters": tool.parameters
+            }
+        
+        return {
+            "available_tools": len(tools_info),
+            "tool_categories": list(set(tool.category for tool in tool_registry.tools.values())),
+            "tools": tools_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing tools: {e}")
         return {"error": str(e)}
 
 if __name__ == "__main__":

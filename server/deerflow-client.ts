@@ -229,6 +229,88 @@ export class DeerFlowClient {
       return { message: 'Cleanup failed', remaining_tasks: 0 };
     }
   }
+
+  /**
+   * Execute research using the complete DeerFlow agent system with multi-agent orchestration
+   */
+  async executeFullAgentResearch(params: {
+    research_question: string;
+    user_id: string;
+    complexity?: string;
+    enable_multi_agent?: boolean;
+    enable_reasoning?: boolean;
+    preferences?: any;
+  }): Promise<any> {
+    try {
+      // Ensure DeerFlow service is running
+      if (!(await checkDeerFlowService())) {
+        console.log('DeerFlow service not running, starting it now...');
+        const started = await startDeerFlowService();
+        if (!started) {
+          throw new Error('Failed to start DeerFlow service');
+        }
+      }
+
+      console.log('Executing full DeerFlow agent research:', params);
+      const serviceUrl = getDeerFlowServiceUrl();
+      const response = await axios.post(`${serviceUrl}/deerflow/full-research`, params, {
+        timeout: 90000, // 90 second timeout for complex multi-agent research
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error executing full agent research:', error);
+      return {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        capabilities: []
+      };
+    }
+  }
+
+  /**
+   * Get DeerFlow system capabilities and status
+   */
+  async getCapabilities(): Promise<any> {
+    try {
+      const serviceUrl = getDeerFlowServiceUrl();
+      const response = await axios.get(`${serviceUrl}/deerflow/capabilities`, {
+        timeout: 10000,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting DeerFlow capabilities:', error);
+      return {
+        service: 'DeerFlow Agent System',
+        status: 'Service unavailable',
+        capabilities: {},
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * List all available tools for DeerFlow agents
+   */
+  async getAvailableTools(): Promise<any> {
+    try {
+      const serviceUrl = getDeerFlowServiceUrl();
+      const response = await axios.get(`${serviceUrl}/deerflow/tools`, {
+        timeout: 10000,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting DeerFlow tools:', error);
+      return {
+        available_tools: 0,
+        tool_categories: [],
+        tools: {},
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
 }
 
 // Export a singleton instance
