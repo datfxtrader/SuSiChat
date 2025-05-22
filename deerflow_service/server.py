@@ -364,5 +364,105 @@ async def get_research_status(research_id: str):
         "elapsed_time": time.time() - research_state[research_id]["start_time"]
     }
 
+# New Agent Endpoints for Advanced Research
+
+class AgentResearchRequest(BaseModel):
+    research_question: str
+    depth: Optional[str] = "comprehensive"
+    include_reasoning: Optional[bool] = True
+    learning_mode: Optional[bool] = True
+    preferences: Optional[Dict[str, Any]] = None
+
+class AgentResearchResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+@app.post("/agent/research", response_model=AgentResearchResponse)
+async def create_agent_research_task(request: AgentResearchRequest):
+    """Create a new intelligent research task with planning and reasoning"""
+    logger.info(f"Creating agent research task: {request.research_question}")
+    
+    try:
+        # Create task using agent core
+        task_id = await agent_core.create_research_task(
+            query=request.research_question,
+            preferences={
+                "depth": request.depth,
+                "include_reasoning": request.include_reasoning,
+                "learning_mode": request.learning_mode,
+                **(request.preferences or {})
+            }
+        )
+        
+        return AgentResearchResponse(
+            task_id=task_id,
+            status="created",
+            message="Research task created successfully with intelligent planning"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to create agent research task: {e}")
+        return AgentResearchResponse(
+            task_id="",
+            status="error",
+            message=f"Failed to create task: {str(e)}"
+        )
+
+@app.get("/agent/task/{task_id}")
+async def get_agent_task_status(task_id: str):
+    """Get detailed status of an agent research task"""
+    logger.info(f"Getting status for agent task: {task_id}")
+    
+    try:
+        status = agent_core.get_task_status(task_id)
+        if not status:
+            return {"error": "Task not found", "task_id": task_id}
+        
+        return status
+        
+    except Exception as e:
+        logger.error(f"Error getting task status: {e}")
+        return {"error": str(e), "task_id": task_id}
+
+@app.get("/agent/tasks")
+async def list_agent_tasks():
+    """List all active agent tasks"""
+    try:
+        tasks = []
+        for task_id in agent_core.active_agents.keys():
+            status = agent_core.get_task_status(task_id)
+            if status:
+                tasks.append({
+                    "task_id": task_id,
+                    "status": status["status"],
+                    "progress": status["progress"],
+                    "query": status["metadata"].get("query", "")[:100] + "...",
+                    "created_at": status["metadata"].get("created_at")
+                })
+        
+        return {"tasks": tasks, "total": len(tasks)}
+        
+    except Exception as e:
+        logger.error(f"Error listing tasks: {e}")
+        return {"error": str(e), "tasks": [], "total": 0}
+
+@app.post("/agent/cleanup")
+async def cleanup_agent_tasks(max_age_hours: int = 24):
+    """Clean up completed agent tasks"""
+    try:
+        initial_count = len(agent_core.active_agents)
+        agent_core.cleanup_completed_tasks(max_age_hours)
+        final_count = len(agent_core.active_agents)
+        
+        return {
+            "message": f"Cleaned up {initial_count - final_count} tasks",
+            "remaining_tasks": final_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
