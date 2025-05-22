@@ -61,6 +61,9 @@ class ResearchRequest(BaseModel):
     model_id: Optional[str] = "deepseek-v3"
     include_market_data: Optional[bool] = True
     include_news: Optional[bool] = True
+    research_length: Optional[str] = "comprehensive"  # brief, standard, comprehensive, detailed
+    research_tone: Optional[str] = "analytical"  # casual, professional, analytical, academic
+    min_word_count: Optional[int] = 1000
 
 class ResearchResponse(BaseModel):
     status: Optional[Dict[str, Any]] = None
@@ -166,9 +169,9 @@ async def search_brave(query: str, max_results: int = 8):
         logger.error(f"Brave search failed: {response.status_code} - {response.text}")
         return []
 
-async def generate_deepseek_response(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 4000):
-    """Generate a response using DeepSeek API."""
-    logger.info("Generating response with DeepSeek")
+async def generate_deepseek_response(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 8000, research_length: str = "comprehensive", research_tone: str = "analytical", min_word_count: int = 1000):
+    """Generate a response using DeepSeek API with enhanced length and tone controls."""
+    logger.info(f"Generating {research_length} response with {research_tone} tone using DeepSeek")
     
     if not DEEPSEEK_API_KEY:
         raise ValueError("DeepSeek API key not found")
@@ -179,10 +182,51 @@ async def generate_deepseek_response(system_prompt: str, user_prompt: str, tempe
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
     }
     
+    # Create enhanced system prompt based on length and tone preferences
+    length_instructions = {
+        "brief": "Provide a concise 300-500 word analysis with key points.",
+        "standard": "Provide a comprehensive 800-1200 word analysis with detailed sections.",
+        "comprehensive": "Provide an extensive 1500-2500 word analysis with thorough coverage of all aspects.",
+        "detailed": "Provide an in-depth 2500+ word analysis with comprehensive examination of all facets."
+    }
+    
+    tone_instructions = {
+        "casual": "Use conversational, accessible language while maintaining accuracy.",
+        "professional": "Use clear, business-appropriate language with professional terminology.",
+        "analytical": "Use precise, data-driven language with logical structure and evidence-based conclusions.",
+        "academic": "Use formal, scholarly language with citations and theoretical frameworks."
+    }
+    
+    enhanced_system_prompt = f"""{system_prompt}
+
+RESEARCH OUTPUT REQUIREMENTS:
+- LENGTH: {length_instructions.get(research_length, length_instructions["comprehensive"])}
+- TONE: {tone_instructions.get(research_tone, tone_instructions["analytical"])}
+- MINIMUM WORDS: {min_word_count}
+
+STRUCTURE REQUIREMENTS:
+1. Executive Summary (2-3 paragraphs)
+2. Detailed Analysis (multiple subsections with headers)
+3. Key Findings (bulleted insights)
+4. Current Developments (latest updates)
+5. Multiple Perspectives (different viewpoints)
+6. Supporting Evidence (data and examples)
+7. Implications and Context (broader significance)
+8. Conclusions and Outlook (future considerations)
+
+QUALITY STANDARDS:
+- Use specific examples and concrete data
+- Include multiple authoritative sources
+- Provide balanced analysis from different angles
+- Explain complex concepts clearly
+- Connect findings to broader trends
+- Support all claims with evidence
+- Use appropriate section headers and formatting"""
+
     data = {
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": enhanced_system_prompt},
             {"role": "user", "content": user_prompt}
         ],
         "temperature": temperature,
