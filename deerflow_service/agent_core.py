@@ -15,6 +15,15 @@ from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# Import reasoning engine and domain agents for Phase 2
+try:
+    from reasoning_engine import reasoning_engine, Evidence, EvidenceType
+    from domain_agents import domain_orchestrator
+    ADVANCED_REASONING_AVAILABLE = True
+except ImportError:
+    ADVANCED_REASONING_AVAILABLE = False
+    logger.warning("Advanced reasoning components not available")
+
 logger = logging.getLogger("agent_core")
 
 class TaskStatus(Enum):
@@ -285,12 +294,13 @@ class WorkingMemory:
         }
 
 class AgentCore:
-    """Main agent core that orchestrates the research process"""
+    """Main agent core that orchestrates the research process with advanced reasoning"""
     
     def __init__(self):
         self.planner = TaskPlanner()
         self.active_agents: Dict[str, AgentState] = {}
-        logger.info("AgentCore initialized")
+        self.reasoning_enabled = ADVANCED_REASONING_AVAILABLE
+        logger.info(f"AgentCore initialized with reasoning capabilities: {self.reasoning_enabled}")
     
     async def create_research_task(
         self, 
@@ -355,9 +365,13 @@ class AgentCore:
             
             logger.info(f"Planning completed for {task_id}. Strategy: {execution_plan.strategy}")
             
-            # Start execution (placeholder for now)
-            agent_state.status = TaskStatus.COMPLETED
-            agent_state.confidence_scores["planning"] = 0.85
+            # Start execution with reasoning if available
+            if self.reasoning_enabled:
+                await self._execute_with_reasoning(task_id, query)
+            else:
+                # Basic execution without advanced reasoning
+                agent_state.status = TaskStatus.COMPLETED
+                agent_state.confidence_scores["planning"] = 0.85
             
         except Exception as e:
             logger.error(f"Planning phase failed for {task_id}: {e}")
@@ -410,6 +424,93 @@ class AgentCore:
         for task_id in to_remove:
             del self.active_agents[task_id]
             logger.info(f"Cleaned up task {task_id}")
+
+    async def _execute_with_reasoning(self, task_id: str, query: str):
+        """Execute research task with advanced reasoning capabilities"""
+        try:
+            agent_state = self.active_agents[task_id]
+            agent_state.status = TaskStatus.REASONING
+            
+            # Simulate evidence collection (in real implementation, this would come from web search)
+            mock_evidence_data = [
+                {
+                    "content": f"Research findings related to {query}. This represents collected information from various sources.",
+                    "url": "https://example-research-source.com",
+                    "source": "research-database",
+                    "relevance_score": 0.8
+                }
+            ]
+            
+            # Process evidence with reasoning engine
+            if ADVANCED_REASONING_AVAILABLE:
+                # Convert raw evidence to structured Evidence objects
+                evidence_objects = reasoning_engine.process_evidence(mock_evidence_data)
+                
+                # Analyze with domain agents
+                domain_analysis = await domain_orchestrator.process_with_domain_expertise(query, evidence_objects)
+                
+                # Form hypotheses using reasoning engine
+                hypotheses = reasoning_engine.form_hypotheses(query, evidence_objects)
+                
+                # Generate conclusions
+                conclusions = reasoning_engine.perform_logical_inference(
+                    premises=[f"Research query: {query}"],
+                    evidence=evidence_objects
+                )
+                
+                # Create comprehensive reasoning report
+                reasoning_report = reasoning_engine.synthesize_reasoning_report(
+                    query=query,
+                    evidence=evidence_objects,
+                    hypotheses=hypotheses,
+                    conclusions=conclusions
+                )
+                
+                # Update agent state with reasoning results
+                agent_state.reasoning_chain.append({
+                    "step": "domain_analysis",
+                    "domain_expertise": domain_analysis,
+                    "timestamp": time.time()
+                })
+                
+                agent_state.reasoning_chain.append({
+                    "step": "hypothesis_formation",
+                    "hypotheses": [
+                        {
+                            "statement": h.statement,
+                            "confidence": h.confidence_level,
+                            "status": h.status
+                        } for h in hypotheses
+                    ],
+                    "timestamp": time.time()
+                })
+                
+                agent_state.reasoning_chain.append({
+                    "step": "logical_inference",
+                    "conclusions": [
+                        {
+                            "statement": c.statement,
+                            "reasoning_type": c.reasoning_type.value,
+                            "confidence": c.confidence_score
+                        } for c in conclusions
+                    ],
+                    "timestamp": time.time()
+                })
+                
+                # Set confidence scores based on reasoning quality
+                agent_state.confidence_scores["domain_analysis"] = domain_analysis.get("consolidated_insights", [])
+                agent_state.confidence_scores["reasoning"] = reasoning_report["reasoning_summary"]["overall_confidence"]
+                agent_state.confidence_scores["evidence_quality"] = reasoning_report["evidence_analysis"].get("high_credibility_count", 0) / max(1, len(evidence_objects))
+            
+            # Mark as completed
+            agent_state.status = TaskStatus.COMPLETED
+            logger.info(f"Advanced reasoning completed for task {task_id}")
+            
+        except Exception as e:
+            logger.error(f"Reasoning execution failed for {task_id}: {e}")
+            agent_state = self.active_agents.get(task_id)
+            if agent_state:
+                agent_state.status = TaskStatus.FAILED
 
 # Global agent core instance
 agent_core = AgentCore()
