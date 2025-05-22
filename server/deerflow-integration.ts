@@ -40,6 +40,9 @@ export interface ResearchParams {
   modelId?: string;
   includeMarketData?: boolean;
   includeNews?: boolean;
+  researchLength?: string;
+  researchTone?: string;
+  minWordCount?: number;
 }
 
 /**
@@ -493,12 +496,15 @@ Your report should:
       // Use the deerflowClient that's already imported at the top of the file
       // This fixes the "require is not defined" error
       
-      // Prepare request parameters for DeerFlow service
+      // Prepare request parameters for DeerFlow service with enhanced settings
       const deerflowParams = {
         research_question: params.query,
         model_id: params.modelId || 'deepseek-v3',
         include_market_data: params.includeMarketData !== false,
-        include_news: params.includeNews !== false
+        include_news: params.includeNews !== false,
+        research_length: params.researchLength || 'comprehensive',
+        research_tone: params.researchTone || 'analytical',
+        min_word_count: params.minWordCount || 1500
       };
       
       // Call the DeerFlow service
