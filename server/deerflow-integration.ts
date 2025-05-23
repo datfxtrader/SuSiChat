@@ -717,11 +717,16 @@ Your report should:
       if (visualData.length > 0) {
         console.log('Processing visualization data:', visualData.length, 'items');
         visualData.forEach((visual: any) => {
-          if (visual.type === 'chart') {
-            report = report.replace(visual.placeholder, visual.chartHtml);
-          } else if (visual.type === 'table') {
-            report = report.replace(visual.placeholder, visual.tableHtml);
-          }
+          try {
+        if (visual.type === 'chart') {
+          report = report.replace(visual.placeholder, visual.chartHtml);
+        } else if (visual.type === 'table') {
+          report = report.replace(visual.placeholder, visual.tableHtml);
+        }
+      } catch (err) {
+        console.error('Error processing visualization:', err);
+        errorRate.visualizations = (errorRate.visualizations || 0) + 1;
+      }
         });
       }
 
