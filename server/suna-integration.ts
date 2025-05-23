@@ -1,5 +1,84 @@
 import { performTavilySearch, performBraveSearch } from './search-engines';
 
+// DeepSeek API integration
+async function generateDeepSeekResponse(messages: any[], researchDepth: number): Promise<string> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error('DeepSeek API key not configured');
+  }
+
+  const maxTokens = researchDepth === 1 ? 2048 : researchDepth === 2 ? 4096 : 8192;
+  
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || 'No response generated';
+  } catch (error) {
+    console.error('DeepSeek API error:', error);
+    throw error;
+  }
+}
+
+// Gemini API integration  
+async function generateGeminiResponse(messages: any[], researchDepth: number): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  const maxTokens = researchDepth === 3 ? 25000 : 8192; // High token limit for Research Depth 3
+  
+  try {
+    // Convert messages to Gemini format
+    const geminiMessages = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: geminiMessages,
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.7
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.candidates[0]?.content?.parts[0]?.text || 'No response generated';
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    throw error;
+  }
+}
+
 interface CacheEntry {
   results: any;
   timestamp: number;
@@ -246,20 +325,26 @@ Provide helpful, accurate responses based on the available information.`
       ];
 
       // Select model based on research depth
-      let selectedModel = 'gemini-1.5-flash';
+      let selectedModel = 'deepseek-chat';
       if (researchDepth === 3) {
         selectedModel = 'gemini-1.5-flash'; // High token limit for comprehensive reports
       }
 
-      // For now, provide a basic response since AI APIs aren't configured
-      const response = `I understand you're asking about: "${data.query}"
-
-${webSearchContent ? 'Based on the latest search results, I can help you with this topic.' : 'I can help you with this query.'}
-
-Research Depth: ${researchDepth}
-${searchMetadata ? `Found ${searchMetadata.resultCount} relevant sources` : 'No web search performed'}
-
-To provide more detailed responses, please ensure the AI API keys are properly configured.`;
+      // Generate AI response using configured models
+      let response: string;
+      
+      try {
+        if (selectedModel.startsWith('deepseek')) {
+          response = await generateDeepSeekResponse(messages, researchDepth);
+        } else if (selectedModel.startsWith('gemini')) {
+          response = await generateGeminiResponse(messages, researchDepth);
+        } else {
+          throw new Error('Unsupported model');
+        }
+      } catch (error) {
+        console.error('Error generating AI response:', error);
+        response = `I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.`;
+      }
 
       // Store conversation
       const conversationId = data.conversationId || data.threadId || `conv_${Date.now()}`;
