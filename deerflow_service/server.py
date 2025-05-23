@@ -307,14 +307,22 @@ async def perform_deep_research(research_question: str, research_id: str, resear
         }
         
         # Step 1: Generate query variations for broader search
-        log_entries.append("Generating search query variations...")
+        log_entries.append("Generating expanded search query variations...")
         query_variations = [
             research_question,
             f"latest research on {research_question}",
             f"detailed analysis of {research_question}",
             f"{research_question} statistics and data",
             f"{research_question} expert opinions",
-            f"{research_question} comprehensive overview"
+            f"{research_question} comprehensive overview",
+            f"{research_question} current market analysis",
+            f"{research_question} technical analysis",
+            f"{research_question} price prediction",
+            f"{research_question} news and updates",
+            f"{research_question} institutional analysis",
+            f"{research_question} trading patterns",
+            f"{research_question} market sentiment",
+            f"{research_question} fundamental analysis"
         ]
         
         # Step 2: Search for information using multiple queries
@@ -323,7 +331,7 @@ async def perform_deep_research(research_question: str, research_id: str, resear
         
         for query in query_variations:
             try:
-                search_results = await search_web(query, max_results=5)
+                search_results = await search_web(query, max_results=8)
                 if search_results and isinstance(search_results, list):
                     all_search_results.extend(search_results)
                 elif search_results:
