@@ -698,7 +698,11 @@ Your report should:
         report = this.formatResearchReport(deerflowResponse.response);
         console.log('Found report as string in response, length:', report.length);
       }
+    } catch (error) {
+      console.error('Error processing DeerFlow response:', error);
+      return { success: false, error: 'Failed to process research results' };
     }
+  }
 
   private formatResearchReport(report: string): string {
     // Fix common formatting issues
@@ -709,9 +713,7 @@ Your report should:
       .replace(/\[\d+\]\s*(?=\[\d+\])/g, '\n$&') // Fix source reference formatting
       .trim();
   }
-
-      // Extract visualization data and sources
-      let visualData = deerflowResponse.visualizations || [];
+}
       let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
       
       // Process visualization data if available
