@@ -64,6 +64,23 @@ export class ResearchService {
       this.activeRequests.delete(researchId);
     }
   }
+
+  private formatSources(results: any[]): ResearchSource[] {
+    return results.map((result: any) => {
+      try {
+        if (!result || !result.url) return null;
+        const domain = new URL(result.url).hostname;
+        return {
+          title: result.title || domain,
+          url: result.url,
+          domain: domain,
+          content: result.content || result.snippet || ''
+        };
+      } catch (e) {
+        return null;
+      }
+    }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
+  }
   /**
    * Perform research at the specified depth level
    */
@@ -136,35 +153,15 @@ export class ResearchService {
     const startTime = Date.now();
 
     try {
-      // Direct import to avoid global object issues
       const { performWebSearch } = require('./performWebSearch');
-
-      // Perform web search using the function
       const searchResults = await performWebSearch(params.query);
 
       if (searchResults.error) {
         throw new Error(`Web search error: ${searchResults.error}`);
       }
 
-      // Extract search results
       const results = searchResults.results || [];
-
-      // Format sources
-      const sources: ResearchSource[] = results.map((result: any) => {
-        try {
-          if (!result || !result.url) return null;
-          const domain = new URL(result.url).hostname;
-          const source: ResearchSource = {
-            title: result.title || domain,
-            url: result.url,
-            domain: domain,
-            content: result.content || result.snippet || ''
-          };
-          return source;
-        } catch (e) {
-          return null;
-        }
-      }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
+      const sources = this.formatSources(results);
 
       // Generate a report from results
       let report = '';
