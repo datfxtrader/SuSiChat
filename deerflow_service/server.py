@@ -184,6 +184,40 @@ async def search_brave(query: str, max_results: int = 8):
         logger.error(f"Brave search failed: {response.status_code} - {response.text}")
         return []
 
+async def generate_gemini_response(system_prompt: str, user_prompt: str, max_tokens: int = 25000):
+    """Generate a response using Gemini API for comprehensive analysis."""
+    logger.info(f"Generating comprehensive response using Gemini 1.5 Flash with {max_tokens} tokens")
+    
+    try:
+        import google.generativeai as genai
+        
+        # Configure Gemini
+        gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_api_key:
+            raise ValueError("Gemini API key not found - falling back to DeepSeek")
+        
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Combine prompts for comprehensive analysis
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        
+        # Generate with high token limit for comprehensive analysis
+        response = model.generate_content(
+            full_prompt,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=max_tokens,
+                temperature=0.7,
+            )
+        )
+        
+        return response.text
+        
+    except Exception as e:
+        logger.error(f"Gemini API error: {e} - falling back to DeepSeek")
+        # Fall back to DeepSeek with limited tokens if Gemini fails
+        return await generate_deepseek_response(system_prompt, user_prompt, max_tokens=8000)
+
 async def generate_deepseek_response(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 8000, research_length: str = "comprehensive", research_tone: str = "analytical", min_word_count: int = 1000):
     """Generate a response using DeepSeek API with enhanced length and tone controls."""
     logger.info(f"Generating {research_length} response with {research_tone} tone using DeepSeek")
@@ -384,11 +418,18 @@ Your report should:
 
 Format your report in Markdown, but make it readable and professional."""
         
-        # Use dynamic token allocation based on research depth
+        # Use dynamic token allocation and model selection based on research depth
         research_depth = research_state[research_id].get("research_depth", 3)  # Default to depth 3
         dynamic_token_limit = get_token_limit_by_depth(research_depth)
         logger.info(f"Using {dynamic_token_limit} tokens for research depth {research_depth}")
-        report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=dynamic_token_limit)
+        
+        # Smart model selection: Use Gemini for comprehensive Research Depth 3, DeepSeek for others
+        if research_depth == 3 and dynamic_token_limit > 8192:
+            logger.info(f"Using Gemini 1.5 Flash for comprehensive analysis with {dynamic_token_limit} tokens")
+            report = await generate_gemini_response(system_prompt, user_prompt, max_tokens=dynamic_token_limit)
+        else:
+            logger.info(f"Using DeepSeek for standard analysis with {min(dynamic_token_limit, 8192)} tokens")
+            report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=min(dynamic_token_limit, 8192))
         log_entries.append(f"Research report generated successfully: {len(report)} characters")
         
         # Step 6: Finalize research response with proper logging
