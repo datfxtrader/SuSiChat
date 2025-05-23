@@ -38,6 +38,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
     }
   };
 
+  const isActive = (path: string) => location === path;
+
   return (
     <div className={cn(
       "border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900",
@@ -81,22 +83,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.path}>
-              <Link href={item.path} onClick={handleItemClick}>
-                <a className={cn(
-                  "flex items-center space-x-3 px-4 py-2 rounded-lg",
-                  location === item.path
-                    ? "bg-primary/10 text-primary dark:bg-primary/20"
-                    : "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
-                )}>
+              <div className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+                isActive(item.path) && "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+              )}>
+                <Link href={item.path} onClick={handleItemClick} className="flex items-center gap-3 w-full">
                   <span className="material-icons">{item.icon}</span>
-                  <span>{item.label}</span>
-                  {item.path === "/family-room" && (
-                    <span className="ml-auto bg-accent text-white text-xs px-2 py-0.5 rounded-full">
-                      {familyRooms?.length || 0}
-                    </span>
-                  )}
-                </a>
-              </Link>
+                  {item.label}
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
