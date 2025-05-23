@@ -56,30 +56,30 @@ export class ResearchService {
   async performResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
     const depth = params.depth || ResearchDepth.Basic;
-    
+
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
-    
+
     try {
       // Basic search (depth 1) - use existing performWebSearch
       if (depth === ResearchDepth.Basic) {
         return await this.performBasicResearch(params);
       }
-      
+
       // Enhanced search (depth 2) - more comprehensive web search
       if (depth === ResearchDepth.Enhanced) {
         return await this.performEnhancedResearch(params);
       }
-      
+
       // Deep research (depth 3) - use DeerFlow
       if (depth === ResearchDepth.Deep) {
         return await this.performDeepResearch(params);
       }
-      
+
       // Default to basic research if invalid depth
       return await this.performBasicResearch(params);
     } catch (error) {
       console.error(`Research error at depth ${depth}:`, error);
-      
+
       // Fall back to a lower depth level if higher depth fails
       if (depth === ResearchDepth.Deep) {
         console.log('Falling back to Enhanced research level due to DeerFlow error');
@@ -94,7 +94,7 @@ export class ResearchService {
           depth: ResearchDepth.Basic
         });
       }
-      
+
       // If even basic research fails, return an error
       let errorMessage = 'Unknown error occurred';
       if (error instanceof Error) {
@@ -104,7 +104,7 @@ export class ResearchService {
       } else if (error) {
         errorMessage = String(error);
       }
-      
+
       return {
         report: `Error performing research: ${errorMessage}`,
         sources: [],
@@ -113,28 +113,28 @@ export class ResearchService {
       };
     }
   }
-  
+
   /**
    * Perform basic research using existing web search
    * This integrates with the existing performWebSearch in suna-integration.ts
    */
   private async performBasicResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
-    
+
     try {
       // Direct import to avoid global object issues
       const { performWebSearch } = require('./performWebSearch');
-      
+
       // Perform web search using the function
       const searchResults = await performWebSearch(params.query);
-      
+
       if (searchResults.error) {
         throw new Error(`Web search error: ${searchResults.error}`);
       }
-      
+
       // Extract search results
       const results = searchResults.results || [];
-      
+
       // Format sources
       const sources: ResearchSource[] = results.map((result: any) => {
         try {
@@ -150,20 +150,20 @@ export class ResearchService {
         } catch (e) {
           return null;
         }
-      }).filter((source): source is ResearchSource => source !== null);
-      
+      }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
+
       // Generate a report from results
       let report = '';
-      
+
       if (results.length > 0) {
         // Simple results summary for basic research
         report = `Here are the key findings from my basic research:\n\n`;
-        
+
         // Add main findings from top results
         results.slice(0, 3).forEach((result: any, index: number) => {
           report += `${index + 1}. ${result.title || 'Source'}: ${result.snippet || result.content || 'Information not available'}\n\n`;
         });
-        
+
         // Add sources reference
         report += `\nSources:\n`;
         sources.forEach((source: any, index: number) => {
@@ -172,7 +172,7 @@ export class ResearchService {
       } else {
         report = `I couldn't find any relevant information for "${params.query}" in my basic research.`;
       }
-      
+
       return {
         report,
         sources,
@@ -190,17 +190,17 @@ export class ResearchService {
       };
     }
   }
-  
+
   /**
    * Perform enhanced research with more sources and better processing
    */
   private async performEnhancedResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
-    
+
     try {
       // Perform multiple searches with different query variations to get more diverse results
       const mainQuery = params.query;
-      
+
       // Create more specific queries by adding qualifiers
       const queries = [
         mainQuery,                                      // Original query
@@ -209,25 +209,25 @@ export class ResearchService {
         `${mainQuery} research findings`,               // For academic/research focus
         `${mainQuery} statistics data`                  // For data-oriented results
       ];
-      
+
       // Direct import to avoid circular dependency issues
       const { performWebSearch } = require('./performWebSearch');
-      
+
       // Run all searches in parallel
       const searchResultPromises = queries.map(query => performWebSearch(query, 10)); // Get more results
       const searchResultsArray = await Promise.all(searchResultPromises);
-      
+
       // Remove any failed searches
       const validSearchResults = searchResultsArray.filter(result => !result.error);
-      
+
       if (validSearchResults.length === 0) {
         throw new Error('All enhanced searches failed');
       }
-      
+
       // Combine and deduplicate results
       const allResults = [];
       const urlsSeen = new Set();
-      
+
       for (const searchResult of validSearchResults) {
         const results = searchResult.results || [];
         for (const result of results) {
@@ -237,30 +237,30 @@ export class ResearchService {
           }
         }
       }
-      
+
       // Sort results by relevance heuristic (prioritize title matches over content matches)
       allResults.sort((a, b) => {
         const aTitle = (a.title || '').toLowerCase();
         const bTitle = (b.title || '').toLowerCase();
         const queryWords = mainQuery.toLowerCase().split(' ');
-        
+
         // Count query word matches in titles
         const aTitleMatches = queryWords.filter(word => aTitle.includes(word)).length;
         const bTitleMatches = queryWords.filter(word => bTitle.includes(word)).length;
-        
+
         if (aTitleMatches !== bTitleMatches) {
           return bTitleMatches - aTitleMatches; // Higher title matches first
         }
-        
+
         // If tie, use content match as secondary sort
         const aContent = (a.snippet || a.content || '').toLowerCase();
         const bContent = (b.snippet || b.content || '').toLowerCase();
         const aContentMatches = queryWords.filter(word => aContent.includes(word)).length;
         const bContentMatches = queryWords.filter(word => bContent.includes(word)).length;
-        
+
         return bContentMatches - aContentMatches;
       });
-      
+
       // Format sources
       const sources: ResearchSource[] = allResults.map((result: any) => {
         try {
@@ -276,15 +276,15 @@ export class ResearchService {
         } catch (e) {
           return null;
         }
-      }).filter((source): source is ResearchSource => source !== null);
-      
+      }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
+
       // Generate a comprehensive report using LLM to synthesize findings
       let report = '';
-      
+
       if (sources.length > 0) {
         // Use only the top sources to avoid overwhelming the LLM
         const topSources = sources.slice(0, 7);
-        
+
         // Extract key content from sources - include full content for better analysis
         const sourceContent = topSources.map((source, index) => {
           // Get the most substantial content possible from each source
@@ -292,11 +292,11 @@ export class ResearchService {
           // Format with clear separation between sources for better LLM comprehension
           return `Source ${index + 1} (${source.title} - ${source.domain}):\n${content}`;
         }).join('\n\n---\n\n');
-        
+
         // Use LLM to synthesize findings
         try {
           const prompt = `You are an advanced research assistant tasked with creating a well-organized, comprehensive report.
-          
+
 Based on the following sources, create a detailed research report about "${mainQuery}".
 Structure your report with these sections:
 1. Executive Summary (1-2 paragraphs)
@@ -311,12 +311,12 @@ Your report should synthesize information from multiple sources, highlight conse
 
           // Create a detailed prompt with source content
           const systemPrompt = 'You are an expert financial and market analyst providing detailed, comprehensive reports with accurate information. Your reports should include specific data, trends, technical analysis, and market insights.';
-          
+
           // Check if this is a financial/forex query
           const isFinancialQuery = /EUR\/USD|USD\/JPY|GBP\/USD|currency|forex|exchange rate|financial market|stock market|trading|investment/i.test(mainQuery);
-          
+
           let userPrompt = '';
-          
+
           if (isFinancialQuery) {
             userPrompt = `Create a comprehensive, expert-level financial analysis report about "${mainQuery}" using the following sources.
 
@@ -371,9 +371,9 @@ Your report should:
             0.7,  // temperature for balanced creativity and accuracy
             4000  // token limit for comprehensive research
           );
-          
+
           report = llmResponse.message || '';
-          
+
           // Add sources reference at the end
           report += '\n\n## Sources Used\n';
           topSources.forEach((source, index) => {
@@ -381,16 +381,16 @@ Your report should:
           });
         } catch (error) {
           console.error('Error generating enhanced report with LLM:', error);
-          
+
           // Fallback to simpler report format if LLM fails
           report = `# Research Report on "${mainQuery}"\n\n`;
           report += `## Key Findings\n\n`;
-          
+
           sources.slice(0, 5).forEach((source, index) => {
             report += `### ${source.title}\n`;
             report += `${source.content}\n\n`;
           });
-          
+
           report += `\n## Sources\n`;
           sources.forEach((source, index) => {
             report += `[${index + 1}] ${source.title}\n${source.url}\n`;
@@ -399,7 +399,7 @@ Your report should:
       } else {
         report = `I couldn't find any relevant information for "${mainQuery}" in my enhanced research.`;
       }
-      
+
       return {
         report,
         sources,
@@ -417,19 +417,19 @@ Your report should:
       };
     }
   }
-  
+
   /**
    * Perform specialized financial research for forex/market queries
    */
   private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
     console.log('Performing specialized financial research for query:', params.query);
-    
+
     try {
       // Extract currency pair if present (e.g., EUR/USD, GBP/USD)
       const currencyPairMatch = params.query.match(/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)\/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)/i);
       const currencyPair = currencyPairMatch ? currencyPairMatch[0].toUpperCase() : null;
-      
+
       if (currencyPair) {
         // For currency pairs, use the forex API
         try {
@@ -439,17 +439,17 @@ Your report should:
             currencyPair,
             timeframe: 'daily'
           });
-          
+
           if (response.status === 200) {
             const data = response.data;
-            
+
             // Format sources
             const sources: ResearchSource[] = (data.sources || []).map((source: any) => ({
               title: source.title,
               url: source.url,
               domain: source.domain
             }));
-            
+
             return {
               report: data.analysis || `Analysis for ${currencyPair} not available.`,
               sources,
@@ -462,20 +462,20 @@ Your report should:
           // Continue to general financial research on error
         }
       }
-      
+
       // Use the specialized financial research module
       const financialResearch = require('./financial-research');
-      
+
       // Generate financial analysis
       const result = await financialResearch.generateFinancialAnalysis(params.query);
-      
+
       // Format sources to match ResearchSource interface
       const sources: ResearchSource[] = result.sources.map(source => ({
         title: source.title,
         url: source.url,
         domain: source.domain
       }));
-      
+
       return {
         report: result.report,
         sources,
@@ -491,21 +491,21 @@ Your report should:
 
   private async performDeepResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
-    
+
     try {
       console.log('Performing deep research with DeerFlow service for query:', params.query);
-      
+
       // Check if this is a financial/forex query that needs specialized handling
       const isFinancialQuery = /EUR\/USD|USD\/JPY|GBP\/USD|currency|forex|exchange rate|financial market|stock market|trading|investment/i.test(params.query);
-      
+
       if (isFinancialQuery) {
         console.log('Detected financial query, using specialized financial research');
         return this.performFinancialResearch(params);
       }
-      
+
       // Use the deerflowClient that's already imported at the top of the file
       // This fixes the "require is not defined" error
-      
+
       // Prepare request parameters for DeerFlow service with enhanced settings
       const deerflowParams = {
         research_question: params.query,
@@ -516,24 +516,24 @@ Your report should:
         research_tone: params.researchTone || 'analytical',
         min_word_count: params.minWordCount || 1500
       };
-      
+
       // Call the DeerFlow service
       console.log('Sending request to DeerFlow service with params:', deerflowParams);
       const deerflowResponse = await deerflowClient.performResearch(deerflowParams);
-      
+
       // Check if there was an error with the DeerFlow service
       if (deerflowResponse.status?.status === 'error') {
         console.error('DeerFlow service error:', deerflowResponse.status.message);
         throw new Error(`DeerFlow service error: ${deerflowResponse.status.message}`);
       }
-      
+
       // Handle processing state - if the response is still processing, wait for completion
       if (deerflowResponse.status?.status === 'processing') {
         console.log('Research is processing, waiting for completion...');
-        
+
         // Wait a bit for research to complete
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         // Try to get the completed result
         try {
           const completedResponse = await deerflowClient.performResearch(deerflowParams);
@@ -544,24 +544,24 @@ Your report should:
           console.log('Failed to get completed result, using current response');
         }
       }
-      
+
       // If still processing after retry, wait longer
       if (deerflowResponse.status?.status === 'processing' && deerflowResponse.status?.id) {
         console.log('Research still processing, waiting longer...');
-        
+
         // Wait for research to be completed (with timeout)
         const maxAttempts = 10;
         const delayBetweenAttempts = 3000; // 3 seconds
         let attempt = 0;
-        
+
         while (attempt < maxAttempts) {
           // Wait before checking again
           await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
-          
+
           // Check status
           try {
             const statusResponse = await deerflowClient.checkResearchStatus(deerflowResponse.status.id);
-            
+
             // If completed, use this response instead
             if (statusResponse.status?.status === 'completed') {
               console.log('Research completed successfully');
@@ -577,33 +577,33 @@ Your report should:
                 processingTime: Date.now() - startTime
               };
             }
-            
+
             // If error, throw
             if (statusResponse.status?.status === 'error') {
               throw new Error(`Research failed: ${statusResponse.status.message}`);
             }
-            
+
             console.log(`Research still in progress (attempt ${attempt + 1}/${maxAttempts})...`);
           } catch (statusError) {
             console.error('Error checking research status:', statusError);
           }
-          
+
           attempt++;
         }
-        
+
         // If we've waited too long, fall back to enhanced research
         console.log('Research taking too long, falling back to enhanced research');
         return this.performEnhancedResearch(params);
       }
-      
+
       // Extract authentic research data directly
       console.log('Processing comprehensive research response...');
       console.log('Raw DeerFlow response keys:', Object.keys(deerflowResponse));
-      
+
       // The DeerFlow service completed successfully but may return data in different formats
       let report = '';
       let sources: ResearchSource[] = [];
-      
+
       // Check multiple possible response formats from DeerFlow
       if (deerflowResponse.report) {
         report = deerflowResponse.report;
@@ -615,10 +615,10 @@ Your report should:
         report = deerflowResponse.response;
         console.log('Found report as string in response, length:', report.length);
       }
-      
+
       // Extract sources from multiple possible locations
       let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
-      
+
       if (Array.isArray(sourceData) && sourceData.length > 0) {
         console.log('Found sources array with', sourceData.length, 'items');
         sourceData.forEach((source: any, index: number) => {
@@ -632,7 +632,7 @@ Your report should:
           }
         });
       }
-      
+
       // If we still don't have a report but the service indicated success,
       // there might be an async response we need to retrieve
       if (!report && deerflowResponse.status?.status === 'processing') {
@@ -640,16 +640,16 @@ Your report should:
         // We'll return what we have and let the fallback handle the rest
         report = 'Research is being processed. Please check back in a moment.';
       }
-      
+
       console.log(`Final result: ${sources.length} sources, ${report.length} characters`);
-      
+
       console.log('Formatted sources count:', sources.length);
-      
+
       // Log service process info
       if (deerflowResponse.service_process_log && deerflowResponse.service_process_log.length > 0) {
         console.log('DeerFlow service process log:', deerflowResponse.service_process_log.join('\n'));
       }
-      
+
       // Return the research result, always labeling as Deep research even if we used fallback
       // This ensures consistent user experience
       return {
@@ -660,7 +660,7 @@ Your report should:
       };
     } catch (error) {
       console.error('Error performing deep research with DeerFlow:', error);
-      
+
       // Fall back to enhanced research if DeerFlow fails
       console.log('DeerFlow service unavailable or error occurred. Falling back to enhanced research...');
       return this.performEnhancedResearch(params);
