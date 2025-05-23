@@ -8,6 +8,7 @@ import { checkDeerFlowService, startDeerFlowService, getDeerFlowServiceUrl } fro
 // Create axios instance with extended timeout for comprehensive research
 const deerflowAxios = axios.create({
   timeout: 600000, // 10 minutes for comprehensive research
+  validateStatus: (status) => status >= 200 && status < 500, // Handle HTTP errors properly
 });
 
 /**
@@ -137,6 +138,9 @@ export class DeerFlowClient {
       return response.data;
     } catch (error) {
       console.error('Error performing DeerFlow research:', error);
+      
+      // Handle timeout errors specifically
+      const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
       
       // Return error response
       return {
@@ -294,7 +298,12 @@ export class DeerFlowClient {
   /**
    * Get DeerFlow system capabilities and status
    */
-  async getCapabilities(): Promise<any> {
+  async getCapabilities(): Promise<{
+    service: string;
+    status: string;
+    capabilities: Record<string, any>;
+    error?: string;
+  }> {
     try {
       const serviceUrl = getDeerFlowServiceUrl();
       const response = await axios.get(`${serviceUrl}/deerflow/capabilities`, {
