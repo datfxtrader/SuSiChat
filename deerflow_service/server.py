@@ -96,24 +96,30 @@ def get_token_limit_by_depth(research_depth: int) -> int:
 
 # Helper functions for research
 async def search_web(query: str, max_results: int = 8):
-    """Search the web using available search engines."""
+    """Search the web using available search engines with Brave as primary."""
     logger.info(f"Searching web for: {query}")
     
-    # First try Tavily if available
-    if TAVILY_API_KEY:
-        try:
-            return await search_tavily(query, max_results)
-        except Exception as e:
-            logger.error(f"Tavily search error: {e}")
-    
-    # Fall back to Brave search if available
+    # Primary: Use Brave search if available
     if BRAVE_API_KEY:
         try:
             return await search_brave(query, max_results)
         except Exception as e:
             logger.error(f"Brave search error: {e}")
     
-    # Return empty results if both searches fail
+    # Backup 1: Try DuckDuckGo (no API key required)
+    try:
+        return await search_duckduckgo(query, max_results)
+    except Exception as e:
+        logger.error(f"DuckDuckGo search error: {e}")
+    
+    # Backup 2: Try Tavily if available
+    if TAVILY_API_KEY:
+        try:
+            return await search_tavily(query, max_results)
+        except Exception as e:
+            logger.error(f"Tavily search error: {e}")
+    
+    # Return empty results if all searches fail
     logger.warning("All search methods failed")
     return []
 
@@ -149,6 +155,52 @@ async def search_tavily(query: str, max_results: int = 8):
         ]
     else:
         logger.error(f"Tavily search failed: {response.status_code} - {response.text}")
+        return []
+
+async def search_duckduckgo(query: str, max_results: int = 8):
+    """Search using DuckDuckGo Instant Answer API (no API key required)."""
+    try:
+        import aiohttp
+        import json
+        from urllib.parse import quote
+        
+        # DuckDuckGo Instant Answer API endpoint
+        encoded_query = quote(query)
+        url = f"https://api.duckduckgo.com/?q={encoded_query}&format=json&no_html=1&skip_disambig=1"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = []
+                    
+                    # Process DuckDuckGo results
+                    if data.get('RelatedTopics'):
+                        for topic in data.get('RelatedTopics', [])[:max_results]:
+                            if isinstance(topic, dict) and 'Text' in topic and 'FirstURL' in topic:
+                                results.append({
+                                    'title': topic.get('Text', '')[:100] + '...' if len(topic.get('Text', '')) > 100 else topic.get('Text', ''),
+                                    'url': topic.get('FirstURL', ''),
+                                    'snippet': topic.get('Text', ''),
+                                    'domain': topic.get('FirstURL', '').split('/')[2] if '/' in topic.get('FirstURL', '') else 'duckduckgo.com'
+                                })
+                    
+                    # If no related topics, try abstract
+                    if not results and data.get('Abstract'):
+                        results.append({
+                            'title': data.get('Heading', 'DuckDuckGo Result'),
+                            'url': data.get('AbstractURL', 'https://duckduckgo.com'),
+                            'snippet': data.get('Abstract', ''),
+                            'domain': data.get('AbstractURL', '').split('/')[2] if data.get('AbstractURL') and '/' in data.get('AbstractURL') else 'duckduckgo.com'
+                        })
+                    
+                    logger.info(f"DuckDuckGo search returned {len(results)} results")
+                    return results
+                else:
+                    logger.error(f"DuckDuckGo API error: {response.status}")
+                    return []
+    except Exception as e:
+        logger.error(f"DuckDuckGo search failed: {e}")
         return []
 
 async def search_brave(query: str, max_results: int = 8):
@@ -481,9 +533,15 @@ async def startup_event():
     """Initialize any resources needed by the service."""
     logger.info("DeerFlow research service starting up...")
     
-    # Check for required API keys
-    if not TAVILY_API_KEY and not BRAVE_API_KEY:
-        logger.warning("No search API keys found. Web search functionality will be limited.")
+    # Check search capabilities
+    search_engines = []
+    if BRAVE_API_KEY:
+        search_engines.append("Brave (Primary)")
+    search_engines.append("DuckDuckGo (Backup)")
+    if TAVILY_API_KEY:
+        search_engines.append("Tavily (Backup)")
+    
+    logger.info(f"Available search engines: {', '.join(search_engines)}")
     
     if not DEEPSEEK_API_KEY:
         logger.warning("DeepSeek API key not found. LLM functionality will be unavailable.")
