@@ -709,7 +709,19 @@ Your report should:
       return this.performEnhancedResearch(params);
     }
   }
+
+  // Added analyzeAndDecompose function here
+  private async analyzeAndDecompose(query: string): Promise<any> {
+      // Placeholder for actual implementation using DeerFlow agent system
+      console.log(`Analyzing and decomposing query: ${query}`);
+      return {
+          mainTask: query,
+          subTasks: [], // Replace with actual subtasks
+          reasoning: "Decomposition is not fully implemented"
+      };
+  }
 }
 
 // Export singleton instance
 export const researchService = new ResearchService();
+```
