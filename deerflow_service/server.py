@@ -258,7 +258,7 @@ QUALITY STANDARDS:
         logger.error(f"DeepSeek API call failed: {response.status_code} - {response.text}")
         raise Exception(f"DeepSeek API call failed: {response.status_code}")
 
-async def perform_deep_research(research_question: str, research_id: str):
+async def perform_deep_research(research_question: str, research_id: str, research_depth: int = 3):
     """Perform comprehensive research using multiple steps and sources."""
     log_entries = []
     
@@ -459,11 +459,12 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
         service_process_log=["Research initialized", "Processing request..."]
     )
     
-    # Perform research in the background
+    # Perform research in the background with research depth
     background_tasks.add_task(
         perform_deep_research,
         request.research_question,
-        research_id
+        research_id,
+        request.research_depth
     )
     
     # Return initial response immediately
