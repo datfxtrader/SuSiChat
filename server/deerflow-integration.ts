@@ -504,10 +504,17 @@ Your report should:
     const startTime = Date.now();
 
     try {
-      console.log('Performing deep research with DeerFlow service for query:', params.query);
+      console.log('Starting DeerFlow research pipeline for query:', params.query);
 
-      // Use DeerFlow's built-in agent specialization system
-      console.log('Using DeerFlow multi-agent system for research');
+      // First let DeerFlow analyze and decompose the task
+      const deerflowClient = require('./deerflow-client').deerflowClient;
+      const taskAnalysis = await deerflowClient.createAgentResearchTask({
+        research_question: params.query,
+        depth: 'comprehensive',
+        include_reasoning: true
+      });
+
+      console.log('Task analysis and decomposition:', taskAnalysis);
 
       // Use the deerflowClient that's already imported at the top of the file
       // This fixes the "require is not defined" error
