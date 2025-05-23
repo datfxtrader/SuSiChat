@@ -552,7 +552,20 @@ export class SunaIntegrationService {
    */
   async sendMessage(data: SunaRequest): Promise<any> {
     try {
-      const selectedModel = data.model || 'deepseek-chat';
+      // Smart Auto Model Routing Logic
+      let selectedModel = data.model || 'deepseek-chat';
+      
+      // If "auto" model is selected, intelligently route based on research depth
+      if (selectedModel === 'auto') {
+        if (data.researchDepth === 3) {
+          selectedModel = 'gemini-1.5-flash'; // Use Gemini for comprehensive Research Depth 3
+          console.log(`Auto model: Routing Research Depth 3 to Gemini 1.5 Flash for unlimited tokens`);
+        } else {
+          selectedModel = 'deepseek-chat'; // Use DeepSeek for Depth 1-2
+          console.log(`Auto model: Routing Research Depth ${data.researchDepth || 1} to DeepSeek for efficiency`);
+        }
+      }
+      
       console.log(`Processing Suna agent message with model ${selectedModel}:`, data.query);
       
       // If no thread ID is provided, we need to create a new thread
