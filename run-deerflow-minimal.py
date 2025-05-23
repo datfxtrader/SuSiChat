@@ -137,10 +137,41 @@ async def search_web(query: str, max_results: int = 5):
     # Return empty results if all search methods fail
     return []
 
-async def generate_with_deepseek(system_prompt: str, user_prompt: str):
+async def generate_with_gemini(system_prompt: str, user_prompt: str, max_tokens: int = 25000):
+    """Generate text using Gemini API for comprehensive analysis."""
+    try:
+        import google.generativeai as genai
+        
+        # Configure Gemini
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Combine prompts
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        
+        # Generate with high token limit
+        response = model.generate_content(
+            full_prompt,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=max_tokens,
+                temperature=0.7,
+            )
+        )
+        
+        return response.text
+        
+    except Exception as e:
+        logger.error(f"Gemini API error: {e}")
+        # Fall back to DeepSeek if Gemini fails
+        return await generate_with_deepseek(system_prompt, user_prompt, max_tokens=8000)
+
+async def generate_with_deepseek(system_prompt: str, user_prompt: str, max_tokens: int = 8000):
     """Generate text using DeepSeek API."""
     if not DEEPSEEK_API_KEY:
         return "ERROR: DeepSeek API key not available"
+    
+    # Ensure max_tokens doesn't exceed DeepSeek's limit
+    max_tokens = min(max_tokens, 8192)
     
     try:
         url = "https://api.deepseek.com/v1/chat/completions"
