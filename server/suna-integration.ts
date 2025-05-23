@@ -61,7 +61,7 @@ function cleanupCache(): void {
   let expiredCount = 0;
 
   // Remove expired entries
-  for (const [key, entry] of searchCache.entries()) {
+  for (const [key, entry] of searchCache.dump()) {
     if (now - entry.timestamp > CACHE_TTL) {
       searchCache.delete(key);
       expiredCount++;
