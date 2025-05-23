@@ -18,7 +18,14 @@ async function generateForexAnalysis(query) {
     // Generate using DeepSeek
     const systemPrompt = 'You are an expert financial analyst specializing in forex markets. Create a comprehensive, data-driven analysis based on market fundamentals, technical indicators, and economic factors.';
     
-    const userPrompt = ;
+    const userPrompt = `Create a detailed market analysis for ${query} including:
+1. Current Market Status - Evaluate price levels, trends, and recent movements
+2. Technical Analysis - Support/resistance levels and key technical indicators
+3. Fundamental Analysis - Economic data, central bank policies, and market events
+4. Market Outlook - Short and medium-term forecasts with target levels
+5. Risk Factors - Key risks and potential market impacts
+
+Current date: ${new Date().toISOString().split('T')[0]}`;
 
     // Call DeepSeek API
     const response = await axios.post(
@@ -35,7 +42,7 @@ async function generateForexAnalysis(query) {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}` 
         }
       }
     );
@@ -47,7 +54,12 @@ async function generateForexAnalysis(query) {
     }
   } catch (error) {
     console.error('Error generating forex analysis:', error);
-    return ;
+    return `# ${query} Market Analysis
+
+Unable to generate detailed analysis. Please check market data sources for current information.
+
+Key Resources:
+${FOREX_SOURCES.map(source => `- ${source.title}: ${source.url}`).join('\n')}`;
   }
 }
 
