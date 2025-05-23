@@ -25,7 +25,7 @@ export interface WebSearchResponse {
 /**
  * Perform a web search with robust error handling and retries
  */
-export async function performWebSearch(
+async function performWebSearch(
   query: string, 
   maxResults: number = 5,
   retries: number = 3
