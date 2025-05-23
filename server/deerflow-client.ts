@@ -101,14 +101,21 @@ export class DeerFlowClient {
    */
   async performResearch(params: DeerFlowResearchParams): Promise<DeerFlowResearchResponse> {
     try {
-      // Check if DeerFlow service is running
-      if (!(await checkDeerFlowService())) {
+      // Check if DeerFlow service is running, with retry logic
+      let serviceRunning = await checkDeerFlowService();
+      
+      if (!serviceRunning) {
         console.log('DeerFlow service not running, starting it now...');
         
         // Start the service
         const started = await startDeerFlowService();
         if (!started) {
-          throw new Error('Failed to start DeerFlow service');
+          console.log('Failed to start DeerFlow service, checking if already running...');
+          // Double-check if service might have been started by another process
+          serviceRunning = await checkDeerFlowService();
+          if (!serviceRunning) {
+            throw new Error('Failed to start DeerFlow service');
+          }
         }
       }
       
