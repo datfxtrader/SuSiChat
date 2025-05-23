@@ -4,6 +4,11 @@
  */
 
 const axios = require('axios');
+const NodeCache = require('node-cache');
+const rateLimit = require('express-rate-limit');
+
+// Initialize cache with 15 minute TTL
+const cache = new NodeCache({ stdTTL: 900 });
 
 // Default financial data sources
 const FINANCIAL_SOURCES = [
@@ -32,7 +37,9 @@ function isFinancialQuery(query) {
   
   const lowerQuery = query.toLowerCase();
   const financialTerms = [
-    'eur/usd', 'gbp/usd', 'usd/jpy', 'forex', 'currency', 'exchange rate'
+    'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad', 'nzd/usd',
+    'usd/chf', 'forex', 'currency', 'exchange rate', 'pip', 'spread',
+    'technical analysis', 'fundamental analysis', 'trading', 'market'
   ];
   
   return financialTerms.some(term => lowerQuery.includes(term));
@@ -43,7 +50,17 @@ function isFinancialQuery(query) {
  */
 async function getFinancialAnalysis(query) {
   try {
+    // Check cache first
+    const cacheKey = `financial-analysis-${query}`;
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
+    }
+
     const apiKey = process.env.DEEPSEEK_API_KEY;
+    const maxRetries = 3;
+    let retryCount = 0;
+    let lastError;
     
     if (!apiKey) {
       console.log('DeepSeek API key not found');
