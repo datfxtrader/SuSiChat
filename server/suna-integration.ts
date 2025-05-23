@@ -599,13 +599,9 @@ export class SunaIntegrationService {
       
 
 
-      // Get the research depth level from multiple possible sources
-      const researchDepth = data.researchDepth || data.research_depth || data.depth || 1;
-      console.log(`Research depth detected: ${researchDepth} from data:`, {
-        researchDepth: data.researchDepth,
-        research_depth: data.research_depth, 
-        depth: data.depth
-      });
+      // Get the research depth level 
+      const researchDepth = data.researchDepth || 1;
+      console.log(`Research depth detected: ${researchDepth}`);
 
       // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
       if (researchDepth === 3) {
@@ -696,82 +692,9 @@ export class SunaIntegrationService {
             .replace(/^(what|how|when|where|who|why|can you|could you|would you|tell me|do you know|i need to know|i want to know|please find|search for|look up)/i, '')
             .trim();
           
-          // Get the research depth level from multiple possible sources
-          const researchDepth = data.researchDepth || data.research_depth || data.depth || 1;
-          console.log(`Research depth detected: ${researchDepth} from data:`, {
-            researchDepth: data.researchDepth,
-            research_depth: data.research_depth, 
-            depth: data.depth
-          });
-          
-          // Force DeerFlow for depth level 3 from ANY UI component
-          if (researchDepth === 3) {
-            console.log(`🚀 COMPREHENSIVE RESEARCH MODE ACTIVATED - Using DeerFlow for deep research (level 3) on: "${finalQuery}"`);
-            
-            try {
-              // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
-              const modelId = researchDepth === 3 ? 'gemini-1.5-flash' : 
-                             data.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : 
-                             data.model === 'gemini-1.0-pro' ? 'gemini-1.5-pro' : 'deepseek-v3';
-              
-              console.log(`🎯 Research Depth ${researchDepth} using model: ${modelId} for unlimited comprehensive analysis`);
-              
-              // Call DeerFlow research service with depth-based token allocation
-              const deerflowResult = await researchService.performResearch({
-                query: finalQuery,
-                depth: ResearchDepth.Deep,
-                modelId: modelId,
-                researchDepth: researchDepth, // Universal token allocation: 1=8K, 2=15K, 3=25K tokens
-                researchLength: 'comprehensive',
-                researchTone: 'analytical',
-                minWordCount: 1500
-              });
-              
-              if (deerflowResult && deerflowResult.report) {
-                // Use the full comprehensive report directly without truncation
-                console.log(`DeerFlow returned comprehensive report: ${deerflowResult.report.length} characters`);
-                webSearchContent = deerflowResult.report;
-                
-                // Format source metadata
-                const searchEndTime = Date.now();
-                const sourceDomains: string[] = [];
-                const sourceDetails: any[] = [];
-                
-                if (deerflowResult.sources && deerflowResult.sources.length > 0) {
-                  deerflowResult.sources.forEach((source: any) => {
-                    if (source.domain) sourceDomains.push(source.domain);
-                    sourceDetails.push({
-                      title: source.title || 'Source',
-                      url: source.url || '',
-                      domain: source.domain || ''
-                    });
-                  });
-                }
-                
-                searchMetadata = {
-                  query: finalQuery,
-                  sources: sourceDomains,
-                  resultCount: sourceDetails.length,
-                  searchEngines: ['DeerFlow'],
-                  searchTime: searchEndTime - searchStartTime,
-                  sourceDetails
-                };
-              } else {
-                // Fall back to regular search if DeerFlow returns no results
-                console.log('DeerFlow research returned no results, falling back to regular search');
-                webSearchResults = await performWebSearch(finalQuery);
-              }
-            } catch (error) {
-              console.error('Error using DeerFlow research:', error);
-              // Fall back to regular search on error
-              console.log('Falling back to regular web search due to DeerFlow error');
-              webSearchResults = await performWebSearch(finalQuery);
-            }
-          } else {
-            // Use regular web search for depth levels 1 and 2
-            console.log(`Web search using refined query: ${finalQuery}`);
-            webSearchResults = await performWebSearch(finalQuery);
-          }
+          // Continue with regular web search for depth 1 & 2
+          console.log(`Web search using refined query: ${finalQuery}`);
+          webSearchResults = await performWebSearch(finalQuery);
           
           // Format search results and handle potential null/undefined results
           const webSearchError = webSearchResults?.error || null;

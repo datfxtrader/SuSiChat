@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
-import researchRoutes from "./routes/research";
+
 import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
 import forexDataRoutes from "./routes/forexData";
@@ -21,9 +21,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
   
-  // Mount research routes
-  app.use('/api', researchRoutes);
-  
+
   // Mount financial research routes
   app.use('/api/financial-research', financialResearchRoutes);
   
@@ -391,8 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
 
-  // Research endpoints with DeerFlow integration
-  app.use('/api/research', researchRoutes);
+
 
   return httpServer;
 }
