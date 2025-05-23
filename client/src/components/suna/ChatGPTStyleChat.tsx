@@ -73,64 +73,26 @@ interface ResearchResponseProps {
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources }) => {
   const [expandedSources, setExpandedSources] = useState(false);
   
-  // Improved function to process content and highlight citations [1], [2], etc.
-  const renderContentWithCitations = (text: string) => {
-    // Extract the main content (everything before "Sources:" section)
-    // Preserve all content before any sources section
+  // Clean content processing - remove all citations and sources sections
+  const renderCleanContent = (text: string) => {
+    // Remove everything after "Sources:" section
     const contentSplit = text.split(/Sources:/i);
-    const mainContent = contentSplit[0];
+    let cleanContent = contentSplit[0];
     
-    // Only process the main content for citations, completely removing the sources section from response
-    const contentToProcess = mainContent || text;
+    // Remove all citation markers [1], [2], etc. from the content
+    cleanContent = cleanContent.replace(/\[\d+\]/g, '');
     
-    // Improved regex to find citation markers [1], [2], etc. that aren't part of URLs
-    const parts = contentToProcess.split(/(\[\d+\](?!\)))/g);
+    // Clean up any double spaces or formatting issues from removed citations
+    cleanContent = cleanContent.replace(/\s+/g, ' ').trim();
     
-    if (parts.length <= 1) return <ReactMarkdown>{contentToProcess}</ReactMarkdown>;
-    
-    return (
-      <>
-        {parts.map((part, i) => {
-          // Check if this part is a citation marker
-          const citationMatch = part.match(/\[(\d+)\](?!\))/);
-          if (citationMatch) {
-            const sourceIndex = parseInt(citationMatch[1]) - 1;
-            if (sourceIndex >= 0 && sourceIndex < sources.length) {
-              return (
-                <span key={i} className="inline-flex items-baseline">
-                  <sup 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      // Open in a new window to prevent navigation issues
-                      window.open(sources[sourceIndex]?.url, '_blank', 'noopener,noreferrer');
-                      return false;
-                    }}
-                    className="text-blue-600 hover:text-blue-800 cursor-pointer text-xs font-medium mx-0.5"
-                    title={`Source: ${sources[sourceIndex]?.title || 'View source'}`}
-                  >
-                    {citationMatch[1]}
-                  </sup>
-                </span>
-              );
-            }
-          }
-          
-          // Otherwise render as regular markdown
-          return (
-            <span key={i}>
-              {part.length > 0 ? <ReactMarkdown>{part}</ReactMarkdown> : null}
-            </span>
-          );
-        })}
-      </>
-    );
+    return <ReactMarkdown>{cleanContent}</ReactMarkdown>;
   };
   
   return (
     <div className="flex flex-col">
       {/* Main response content */}
       <div className="prose prose-blue max-w-none">
-        {renderContentWithCitations(content)}
+        {renderCleanContent(content)}
       </div>
       
       {/* Sources section */}
