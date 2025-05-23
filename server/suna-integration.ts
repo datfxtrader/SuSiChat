@@ -599,6 +599,58 @@ export class SunaIntegrationService {
       
 
 
+      // Get the research depth level from multiple possible sources
+      const researchDepth = data.researchDepth || data.research_depth || data.depth || 1;
+      console.log(`Research depth detected: ${researchDepth} from data:`, {
+        researchDepth: data.researchDepth,
+        research_depth: data.research_depth, 
+        depth: data.depth
+      });
+
+      // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
+      if (researchDepth === 3) {
+        console.log(`🚀 COMPREHENSIVE RESEARCH MODE ACTIVATED - Using DeerFlow for deep research (level 3) on: "${data.query}"`);
+        
+        try {
+          // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
+          const modelId = 'gemini-1.5-flash';
+          console.log(`🎯 Research Depth ${researchDepth} using model: ${modelId} for unlimited comprehensive analysis`);
+          
+          // Call DeerFlow research service directly
+          const deerflowResult = await researchService.performResearch({
+            query: data.query,
+            depth: ResearchDepth.Deep,
+            modelId: modelId,
+            researchDepth: researchDepth,
+            researchLength: 'comprehensive',
+            researchTone: 'analytical',
+            minWordCount: 2500
+          });
+          
+          if (deerflowResult && deerflowResult.report) {
+            console.log(`✅ DeerFlow comprehensive research completed: ${deerflowResult.report.length} characters`);
+            
+            // Return the comprehensive report directly
+            return {
+              message: {
+                id: `run-${Date.now()}`,
+                role: 'assistant',
+                content: deerflowResult.report,
+                sources: deerflowResult.sources || [],
+                metadata: {
+                  searchTime: Date.now() - Date.now(),
+                  sourceCount: deerflowResult.sources?.length || 0,
+                  researchDepth: researchDepth,
+                  model: modelId
+                }
+              }
+            };
+          }
+        } catch (error) {
+          console.error('DeerFlow comprehensive research error:', error);
+        }
+      }
+
       // Determine if we should perform web search
       const shouldSearch = !disableSearch && 
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
