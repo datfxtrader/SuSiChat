@@ -533,9 +533,9 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                       )}
                     </div>
                     
-                    <div className="flex-grow max-w-[90%] sm:max-w-3xl overflow-hidden">
+                    <div className="flex-grow w-full overflow-visible">
                       <div className={cn(
-                        "text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800 rounded-lg p-3",
+                        "text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800 rounded-lg p-3 whitespace-pre-wrap",
                         isUserMessage 
                           ? "bg-blue-100 border border-blue-200" 
                           : "bg-white border border-gray-200 shadow-sm"
@@ -571,7 +571,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     </div>
                   </div>
                   
-                  <div className="flex-grow max-w-[90%] sm:max-w-3xl">
+                  <div className="flex-grow w-full">
                     <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                       {researchMode ? (
                         <div className="flex flex-col">
