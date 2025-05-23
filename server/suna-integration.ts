@@ -642,8 +642,13 @@ export class SunaIntegrationService {
             .replace(/^(what|how|when|where|who|why|can you|could you|would you|tell me|do you know|i need to know|i want to know|please find|search for|look up)/i, '')
             .trim();
           
-          // Get the research depth level (default to 1 if not specified)
-          const researchDepth = data.researchDepth || 1;
+          // Get the research depth level from multiple possible sources
+          const researchDepth = data.researchDepth || data.research_depth || data.depth || 1;
+          console.log(`Research depth detected: ${researchDepth} from data:`, {
+            researchDepth: data.researchDepth,
+            research_depth: data.research_depth, 
+            depth: data.depth
+          });
           
           // For depth level 3, use DeerFlow research service
           if (researchDepth === 3) {
