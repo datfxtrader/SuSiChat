@@ -1396,7 +1396,9 @@ const getUserConversations = async (req: any, res: Response) => {
 };
 
 // Export the service instance and route handlers together
-exports.sunaService = sunaService;
-exports.sendMessageToSuna = sendMessageToSuna;
-exports.getSunaConversation = getSunaConversation;
-exports.getUserConversations = getUserConversations;
+export {
+  sunaService,
+  sendMessageToSuna,
+  getSunaConversation,
+  getUserConversations
+};
