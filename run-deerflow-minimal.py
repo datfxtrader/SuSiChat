@@ -156,7 +156,7 @@ async def generate_with_deepseek(system_prompt: str, user_prompt: str):
                 {"role": "user", "content": user_prompt}
             ],
             "temperature": 0.3,
-            "max_tokens": 4000
+            "max_tokens": 8000
         }
         
         response = requests.post(url, headers=headers, json=data)
