@@ -709,8 +709,21 @@ Your report should:
       .trim();
   }
 
-      // Extract sources from multiple possible locations
+      // Extract visualization data and sources
+      let visualData = deerflowResponse.visualizations || [];
       let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
+      
+      // Process visualization data if available
+      if (visualData.length > 0) {
+        console.log('Processing visualization data:', visualData.length, 'items');
+        visualData.forEach((visual: any) => {
+          if (visual.type === 'chart') {
+            report = report.replace(visual.placeholder, visual.chartHtml);
+          } else if (visual.type === 'table') {
+            report = report.replace(visual.placeholder, visual.tableHtml);
+          }
+        });
+      }
 
       if (Array.isArray(sourceData) && sourceData.length > 0) {
         console.log('Found sources array with', sourceData.length, 'items');
