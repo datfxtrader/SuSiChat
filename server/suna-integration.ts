@@ -29,19 +29,13 @@ export const apiLimiter = rateLimit({
 
 // Input validation class
 class SunaRequestDTO {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(1000)
-  query: string;
-
-  @IsString()
-  userId: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(3)
+  query!: string;
+  userId!: string;
   researchDepth?: number;
+
+  constructor() {
+    // Empty constructor for class-validator
+  }
 }
 
 // Cache TTL in milliseconds (5 minutes)
