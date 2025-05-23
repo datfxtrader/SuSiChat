@@ -12,7 +12,7 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [workflows]
-runButton = "Project"
+runButton = "Start Full Stack"
 
 [[workflows.workflow]]
 name = "Project"
@@ -31,6 +31,19 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Start Full Stack"
+author = 36382494
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node start-suna.js"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python deerflow_service/server.py"
 
 [[ports]]
 localPort = 5000
