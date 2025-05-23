@@ -654,11 +654,12 @@ export class SunaIntegrationService {
               const modelId = data.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : 
                              data.model === 'gemini-1.0-pro' ? 'gemini-1.5-pro' : 'deepseek-v3';
               
-              // Call DeerFlow research service with comprehensive settings
+              // Call DeerFlow research service with depth-based token allocation
               const deerflowResult = await researchService.performResearch({
                 query: finalQuery,
                 depth: ResearchDepth.Deep,
                 modelId: modelId,
+                researchDepth: researchDepth, // Pass research depth for token allocation
                 researchLength: 'comprehensive',
                 researchTone: 'analytical',
                 minWordCount: 1500

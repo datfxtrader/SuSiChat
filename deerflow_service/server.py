@@ -80,6 +80,20 @@ TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 
+def get_token_limit_by_depth(research_depth: int) -> int:
+    """
+    Universal token allocation based on research depth for ALL models
+    Depth 1: 8,000 tokens (Quick insights)
+    Depth 2: 15,000 tokens (Detailed analysis)  
+    Depth 3: 25,000 tokens (Comprehensive research)
+    """
+    token_mapping = {
+        1: 8000,   # Quick insights
+        2: 15000,  # Detailed analysis  
+        3: 25000   # Comprehensive research
+    }
+    return token_mapping.get(research_depth, 8000)  # Default to 8000 if invalid depth
+
 # Helper functions for research
 async def search_web(query: str, max_results: int = 8):
     """Search the web using available search engines."""
@@ -369,7 +383,9 @@ Your report should:
 
 Format your report in Markdown, but make it readable and professional."""
         
-        report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=8000)
+        # Use dynamic token allocation based on research depth
+        dynamic_token_limit = get_token_limit_by_depth(request.research_depth)
+        report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=dynamic_token_limit)
         log_entries.append(f"Research report generated successfully: {len(report)} characters")
         
         # Step 6: Finalize research response with proper logging
