@@ -655,7 +655,8 @@ export class SunaIntegrationService {
             };
           }
         } catch (error) {
-          // Silent fallback for production
+          console.error('DeerFlow research error:', error);
+          console.log('Falling back to basic web search due to DeerFlow error');
         }
       }
 
