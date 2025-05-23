@@ -225,7 +225,7 @@ export class ResearchService {
       ];
 
       // Direct import to avoid circular dependency issues
-      const { performWebSearch } = require('./performWebSearch');
+      const { performWebSearch } = await import('./performWebSearch');
 
       // Run all searches in parallel
       const searchResultPromises = queries.map(query => performWebSearch(query, 10)); // Get more results
