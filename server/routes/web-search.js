@@ -11,7 +11,7 @@ const axios = require('axios');
 // API endpoint for web search
 router.post('/', async (req, res) => {
   try {
-    const { query, maxResults = 10 } = req.body;
+    const { query, maxResults = 20 } = req.body;
     
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
