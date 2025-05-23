@@ -17,11 +17,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
   const { user } = useAuth();
   const [location] = useLocation();
   const { upcomingReminders } = useSchedule();
-  
+
   const { data: familyRooms } = useQuery({
     queryKey: ['/api/family-rooms'],
   });
-  
+
   const navItems = [
     { path: "/", icon: "chat", label: "Chat" },
     { path: "/schedule", icon: "event", label: "Schedule" },
@@ -31,13 +31,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
     { path: "/profile", icon: "school", label: "Homework Help" },
     { path: "/trip", icon: "flight_takeoff", label: "Trip Planning" },
   ];
-  
+
   const handleItemClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (onItemClick) {
       onItemClick();
     }
   };
-  
+
   return (
     <div className={cn(
       "border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900",
@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
           <h1 className="text-lg font-semibold">Tongkeeper</h1>
         </div>
       </div>
-      
+
       {/* User Profile Section */}
       <div className="p-4 border-b border-neutral-200 dark:border-neutral-800">
         <div className="flex items-center space-x-3">
@@ -75,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
           </Link>
         </div>
       </div>
-      
+
       {/* Navigation Links */}
       <nav className="flex-1 px-2 py-4 auto-overflow">
         <ul className="space-y-1">
@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
             </li>
           ))}
         </ul>
-        
+
         {/* Family Chats Section */}
         {familyRooms && familyRooms.length > 0 && (
           <div className="mt-8">
@@ -114,25 +114,25 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
                 </a>
               </Link>
             </div>
-            
+
             {familyRooms.map((room) => (
               <Link 
                 key={room.id} 
                 href={`/family-room/${room.id}`}
                 onClick={handleItemClick}
               >
-                <a className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-1">
+                <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-1">
                   <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center">
                     <span className="material-icons text-white text-sm">home</span>
                   </div>
                   <span>{room.name}</span>
-                </a>
+                </div>
               </Link>
             ))}
           </div>
         )}
       </nav>
-      
+
       {/* Upcoming Reminders Preview */}
       {upcomingReminders && upcomingReminders.length > 0 && (
         <div className="p-4 border-t border-neutral-200 dark:border-neutral-800">
