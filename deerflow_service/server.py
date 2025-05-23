@@ -272,46 +272,69 @@ async def perform_deep_research(research_question: str, research_id: str):
         all_search_results = []
         
         for query in query_variations:
-            search_results = await search_web(query, max_results=5)
-            all_search_results.extend(search_results)
+            try:
+                search_results = await search_web(query, max_results=5)
+                if search_results and isinstance(search_results, list):
+                    all_search_results.extend(search_results)
+                elif search_results:
+                    all_search_results.append(search_results)
+            except Exception as e:
+                logger.error(f"Search error for query '{query}': {e}")
+                continue
         
-        # Step 3: Deduplicate results based on URL
-        seen_urls = set()
-        unique_results = []
-        
-        for result in all_search_results:
-            if result and isinstance(result, dict) and result.get("url") and result["url"] not in seen_urls:
-                seen_urls.add(result["url"])
-                unique_results.append(result)
-        
-        log_entries.append(f"Found {len(unique_results)} unique sources.")
-        
-        # Step 4: Format sources
+        # Step 3: Process and validate results
         sources = []
         sources_text = ""
+        seen_urls = set()
         
-        for i, result in enumerate(unique_results[:10]):  # Limit to top 10 sources
-            domain = "unknown"
+        for result in all_search_results:
             try:
-                from urllib.parse import urlparse
-                domain = urlparse(result.get("url", "")).netloc
-            except:
-                pass
-            
-            source = {
-                "title": result.get("title", "Untitled"),
-                "url": result.get("url", ""),
-                "domain": domain,
-                "content": result.get("content", "")[:1000] if result.get("content") else ""
-            }
-            sources.append(source)
-            
-            # Add to text representation for the LLM
-            title = result.get("title", "Untitled")
-            url = result.get("url", "")
-            content = result.get("content", "")[:1000]
-            sources_text += f"Source {i+1}: {title} ({url})\n"
-            sources_text += f"Content: {content}...\n\n"
+                # Ensure result is valid
+                if not result or not isinstance(result, dict):
+                    continue
+                
+                # Extract basic fields safely
+                title = str(result.get("title", "Untitled")).strip()
+                url = str(result.get("url", "")).strip()
+                content = str(result.get("content", "")).strip()
+                
+                # Skip if no URL or duplicate
+                if not url or url in seen_urls:
+                    continue
+                
+                seen_urls.add(url)
+                
+                # Extract domain safely
+                domain = "unknown"
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    domain = parsed.netloc if parsed.netloc else "unknown"
+                except:
+                    domain = "unknown"
+                
+                # Create source object
+                source = {
+                    "title": title,
+                    "url": url,
+                    "domain": domain,
+                    "content": content[:1000] if content else ""
+                }
+                sources.append(source)
+                
+                # Add to text for LLM (limit to first 10 sources)
+                if len(sources) <= 10:
+                    sources_text += f"Source {len(sources)}: {title} ({url})\n"
+                    if content:
+                        sources_text += f"Content: {content[:1000]}...\n\n"
+                    else:
+                        sources_text += "Content: [No content available]\n\n"
+                
+            except Exception as e:
+                logger.error(f"Error processing search result: {e}")
+                continue
+        
+        log_entries.append(f"Successfully processed {len(sources)} authentic sources.")
         
         # Step 5: Generate comprehensive research report
         log_entries.append("Generating comprehensive research report...")
