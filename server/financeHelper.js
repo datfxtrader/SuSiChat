@@ -61,6 +61,31 @@ const FINANCIAL_SOURCES = [
     title: "BabyPips",
     url: "https://www.babypips.com/",
     domain: "babypips.com"
+  },
+  {
+    title: "CoinGecko",
+    url: "https://www.coingecko.com/",
+    domain: "coingecko.com"
+  },
+  {
+    title: "Kitco",
+    url: "https://www.kitco.com/",
+    domain: "kitco.com"
+  },
+  {
+    title: "CryptoCompare",
+    url: "https://www.cryptocompare.com/",
+    domain: "cryptocompare.com"
+  },
+  {
+    title: "GoldPrice",
+    url: "https://goldprice.org/",
+    domain: "goldprice.org"
+  },
+  {
+    title: "CME Group",
+    url: "https://www.cmegroup.com/markets/commodities.html",
+    domain: "cmegroup.com"
   }
 ];
 
@@ -74,7 +99,11 @@ function isFinancialQuery(query) {
   const financialTerms = [
     'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad', 'nzd/usd',
     'usd/chf', 'forex', 'currency', 'exchange rate', 'pip', 'spread',
-    'technical analysis', 'fundamental analysis', 'trading', 'market'
+    'technical analysis', 'fundamental analysis', 'trading', 'market',
+    'bitcoin', 'btc', 'eth', 'ethereum', 'crypto', 'cryptocurrency',
+    'gold', 'xau/usd', 'silver', 'xag/usd', 'platinum', 'palladium',
+    'crude oil', 'wti', 'brent', 'natural gas', 'copper', 'aluminum',
+    'corn', 'wheat', 'soybean', 'commodities', 'commodity futures'
   ];
   
   return financialTerms.some(term => lowerQuery.includes(term));
