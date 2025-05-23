@@ -60,7 +60,8 @@ export async function startDeerFlowService(): Promise<boolean> {
           // Ensure API keys are passed to the Python process
           TAVILY_API_KEY: process.env.TAVILY_API_KEY || '',
           BRAVE_API_KEY: process.env.BRAVE_API_KEY || '',
-          DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || ''
+          DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+          GEMINI_API_KEY: process.env.GEMINI_API_KEY || ''
         },
         stdio: ['ignore', 'pipe', 'pipe']
       });
