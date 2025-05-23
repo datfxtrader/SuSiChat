@@ -519,8 +519,26 @@ Your report should:
       }
       
       // Handle processing state - if the response is still processing, wait for completion
-      if (deerflowResponse.status?.status === 'processing' && deerflowResponse.status?.id) {
+      if (deerflowResponse.status?.status === 'processing') {
         console.log('Research is processing, waiting for completion...');
+        
+        // Wait a bit for research to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Try to get the completed result
+        try {
+          const completedResponse = await deerflowClient.performResearch(deerflowParams);
+          if (completedResponse.report) {
+            deerflowResponse = completedResponse;
+          }
+        } catch (error) {
+          console.log('Failed to get completed result, using current response');
+        }
+      }
+      
+      // If still processing after retry, wait longer
+      if (deerflowResponse.status?.status === 'processing' && deerflowResponse.status?.id) {
+        console.log('Research still processing, waiting longer...');
         
         // Wait for research to be completed (with timeout)
         const maxAttempts = 10;
