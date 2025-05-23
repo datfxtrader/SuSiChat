@@ -512,16 +512,24 @@ Your report should:
       // Use the deerflowClient that's already imported at the top of the file
       // This fixes the "require is not defined" error
 
-      // Prepare request parameters for DeerFlow service with enhanced settings
-      const deerflowParams = {
-        research_question: params.query,
-        model_id: params.modelId || 'deepseek-v3',
-        include_market_data: params.includeMarketData !== false,
-        include_news: params.includeNews !== false,
-        research_length: params.researchLength || 'comprehensive',
-        research_tone: params.researchTone || 'analytical',
-        min_word_count: params.minWordCount || 1500
-      };
+      // Prepare request parameters for DeerFlow service with full capabilities
+        const deerflowParams = {
+          research_question: params.query,
+          model_id: params.modelId || 'deepseek-v3',
+          include_market_data: params.includeMarketData !== false,
+          include_news: params.includeNews !== false,
+          research_length: params.researchLength || 'comprehensive',
+          research_tone: params.researchTone || 'analytical',
+          min_word_count: params.minWordCount || 1500,
+          enable_multi_agent: true,
+          enable_reasoning: true,
+          use_domain_expertise: true,
+          learning_mode: true,
+          preferences: {
+            depth: 'comprehensive',
+            include_reasoning: true
+          }
+        };
 
       // Call the DeerFlow service with retries
       console.log('Sending request to DeerFlow service with params:', deerflowParams);
@@ -719,4 +727,3 @@ Your report should:
 
 // Export singleton instance
 export const researchService = new ResearchService();
-```
