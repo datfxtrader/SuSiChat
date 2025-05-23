@@ -2,8 +2,8 @@ import axios from 'axios';
 import { log } from './utils/logger';
 
 // Environment variables for API keys
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
+const DUCKDUCKGO_URL = 'https://api.duckduckgo.com/';
 
 export interface SearchResult {
   title: string;
@@ -12,6 +12,62 @@ export interface SearchResult {
   score?: number;
   publishedDate?: string;
   source: string;
+}
+
+async function searchDuckDuckGo(query: string, maxResults: number = 10) {
+  try {
+    const response = await axios.get(DUCKDUCKGO_URL, {
+      params: {
+        q: query,
+        format: 'json',
+        no_html: 1,
+        no_redirect: 1
+      }
+    });
+    
+    return response.data.RelatedTopics
+      .slice(0, maxResults)
+      .map((topic: any) => ({
+        title: topic.Text?.split(' - ')[0] || topic.Text,
+        content: topic.Text,
+        url: topic.FirstURL,
+        source: 'DuckDuckGo'
+      }));
+  } catch (error) {
+    console.error('DuckDuckGo search error:', error);
+    return [];
+  }
+}
+
+async function searchBrave(query: string, maxResults: number = 10) {
+  if (!BRAVE_API_KEY) {
+    console.warn('Brave API key not found');
+    return [];
+  }
+
+  try {
+    const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+      headers: {
+        'Accept': 'application/json',
+        'X-Subscription-Token': BRAVE_API_KEY
+      },
+      params: {
+        q: query,
+        count: maxResults
+      }
+    });
+
+    return response.data.web.results.map((result: any) => ({
+      title: result.title,
+      content: result.description,
+      url: result.url,
+      publishedDate: result.age,
+      source: 'Brave'
+    }));
+  } catch (error) {
+    console.error('Brave search error:', error);
+    return [];
+  }
 }
 
 export interface WebSearchResponse {
@@ -39,6 +95,39 @@ export async function performWebSearch(
   diversitySources: boolean = true,
   systemId: 'suna' | 'deerflow' = 'suna' // Track which system is making the request
 ): Promise<WebSearchResponse> {
+
+  // Check cache first
+  const cacheKey = `${query}-${maxResults}-${systemId}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    return cached.results;
+  }
+
+  // Perform parallel searches
+  const [duckResults, braveResults] = await Promise.all([
+    searchDuckDuckGo(query, Math.ceil(maxResults/2)),
+    searchBrave(query, Math.ceil(maxResults/2))
+  ]);
+
+  // Combine and deduplicate results
+  const allResults = [...duckResults, ...braveResults];
+  const uniqueResults = allResults.filter((result, index, self) =>
+    index === self.findIndex((r) => r.url === result.url)
+  );
+
+  const response = {
+    results: uniqueResults.slice(0, maxResults),
+    query,
+    timestamp: new Date().toISOString()
+  };
+
+  // Cache the results
+  searchCache.set(cacheKey, {
+    results: response,
+    timestamp: Date.now()
+  });
+
+  return response;
 
   // Check cache first
   const cacheKey = `${query}-${maxResults}-${systemId}`;
