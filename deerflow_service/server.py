@@ -549,9 +549,9 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI with lifespan
 app = FastAPI(lifespan=lifespan)
-    
-    if not DEEPSEEK_API_KEY:
-        logger.warning("DeepSeek API key not found. LLM functionality will be unavailable.")
+
+if not DEEPSEEK_API_KEY:
+    logger.warning("DeepSeek API key not found. LLM functionality will be unavailable.")
 
 @app.get("/health")
 async def health_check():
