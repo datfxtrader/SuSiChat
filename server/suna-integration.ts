@@ -658,9 +658,9 @@ export class SunaIntegrationService {
             depth: data.depth
           });
           
-          // For depth level 3, use DeerFlow research service
+          // Force DeerFlow for depth level 3 from ANY UI component
           if (researchDepth === 3) {
-            console.log(`Using DeerFlow for deep research (level 3) on: "${finalQuery}"`);
+            console.log(`🚀 COMPREHENSIVE RESEARCH MODE ACTIVATED - Using DeerFlow for deep research (level 3) on: "${finalQuery}"`);
             
             try {
               // Determine model ID based on the selected LLM
