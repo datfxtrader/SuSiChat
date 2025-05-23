@@ -4,6 +4,10 @@
  */
 
 const axios = require('axios');
+const NodeCache = require('node-cache');
+
+// Initialize cache with 5 minute TTL
+const cache = new NodeCache({ stdTTL: 300 });
 
 // API keys from environment variables
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -15,11 +19,26 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
  */
 async function generateFinancialResearch(query) {
   console.log('Generating fallback financial research for:', query);
+  const startTime = Date.now();
+
+  // Check cache first
+  const cacheKey = `financial-research-${query}`;
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    console.log('Returning cached research');
+    return cachedResult;
+  }
   
   try {
     // Try to use DeepSeek for generating the report
     if (DEEPSEEK_API_KEY) {
-      const response = await axios.post(
+      const maxRetries = 3;
+      let retryCount = 0;
+      let lastError;
+
+      while (retryCount < maxRetries) {
+        try {
+          const response = await axios.post(
         'https://api.deepseek.com/v1/chat/completions',
         {
           model: 'deepseek-chat',
@@ -41,10 +60,29 @@ async function generateFinancialResearch(query) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
           }
-        }
-      );
+        },
+        {
+          timeout: 10000 // 10 second timeout
+        });
       
-      if (response.data && response.data.choices && response.data.choices[0]) {
+        if (response.data && response.data.choices && response.data.choices[0]) {
+          return {
+            report: response.data.choices[0].message.content,
+            sources: getDefaultSources(),
+            depth: 3,
+            processingTime: Date.now() - startTime
+          };
+        }
+        break;
+      } catch (error) {
+        lastError = error;
+        retryCount++;
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, retryCount)));
+          continue;
+        }
+        throw lastError;
+      }
         return {
           report: response.data.choices[0].message.content,
           sources: getDefaultSources(),
