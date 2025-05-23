@@ -154,7 +154,7 @@ export class ResearchService {
 
     try {
       const { performWebSearch } = require('./performWebSearch');
-      const searchResults = await performWebSearch(params.query, 20, 3, true, 'deerflow');
+      const searchResults = await performWebSearch(params.query);
 
       if (searchResults.error) {
         throw new Error(`Web search error: ${searchResults.error}`);
@@ -504,9 +504,9 @@ Your report should:
     const startTime = Date.now();
 
     try {
-      console.log('Starting enhanced DeerFlow-Suna research pipeline for query:', params.query);
+      console.log('Starting DeerFlow research pipeline for query:', params.query);
 
-      // Use DeerFlow client directly
+      // First let DeerFlow analyze and decompose the task
       const deerflowClient = require('./deerflow-client').deerflowClient;
       const taskAnalysis = await deerflowClient.createAgentResearchTask({
         research_question: params.query,
@@ -685,11 +685,6 @@ Your report should:
         report = this.formatResearchReport(deerflowResponse.response);
         console.log('Found report as string in response, length:', report.length);
       }
-    } catch (error) {
-      console.error('Error processing DeerFlow response:', error);
-      return { success: false, error: 'Failed to process research results' };
-    }
-  }
 
   private formatResearchReport(report: string): string {
     // Fix common formatting issues
@@ -700,25 +695,9 @@ Your report should:
       .replace(/\[\d+\]\s*(?=\[\d+\])/g, '\n$&') // Fix source reference formatting
       .trim();
   }
-}
+
+      // Extract sources from multiple possible locations
       let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
-      
-      // Process visualization data if available
-      if (visualData.length > 0) {
-        console.log('Processing visualization data:', visualData.length, 'items');
-        visualData.forEach((visual: any) => {
-          try {
-        if (visual.type === 'chart') {
-          report = report.replace(visual.placeholder, visual.chartHtml);
-        } else if (visual.type === 'table') {
-          report = report.replace(visual.placeholder, visual.tableHtml);
-        }
-      } catch (err) {
-        console.error('Error processing visualization:', err);
-        errorRate.visualizations = (errorRate.visualizations || 0) + 1;
-      }
-        });
-      }
 
       if (Array.isArray(sourceData) && sourceData.length > 0) {
         console.log('Found sources array with', sourceData.length, 'items');
@@ -753,17 +732,11 @@ Your report should:
 
       // Return the research result, always labeling as Deep research even if we used fallback
       // This ensures consistent user experience
-      // Smart report combination - avoid duplication
-      const combinedReport = report.includes(sunaResults) ? 
-        report : // DeerFlow already incorporated Suna's insights
-        `${report}\n\nAdditional Insights (via Suna Analysis):\n${sunaResults}`;
-
       return {
-        report: combinedReport,
-        sources: [...sources, ...(sunaAnalysis?.message?.searchMetadata?.sourceDetails || [])],
+        report,
+        sources,
         depth: ResearchDepth.Deep,
-        processingTime: Date.now() - startTime,
-        enhancedWithSuna: true
+        processingTime: Date.now() - startTime
       };
     } catch (error) {
       console.error('Error performing deep research with DeerFlow:', error);

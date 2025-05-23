@@ -790,7 +790,8 @@ async def optimize_strategies():
         recommendations = []
 
         if insights.get("strategy_rankings"):
-            best_strategies = insights["strategy_rankings"][:3]
+            ```python
+best_strategies = insights["strategy_rankings"][:3]
             recommendations.append(f"Top performing strategies: {', '.join(s['strategy'] for s in best_strategies)}")
 
             # Check if any strategies are underperforming

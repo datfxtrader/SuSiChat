@@ -4,9 +4,9 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
-// import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
+import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
 
-// import financialResearchRoutes from "./routes/financial-research";
+import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
 
 // WebSocket client connections and their associated rooms
@@ -22,7 +22,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
 
   // Mount financial research routes
-  // app.use('/api/financial-research', financialResearchRoutes);
+  app.use('/api/financial-research', financialResearchRoutes);
   
   // Mount web search routes
   app.use('/api/web-search', webSearchRoutes);
@@ -380,10 +380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Suna Integration endpoints - temporarily disabled for testing
-  // app.post('/api/suna/message', isAuthenticated, sendMessageToSuna);
-  // app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
-  // app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
+  // Suna Integration endpoints
+  app.post('/api/suna/message', isAuthenticated, sendMessageToSuna);
+  app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
+  app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
 
 
 

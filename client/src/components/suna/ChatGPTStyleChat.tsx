@@ -505,24 +505,12 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                       {researchMode ? (
                         <div className="flex flex-col">
-                          <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                              <span className="text-sm text-gray-700">Analyzing your research query...</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                              <span className="text-sm text-gray-700">Running parallel searches: DuckDuckGo + Brave + Tavily</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
-                              <span className="text-sm text-gray-700">Processing results with AI analysis...</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
-                              <span className="text-sm text-gray-700">Generating comprehensive report...</span>
-                            </div>
-                          </div>
+                          <ResearchProgress 
+                            stage={1} 
+                            progress={0}
+                            query={message}
+                            isActive={isSending}
+                          />
                         </div>
                       ) : (
                         <div className="flex space-x-2">
