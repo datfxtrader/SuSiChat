@@ -61,9 +61,10 @@ class ResearchRequest(BaseModel):
     model_id: Optional[str] = "deepseek-v3"
     include_market_data: Optional[bool] = True
     include_news: Optional[bool] = True
+    research_depth: Optional[int] = 3
     research_length: Optional[str] = "comprehensive"  # brief, standard, comprehensive, detailed
     research_tone: Optional[str] = "analytical"  # casual, professional, analytical, academic
-    min_word_count: Optional[int] = 1000
+    min_word_count: Optional[int] = 1500
 
 class ResearchResponse(BaseModel):
     status: Optional[Dict[str, Any]] = None
