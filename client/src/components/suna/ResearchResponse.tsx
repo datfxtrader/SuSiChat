@@ -110,29 +110,7 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                 {children}
               </td>
             ),
-            // Handle asterisk bullet points commonly used by AI
-            text: ({children}) => {
-              if (typeof children === 'string') {
-                // Convert "* text" to proper bullet points
-                const lines = children.split('\n');
-                const processedLines = lines.map((line, index) => {
-                  if (line.trim().startsWith('* ')) {
-                    return (
-                      <div key={index} className="flex items-start mb-2">
-                        <span className="text-blue-500 mr-2 mt-1">•</span>
-                        <span className="flex-1">{line.trim().substring(2)}</span>
-                      </div>
-                    );
-                  }
-                  return line;
-                });
-                
-                if (processedLines.some(line => typeof line !== 'string')) {
-                  return <div>{processedLines}</div>;
-                }
-              }
-              return children;
-            }
+            // Let ReactMarkdown handle all text formatting naturally
           }}
         >
           {content}
