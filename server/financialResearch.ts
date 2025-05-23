@@ -64,6 +64,30 @@ export async function generateForexResearch(query: string): Promise<{
       url: "https://www.marketwatch.com/",
       domain: "marketwatch.com",
       content: "Stock market news and financial analysis"
+    },
+    {
+      title: "Seeking Alpha",
+      url: "https://seekingalpha.com/",
+      domain: "seekingalpha.com",
+      content: "In-depth market analysis and research"
+    },
+    {
+      title: "Financial Times",
+      url: "https://www.ft.com/",
+      domain: "ft.com", 
+      content: "Global financial news and expert analysis"
+    },
+    {
+      title: "Yahoo Finance",
+      url: "https://finance.yahoo.com/",
+      domain: "finance.yahoo.com",
+      content: "Financial data and market statistics"
+    },
+    {
+      title: "CNBC",
+      url: "https://www.cnbc.com/",
+      domain: "cnbc.com",
+      content: "Real-time financial news and market coverage"
     }
   ];
 
