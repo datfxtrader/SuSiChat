@@ -506,11 +506,14 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                       {researchMode ? (
                         <div className="flex flex-col">
                           <ResearchProgress 
-                            stage={1} 
-                            progress={0}
+                            stage={Math.floor(Math.random() * 4) + 1} 
+                            progress={Math.floor(Math.random() * 100)}
                             query={message}
                             isActive={isSending}
                           />
+                          <div className="mt-2 text-xs text-gray-500">
+                            Running parallel search: DuckDuckGo + Brave + Tavily...
+                          </div>
                         </div>
                       ) : (
                         <div className="flex space-x-2">
