@@ -1,8 +1,8 @@
 
 import axios from 'axios';
-import { performWebSearch } from './performWebSearch';
+import { ResearchResult, ResearchDepth } from './deerflow-integration';
 
-// Financial data sources
+// Unified financial sources
 const FINANCIAL_SOURCES = [
   {
     title: "Investing.com",
@@ -20,7 +20,7 @@ const FINANCIAL_SOURCES = [
     domain: "fxstreet.com",
     endpoints: {
       analysis: "/api/analysis",
-      forecast: "/api/forecast"
+      forecast: "/api/forecast" 
     }
   },
   {
@@ -35,9 +35,28 @@ const FINANCIAL_SOURCES = [
 ];
 
 /**
+ * Check if a query is finance-related
+ */
+export function isFinancialQuery(query: string): boolean {
+  if (!query) return false;
+  
+  const financialTerms = [
+    'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad', 'nzd/usd',
+    'usd/chf', 'forex', 'currency', 'exchange rate', 'pip', 'spread',
+    'technical analysis', 'fundamental analysis', 'trading', 'market',
+    'bitcoin', 'btc', 'eth', 'ethereum', 'crypto', 'cryptocurrency',
+    'gold', 'xau/usd', 'silver', 'xag/usd', 'commodities'
+  ];
+
+  return financialTerms.some(term => 
+    query.toLowerCase().includes(term.toLowerCase())
+  );
+}
+
+/**
  * Generate financial analysis using LLM
  */
-async function generateFinancialAnalysis(query: string, retryCount = 0) {
+async function generateFinancialAnalysis(query: string, retryCount = 0): Promise<string> {
   try {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     
@@ -52,7 +71,7 @@ async function generateFinancialAnalysis(query: string, retryCount = 0) {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert financial analyst with deep knowledge of forex markets.'
+            content: 'You are an expert financial analyst specialized in forex markets.'
           },
           {
             role: 'user',
@@ -85,50 +104,29 @@ async function generateFinancialAnalysis(query: string, retryCount = 0) {
 }
 
 /**
- * Check if a query is finance-related
- */
-export function isFinancialQuery(query: string): boolean {
-  if (!query) return false;
-  
-  const financialTerms = [
-    'eur/usd', 'gbp/usd', 'usd/jpy', 'forex', 'currency', 'exchange rate',
-    'financial market', 'stock market', 'trading', 'central bank', 
-    'interest rate', 'inflation', 'recession', 'gdp', 'monetary policy'
-  ];
-  
-  return financialTerms.some(term => query.toLowerCase().includes(term));
-}
-
-/**
  * Perform comprehensive financial research
  */
-export async function performFinancialResearch(query: string) {
+export async function performFinancialResearch(query: string): Promise<ResearchResult> {
   console.log('Performing financial research for:', query);
   
   const startTime = Date.now();
   
   try {
-    // Get web search results
-    const searchResults = await performWebSearch(query);
-    
-    // Generate analysis
-    const analysis = await generateFinancialAnalysis(query);
+    const report = await generateFinancialAnalysis(query);
     
     return {
-      report: analysis,
+      report,
       sources: FINANCIAL_SOURCES,
-      webResults: searchResults.results,
-      processingTime: Date.now() - startTime,
-      success: true
+      depth: ResearchDepth.Deep,
+      processingTime: Date.now() - startTime
     };
   } catch (error) {
     console.error('Financial research failed:', error);
     return {
       report: 'Research generation failed. Please try again.',
       sources: FINANCIAL_SOURCES,
-      processingTime: Date.now() - startTime,
-      success: false,
-      error: error instanceof Error ? error.message : String(error)
+      depth: ResearchDepth.Deep,
+      processingTime: Date.now() - startTime
     };
   }
 }

@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 import { log } from './utils/logger';
 
@@ -5,13 +6,34 @@ import { log } from './utils/logger';
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
 
+export interface SearchResult {
+  title: string;
+  content?: string;
+  url: string;
+  score?: number;
+  publishedDate?: string;
+  source: string;
+}
+
+export interface WebSearchResponse {
+  results: SearchResult[];
+  tavilyResults?: any;
+  braveResults?: any;
+  query: string;
+  timestamp: string;
+}
+
 /**
  * Perform a web search with robust error handling and retries
  */
-export async function performWebSearch(query: string, maxResults: number = 5, retries: number = 3) {
+export async function performWebSearch(
+  query: string, 
+  maxResults: number = 5,
+  retries: number = 3
+): Promise<WebSearchResponse> {
   console.log(`Performing web search for: "${query}"`);
 
-  const results: any[] = [];
+  const results: SearchResult[] = [];
   let tavilyResults = null;
   let braveResults = null;
 
@@ -24,8 +46,6 @@ export async function performWebSearch(query: string, maxResults: number = 5, re
           query,
           search_depth: 'advanced',
           include_answer: true,
-          include_domains: [],
-          exclude_domains: [],
           max_results: maxResults,
           include_raw_content: false,
           filters: {
@@ -40,7 +60,7 @@ export async function performWebSearch(query: string, maxResults: number = 5, re
         }
       );
 
-      if (response.data && response.data.results) {
+      if (response.data?.results) {
         tavilyResults = response.data;
         for (const result of response.data.results) {
           results.push({
@@ -75,7 +95,7 @@ export async function performWebSearch(query: string, maxResults: number = 5, re
         }
       });
 
-      if (response.data && response.data.web && response.data.web.results) {
+      if (response.data?.web?.results) {
         braveResults = response.data;
         for (const result of response.data.web.results) {
           results.push({
@@ -112,6 +132,3 @@ export async function performWebSearch(query: string, maxResults: number = 5, re
     timestamp: new Date().toISOString()
   };
 }
-
-// Make the function available globally
-(global as any).performWebSearch = performWebSearch;
