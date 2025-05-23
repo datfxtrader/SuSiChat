@@ -96,28 +96,26 @@ def get_token_limit_by_depth(research_depth: int) -> int:
 
 # Helper functions for research
 async def search_web(query: str, max_results: int = 8):
-    """Search the web using available search engines with Brave as primary."""
+    """Search the web using available search engines with DuckDuckGo as primary."""
     logger.info(f"Searching web for: {query}")
     
-    # Primary: Use Brave search if available
+    # Primary: Use DuckDuckGo (no API key required)
+    try:
+        results = await search_duckduckgo(query, max_results)
+        if results:
+            return results
+    except Exception as e:
+        logger.error(f"DuckDuckGo search error: {e}")
+    
+    # Backup: Try Brave if available 
     if BRAVE_API_KEY:
         try:
             return await search_brave(query, max_results)
         except Exception as e:
-            logger.error(f"Brave search error: {e}")
-    
-    # Backup 1: Try DuckDuckGo (no API key required)
-    try:
-        return await search_duckduckgo(query, max_results)
-    except Exception as e:
-        logger.error(f"DuckDuckGo search error: {e}")
-    
-    # Backup 2: Try Tavily if available
-    if TAVILY_API_KEY:
-        try:
-            return await search_tavily(query, max_results)
-        except Exception as e:
-            logger.error(f"Tavily search error: {e}")
+            if "RATE_LIMITED" in str(e):
+                logger.warning("Brave search rate limited, skipping")
+            else:
+                logger.error(f"Brave search error: {e}")
     
     # Return empty results if all searches fail
     logger.warning("All search methods failed")
