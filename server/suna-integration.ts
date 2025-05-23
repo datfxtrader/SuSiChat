@@ -9,6 +9,10 @@ import rateLimit from 'express-rate-limit';
 import { validate } from 'class-validator';
 import { IsString, MinLength, MaxLength, IsOptional, IsNumber, Min, Max } from 'class-validator';
 
+// Cache related constants
+const CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_SIZE = 50;
+
 // LRU cache for web search results
 const searchCache = new LRU({
   max: 100,
@@ -41,10 +45,11 @@ class SunaRequestDTO {
 }
 
 // Cache TTL in milliseconds (5 minutes)
-const CACHE_TTL = 5 * 60 * 1000;
-
-// Maximum cache size (number of entries)
-const MAX_CACHE_SIZE = 50;
+interface CacheEntry {
+  results: any;
+  timestamp: number;
+  queryUsed: string;
+}
 
 // Simple hash function for queries
 function hashQuery(query: string): string {
@@ -241,6 +246,7 @@ async function performWebSearch(query: string, retries = 3, timeout = 10000) {
     return { error: 'Failed to perform web search' };
   }
 }
+}
 
 // Configuration for LLM APIs (used for Suna agent functionality)
 // DeepSeek
@@ -269,12 +275,12 @@ interface SunaRequest {
   projectId?: string;
   threadId?: string;
   model?: string;
-  researchDepth?: number;     // 1-3 scale for research depth level
+  researchDepth?: number;
   searchPreferences?: {
-    forceSearch?: boolean;    // Force web search even if not detected automatically
-    disableSearch?: boolean;  // Disable web search for this query
-    priority?: 'relevance' | 'freshness'; // Sort by relevance (default) or freshness
-    maxResults?: number;      // Maximum number of results to return
+    forceSearch?: boolean;
+    disableSearch?: boolean;
+    priority?: 'relevance' | 'freshness';
+    maxResults?: number;
   };
 }
 
@@ -289,15 +295,15 @@ interface SunaMessage {
   modelUsed?: string;
   webSearchUsed?: boolean;
   searchMetadata?: {
-    query?: string;         // The actual search query used
-    sources?: string[];     // List of source domains used
-    resultCount?: number;   // Number of results found
-    searchEngines?: string[]; // Which search engines were used
-    searchTime?: number;    // How long the search took in ms
-    sourceDetails?: {       // Detailed source information
-      title: string;        // Article title
-      url: string;          // Full article URL
-      domain: string;       // Domain name
+    query?: string;
+    sources?: string[];
+    resultCount?: number;
+    searchEngines?: string[];
+    searchTime?: number;
+    sourceDetails?: {
+      title: string;
+      url: string;
+      domain: string;
     }[];
   };
 }
@@ -330,7 +336,7 @@ const mockConversations: Record<string, SunaConversation> = {};
 /**
  * Suna integration service for communicating with the Suna backend
  */
-export class SunaIntegrationService {
+class SunaIntegrationService {
   private projectId: string;
   private apiKey: string | null = null;
 
@@ -878,8 +884,7 @@ export class SunaIntegrationService {
               const dateMatches = content.match(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b/gi);
 
               if (dateMatches) {
-                dateMatches.forEach((date: string) => {
-                  if (!dateFacts.has(date)) {
+                dateMatches.forEach((date: string) => {                  if (!dateFacts.has(date)) {
                     dateFacts.set(date, []);
                   }
                   dateFacts.get(date).push(result.url);
@@ -1112,7 +1117,7 @@ Use the current date and web search information when responding about current ev
           try {
             aiResponse = await this.callGeminiAPI(messages, 'gemini-1.5-flash');
             modelUsed = 'Gemini 1.5 Flash (fallback)';
-            break;
+            
           } catch (fallbackError) {
             console.error('Gemini fallback failed:', fallbackError);
           }
