@@ -718,9 +718,47 @@ export class SunaIntegrationService {
           } catch (err) {
             console.error('Error performing web search:', err);
           }
-          
-          // Track search completion time
-          const searchEndTime = Date.now();
+                
+                // Format source metadata
+                const searchEndTime = Date.now();
+                const sourceDomains: string[] = [];
+                const sourceDetails: any[] = [];
+                
+                if (deerflowResult.sources && deerflowResult.sources.length > 0) {
+                  deerflowResult.sources.forEach((source: any) => {
+                    if (source.domain) sourceDomains.push(source.domain);
+                    sourceDetails.push({
+                      title: source.title || 'Source',
+                      url: source.url || '',
+                      domain: source.domain || ''
+                    });
+                  });
+                }
+                
+                searchMetadata = {
+                  query: finalQuery,
+                  sources: sourceDomains,
+                  resultCount: sourceDetails.length,
+                  searchEngines: ['DeerFlow'],
+                  searchTime: searchEndTime - searchStartTime,
+                  sourceDetails
+                };
+              } else {
+                // Fall back to regular search if DeerFlow returns no results
+                console.log('DeerFlow research returned no results, falling back to regular search');
+                webSearchResults = await performWebSearch(finalQuery);
+              }
+            } catch (error) {
+              console.error('Error using DeerFlow research:', error);
+              // Fall back to regular search on error
+              console.log('Falling back to regular web search due to DeerFlow error');
+              webSearchResults = await performWebSearch(finalQuery);
+            }
+          } else {
+            // Use regular web search for depth levels 1 and 2
+            console.log(`Web search using refined query: ${finalQuery}`);
+            webSearchResults = await performWebSearch(finalQuery);
+          }
           
           // Format search results and handle potential null/undefined results
           const webSearchError = webSearchResults?.error || null;
@@ -744,31 +782,31 @@ export class SunaIntegrationService {
             const results = webSearchResults?.results || [];
             if (Array.isArray(results)) {
               results.forEach((result: any) => {
-                  if (result.url) {
-                    try {
-                      const domain = new URL(result.url).hostname;
-                      const title = result.title || domain;
-                      
-                      // Add domain to list of unique domains
-                      if (!sourceDomains.includes(domain)) {
-                        sourceDomains.push(domain);
-                      }
-                      
-                      // Add full source information
-                      sourceUrls.push({
-                        title: title,
-                        url: result.url,
-                        domain: domain
-                      });
-                    } catch (e) {
-                      // Skip invalid URLs
-                    }
+              if (result.url) {
+                try {
+                  const domain = new URL(result.url).hostname;
+                  const title = result.title || domain;
+                  
+                  // Add domain to list of unique domains
+                  if (!sourceDomains.includes(domain)) {
+                    sourceDomains.push(domain);
                   }
-                });
-            }
+                  
+                  // Add full source information
+                  sourceUrls.push({
+                    title: title,
+                    url: result.url,
+                    domain: domain
+                  });
+                } catch (e) {
+                  // Skip invalid URLs
+                }
+              }
+            });
             
-            // Calculate search time  
-            const searchTimeMs = Date.now() - (Date.now() - 2000); // Approximate timing
+            // Calculate search time
+            const searchEndTime = Date.now();
+            const searchTimeMs = searchEndTime - searchStartTime;
             
             // Create search metadata with detailed source information
             searchMetadata = {
@@ -973,6 +1011,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       } catch (err) {
         console.error('Error performing web search:', err);
       }
+    }
       
       // Prepare messages array with system prompt and history
       const messages = [
