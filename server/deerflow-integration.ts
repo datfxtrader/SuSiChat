@@ -602,7 +602,7 @@ Your report should:
                 report: statusResponse.report || 'No research report was generated.',
                 sources: (statusResponse.sources || []).map((source: any) => ({
                   title: source.title || 'Untitled',
-                  url: source.url,
+                  url: source.url || '',
                   domain: source.domain || 'unknown',
                   content: source.content
                 })),

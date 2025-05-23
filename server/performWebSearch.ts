@@ -31,7 +31,8 @@ const MAX_SEARCH_RETRIES = 3;
 export async function performWebSearch(
   query: string, 
   maxResults: number = 20,
-  retries: number = MAX_SEARCH_RETRIES
+  retries: number = MAX_SEARCH_RETRIES,
+  diversitySources: boolean = true
 ): Promise<WebSearchResponse> {
   console.log(`Performing web search for: "${query}"`);
 
