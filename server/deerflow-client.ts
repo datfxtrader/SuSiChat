@@ -5,6 +5,11 @@
 import axios from 'axios';
 import { checkDeerFlowService, startDeerFlowService, getDeerFlowServiceUrl } from './deerflow-manager';
 
+// Create axios instance with extended timeout for comprehensive research
+const deerflowAxios = axios.create({
+  timeout: 600000, // 10 minutes for comprehensive research
+});
+
 /**
  * Parameters for the DeerFlow research API
  */
@@ -110,9 +115,7 @@ export class DeerFlowClient {
       // Make the actual API call to DeerFlow
       console.log('Making request to DeerFlow service:', params);
       const serviceUrl = getDeerFlowServiceUrl();
-      const response = await axios.post(`${serviceUrl}/research`, params, {
-        timeout: 600000 // 10 minutes for comprehensive research
-      });
+      const response = await deerflowAxios.post(`${serviceUrl}/research`, params);
       
       return response.data;
     } catch (error) {
