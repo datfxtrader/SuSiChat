@@ -122,14 +122,22 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                 <ExternalLink className="inline w-3 h-3 ml-1" />
               </a>
             ),
-            // Let ReactMarkdown handle all text formatting naturally
+            // Enhanced quote formatting
+            blockquote: ({children}) => (
+              <div className="flex gap-2 my-4">
+                <div className="w-1 bg-blue-500 rounded" />
+                <blockquote className="text-gray-700 italic pl-4">
+                  {children}
+                </blockquote>
+              </div>
+            ),
           }}
         >
           {content}
         </ReactMarkdown>
       </div>
 
-      {/* Sources section */}
+      {/* Sources section with enhanced styling */}
       {sources.length > 0 && (
         <div className="mt-6 pt-4 border-t border-gray-200">
           <div className="flex items-center justify-between mb-3">
@@ -152,10 +160,10 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                   {index + 1}
                 </div>
                 <div className="flex-grow min-w-0">
-                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate">
+                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate leading-snug">
                     {source.title}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 flex items-center">
+                  <div className="text-xs text-gray-500 mt-1.5 flex items-center space-x-2">
                     <span className="truncate">{source.domain}</span>
                     {source.publishedDate && (
                       <>
