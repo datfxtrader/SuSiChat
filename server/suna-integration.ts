@@ -21,11 +21,14 @@ async function generateDeepSeekResponse(messages: any[], researchDepth: number):
         messages: messages,
         max_tokens: maxTokens,
         temperature: 0.7,
-        stream: false
+        stream: false,
+        top_p: 0.95
       })
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('DeepSeek API error details:', errorText);
       throw new Error(`DeepSeek API error: ${response.status}`);
     }
 
@@ -328,8 +331,8 @@ Provide helpful, accurate responses based on the available information.`
         }
       ];
 
-      // Select model based on research depth
-      let selectedModel = 'deepseek-chat';
+      // Select model based on research depth - using Gemini for better reliability
+      let selectedModel = 'gemini-1.5-flash';
       if (researchDepth === 3) {
         selectedModel = 'gemini-1.5-flash'; // High token limit for comprehensive reports
       }
