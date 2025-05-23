@@ -1,3 +1,4 @@
+
 /**
  * Financial research handler for forex/market queries
  * This provides specialized analysis when web search is unavailable
@@ -5,35 +6,52 @@
 
 const axios = require('axios');
 
-// Financial markets data sources
+// API constants
+const API_TIMEOUT = 30000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 1000;
+
+// Financial markets data sources with specialized endpoints
 const FOREX_SOURCES = [
   {
     title: "Investing.com",
     url: "https://www.investing.com/currencies/",
-    domain: "investing.com"
+    domain: "investing.com",
+    endpoints: {
+      live: "/api/live-rates",
+      news: "/api/news",
+      calendar: "/api/calendar"
+    }
   },
   {
     title: "FXStreet",
     url: "https://www.fxstreet.com/",
-    domain: "fxstreet.com"
+    domain: "fxstreet.com",
+    endpoints: {
+      analysis: "/api/analysis",
+      forecast: "/api/forecast"
+    }
   },
   {
     title: "DailyFX",
     url: "https://www.dailyfx.com/",
-    domain: "dailyfx.com"
+    domain: "dailyfx.com",
+    endpoints: {
+      technical: "/api/technical",
+      fundamental: "/api/fundamental"
+    }
   }
 ];
 
 /**
- * Generate forex market analysis using DeepSeek API
+ * Generate forex market analysis using DeepSeek API with retries
  */
-async function generateForexAnalysis(query) {
+async function generateForexAnalysis(query, retryCount = 0) {
   try {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     
     if (!apiKey) {
-      console.error('DeepSeek API key not available');
-      return "Unable to generate detailed research: API key missing";
+      throw new Error('DeepSeek API key not available');
     }
     
     const response = await axios.post(
@@ -50,25 +68,33 @@ async function generateForexAnalysis(query) {
             content: `Create a detailed analysis for ${query} including current price levels, technical analysis (support/resistance, indicators), fundamental factors, and market outlook. Include specific numerical data and format with clear section headings.`
           }
         ],
-        temperature: 0.5,
+        temperature: 0.4,
         max_tokens: 2000
       },
       {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
-        }
+        },
+        timeout: API_TIMEOUT
       }
     );
     
-    if (response.data && response.data.choices && response.data.choices[0]) {
+    if (response.data?.choices?.[0]?.message?.content) {
       return response.data.choices[0].message.content;
-    } else {
-      throw new Error('Invalid API response');
     }
+    
+    throw new Error('Invalid API response format');
+    
   } catch (error) {
-    console.error('Error generating forex analysis:', error);
-    return `# ${query} Analysis\n\nI apologize, but I cannot provide detailed analysis at this time due to technical issues. Please try using a different research depth level.`;
+    console.error(`Error generating forex analysis (attempt ${retryCount + 1}):`, error);
+    
+    if (retryCount < MAX_RETRIES) {
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return generateForexAnalysis(query, retryCount + 1);
+    }
+    
+    return `# ${query} Analysis\n\nI apologize, but I cannot provide detailed analysis at this time. Error: ${error.message}. Please try again later or use a different research depth level.`;
   }
 }
 
@@ -76,10 +102,13 @@ async function generateForexAnalysis(query) {
  * Check if a query is related to financial markets
  */
 function isFinancialQuery(query) {
+  if (!query) return false;
+  
   const financialTerms = [
     'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'nzd/usd', 'usd/cad',
     'forex', 'currency', 'exchange rate', 'financial market', 'stock market',
-    'trading', 'central bank', 'interest rate', 'inflation', 'recession'
+    'trading', 'central bank', 'interest rate', 'inflation', 'recession',
+    'gdp', 'monetary policy', 'economic data', 'fed', 'ecb', 'boe', 'boj'
   ];
   
   const lowerQuery = query.toLowerCase();
@@ -87,23 +116,38 @@ function isFinancialQuery(query) {
 }
 
 /**
- * Perform financial research with DeepSeek
+ * Perform financial research with DeepSeek and enhanced data sources
  */
 async function performFinancialResearch(query) {
   console.log('Using specialized financial research for:', query);
   
   const startTime = Date.now();
-  const report = await generateForexAnalysis(query);
   
-  return {
-    report,
-    sources: FOREX_SOURCES,
-    depth: 3,
-    processingTime: Date.now() - startTime
-  };
+  try {
+    const report = await generateForexAnalysis(query);
+    
+    return {
+      report,
+      sources: FOREX_SOURCES,
+      depth: 3,
+      processingTime: Date.now() - startTime,
+      success: true
+    };
+  } catch (error) {
+    console.error('Financial research failed:', error);
+    return {
+      report: 'Research generation failed. Please try again.',
+      sources: FOREX_SOURCES,
+      depth: 3,
+      processingTime: Date.now() - startTime,
+      success: false,
+      error: error.message
+    };
+  }
 }
 
 module.exports = {
   isFinancialQuery,
-  performFinancialResearch
+  performFinancialResearch,
+  FOREX_SOURCES
 };
