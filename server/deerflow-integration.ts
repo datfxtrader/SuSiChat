@@ -506,19 +506,21 @@ Your report should:
     try {
       console.log('Starting enhanced DeerFlow-Suna research pipeline for query:', params.query);
 
-      // First let Suna analyze and decompose the task
-      const { sendMessageToSuna } = require('./suna-integration');
-      const sunaAnalysis = await sendMessageToSuna({
-        query: params.query,
-        researchDepth: 3, // Maximum depth for comprehensive research
-        model: params.modelId || "deepseek-chat"
-      });
+      // Run Suna and DeerFlow analysis in parallel
+      const [sunaAnalysis, deerflowClient] = await Promise.all([
+        (async () => {
+          const { sendMessageToSuna } = require('./suna-integration');
+          return sendMessageToSuna({
+            query: params.query,
+            researchDepth: 3,
+            model: params.modelId || "deepseek-chat"
+          });
+        })(),
+        Promise.resolve(require('./deerflow-client').deerflowClient)
+      ]);
 
-      // Extract insights from Suna's initial analysis
+      // Extract insights from Suna's analysis while DeerFlow processes
       const sunaResults = sunaAnalysis?.message?.content || '';
-
-      // First let DeerFlow analyze and decompose the task
-      const deerflowClient = require('./deerflow-client').deerflowClient;
       const taskAnalysis = await deerflowClient.createAgentResearchTask({
         research_question: params.query,
         depth: 'comprehensive',
@@ -743,13 +745,10 @@ Your report should:
 
       // Return the research result, always labeling as Deep research even if we used fallback
       // This ensures consistent user experience
-      // Combine DeerFlow and Suna insights
-      const combinedReport = `
-${report}
-
-Additional Insights (via Suna Analysis):
-${sunaResults}
-`;
+      // Smart report combination - avoid duplication
+      const combinedReport = report.includes(sunaResults) ? 
+        report : // DeerFlow already incorporated Suna's insights
+        `${report}\n\nAdditional Insights (via Suna Analysis):\n${sunaResults}`;
 
       return {
         report: combinedReport,
