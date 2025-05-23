@@ -58,7 +58,7 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
           ],
           generationConfig: {
             temperature: 0.5,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 15000,
           }
         },
         {
@@ -91,7 +91,7 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
             }
           ],
           temperature: 0.5,
-          max_tokens: 2000
+          max_tokens: 8000
         },
         {
           headers: {
