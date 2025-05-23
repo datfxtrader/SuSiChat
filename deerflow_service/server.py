@@ -32,6 +32,9 @@ try:
 except ImportError:
     FULL_DEERFLOW_AVAILABLE = False
 
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -790,8 +793,7 @@ async def optimize_strategies():
         recommendations = []
 
         if insights.get("strategy_rankings"):
-            ```python
-best_strategies = insights["strategy_rankings"][:3]
+            best_strategies = insights["strategy_rankings"][:3]
             recommendations.append(f"Top performing strategies: {', '.join(s['strategy'] for s in best_strategies)}")
 
             # Check if any strategies are underperforming
