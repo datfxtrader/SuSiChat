@@ -519,7 +519,7 @@ Your report should:
 
       // Call the DeerFlow service
       console.log('Sending request to DeerFlow service with params:', deerflowParams);
-      const deerflowResponse = await deerflowClient.performResearch(deerflowParams);
+      let deerflowResponse = await deerflowClient.performResearch(deerflowParams);
 
       // Check if there was an error with the DeerFlow service
       if (deerflowResponse.status?.status === 'error') {
