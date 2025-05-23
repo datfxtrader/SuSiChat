@@ -10,11 +10,28 @@ const sunaEnv = {
   PYTHONUNBUFFERED: '1',  // This ensures Python output is not buffered
 };
 
-// Start the Suna backend process
-const suna = spawn('python', ['suna-repo/run-minimal.py'], { 
-  env: sunaEnv,
-  stdio: 'inherit' // Show output in the console
-});
+// Function to wait before starting process
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Start the Suna backend process with delay
+const startSuna = async () => {
+  console.log('Waiting for other services to initialize...');
+  await wait(3000); // Wait 3 seconds before starting
+  
+  const suna = spawn('python', ['suna-repo/run-minimal.py'], { 
+    env: sunaEnv,
+    stdio: 'inherit' // Show output in the console
+  });
+
+  suna.on('error', (err) => {
+    console.error('Failed to start Suna:', err);
+  });
+
+  return suna;
+};
+
+// Start Suna with delay
+const suna = await startSuna();
 
 suna.on('close', (code) => {
   console.log(`Suna backend process exited with code ${code}`);
