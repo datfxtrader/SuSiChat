@@ -39,11 +39,11 @@ mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node start-suna.js"
+args = "python deerflow_service/server.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python deerflow_service/server.py"
+args = "sleep 3"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
