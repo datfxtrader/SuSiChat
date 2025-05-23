@@ -597,6 +597,14 @@ export class SunaIntegrationService {
       // Get max results from preferences or default to 5
       const maxResults = data.searchPreferences?.maxResults || 5;
       
+      // Get the research depth level from multiple possible sources
+      const researchDepth = data.researchDepth || data.research_depth || data.depth || 1;
+      console.log(`Research depth detected: ${researchDepth} from data:`, {
+        researchDepth: data.researchDepth,
+        research_depth: data.research_depth, 
+        depth: data.depth
+      });
+
       // Determine if we should perform web search
       const shouldSearch = !disableSearch && 
         ((TAVILY_API_KEY || BRAVE_API_KEY) && 
