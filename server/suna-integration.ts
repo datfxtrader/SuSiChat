@@ -44,22 +44,24 @@ async function generateGeminiResponse(messages: any[], researchDepth: number): P
     throw new Error('Gemini API key not configured');
   }
 
-  const maxTokens = researchDepth === 3 ? 25000 : 8192; // High token limit for Research Depth 3
+  const maxTokens = researchDepth === 3 ? 8192 : 4096; // Adjusted for Gemini limits
   
   try {
-    // Convert messages to Gemini format
-    const geminiMessages = messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+    // Convert messages to Gemini format - only use user messages, system as text
+    const userMessage = messages.find(msg => msg.role === 'user')?.content || '';
+    const systemMessage = messages.find(msg => msg.role === 'system')?.content || '';
+    
+    const combinedPrompt = systemMessage ? `${systemMessage}\n\nUser: ${userMessage}` : userMessage;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        contents: geminiMessages,
+        contents: [{
+          parts: [{ text: combinedPrompt }]
+        }],
         generationConfig: {
           maxOutputTokens: maxTokens,
           temperature: 0.7
@@ -68,11 +70,13 @@ async function generateGeminiResponse(messages: any[], researchDepth: number): P
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error details:', errorText);
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.candidates[0]?.content?.parts[0]?.text || 'No response generated';
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
   } catch (error) {
     console.error('Gemini API error:', error);
     throw error;
@@ -346,11 +350,16 @@ Provide helpful, accurate responses based on the available information.`
         response = `I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.`;
       }
 
+      // Ensure response is defined
+      if (!response) {
+        response = `I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.`;
+      }
+
       // Store conversation
       const conversationId = data.conversationId || data.threadId || `conv_${Date.now()}`;
       const conversation = conversations.get(conversationId) || {
         id: conversationId,
-        title: data.query.slice(0, 50) + '...',
+        title: (data.query || 'New conversation').slice(0, 50) + '...',
         messages: [],
         createdAt: new Date().toISOString(),
         userId: data.userId
