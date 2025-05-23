@@ -20,8 +20,8 @@ async function generateFinancialAnalysis(query, model = 'auto', depth = 3) {
     // Select model based on availability, depth and preference
     let selectedModel = model;
 
-    // Prioritize Gemini for depth 3 when in auto mode
-    if (model === 'auto' && depth === 3 && GEMINI_API_KEY) {
+    // Use Gemini for depth 3 research
+    if (depth === 3 && GEMINI_API_KEY) {
       selectedModel = 'gemini-1.5-flash';
     }
 
