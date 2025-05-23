@@ -547,9 +547,23 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                             sources={getSourcesFromMetadata(msg)}
                           />
                         ) : (
-                          <ReactMarkdown>
-                            {msg.content}
-                          </ReactMarkdown>
+                          <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+                            <ReactMarkdown
+                              components={{
+                                h1: ({children}) => <h1 className="text-xl font-bold mt-6 mb-4 text-gray-900 border-b border-gray-200 pb-2">{children}</h1>,
+                                h2: ({children}) => <h2 className="text-lg font-semibold mt-6 mb-3 text-gray-900">{children}</h2>,
+                                h3: ({children}) => <h3 className="text-base font-semibold mt-4 mb-2 text-gray-900">{children}</h3>,
+                                strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                                p: ({children}) => <p className="mb-4 leading-relaxed text-gray-800">{children}</p>,
+                                ul: ({children}) => <ul className="list-disc list-inside my-4 space-y-2 ml-4">{children}</ul>,
+                                ol: ({children}) => <ol className="list-decimal list-inside my-4 space-y-2 ml-4">{children}</ol>,
+                                li: ({children}) => <li className="mb-2 leading-relaxed">{children}</li>,
+                                blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-4 my-4 italic text-gray-700 bg-gray-50 py-2">{children}</blockquote>
+                              }}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
                         )}
                         {/* Show model and search info if it's an assistant message */}
                         {!isUserMessage && msg.modelUsed && (
