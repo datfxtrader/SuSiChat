@@ -280,7 +280,7 @@ async def perform_deep_research(research_question: str, research_id: str):
         unique_results = []
         
         for result in all_search_results:
-            if result["url"] not in seen_urls:
+            if result and isinstance(result, dict) and result.get("url") and result["url"] not in seen_urls:
                 seen_urls.add(result["url"])
                 unique_results.append(result)
         
@@ -294,21 +294,24 @@ async def perform_deep_research(research_question: str, research_id: str):
             domain = "unknown"
             try:
                 from urllib.parse import urlparse
-                domain = urlparse(result["url"]).netloc
+                domain = urlparse(result.get("url", "")).netloc
             except:
                 pass
             
             source = {
-                "title": result["title"],
-                "url": result["url"],
+                "title": result.get("title", "Untitled"),
+                "url": result.get("url", ""),
                 "domain": domain,
-                "content": result["content"][:1000] if result["content"] else ""  # Limit content length
+                "content": result.get("content", "")[:1000] if result.get("content") else ""
             }
             sources.append(source)
             
             # Add to text representation for the LLM
-            sources_text += f"Source {i+1}: {result['title']} ({result['url']})\n"
-            sources_text += f"Content: {result['content'][:1000]}...\n\n"
+            title = result.get("title", "Untitled")
+            url = result.get("url", "")
+            content = result.get("content", "")[:1000]
+            sources_text += f"Source {i+1}: {title} ({url})\n"
+            sources_text += f"Content: {content}...\n\n"
         
         # Step 5: Generate comprehensive research report
         log_entries.append("Generating comprehensive research report...")
