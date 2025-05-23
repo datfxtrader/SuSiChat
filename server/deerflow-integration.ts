@@ -504,7 +504,18 @@ Your report should:
     const startTime = Date.now();
 
     try {
-      console.log('Starting DeerFlow research pipeline for query:', params.query);
+      console.log('Starting enhanced DeerFlow-Suna research pipeline for query:', params.query);
+
+      // First let Suna analyze and decompose the task
+      const { sendMessageToSuna } = require('./suna-integration');
+      const sunaAnalysis = await sendMessageToSuna({
+        query: params.query,
+        researchDepth: 3, // Maximum depth for comprehensive research
+        model: params.modelId || "deepseek-chat"
+      });
+
+      // Extract insights from Suna's initial analysis
+      const sunaResults = sunaAnalysis?.message?.content || '';
 
       // First let DeerFlow analyze and decompose the task
       const deerflowClient = require('./deerflow-client').deerflowClient;
@@ -732,11 +743,20 @@ Your report should:
 
       // Return the research result, always labeling as Deep research even if we used fallback
       // This ensures consistent user experience
+      // Combine DeerFlow and Suna insights
+      const combinedReport = `
+${report}
+
+Additional Insights (via Suna Analysis):
+${sunaResults}
+`;
+
       return {
-        report,
-        sources,
+        report: combinedReport,
+        sources: [...sources, ...(sunaAnalysis?.message?.searchMetadata?.sourceDetails || [])],
         depth: ResearchDepth.Deep,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
+        enhancedWithSuna: true
       };
     } catch (error) {
       console.error('Error performing deep research with DeerFlow:', error);
