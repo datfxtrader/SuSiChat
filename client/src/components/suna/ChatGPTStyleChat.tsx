@@ -65,76 +65,7 @@ function logSourceInfo(source: Source) {
 // Note: ResearchProgress component is now imported from ./ResearchProgress.tsx
 // This provides dynamic, real-time progress tracking instead of static values
 
-// Research response component
-interface ResearchResponseProps {
-  content: string;
-  sources: Source[];
-}
-
-const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources }) => {
-  const [expandedSources, setExpandedSources] = useState(false);
-  
-  // Clean content processing - remove all citations and sources sections
-  const renderCleanContent = (text: string) => {
-    // Remove everything after "Sources:" section
-    const contentSplit = text.split(/Sources:/i);
-    let cleanContent = contentSplit[0];
-    
-    // Remove all citation markers [1], [2], etc. from the content
-    cleanContent = cleanContent.replace(/\[\d+\]/g, '');
-    
-    // Clean up any double spaces or formatting issues from removed citations
-    cleanContent = cleanContent.replace(/\s+/g, ' ').trim();
-    
-    return <ReactMarkdown>{cleanContent}</ReactMarkdown>;
-  };
-  
-  return (
-    <div className="flex flex-col">
-      {/* Main response content */}
-      <div className="prose prose-blue max-w-none">
-        {renderCleanContent(content)}
-      </div>
-      
-      {/* Sources section */}
-      {sources.length > 0 && (
-        <div className="mt-3">
-          <button 
-            onClick={() => setExpandedSources(!expandedSources)}
-            className="flex items-center text-xs text-gray-500 hover:text-gray-700"
-          >
-            {expandedSources ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
-            {expandedSources ? "Hide Sources" : `View ${sources.length} Sources`}
-          </button>
-          
-          {expandedSources && (
-            <div className="mt-2 border-t pt-2">
-              <h4 className="text-sm font-medium text-gray-700">Sources</h4>
-              <div className="space-y-2 mt-1">
-                {sources.map((source, index) => (
-                  <div key={index} className="text-xs flex">
-                    <span className="font-medium mr-2">[{index + 1}]</span>
-                    <div>
-                      <a 
-                        href={source.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline font-medium"
-                      >
-                        {source.title}
-                      </a>
-                      <p className="text-gray-500">{source.domain}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+// Research response component is now imported from './ResearchResponse'
 
 interface ChatGPTStyleChatProps {
   threadId?: string;
