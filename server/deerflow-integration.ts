@@ -741,31 +741,37 @@ Your report should:
     } catch (error) {
       console.error('Error performing deep research with DeerFlow:', error);
 
-      // Log detailed error information
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        query: params.query,
-        errorType: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error)
-      };
-      console.log('DeerFlow error details:', errorDetails);
+      // Classify error type
+      const isNetworkError = error.message?.includes('network') || 
+                          error.message?.includes('ECONNREFUSED') ||
+                          error.code === 'ECONNRESET';
 
-      // First try recovery with retries
-      if (error instanceof Error && error.message.includes('timeout')) {
-        console.log('Timeout error detected, retrying with longer timeout...');
+      const isTimeoutError = error.message?.includes('timeout') ||
+                          error.code === 'ETIMEDOUT';
+
+      // Handle specific error types
+      if (isNetworkError) {
+        console.log('Network error detected, attempting reconnection...');
         try {
-          const retryResponse = await this.performDeepResearch({
-            ...params,
-            timeout: 60000 // Extended timeout
-          });
-          if (retryResponse.report) return retryResponse;
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return await this.performDeepResearch(params);
         } catch (retryError) {
-          console.error('Retry also failed:', retryError);
+          console.error('Reconnection failed:', retryError);
         }
       }
 
-      // Fall back to enhanced research if recovery fails
-      console.log('DeerFlow service unavailable or recovery failed. Falling back to enhanced research...');
+      if (isTimeoutError) {
+        console.log('Timeout detected, retrying with extended timeout...');
+        try {
+          return await this.performDeepResearch({
+            ...params,
+            timeout: 60000
+          });
+        } catch (retryError) {
+          console.error('Extended timeout retry failed:', retryError);
+        }
+      }
+
       return this.performEnhancedResearch(params);
     }
   }
