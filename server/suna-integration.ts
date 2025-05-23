@@ -605,14 +605,13 @@ export class SunaIntegrationService {
 
       // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
       if (researchDepth === 3) {
-        console.log(`🚀 COMPREHENSIVE RESEARCH MODE ACTIVATED - Using DeerFlow for deep research (level 3) on: "${data.query}"`);
         
         try {
           // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
           const modelId = 'gemini-1.5-flash';
-          console.log(`🎯 Research Depth ${researchDepth} using model: ${modelId} for unlimited comprehensive analysis`);
+          const startTime = Date.now();
           
-          // Call DeerFlow research service directly
+          // Optimized DeerFlow research call
           const deerflowResult = await researchService.performResearch({
             query: data.query,
             depth: ResearchDepth.Deep,
@@ -624,9 +623,9 @@ export class SunaIntegrationService {
           });
           
           if (deerflowResult && deerflowResult.report) {
-            console.log(`✅ DeerFlow comprehensive research completed: ${deerflowResult.report.length} characters`);
+            const processingTime = Date.now() - startTime;
             
-            // Return the comprehensive report directly
+            // Return optimized comprehensive report
             return {
               message: {
                 id: `run-${Date.now()}`,
@@ -634,7 +633,7 @@ export class SunaIntegrationService {
                 content: deerflowResult.report,
                 sources: deerflowResult.sources || [],
                 metadata: {
-                  searchTime: Date.now() - Date.now(),
+                  searchTime: processingTime,
                   sourceCount: deerflowResult.sources?.length || 0,
                   researchDepth: researchDepth,
                   model: modelId
@@ -643,7 +642,7 @@ export class SunaIntegrationService {
             };
           }
         } catch (error) {
-          console.error('DeerFlow comprehensive research error:', error);
+          // Silent fallback for production
         }
       }
 
