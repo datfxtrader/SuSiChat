@@ -685,6 +685,8 @@ Your report should:
         report = this.formatResearchReport(deerflowResponse.response);
         console.log('Found report as string in response, length:', report.length);
       }
+    }
+  }
 
   private formatResearchReport(report: string): string {
     // Fix common formatting issues
