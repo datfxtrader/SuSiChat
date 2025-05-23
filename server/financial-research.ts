@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 import { ResearchResult, ResearchDepth } from './deerflow-integration';
 
@@ -36,7 +35,7 @@ const FINANCIAL_SOURCES = [
  */
 export function isFinancialQuery(query: string): boolean {
   if (!query) return false;
-  
+
   const financialTerms = [
     'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad',
     'forex', 'currency', 'exchange rate', 'pip', 'spread',
@@ -54,11 +53,12 @@ export function isFinancialQuery(query: string): boolean {
  */
 async function generateFinancialAnalysis(query: string): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  
+  const API_TIMEOUT = 30000;
+
   if (!apiKey) {
     throw new Error('DeepSeek API key not available');
   }
-  
+
   const response = await axios.post(
     'https://api.deepseek.com/v1/chat/completions',
     {
@@ -88,14 +88,14 @@ Current date: ${new Date().toISOString().split('T')[0]}`
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      timeout: 30000
+      timeout: API_TIMEOUT
     }
   );
-  
+
   if (!response.data?.choices?.[0]?.message?.content) {
     throw new Error('Invalid API response format');
   }
-  
+
   return response.data.choices[0].message.content;
 }
 
@@ -104,10 +104,10 @@ Current date: ${new Date().toISOString().split('T')[0]}`
  */
 export async function performFinancialResearch(query: string): Promise<ResearchResult> {
   const startTime = Date.now();
-  
+
   try {
     const report = await generateFinancialAnalysis(query);
-    
+
     return {
       report,
       sources: FINANCIAL_SOURCES,
