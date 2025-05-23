@@ -505,14 +505,23 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                       {researchMode ? (
                         <div className="flex flex-col">
-                          <ResearchProgress 
-                            stage={Math.floor(Math.random() * 4) + 1} 
-                            progress={Math.floor(Math.random() * 100)}
-                            query={message}
-                            isActive={isSending}
-                          />
-                          <div className="mt-2 text-xs text-gray-500">
-                            Running parallel search: DuckDuckGo + Brave + Tavily...
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                              <span className="text-sm text-gray-700">Analyzing your research query...</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                              <span className="text-sm text-gray-700">Running parallel searches: DuckDuckGo + Brave + Tavily</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+                              <span className="text-sm text-gray-700">Processing results with AI analysis...</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                              <span className="text-sm text-gray-700">Generating comprehensive report...</span>
+                            </div>
                           </div>
                         </div>
                       ) : (
