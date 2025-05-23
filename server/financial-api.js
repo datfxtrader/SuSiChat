@@ -13,12 +13,17 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 /**
  * Generate financial/forex analysis 
  */
-async function generateFinancialAnalysis(query, model = 'auto') {
+async function generateFinancialAnalysis(query, model = 'auto', depth = 3) {
   console.log('Generating financial analysis for:', query);
 
   try {
-    // Select model based on availability and preference
+    // Select model based on availability, depth and preference
     let selectedModel = model;
+
+    // Prioritize Gemini for depth 3 when in auto mode
+    if (model === 'auto' && depth === 3 && GEMINI_API_KEY) {
+      selectedModel = 'gemini-1.5-flash';
+    }
 
     // If model is specified directly, verify API key availability
     if (model.startsWith('gemini') && !GEMINI_API_KEY) {
@@ -165,7 +170,7 @@ async function performFinancialResearch(query, depth = 3, model = 'auto') {
   console.log(`Performing financial research at depth ${depth} for: ${query}`);
 
   const startTime = Date.now();
-  const { report, sources, success, model: usedModel } = await generateFinancialAnalysis(query, model);
+  const { report, sources, success, model: usedModel } = await generateFinancialAnalysis(query, model, depth);
 
   return {
     report,
