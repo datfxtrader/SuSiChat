@@ -10,7 +10,7 @@ const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
 /**
  * Perform a web search using available search engines
  */
-async function performWebSearch(query: string, maxResults: number = 5) {
+export async function performWebSearch(query: string, maxResults: number = 5) {
   console.log(`Performing web search for: "${query}"`);
   
   try {
@@ -185,6 +185,3 @@ async function performWebSearch(query: string, maxResults: number = 5) {
 
 // Make the function available globally to avoid circular imports
 (global as any).performWebSearch = performWebSearch;
-
-// Export the function
-export { performWebSearch };
