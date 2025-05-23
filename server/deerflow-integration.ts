@@ -470,7 +470,7 @@ Your report should:
       const result = await financialResearch.generateFinancialAnalysis(params.query);
 
       // Format sources to match ResearchSource interface
-      const sources: ResearchSource[] = result.sources.map(source => ({
+      const sources: ResearchSource[] = result.sources.map((source: {title: string; url: string; domain: string}) => ({
         title: source.title,
         url: source.url,
         domain: source.domain
