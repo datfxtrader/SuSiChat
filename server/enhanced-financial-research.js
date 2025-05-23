@@ -1,5 +1,10 @@
 /**
  * Enhanced financial market research module
+
+const NodeCache = require('node-cache');
+const cache = new NodeCache({ stdTTL: 300 }); // 5 minute cache
+
+
  * This module integrates web search results with specialized financial analysis
  */
 
@@ -13,6 +18,14 @@ const axios = require('axios');
 async function generateMarketAnalysis(query) {
   console.log(`Generating enhanced financial analysis for: ${query}`);
   const startTime = Date.now();
+  
+  // Check cache first
+  const cacheKey = `market-analysis-${query}`;
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    console.log('Returning cached analysis');
+    return cachedResult;
+  }
   
   // Step 1: Perform web search to get real-time data
   const webSearchResults = await performFinancialWebSearch(query);
@@ -39,10 +52,25 @@ async function performFinancialWebSearch(query) {
     const searchEndpoint = '/api/web-search';
     const formattedQuery = formatFinancialQuery(query);
     
-    const response = await axios.post(searchEndpoint, {
-      query: formattedQuery,
-      maxResults: 10
-    });
+    const maxRetries = 3;
+    let retryCount = 0;
+    let response;
+
+    while (retryCount < maxRetries) {
+      try {
+        response = await axios.post(searchEndpoint, {
+          query: formattedQuery,
+          maxResults: 10
+        }, {
+          timeout: 10000
+        });
+        break;
+      } catch (error) {
+        retryCount++;
+        if (retryCount === maxRetries) throw error;
+        await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+      }
+    }
     
     if (response.data && response.data.results && response.data.results.length > 0) {
       return response.data.results;
@@ -119,6 +147,32 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
+
+/**
+ * Validate search result credibility
+ */
+function validateSourceCredibility(result) {
+  // List of trusted financial domains
+  const trustedDomains = [
+    'bloomberg.com',
+    'reuters.com',
+    'ft.com',
+    'wsj.com',
+    'investing.com',
+    'fxstreet.com',
+    'tradingview.com',
+    'dailyfx.com'
+  ];
+  
+  try {
+    const domain = new URL(result.url).hostname;
+    return trustedDomains.some(trusted => domain.includes(trusted));
+  } catch (e) {
+    return false;
+  }
+}
+
+
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.3,
