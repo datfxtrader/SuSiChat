@@ -43,7 +43,7 @@ args = "node start-suna.js"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "sleep 2"
+args = "sleep 5"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
@@ -51,7 +51,7 @@ args = "python deerflow_service/server.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "sleep 2"
+args = "sleep 5"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
