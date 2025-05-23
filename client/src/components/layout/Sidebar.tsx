@@ -116,18 +116,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
             </div>
 
             {familyRooms.map((room) => (
-              <Link 
-                key={room.id} 
-                href={`/family-room/${room.id}`}
-                onClick={handleItemClick}
-              >
-                <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-1">
-                  <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center">
-                    <span className="material-icons text-white text-sm">home</span>
+              <div key={room.id} onClick={handleItemClick}>
+                <Link href={`/family-room/${room.id}`}>
+                  <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-1">
+                    <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center">
+                      <span className="material-icons text-white text-sm">home</span>
+                    </div>
+                    <span>{room.name}</span>
                   </div>
-                  <span>{room.name}</span>
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         )}
