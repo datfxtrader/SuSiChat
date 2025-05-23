@@ -81,9 +81,12 @@ export async function performWebSearch(
     }
   }
 
-  // Try Brave as backup
+  // Try Brave as backup (with rate limiting)
   if (BRAVE_API_KEY && results.length < maxResults) {
     try {
+      // Add 1.2 second delay to respect Brave's rate limit (1 req/sec)
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      
       const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
         params: {
           q: query,

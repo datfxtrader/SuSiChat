@@ -110,6 +110,18 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                 {children}
               </td>
             ),
+            // Enhanced link formatting to make URLs clickable
+            a: ({href, children}) => (
+              <a 
+                href={href} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                {children}
+                <ExternalLink className="inline w-3 h-3 ml-1" />
+              </a>
+            ),
             // Let ReactMarkdown handle all text formatting naturally
           }}
         >
