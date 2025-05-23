@@ -8,7 +8,6 @@ import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./
 
 import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
-import forexDataRoutes from "./routes/forexData";
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -27,9 +26,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Mount web search routes
   app.use('/api/web-search', webSearchRoutes);
-  
-  // Mount forex data routes
-  app.use('/api/forex', forexDataRoutes);
   
   const httpServer = createServer(app);
   
