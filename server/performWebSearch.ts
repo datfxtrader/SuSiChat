@@ -28,12 +28,25 @@ export interface WebSearchResponse {
 const SEARCH_TIMEOUT = 15000;
 const MAX_SEARCH_RETRIES = 3;
 
+// Unified search service for both Suna and DeerFlow
+const searchCache = new Map<string, {results: WebSearchResponse, timestamp: number}>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export async function performWebSearch(
   query: string, 
   maxResults: number = 20,
   retries: number = MAX_SEARCH_RETRIES,
-  diversitySources: boolean = true
+  diversitySources: boolean = true,
+  systemId: 'suna' | 'deerflow' = 'suna' // Track which system is making the request
 ): Promise<WebSearchResponse> {
+
+  // Check cache first
+  const cacheKey = `${query}-${maxResults}-${systemId}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    console.log(`Using cached search results for ${systemId}`);
+    return cached.results;
+  }
   console.log(`Performing web search for: "${query}"`);
 
   const results: SearchResult[] = [];

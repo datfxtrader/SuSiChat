@@ -741,7 +741,7 @@ class SunaIntegrationService {
 
           // Continue with regular web search for depth 1 & 2
           console.log(`Web search using refined query: ${finalQuery}`);
-          webSearchResults = await performWebSearch(finalQuery);
+          webSearchResults = await performWebSearch(finalQuery, maxResults, 3, true, 'suna');
 
           // Format search results and handle potential null/undefined results
           const webSearchError = webSearchResults?.error || null;

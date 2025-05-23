@@ -154,7 +154,7 @@ export class ResearchService {
 
     try {
       const { performWebSearch } = require('./performWebSearch');
-      const searchResults = await performWebSearch(params.query);
+      const searchResults = await performWebSearch(params.query, 20, 3, true, 'deerflow');
 
       if (searchResults.error) {
         throw new Error(`Web search error: ${searchResults.error}`);
