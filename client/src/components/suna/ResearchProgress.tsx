@@ -71,6 +71,8 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
   const [currentProgress, setCurrentProgress] = useState(progress);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [currentSearchStep, setCurrentSearchStep] = useState("");
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
   // Simulate realistic progress updates when active
   useEffect(() => {
@@ -223,12 +225,36 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
         })}
       </div>
 
-      {/* Real-time Status */}
-      <div className="flex items-center justify-center space-x-1 text-xs text-gray-500 bg-gray-50 rounded-md py-2">
-        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-        <span>
-          {isActive ? 'Researching in real-time...' : 'Research paused'}
-        </span>
+      {/* Real-time Status with current search step */}
+      <div className="bg-gray-50 rounded-md py-3 px-4">
+        <div className="flex items-center justify-center space-x-1 text-xs text-gray-500 mb-2">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <span>
+            {isActive ? 'Researching in real-time...' : 'Research paused'}
+          </span>
+        </div>
+        
+        {/* Current search step display */}
+        {currentSearchStep && (
+          <div className="text-xs text-gray-700 text-center mb-2">
+            <span className="font-medium">🔍 Current: </span>
+            {currentSearchStep}
+          </div>
+        )}
+        
+        {/* Recent search history */}
+        {searchHistory.length > 0 && (
+          <div className="max-h-20 overflow-y-auto">
+            <div className="text-xs text-gray-500 space-y-1">
+              {searchHistory.slice(-3).map((step, index) => (
+                <div key={index} className="flex items-center">
+                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="truncate">{step}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
