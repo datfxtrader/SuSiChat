@@ -1,20 +1,18 @@
-import { deerflowClient } from './deerflow-client';
-import { performWebSearch } from './webSearch';
 
-export async function performFinancialResearch(query: string, options = {}) {
+import { Router } from 'express';
+import { performFinancialAnalysis } from './deerflow-integration';
+import { isAuthenticated } from './replitAuth';
+
+const router = Router();
+
+router.post('/analyze', isAuthenticated, async (req, res) => {
   try {
-    const deerflowResult = await deerflowClient.performResearch({
-      research_question: query,
-      include_market_data: true,
-      research_tone: 'analytical'
-    });
-
-    return {
-      analysis: deerflowResult.report,
-      sources: deerflowResult.sources
-    };
+    const result = await performFinancialAnalysis(req.body);
+    res.json(result);
   } catch (error) {
-    console.error('Financial research error:', error);
-    return { error: 'Research failed' };
+    console.error('Financial analysis error:', error);
+    res.status(500).json({ error: 'Failed to perform financial analysis' });
   }
-}
+});
+
+export default router;

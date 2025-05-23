@@ -1,28 +1,21 @@
 
 import axios from 'axios';
-import { performDeerFlowSearch } from './deerflow-integration';
+import { performRobustSearch } from './robustWebSearch';
+import { SafeSearchProvider } from './safeWebSearch';
 
-export async function performWebSearch(query: string, numResults = 10, maxDepth = 2, includeContent = true, source = 'brave') {
+export async function performWebSearch(query: string, options = {}) {
   try {
-    if (source === 'deerflow') {
-      return await performDeerFlowSearch(query, numResults);
+    // First attempt robust search
+    const robustResults = await performRobustSearch(query);
+    if (robustResults && robustResults.length > 0) {
+      return robustResults;
     }
-    
-    // Fallback to Brave search
-    const response = await axios.get(`https://api.search.brave.com/res/v1/web/search`, {
-      headers: { 'X-Subscription-Token': process.env.BRAVE_API_KEY },
-      params: { q: query, count: numResults }
-    });
 
-    return {
-      results: response.data.web.results.map((result: any) => ({
-        title: result.title,
-        url: result.url,
-        snippet: result.description
-      }))
-    };
+    // Fallback to safe search
+    const safeSearch = new SafeSearchProvider();
+    return await safeSearch.search(query);
   } catch (error) {
     console.error('Web search error:', error);
-    return { error: 'Search failed', results: [] };
+    throw error;
   }
 }
