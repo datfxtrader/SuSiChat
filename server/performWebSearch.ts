@@ -185,6 +185,3 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
 
 // Make the function available globally to avoid circular imports
 (global as any).performWebSearch = performWebSearch;
-
-// Export the function directly to avoid errors with require
-export { performWebSearch };
