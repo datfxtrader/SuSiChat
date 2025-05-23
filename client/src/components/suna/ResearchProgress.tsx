@@ -76,17 +76,20 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
 
   // Simulate realistic progress updates when active
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) return () => {};
 
     const interval = setInterval(() => {
-      setTimeElapsed(prev => prev + 1);
-      
+      setTimeElapsed(prev => {
+        const newValue = prev + 0.5;
+        return isActive ? newValue : prev;
+      });
+
       // Simulate stage progression based on time
       const totalTime = timeElapsed;
       let newStage = 1;
       let stageProgress = 0;
       let cumulativeTime = 0;
-      
+
       for (const stageInfo of progressStages) {
         if (totalTime >= cumulativeTime && totalTime < cumulativeTime + stageInfo.duration) {
           newStage = stageInfo.id;
@@ -98,7 +101,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
           newStage = Math.min(stageInfo.id + 1, progressStages.length);
         }
       }
-      
+
       setCurrentStage(newStage);
       setCurrentProgress(Math.min(stageProgress, 100));
     }, 1000);
@@ -110,7 +113,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
   useEffect(() => {
     const targetProgress = currentProgress;
     const diff = targetProgress - animatedProgress;
-    
+
     if (Math.abs(diff) > 1) {
       const step = diff > 0 ? 2 : -2;
       const timer = setTimeout(() => {
@@ -119,7 +122,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
           return diff > 0 ? Math.min(next, targetProgress) : Math.max(next, targetProgress);
         });
       }, 50);
-      
+
       return () => clearTimeout(timer);
     }
   }, [currentProgress, animatedProgress]);
@@ -233,7 +236,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
             {isActive ? 'Researching in real-time...' : 'Research paused'}
           </span>
         </div>
-        
+
         {/* Current search step display */}
         {currentSearchStep && (
           <div className="text-xs text-gray-700 text-center mb-2">
@@ -241,7 +244,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
             {currentSearchStep}
           </div>
         )}
-        
+
         {/* Recent search history */}
         {searchHistory.length > 0 && (
           <div className="max-h-20 overflow-y-auto">
