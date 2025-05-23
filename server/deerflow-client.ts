@@ -29,6 +29,14 @@ export interface DeerFlowResearchParams {
 export interface DeerFlowResearchResponse {
   status?: any;
   report?: string;
+  response?: {
+    report?: string;
+    sources?: Array<{
+      title: string;
+      url: string;
+      domain: string;
+    }>;
+  };
   visualization_path?: string;
   timestamp?: string;
   sources?: Array<{
