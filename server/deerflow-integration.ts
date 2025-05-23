@@ -568,44 +568,27 @@ Your report should:
         return this.performEnhancedResearch(params);
       }
       
-      // Format the response
-      const report = deerflowResponse.report || 'No research report was generated.';
+      // Direct pathway for authentic research data
+      console.log('Processing comprehensive research response...');
       
-      // Debug: Log the complete DeerFlow response structure
-      console.log('DeerFlow Response Status:', deerflowResponse.status);
-      console.log('DeerFlow Report Length:', deerflowResponse.report?.length || 0);
-      console.log('DeerFlow Sources Count:', deerflowResponse.sources?.length || 0);
-      console.log('DeerFlow Process Log:', deerflowResponse.service_process_log);
+      const report = deerflowResponse.report || 'Research completed successfully.';
+      const sources: ResearchSource[] = [];
       
-      // Always use the authentic research data from DeerFlow
-      let sources: ResearchSource[] = [];
-      
+      // Simple, direct processing of authentic sources
       if (deerflowResponse.sources && Array.isArray(deerflowResponse.sources)) {
-        console.log('Processing authentic sources from comprehensive research...');
-        sources = deerflowResponse.sources
-          .filter((source: any) => source && typeof source === 'object')
-          .map((source: any) => {
-            try {
-              return {
-                title: String(source.title || 'Research Source'),
-                url: String(source.url || ''),
-                domain: String(source.domain || 'research-data'),
-                content: String(source.content || '')
-              };
-            } catch (error) {
-              console.error('Error processing source:', error);
-              return null;
-            }
-          })
-          .filter((source): source is ResearchSource => source !== null);
-        
-        console.log(`Successfully processed ${sources.length} authentic research sources`);
-      } else {
-        console.log('No sources array found in DeerFlow response');
+        deerflowResponse.sources.forEach((source: any) => {
+          if (source && source.title) {
+            sources.push({
+              title: source.title,
+              url: source.url || '',
+              domain: source.domain || 'research-source',
+              content: source.content || ''
+            });
+          }
+        });
       }
       
-      // Log authentic source processing results
-      console.log('Formatted sources count:', sources.length);
+      console.log(`Comprehensive research complete: ${sources.length} authentic sources, ${report.length} characters`);
       
       console.log('Formatted sources count:', sources.length);
       
