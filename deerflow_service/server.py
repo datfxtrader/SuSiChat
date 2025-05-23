@@ -268,7 +268,8 @@ async def perform_deep_research(research_question: str, research_id: str):
             "status": "in_progress",
             "start_time": time.time(),
             "log": log_entries,
-            "sources": []
+            "sources": [],
+            "research_depth": 3  # Default to maximum depth for comprehensive reports
         }
         
         # Step 1: Generate query variations for broader search
