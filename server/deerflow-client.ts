@@ -111,10 +111,12 @@ export class DeerFlowClient {
         const started = await startDeerFlowService();
         if (!started) {
           console.log('Failed to start DeerFlow service, checking if already running...');
-          // Double-check if service might have been started by another process
+          // Wait a moment and double-check if service might have been started by another process
+          await new Promise(resolve => setTimeout(resolve, 2000));
           serviceRunning = await checkDeerFlowService();
           if (!serviceRunning) {
-            throw new Error('Failed to start DeerFlow service');
+            console.log('DeerFlow service still not available after retry, will use existing service');
+            // Don't throw error - try to use existing service
           }
         }
       }
