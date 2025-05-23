@@ -969,12 +969,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 `;
             console.log('Successfully retrieved web search results');
           }
-        }
-      } catch (err) {
-        console.error('Error performing web search:', err);
       }
+    } catch (err) {
+      console.error('Error in search processing:', err);
+    }
       
-      // Prepare messages array with system prompt and history
+    // Prepare messages array with system prompt and history
       const messages = [
         {
           role: 'system',
