@@ -30,9 +30,8 @@ const MAX_SEARCH_RETRIES = 3;
 
 export async function performWebSearch(
   query: string, 
-  maxResults: number = 20,
-  retries: number = MAX_SEARCH_RETRIES,
-  diversitySources: boolean = true
+  maxResults: number = 5,
+  retries: number = MAX_SEARCH_RETRIES
 ): Promise<WebSearchResponse> {
   console.log(`Performing web search for: "${query}"`);
 
@@ -50,7 +49,7 @@ export async function performWebSearch(
       try {
         console.log('Starting DuckDuckGo search...');
         const duckResponse = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1&skip_disambig=1`);
-
+        
         if (duckResponse.data?.RelatedTopics) {
           duckduckgoResults = duckResponse.data;
           const topics = duckResponse.data.RelatedTopics.slice(0, Math.ceil(maxResults / 3));
@@ -81,14 +80,13 @@ export async function performWebSearch(
           console.log('Starting Brave search...');
           // Small delay for Brave rate limiting
           await new Promise(resolve => setTimeout(resolve, 500));
-
+          
           const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
             params: {
               q: query,
-              count: Math.min(maxResults * 2, 30), // Get more results to account for filtering
-              freshness: 'day', // Prioritize very recent results
-              textDecorations: false,
-              textFormat: 'raw'
+              count: Math.ceil(maxResults / 2),
+              search_lang: 'en',
+              freshness: 'month',
             },
             headers: {
               'Accept': 'application/json',

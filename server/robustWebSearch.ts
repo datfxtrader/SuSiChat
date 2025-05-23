@@ -11,7 +11,7 @@ const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
 /**
  * Perform a web search with robust error handling
  */
-export async function robustWebSearch(query: string, maxResults: number = 20) {
+export async function robustWebSearch(query: string, maxResults: number = 5) {
   console.log(`Performing robust web search for: "${query}"`);
   
   const results: any[] = [];

@@ -659,10 +659,15 @@ class SunaIntegrationService {
           const startTime = Date.now();
 
           // Optimized DeerFlow research call
-          const deerflowResult = await researchService.performDeepResearch(
-            data.query,
-            researchDepth
-          );
+          const deerflowResult = await researchService.performResearch({
+            query: data.query,
+            depth: ResearchDepth.Deep,
+            modelId: modelId,
+            researchDepth: researchDepth,
+            researchLength: 'comprehensive',
+            researchTone: 'analytical',
+            minWordCount: 2500
+          });
 
           if (deerflowResult && deerflowResult.report) {
             const processingTime = Date.now() - startTime;
@@ -977,6 +982,8 @@ ${recencyIndicator}
 URL: ${result.url || 'No URL available'}
 Content: ${result.content || result.description || 'No content available'}`;
 }).join('\n\n') || 'No results found'}
+
+${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
 
 Current Date: ${new Date().toISOString().split('T')[0]}
 `;

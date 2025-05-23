@@ -57,7 +57,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
-
+  
   const { 
     messages = [], 
     allConversations = [] as SunaConversation[],
@@ -81,7 +81,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
         "Analyzing available context...",
         "Generating comprehensive answer..."
       ];
-
+      
       const interval = 700; // ms between thinking steps
       steps.forEach((step, index) => {
         setTimeout(() => {
@@ -106,7 +106,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
 
   const handleSendMessage = () => {
     if (!message.trim()) return;
-
+    
     sendMessage({ message });
     setMessage('');
   };
@@ -145,7 +145,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
 
   const renderMessage = (msg: { id?: string; role: string; content: string; timestamp: string }, index: number) => {
     const isUserMessage = msg.role === 'user';
-
+    
     return (
       <div
         key={msg.id || index}
@@ -172,7 +172,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
               <span className="text-xs font-medium">Suna AI</span>
             </div>
           )}
-
+          
           <div className="whitespace-pre-wrap break-words">
             <ReactMarkdown
               components={{
@@ -203,7 +203,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
               {msg.content}
             </ReactMarkdown>
           </div>
-
+          
           <span className="text-xs opacity-70 mt-2 self-end">
             {formatRelativeTime(new Date(msg.timestamp))}
           </span>
@@ -214,7 +214,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
 
   const renderThinkingIndicator = () => {
     if (!showThinking || !isSending) return null;
-
+    
     return (
       <div className="flex w-full mb-4 justify-start">
         <div className="flex flex-col max-w-[80%] rounded-2xl p-4 bg-muted/60 text-card-foreground rounded-tl-none shadow-sm">
@@ -224,7 +224,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
             </div>
             <span className="text-xs font-medium">Suna AI is thinking</span>
           </div>
-
+          
           <div className="whitespace-pre-wrap break-words">
             {thinkingSteps.map((step, idx) => (
               <div key={idx} className="flex items-center mb-1 opacity-90">
@@ -232,7 +232,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
                 <span className="text-sm">{step}</span>
               </div>
             ))}
-
+            
             <div className="flex items-center">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
               <span className="text-sm">Processing...</span>
@@ -313,7 +313,7 @@ export function ModernSunaChat({ threadId }: ModernSunaChatProps) {
                 : 'New Conversation'}
             </h1>
           </div>
-
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">

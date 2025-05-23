@@ -17,7 +17,7 @@ interface ResearchResponseProps {
 
 export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources }) => {
   const [showAllSources, setShowAllSources] = useState(false);
-
+  
   // Display first 6 sources, then show more button
   const displaySources = showAllSources ? sources : sources.slice(0, 6);
   const hasMoreSources = sources.length > 6;
@@ -25,11 +25,11 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
   return (
     <div className="space-y-4">
       {/* Main research content with enhanced markdown formatting */}
-      <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed space-y-4">
+      <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
         <ReactMarkdown
           components={{
             h1: ({children}) => (
-              <h1 className="text-xl font-bold mt-4 mb-3 text-gray-900 border-b-2 border-blue-500 pb-2">
+              <h1 className="text-xl font-bold mt-8 mb-4 text-gray-900 border-b-2 border-blue-500 pb-2">
                 {children}
               </h1>
             ),
@@ -54,7 +54,7 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
               </strong>
             ),
             p: ({children}) => (
-              <p className="my-2 leading-relaxed text-gray-800">
+              <p className="mb-4 leading-relaxed text-gray-800">
                 {children}
               </p>
             ),
@@ -122,22 +122,14 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                 <ExternalLink className="inline w-3 h-3 ml-1" />
               </a>
             ),
-            // Enhanced quote formatting
-            blockquote: ({children}) => (
-              <div className="flex gap-2 my-4">
-                <div className="w-1 bg-blue-500 rounded" />
-                <blockquote className="text-gray-700 italic pl-4">
-                  {children}
-                </blockquote>
-              </div>
-            ),
+            // Let ReactMarkdown handle all text formatting naturally
           }}
         >
           {content}
         </ReactMarkdown>
       </div>
 
-      {/* Sources section with enhanced styling */}
+      {/* Sources section */}
       {sources.length > 0 && (
         <div className="mt-6 pt-4 border-t border-gray-200">
           <div className="flex items-center justify-between mb-3">
@@ -146,7 +138,7 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
               Sources ({sources.length})
             </h4>
           </div>
-
+          
           <div className="grid gap-2">
             {displaySources.map((source, index) => (
               <a
@@ -154,16 +146,16 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-start p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors no-underline"
+                className="group flex items-start p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
               >
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-600 mr-3 mt-0.5">
                   {index + 1}
                 </div>
                 <div className="flex-grow min-w-0">
-                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate leading-snug">
+                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate">
                     {source.title}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1.5 flex items-center space-x-2">
+                  <div className="text-xs text-gray-500 mt-1 flex items-center">
                     <span className="truncate">{source.domain}</span>
                     {source.publishedDate && (
                       <>
