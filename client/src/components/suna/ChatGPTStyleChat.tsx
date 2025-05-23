@@ -97,19 +97,19 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources })
             const sourceIndex = parseInt(citationMatch[1]) - 1;
             if (sourceIndex >= 0 && sourceIndex < sources.length) {
               return (
-                <span key={i} className="inline-flex items-center">
-                  <a 
-                    href="#"
+                <span key={i} className="inline-flex items-baseline">
+                  <sup 
                     onClick={(e) => {
                       e.preventDefault();
                       // Open in a new window to prevent navigation issues
                       window.open(sources[sourceIndex]?.url, '_blank', 'noopener,noreferrer');
                       return false;
                     }}
-                    className="text-blue-600 bg-blue-50 rounded px-1 text-xs font-medium hover:bg-blue-100"
+                    className="text-blue-600 hover:text-blue-800 cursor-pointer text-xs font-medium mx-0.5"
+                    title={`Source: ${sources[sourceIndex]?.title || 'View source'}`}
                   >
-                    {part}
-                  </a>
+                    {citationMatch[1]}
+                  </sup>
                 </span>
               );
             }
