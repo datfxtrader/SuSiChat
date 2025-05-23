@@ -568,27 +568,32 @@ Your report should:
         return this.performEnhancedResearch(params);
       }
       
-      // Direct pathway for authentic research data
+      // Extract authentic research data directly
       console.log('Processing comprehensive research response...');
+      console.log('Raw DeerFlow response:', JSON.stringify(deerflowResponse, null, 2));
       
-      const report = deerflowResponse.report || 'Research completed successfully.';
+      const report = deerflowResponse.report || '';
       const sources: ResearchSource[] = [];
       
-      // Simple, direct processing of authentic sources
-      if (deerflowResponse.sources && Array.isArray(deerflowResponse.sources)) {
-        deerflowResponse.sources.forEach((source: any) => {
-          if (source && source.title) {
+      // Direct extraction of authentic sources
+      if (deerflowResponse.sources) {
+        console.log('Found sources array, processing...');
+        const sourceArray = Array.isArray(deerflowResponse.sources) ? deerflowResponse.sources : [deerflowResponse.sources];
+        
+        sourceArray.forEach((source: any, index: number) => {
+          console.log(`Processing source ${index + 1}:`, source);
+          if (source) {
             sources.push({
-              title: source.title,
+              title: source.title || `Source ${index + 1}`,
               url: source.url || '',
-              domain: source.domain || 'research-source',
+              domain: source.domain || 'research-data',
               content: source.content || ''
             });
           }
         });
       }
       
-      console.log(`Comprehensive research complete: ${sources.length} authentic sources, ${report.length} characters`);
+      console.log(`Final result: ${sources.length} sources, ${report.length} characters`);
       
       console.log('Formatted sources count:', sources.length);
       
