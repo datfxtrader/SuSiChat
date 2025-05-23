@@ -547,20 +547,35 @@ Your report should:
       while (retryCount < maxRetries) {
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+          const timeout = setTimeout(() => controller.abort(), 30000 + (retryCount * 5000)); // Increasing timeout
+
+          const backoffTime = Math.min(1000 * Math.pow(2, retryCount), 10000); // Exponential backoff
+          if (retryCount > 0) {
+            console.log(`Retry attempt ${retryCount} after ${backoffTime}ms backoff`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+          }
 
           deerflowResponse = await deerflowClient.performResearch(deerflowParams, controller.signal);
           clearTimeout(timeout);
           break;
         } catch (error) {
           retryCount++;
-          if (error.name === 'AbortError') {
-            console.log('Request timed out, retrying...');
-          } else {
-            console.error('Request failed, retrying...', error);
+          const isTransientError = error.name === 'AbortError' || 
+                              error.message?.includes('timeout') ||
+                              error.message?.includes('network');
+
+          if (isTransientError && retryCount < maxRetries) {
+            console.log(`Retrying after transient error (${error.name}): attempt ${retryCount}`);
+            continue;
           }
-          if (retryCount === maxRetries) throw error;
-          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+
+          if (retryCount === maxRetries) {
+            console.error('Max retries reached, failing permanently');
+            throw error;
+          }
+
+          console.error('Request failed:', error);
+          throw error;
         }
       }
 
