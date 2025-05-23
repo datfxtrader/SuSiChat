@@ -526,9 +526,10 @@ Format your report in Markdown, but make it readable and professional."""
         
         asyncio.create_task(cleanup_research_state())
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize any resources needed by the service."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown events"""
+    # Startup
     logger.info("DeerFlow research service starting up...")
     
     # Check search capabilities
@@ -540,6 +541,14 @@ async def startup_event():
         search_engines.append("Tavily (Backup)")
     
     logger.info(f"Available search engines: {', '.join(search_engines)}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down DeerFlow research service...")
+
+# Initialize FastAPI with lifespan
+app = FastAPI(lifespan=lifespan)
     
     if not DEEPSEEK_API_KEY:
         logger.warning("DeepSeek API key not found. LLM functionality will be unavailable.")
