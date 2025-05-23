@@ -174,6 +174,13 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
     tavilyResults,
     braveResults
   };
+  } catch (error) {
+    console.error('Web search error:', error);
+    return {
+      error: 'Web search failed',
+      results: []
+    };
+  }
 }
 
 // Make the function available globally to avoid circular imports
