@@ -38,85 +38,132 @@ export async function performWebSearch(
   const results: SearchResult[] = [];
   let tavilyResults = null;
   let braveResults = null;
+  let duckduckgoResults = null;
 
-  // Try Tavily first
+  // Run DuckDuckGo, Brave, and Tavily searches in parallel for maximum efficiency
+  const searchPromises = [];
+
+  // DuckDuckGo search (free, no rate limits)
+  searchPromises.push(
+    (async () => {
+      try {
+        console.log('Starting DuckDuckGo search...');
+        const duckResponse = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1&skip_disambig=1`);
+        
+        if (duckResponse.data?.RelatedTopics) {
+          duckduckgoResults = duckResponse.data;
+          const topics = duckResponse.data.RelatedTopics.slice(0, Math.ceil(maxResults / 3));
+          for (const topic of topics) {
+            if (topic.FirstURL && topic.Text) {
+              results.push({
+                title: topic.Text.split(' - ')[0] || 'DuckDuckGo Result',
+                content: topic.Text || '',
+                url: topic.FirstURL || '',
+                score: 0.8,
+                source: 'DuckDuckGo'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('DuckDuckGo search error:', error);
+        duckduckgoResults = { error: 'DuckDuckGo search failed' };
+      }
+    })()
+  );
+
+  // Brave search with rate limiting
+  if (BRAVE_API_KEY) {
+    searchPromises.push(
+      (async () => {
+        try {
+          console.log('Starting Brave search...');
+          // Small delay for Brave rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+            params: {
+              q: query,
+              count: Math.ceil(maxResults / 2),
+              search_lang: 'en',
+              freshness: 'month',
+            },
+            headers: {
+              'Accept': 'application/json',
+              'X-Subscription-Token': BRAVE_API_KEY
+            }
+          });
+
+          if (response.data?.web?.results) {
+            braveResults = response.data;
+            for (const result of response.data.web.results) {
+              results.push({
+                title: result.title || 'Untitled',
+                content: result.description || '',
+                url: result.url || '',
+                score: 1.0,
+                source: 'Brave'
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Brave search error:', error);
+          braveResults = { error: 'Brave search failed' };
+        }
+      })()
+    );
+  }
+
+  // Tavily search for comprehensive coverage
   if (TAVILY_API_KEY) {
-    try {
-      const response = await axios.post(
-        'https://api.tavily.com/search',
-        {
-          query,
-          search_depth: 'advanced',
-          include_answer: true,
-          max_results: maxResults,
-          include_raw_content: false,
-          filters: {
-            recency_days: 90
-          }
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': TAVILY_API_KEY
-          }
-        }
-      );
+    searchPromises.push(
+      (async () => {
+        try {
+          console.log('Starting Tavily search...');
+          const response = await axios.post(
+            'https://api.tavily.com/search',
+            {
+              query,
+              search_depth: 'advanced',
+              include_answer: true,
+              max_results: Math.ceil(maxResults / 2),
+              include_raw_content: false,
+              filters: {
+                recency_days: 90
+              }
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': TAVILY_API_KEY
+              }
+            }
+          );
 
-      if (response.data?.results) {
-        tavilyResults = response.data;
-        for (const result of response.data.results) {
-          results.push({
-            title: result.title || 'Untitled',
-            content: result.content || '',
-            url: result.url || '',
-            score: result.relevance_score || 1.0,
-            publishedDate: result.published_date || '',
-            source: 'Tavily'
-          });
+          if (response.data?.results) {
+            tavilyResults = response.data;
+            for (const result of response.data.results) {
+              results.push({
+                title: result.title || 'Untitled',
+                content: result.content || '',
+                url: result.url || '',
+                score: result.relevance_score || 1.0,
+                publishedDate: result.published_date || '',
+                source: 'Tavily'
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Tavily search error:', error);
+          tavilyResults = { error: 'Tavily search failed' };
         }
-      }
-    } catch (error) {
-      console.error('Tavily search error:', error);
-      tavilyResults = { error: 'Tavily search failed' };
-    }
+      })()
+    );
   }
 
-  // Try Brave as backup (with rate limiting)
-  if (BRAVE_API_KEY && results.length < maxResults) {
-    try {
-      // Add 1.2 second delay to respect Brave's rate limit (1 req/sec)
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      
-      const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
-        params: {
-          q: query,
-          count: maxResults,
-          search_lang: 'en',
-          freshness: 'month',
-        },
-        headers: {
-          'Accept': 'application/json',
-          'X-Subscription-Token': BRAVE_API_KEY
-        }
-      });
-
-      if (response.data?.web?.results) {
-        braveResults = response.data;
-        for (const result of response.data.web.results) {
-          results.push({
-            title: result.title || 'Untitled',
-            content: result.description || '',
-            url: result.url || '',
-            score: 1.0,
-            source: 'Brave'
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Brave search error:', error);
-      braveResults = { error: 'Brave search failed' };
-    }
-  }
+  // Wait for all searches to complete in parallel
+  await Promise.allSettled(searchPromises);
+  console.log(`Parallel search completed. Found ${results.length} total results.`);
 
   // Optimize results processing
   const seen = new Set();
