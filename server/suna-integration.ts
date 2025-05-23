@@ -1034,14 +1034,14 @@ Use the current date and web search information when responding about current ev
       // Get response based on selected model
       let aiResponse = '';
       // Map API model names to display names
-      let modelUsed = selectedModel;
-      if (selectedModel === 'gemini-1.5-flash') {
-        modelUsed = 'Gemini 1.5 Flash';
-      } else if (selectedModel === 'gemini-1.0-pro') {
-        modelUsed = 'Gemini 1.5 Pro';
-      } else if (selectedModel === 'deepseek-chat') {
-        modelUsed = 'DeepSeek';
-      }
+      const modelDisplayNames = {
+        'gemini-1.5-flash': 'Gemini 1.5 Flash',
+        'gemini-1.0-pro': 'Gemini 1.5 Pro',
+        'deepseek-chat': 'DeepSeek',
+        'auto': 'Auto'
+      };
+      
+      let modelUsed = modelDisplayNames[selectedModel] || selectedModel;
       
       // Log which model we're actually using, for clarity
       console.log(`Using ${modelUsed} (${selectedModel}) to generate response`);
@@ -1051,8 +1051,8 @@ Use the current date and web search information when responding about current ev
         if (selectedModel.startsWith('gemini')) {
           // Call Gemini API
           aiResponse = await this.callGeminiAPI(messages, selectedModel);
-        } else {
-          // Default to DeepSeek API
+        } else if (selectedModel === 'deepseek-chat') {
+          // Use DeepSeek API
           const response = await axios.post(
             DEEPSEEK_API_ENDPOINT,
             {
@@ -1075,8 +1075,23 @@ Use the current date and web search information when responding about current ev
       } catch (error) {
         console.error(`Error with ${selectedModel} API:`, error);
         
-        // Fall back to DeepSeek if Gemini fails
-        if (selectedModel.startsWith('gemini') && DEEPSEEK_API_KEY) {
+        // Check available fallback options
+        const hasGemini = process.env.GEMINI_API_KEY;
+        const hasDeepSeek = DEEPSEEK_API_KEY;
+        
+        // Try to find best available fallback
+        if (hasGemini && !selectedModel.startsWith('gemini')) {
+          console.log('Falling back to Gemini API');
+          try {
+            aiResponse = await this.callGeminiAPI(messages, 'gemini-1.5-flash');
+            modelUsed = 'Gemini 1.5 Flash (fallback)';
+            break;
+          } catch (fallbackError) {
+            console.error('Gemini fallback failed:', fallbackError);
+          }
+        }
+        
+        if (hasDeepSeek && selectedModel !== 'deepseek-chat') {
           console.log('Falling back to DeepSeek API');
           try {
             const fallbackResponse = await axios.post(
