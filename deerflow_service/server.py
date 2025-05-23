@@ -368,7 +368,7 @@ Your report should:
 
 Format your report in Markdown, but make it readable and professional."""
         
-        report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=4000)
+        report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=8000)
         log_entries.append(f"Research report generated successfully: {len(report)} characters")
         
         # Step 6: Finalize research response with proper logging
