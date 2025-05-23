@@ -3,6 +3,17 @@
  */
 
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
+const NodeCache = require('node-cache');
+
+// Cache results for 15 minutes
+const cache = new NodeCache({ stdTTL: 900 });
+
+// Rate limit to 100 requests per 15 minutes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
 
 /**
  * Generate financial market analysis for forex and market queries
@@ -64,10 +75,19 @@ Current date: ${new Date().toISOString().split('T')[0]}`
     
     // Extract and return the generated report
     if (response.data?.choices?.[0]?.message?.content) {
+      const content = response.data.choices[0].message.content;
+      const confidenceScore = calculateConfidenceScore({
+        content,
+        responseTime: Date.now() - startTime,
+        hasNumericalData: /\d+(\.\d+)?%|\$\d+|\d+\.\d+/.test(content),
+        hasTechnicalTerms: /support|resistance|trend|volatility|momentum/i.test(content)
+      });
+      
       return {
-        report: response.data.choices[0].message.content,
+        report: content,
         sources: getDefaultFinancialSources(),
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
+        confidence: confidenceScore
       };
     } else {
       throw new Error('Invalid API response format');
@@ -156,3 +176,21 @@ module.exports = {
   isFinancialQuery,
   getDefaultFinancialSources
 };
+/**
+ * Calculate confidence score for financial analysis
+ * @param {object} params Analysis parameters
+ * @returns {number} Confidence score between 0-1
+ */
+function calculateConfidenceScore({content, responseTime, hasNumericalData, hasTechnicalTerms}) {
+  let score = 0;
+  
+  // Content quality checks
+  if (content.length > 500) score += 0.3;
+  if (hasNumericalData) score += 0.3;
+  if (hasTechnicalTerms) score += 0.2;
+  
+  // Response time check (penalize very fast/slow responses)
+  if (responseTime > 1000 && responseTime < 10000) score += 0.2;
+  
+  return Math.min(1, score);
+}
