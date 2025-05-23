@@ -7,6 +7,7 @@ import { researchService, ResearchDepth } from './deerflow-integration';
 import LRU from 'lru-cache';
 import rateLimit from 'express-rate-limit';
 import { validate } from 'class-validator';
+import { IsString, MinLength, MaxLength, IsOptional, IsNumber, Min, Max } from 'class-validator';
 
 // LRU cache for web search results
 const searchCache = new LRU({
@@ -59,7 +60,7 @@ function isCacheValid(entry: CacheEntry): boolean {
 function cleanupCache(): void {
   const now = Date.now();
   let expiredCount = 0;
-  
+
   // Remove expired entries
   for (const [key, entry] of searchCache.entries()) {
     if (now - entry.timestamp > CACHE_TTL) {
@@ -67,16 +68,16 @@ function cleanupCache(): void {
       expiredCount++;
     }
   }
-  
+
   // If cache is still too large after removing expired entries,
   // remove oldest entries until we're under the limit
   if (searchCache.size > MAX_CACHE_SIZE) {
     const entries = Array.from(searchCache.entries())
       .sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
+
     const toRemove = entries.slice(0, searchCache.size - MAX_CACHE_SIZE);
     toRemove.forEach(([key]) => searchCache.delete(key));
-    
+
     console.log(`Cache cleanup: removed ${expiredCount} expired entries and ${toRemove.length} old entries`);
   } else if (expiredCount > 0) {
     console.log(`Cache cleanup: removed ${expiredCount} expired entries`);
@@ -100,7 +101,7 @@ const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
 async function performTavilySearch(query: string) {
   try {
     console.log('Performing Tavily web search for:', query);
-    
+
     const response = await axios.post(
       TAVILY_SEARCH_URL,
       {
@@ -120,7 +121,7 @@ async function performTavilySearch(query: string) {
         }
       }
     );
-    
+
     return response.data;
   } catch (error) {
     console.error('Error with Tavily web search:', error);
@@ -136,7 +137,7 @@ async function performTavilySearch(query: string) {
 async function performBraveSearch(query: string) {
   try {
     console.log('Performing Brave web search for:', query);
-    
+
     const response = await axios.get(
       BRAVE_SEARCH_URL,
       {
@@ -154,7 +155,7 @@ async function performBraveSearch(query: string) {
         }
       }
     );
-    
+
     return response.data;
   } catch (error) {
     console.error('Error with Brave web search:', error);
@@ -172,11 +173,11 @@ async function performWebSearch(query: string, retries = 3, timeout = 10000) {
     try {
     // Normalize query for caching
     const queryHash = hashQuery(query);
-    
+
     // Check cache first
     if (searchCache.has(queryHash)) {
       const cacheEntry = searchCache.get(queryHash)!;
-      
+
       // If cache is still valid, use it
       if (isCacheValid(cacheEntry)) {
         console.log(`Using cached search results for query: "${query}" (originally queried as: "${cacheEntry.queryUsed}")`);
@@ -187,21 +188,21 @@ async function performWebSearch(query: string, retries = 3, timeout = 10000) {
         console.log(`Cache entry expired for query: "${query}"`);
       }
     }
-    
+
     console.log('Performing combined web search for:', query);
-    
+
     // Run searches with Brave as primary, Tavily as backup
     const [braveResults, tavilyResults] = await Promise.allSettled([
       BRAVE_API_KEY ? performBraveSearch(query) : Promise.resolve({ error: 'Brave API key not configured' }),
       performTavilySearch(query)
     ]);
-    
+
     // Process Tavily results
     const tavilyData = tavilyResults.status === 'fulfilled' ? tavilyResults.value : { error: 'Tavily search failed' };
-    
+
     // Process Brave results
     const braveData = braveResults.status === 'fulfilled' ? braveResults.value : { error: 'Brave search failed' };
-    
+
     // Combine the results
     const combinedResults = {
       tavilyResults: tavilyData,
@@ -209,12 +210,12 @@ async function performWebSearch(query: string, retries = 3, timeout = 10000) {
       answer: tavilyData.answer || '',
       results: []
     };
-    
+
     // Add Tavily results
     if (!tavilyData.error && tavilyData.results) {
       combinedResults.results = [...tavilyData.results];
     }
-    
+
     // Add Brave results
     if (!braveData.error && braveData.web && braveData.web.results) {
       const braveWebResults = braveData.web.results.map((result: any) => ({
@@ -225,14 +226,14 @@ async function performWebSearch(query: string, retries = 3, timeout = 10000) {
       }));
       combinedResults.results = [...combinedResults.results, ...braveWebResults];
     }
-    
+
     // Store in cache
     searchCache.set(queryHash, {
       results: combinedResults,
       timestamp: Date.now(),
       queryUsed: query
     });
-    
+
     console.log(`Web search completed. Cache now has ${searchCache.size} entries`);
     return combinedResults;
   } catch (error) {
@@ -332,19 +333,19 @@ const mockConversations: Record<string, SunaConversation> = {};
 export class SunaIntegrationService {
   private projectId: string;
   private apiKey: string | null = null;
-  
+
   constructor() {
     // Default project ID for all users in Suna
     this.projectId = process.env.SUNA_PROJECT_ID || 'tongkeeper-default';
     this.apiKey = process.env.DEEPSEEK_API_KEY || null;
-    
+
     if (!USE_MOCK_SUNA && !this.apiKey) {
       console.warn('No DeepSeek API key found. Some features may not work correctly.');
     } else if (this.apiKey) {
       console.log('DeepSeek API key detected for Suna integration');
     }
   }
-  
+
   /**
    * Set the API key for Suna
    */
@@ -363,7 +364,7 @@ export class SunaIntegrationService {
       'this week', 'this month', 'this year', 'happening', 'live', 'trending',
       'right now', 'upcoming', 'schedule', 'next', 'previous'
     ];
-    
+
     // Sports-related queries
     const sportsTerms = [
       'match', 'game', 'score', 'vs', 'versus', 'tournament', 'championship',
@@ -371,7 +372,7 @@ export class SunaIntegrationService {
       'season', 'player', 'team', 'transfer', 'win', 'lose', 'draw', 'result',
       'playoff', 'sports', 'athlete', 'olympics', 'world cup'
     ];
-    
+
     // News, politics, and events
     const newsTerms = [
       'election', 'politics', 'voted', 'presidential', 'government', 'congress',
@@ -379,7 +380,7 @@ export class SunaIntegrationService {
       'governor', 'announced', 'conference', 'summit', 'meeting', 'speech',
       'passed away', 'died', 'arrested', 'controversy', 'scandal', 'protest'
     ];
-    
+
     // Financial terms
     const financialTerms = [
       'stock', 'price', 'market', 'index', 'nasdaq', 'nyse', 'dow', 's&p',
@@ -387,14 +388,14 @@ export class SunaIntegrationService {
       'interest rate', 'inflation', 'recession', 'fed', 'federal reserve',
       'economy', 'economic', 'quarterly', 'earnings', 'financial', 'trading'
     ];
-    
+
     // Weather and natural events
     const weatherTerms = [
       'weather', 'forecast', 'temperature', 'rain', 'snow', 'storm', 'hurricane',
       'tornado', 'earthquake', 'climate', 'disaster', 'flooding', 'drought',
       'celsius', 'fahrenheit', 'conditions', 'sunny', 'cloudy', 'humid'
     ];
-    
+
     // Technology and product releases
     const techTerms = [
       'released', 'announced', 'launch', 'update', 'version', 'upgrade',
@@ -402,7 +403,7 @@ export class SunaIntegrationService {
       'release date', 'tech', 'technology', 'gadget', 'smartphone', 'computer',
       'laptop', 'tablet', 'ios', 'windows', 'macos', 'beta'
     ];
-    
+
     // Common question formats that often need current data
     const questionPatterns = [
       'who won', 'what happened', 'when is', 'where is', 'how much is',
@@ -411,84 +412,84 @@ export class SunaIntegrationService {
       'search for', 'tell me about', 'do you know', 'have you heard',
       'what does', 'where can', 'who is', 'show me', 'find information'
     ];
-    
+
     // Explicitly indicates search needs
     const explicitSearchTerms = [
       'search', 'find', 'look up', 'google', 'search engine', 'browser',
       'internet', 'web', 'online', 'research', 'information about'
     ];
-    
+
     // Year patterns that might indicate need for current information
     const yearPattern = /202[0-9]/;
-    
+
     // Location/place patterns often requiring current info
     const locationPattern = /(in|at|near|around) [A-Z][a-z]+(,|\.| )/;
-    
+
     // Patterns indicating comparison/stats that benefit from search
     const comparisonPattern = /(compare|versus|vs\.?|comparison|difference between|better than)/i;
-    
+
     // Combine all the term lists
     const allTerms = [
       ...generalWebSearchTerms,
       ...sportsTerms,
-      ...newsTerms, 
+      ...newsTerms,
       ...financialTerms,
       ...weatherTerms,
       ...techTerms,
       ...questionPatterns,
       ...explicitSearchTerms
     ];
-    
+
     const lowerQuery = query.toLowerCase();
-    
+
     // Context awareness: Check if this appears to be a follow-up question that needs context
-    const isLikelyFollowUp = messages.length > 0 && 
-      (lowerQuery.includes('what about') || 
-       lowerQuery.startsWith('and') || 
-       lowerQuery.startsWith('what if') || 
+    const isLikelyFollowUp = messages.length > 0 &&
+      (lowerQuery.includes('what about') ||
+       lowerQuery.startsWith('and') ||
+       lowerQuery.startsWith('what if') ||
        lowerQuery.startsWith('how about'));
-       
+
     // If it's a follow-up, check the previous messages for search triggers
     if (isLikelyFollowUp && messages.length > 0) {
       // Get the last two messages to establish context
-      const recentMessages = messages.slice(-2).map(m => 
+      const recentMessages = messages.slice(-2).map(m =>
         typeof m.content === 'string' ? m.content.toLowerCase() : '');
-        
+
       // Check if previous messages had search terms
-      const previousMessageHadSearchTerms = recentMessages.some(content => 
+      const previousMessageHadSearchTerms = recentMessages.some(content =>
         allTerms.some(term => content.includes(term)));
-        
+
       // If previous message triggered search, this follow-up probably needs it too
       if (previousMessageHadSearchTerms) {
         return true;
       }
     }
-    
+
     // Check for year mentions (like 2023, 2024, 2025)
     if (yearPattern.test(query)) {
       return true;
     }
-    
+
     // Check for location mentions that likely need current info
     if (locationPattern.test(query)) {
       return true;
     }
-    
+
     // Check for comparison questions that benefit from search
     if (comparisonPattern.test(query)) {
       return true;
     }
-    
+
     // Query refinement: Check if query explicitly asks for facts or details
     if (/\bfact(s|ual)?\b|\bdetail(s|ed)?\b|\bstatistic(s|al)?\b|\bdata\b|\binformation\b/i.test(query)) {
       return true;
     }
-    
+
     // Check for explicit search requests
     if (explicitSearchTerms.some(term => lowerQuery.includes(term))) {
       return true;
     }
-    
+
     // Check for any other term matches
     return allTerms.some(term => lowerQuery.includes(term));
   }
@@ -502,7 +503,7 @@ export class SunaIntegrationService {
   private async callGeminiAPI(messages: any[], model: string = 'gemini-1.5-flash') {
     try {
       console.log(`Calling Gemini API (${model}) for response`);
-      
+
       // Convert messages to Gemini format
       const geminiMessages = messages.map(msg => {
         if (msg.role === 'system') {
@@ -523,12 +524,12 @@ export class SunaIntegrationService {
           };
         }
       });
-      
+
       // Remove the initial acknowledgment from the assistant if it exists
       if (geminiMessages.length > 1 && geminiMessages[1]?.role === 'model') {
         geminiMessages.splice(1, 1);
       }
-      
+
       // Call the Gemini API
       const response = await axios.post(
         `${GEMINI_API_ENDPOINT}/${model}:generateContent?key=${GEMINI_API_KEY}`,
@@ -560,12 +561,12 @@ export class SunaIntegrationService {
           ]
         }
       );
-      
+
       // Extract and return the generated text
       if (response.data.candidates && response.data.candidates.length > 0) {
         return response.data.candidates[0].content.parts[0].text;
       }
-      
+
       throw new Error('No valid response from Gemini API');
     } catch (error) {
       console.error('Error calling Gemini API:', error);
@@ -580,7 +581,7 @@ export class SunaIntegrationService {
     try {
       // Smart Auto Model Routing Logic
       let selectedModel = data.model || 'deepseek-chat';
-      
+
       // If "auto" model is selected, intelligently route based on research depth
       if (selectedModel === 'auto') {
         if (data.researchDepth === 3) {
@@ -591,9 +592,9 @@ export class SunaIntegrationService {
           console.log(`Auto model: Routing Research Depth ${data.researchDepth || 1} to DeepSeek for efficiency`);
         }
       }
-      
+
       console.log(`Processing Suna agent message with model ${selectedModel}:`, data.query);
-      
+
       // If no thread ID is provided, we need to create a new thread
       if (!data.threadId) {
         // Create a thread first
@@ -620,22 +621,22 @@ export class SunaIntegrationService {
           userId: data.userId
         };
       }
-      
+
       // Determine if web search is needed based on the query, context, and user preferences
       let webSearchResults: any = null;
       let webSearchContent = '';
       let searchMetadata: SunaMessage['searchMetadata'] = undefined;
-      
+
       // Check for explicit search commands in the query (like /search)
       const explicitSearchCommand = data.query.match(/^\/search\s+(.*)/i);
       const forceSearch = explicitSearchCommand || (data.searchPreferences?.forceSearch === true);
-      
+
       // Honor user preference to disable search if explicitly set
       const disableSearch = data.searchPreferences?.disableSearch === true;
-      
+
       // Get max results from preferences or default to 5
       const maxResults = data.searchPreferences?.maxResults || 5;
-      
+
 
 
       // Get the research depth level - CRITICAL DEBUG POINT
@@ -648,12 +649,12 @@ export class SunaIntegrationService {
 
       // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
       if (researchDepth === 3) {
-        
+
         try {
           // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
           const modelId = 'gemini-1.5-flash';
           const startTime = Date.now();
-          
+
           // Optimized DeerFlow research call
           const deerflowResult = await researchService.performResearch({
             query: data.query,
@@ -664,10 +665,10 @@ export class SunaIntegrationService {
             researchTone: 'analytical',
             minWordCount: 2500
           });
-          
+
           if (deerflowResult && deerflowResult.report) {
             const processingTime = Date.now() - startTime;
-            
+
             // Return optimized comprehensive report
             return {
               message: {
@@ -691,64 +692,64 @@ export class SunaIntegrationService {
       }
 
       // Determine if we should perform web search
-      const shouldSearch = !disableSearch && 
-        ((TAVILY_API_KEY || BRAVE_API_KEY) && 
+      const shouldSearch = !disableSearch &&
+        ((TAVILY_API_KEY || BRAVE_API_KEY) &&
          (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
-      
+
       if (shouldSearch) {
         try {
           // Track search start time for metrics
           const searchStartTime = Date.now();
-          
+
           // If this is an explicit search command, extract the actual query
-          let refinedQuery = explicitSearchCommand ? 
+          let refinedQuery = explicitSearchCommand ?
             explicitSearchCommand[1] : // Use the query part after /search
             data.query;
-            
+
           // Check if this is a follow-up question requiring context from previous conversation
-          const isFollowUp = !explicitSearchCommand && conversation.messages.length > 0 && 
-            (/^(what|how|when|where|who|why|can|could|would|is|are|was) about/i.test(refinedQuery) || 
-             /^and/i.test(refinedQuery) || 
+          const isFollowUp = !explicitSearchCommand && conversation.messages.length > 0 &&
+            (/^(what|how|when|where|who|why|can|could|would|is|are|was) about/i.test(refinedQuery) ||
+             /^and/i.test(refinedQuery) ||
              /^what if/i.test(refinedQuery));
-             
+
           if (isFollowUp && conversation.messages.length >= 2) {
             // Get previous user query to add context
             const previousUserMessages = conversation.messages
               .filter((msg: SunaMessage) => msg.role === 'user')
               .slice(-2);
-              
+
             if (previousUserMessages.length > 0) {
               // Combine with previous query for more context
               const contextWords = previousUserMessages[0].content
                 .split(' ')
                 .filter((word: string) => word.length > 3) // Only use significant words
                 .slice(0, 5); // Take up to 5 key words for context
-              
+
               // Create a better search query with context
               refinedQuery = `${data.query} ${contextWords.join(' ')}`;
               console.log(`Enhanced follow-up query with context: ${refinedQuery}`);
             }
           }
-          
+
           // Remove question words and focus on key terms for better search
           const finalQuery = refinedQuery
             .replace(/^(what|how|when|where|who|why|can you|could you|would you|tell me|do you know|i need to know|i want to know|please find|search for|look up)/i, '')
             .trim();
-          
+
           // Continue with regular web search for depth 1 & 2
           console.log(`Web search using refined query: ${finalQuery}`);
           webSearchResults = await performWebSearch(finalQuery);
-          
+
           // Format search results and handle potential null/undefined results
           const webSearchError = webSearchResults?.error || null;
           if (!webSearchError) {
             const searchResults = webSearchResults?.results || [];
-            
+
             // Collect source information for metadata
             const sourceDomains: string[] = [];
             const sourceUrls: {title: string, url: string, domain: string}[] = [];
             const usedSearchEngines: string[] = [];
-            
+
             // Track which search engines were used
             if (webSearchResults?.tavilyResults && !webSearchResults?.tavilyResults?.error) {
               usedSearchEngines.push('Tavily');
@@ -756,7 +757,7 @@ export class SunaIntegrationService {
             if (webSearchResults?.braveResults && !webSearchResults?.braveResults?.error) {
               usedSearchEngines.push('Brave');
             }
-            
+
             // Extract source information from results safely
             const results = webSearchResults?.results || [];
             if (Array.isArray(results)) {
@@ -765,12 +766,12 @@ export class SunaIntegrationService {
                 try {
                   const domain = new URL(result.url).hostname;
                   const title = result.title || domain;
-                  
+
                   // Add domain to list of unique domains
                   if (!sourceDomains.includes(domain)) {
                     sourceDomains.push(domain);
                   }
-                  
+
                   // Add full source information
                   sourceUrls.push({
                     title: title,
@@ -782,11 +783,11 @@ export class SunaIntegrationService {
                 }
               }
             });
-            
+
             // Calculate search time
             const searchEndTime = Date.now();
             const searchTimeMs = searchEndTime - searchStartTime;
-            
+
             // Create search metadata with detailed source information
             searchMetadata = {
               query: finalQuery,
@@ -800,14 +801,14 @@ export class SunaIntegrationService {
                 domain: src.domain
               }))
             } as SunaMessage['searchMetadata'];
-            
+
             // Log full source details to confirm they're being included
-            console.log("Source details being added to metadata:", 
+            console.log("Source details being added to metadata:",
               JSON.stringify(sourceUrls, null, 2));
-            
+
             // Sort results by relevance or freshness based on user preference
             const sortingStrategy = data.searchPreferences?.priority || 'relevance';
-            
+
             const sortedResults = [...searchResults].sort((a: any, b: any) => {
               if (sortingStrategy === 'freshness') {
                 // Sort by date if available (newer first)
@@ -815,20 +816,20 @@ export class SunaIntegrationService {
                   return new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime();
                 }
               }
-              
+
               // Default to relevance sorting
               if (a.score && b.score) return b.score - a.score;
               return 0;
             }).slice(0, maxResults); // Limit to max results from preferences
-            
+
             // Format search results for the LLM with improved readability and transparency
             // PHASE 3: IMPROVED RESULT INTEGRATION - Categorize and group results by topic
             const domains = new Map(); // Track domains for diversity
-            
+
             // Extract key topics from results to group related information
             const keyTopics = new Map();
             const keyPhrases = new Set();
-            
+
             // Extract topics and categorize results
             sortedResults.forEach((result: any) => {
               // Extract domain for source tracking
@@ -842,40 +843,40 @@ export class SunaIntegrationService {
                   // Keep default if URL parsing fails
                 }
               }
-              
+
               // Extract potential key phrases from titles (simplified NLP)
               const title = result.title || '';
               const words = title.split(/\s+/).filter((w: string) => w.length > 3);
-              
+
               // Find 2-3 word combinations as potential topics
               for (let i = 0; i < words.length - 1; i++) {
                 const phrase = `${words[i]} ${words[i+1]}`.toLowerCase();
                 keyPhrases.add(phrase);
-                
+
                 if (i < words.length - 2) {
                   const phrase3 = `${words[i]} ${words[i+1]} ${words[i+2]}`.toLowerCase();
                   keyPhrases.add(phrase3);
                 }
               }
             });
-            
+
             // Group results by key topics where possible
             let organizedResults = '';
-            
+
             // Identify contradictions or different perspectives
             const contradictions = [];
             let hasContradictoryInfo = false;
-            
+
             // Look for conflicting dates/numbers across sources
             const numericalFacts = new Map();
             const dateFacts = new Map();
-            
+
             sortedResults.forEach((result: any) => {
               const content = result.content || result.description || '';
-              
+
               // Extract dates (simple regex pattern)
               const dateMatches = content.match(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b/gi);
-              
+
               if (dateMatches) {
                 dateMatches.forEach((date: string) => {
                   if (!dateFacts.has(date)) {
@@ -884,10 +885,10 @@ export class SunaIntegrationService {
                   dateFacts.get(date).push(result.url);
                 });
               }
-              
+
               // Extract numerical facts (simple pattern)
               const numberMatches = content.match(/\$\d+(?:\.\d+)?|\d+(?:\.\d+)? (?:percent|million|billion|trillion)/gi);
-              
+
               if (numberMatches) {
                 numberMatches.forEach((num: string) => {
                   if (!numericalFacts.has(num)) {
@@ -897,10 +898,10 @@ export class SunaIntegrationService {
                 });
               }
             });
-            
+
             // Check for contradictory information in dates and numbers
             let contradictionInfo = '';
-            
+
             // Check dates for contradictions (simple approach)
             const dateContradictions: string[] = [];
             dateFacts.forEach((sources, date) => {
@@ -909,7 +910,7 @@ export class SunaIntegrationService {
                 dateContradictions.push(`Date "${date}" mentioned by ${sources.length} sources`);
               }
             });
-            
+
             // Check numerical facts for contradictions
             const numberContradictions: string[] = [];
             numericalFacts.forEach((sources, number) => {
@@ -918,7 +919,7 @@ export class SunaIntegrationService {
                 numberContradictions.push(`Value "${number}" mentioned by ${sources.length} sources`);
               }
             });
-            
+
             // Add contradiction information if found
             if (dateContradictions.length > 0 || numberContradictions.length > 0) {
               contradictionInfo = `
@@ -927,25 +928,25 @@ ${dateContradictions.join('\n')}
 ${numberContradictions.join('\n')}
 `;
             }
-            
+
             // Extract top domains for source diversity info
             const topDomains = Array.from(domains.entries())
               .sort((a, b) => b[1] - a[1])
               .slice(0, 3)
               .map(([domain, count]) => `${domain} (${count} results)`);
-            
+
             // Generate domain diversity information
             const diversityInfo = topDomains.length > 0 ?
               `Main sources: ${topDomains.join(', ')}` : '';
-              
+
             // Extract common phrases as potential topics
             const topPhrases = Array.from(keyPhrases)
               .slice(0, 5)
               .join(', ');
-              
+
             const topicsInfo = keyPhrases.size > 0 ?
               `Key topics: ${topPhrases}` : '';
-            
+
             // Format the search results with improved organization and analysis
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
@@ -966,12 +967,12 @@ ${sortedResults.map((result: any, index: number) => {
       // Keep default domain if URL parsing fails
     }
   }
-  
+
   // Evaluate recency and credibility (simple heuristics)
-  const recencyIndicator = result.publishedDate ? 
-    `Published: ${result.publishedDate}` : 
+  const recencyIndicator = result.publishedDate ?
+    `Published: ${result.publishedDate}` :
     '';
-  
+
   // Format the result with better attribution and organization
   return `[${index + 1}] "${result.title || 'Untitled'}" 
 Source: ${domain} ${result.source ? `via ${result.source}` : ''}
@@ -991,7 +992,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         console.error('Error performing web search:', err);
       }
     }
-      
+
       // Prepare messages array with system prompt and history
       const messages = [
         {
@@ -1029,7 +1030,7 @@ ${webSearchContent ? webSearchContent : ''}
 Use the current date and web search information when responding about current events, sports, news, or other timely topics. The current date is ${new Date().toISOString().split('T')[0]}.`
         }
       ];
-      
+
       // Add conversation history (up to 10 previous messages)
       const historyMessages = conversation.messages
         .slice(-10)
@@ -1037,15 +1038,15 @@ Use the current date and web search information when responding about current ev
           role: msg.role,
           content: msg.content
         }));
-        
+
       messages.push(...historyMessages);
-      
+
       // Add the current user message
       messages.push({
         role: 'user',
         content: data.query
       });
-      
+
       // Create a user message in the conversation
       const userMessageId = `msg-${uuidv4()}`;
       const userMessage: SunaMessage = {
@@ -1054,9 +1055,9 @@ Use the current date and web search information when responding about current ev
         role: 'user',
         timestamp: new Date().toISOString()
       };
-      
+
       conversation.messages.push(userMessage);
-      
+
       // Get response based on selected model
       let aiResponse = '';
       // Map API model names to display names
@@ -1066,12 +1067,12 @@ Use the current date and web search information when responding about current ev
         'deepseek-chat': 'DeepSeek',
         'auto': 'Auto'
       };
-      
+
       let modelUsed = modelDisplayNames[selectedModel] || selectedModel;
-      
+
       // Log which model we're actually using, for clarity
       console.log(`Using ${modelUsed} (${selectedModel}) to generate response`);
-      
+
       // Try the selected model first
       try {
         if (selectedModel.startsWith('gemini')) {
@@ -1094,17 +1095,17 @@ Use the current date and web search information when responding about current ev
               }
             }
           );
-          
+
           // Extract the AI response
           aiResponse = response.data.choices[0].message.content;
         }
       } catch (error) {
         console.error(`Error with ${selectedModel} API:`, error);
-        
+
         // Check available fallback options
         const hasGemini = process.env.GEMINI_API_KEY;
         const hasDeepSeek = DEEPSEEK_API_KEY;
-        
+
         // Try to find best available fallback
         if (hasGemini && !selectedModel.startsWith('gemini')) {
           console.log('Falling back to Gemini API');
@@ -1116,7 +1117,7 @@ Use the current date and web search information when responding about current ev
             console.error('Gemini fallback failed:', fallbackError);
           }
         }
-        
+
         if (hasDeepSeek && selectedModel !== 'deepseek-chat') {
           console.log('Falling back to DeepSeek API');
           try {
@@ -1135,7 +1136,7 @@ Use the current date and web search information when responding about current ev
                 }
               }
             );
-            
+
             aiResponse = fallbackResponse.data.choices[0].message.content;
             modelUsed = 'deepseek-chat (fallback)';
           } catch (fallbackError) {
@@ -1146,31 +1147,31 @@ Use the current date and web search information when responding about current ev
           throw error;
         }
       }
-      
+
       // Create an assistant message with enhanced metadata about model and search
       const runId = `run-${uuidv4()}`;
-      
+
       // Add article URLs to response for better source attribution
       if (searchMetadata?.sourceDetails && searchMetadata.sourceDetails.length > 0) {
-        console.log("Adding source details to message metadata:", 
+        console.log("Adding source details to message metadata:",
           JSON.stringify(searchMetadata.sourceDetails, null, 2));
-        
+
         // Format source information in a way that's better for the UI
         // Using a dedicated "Sources:" section at the end rather than inline citations
-        const sourceList = searchMetadata.sourceDetails.map((source, index) => 
+        const sourceList = searchMetadata.sourceDetails.map((source, index) =>
           `[${index + 1}] ${source.title}\n${source.url}`).join('\n\n');
-        
+
         // Instruct the AI to use a cleaner citation style
         // Add this instruction to the prompt for better formatting
         const formattingInstruction = `
 Format citations properly by using superscript numbers like [1] at the end of sentences rather than inserting raw URLs or citation markers in the middle of sentences. Put all sources in a dedicated "Sources" section at the end of your response.
 `;
-        
+
         // Append source URLs to the bottom of the response for transparency
         if (!aiResponse.includes('Sources:')) {
           aiResponse += `\n\nSources:\n${sourceList}`;
         }
-        
+
         // Make sure sourceDetails is properly structured in the metadata
         // This is a defensive measure to ensure the data reaches the frontend correctly
         console.log("Final metadata structure:", JSON.stringify({
@@ -1182,7 +1183,7 @@ Format citations properly by using superscript numbers like [1] at the end of se
           }))
         }, null, 2));
       }
-      
+
       const assistantMessage: SunaMessage = {
         id: runId,
         content: aiResponse,
@@ -1192,21 +1193,21 @@ Format citations properly by using superscript numbers like [1] at the end of se
         webSearchUsed: !!webSearchContent,
         searchMetadata: searchMetadata
       };
-      
+
       // Add to conversation
       conversation.messages.push(assistantMessage);
-      
+
       // Update conversation title if it's the first exchange
       if (conversation.messages.length === 2) {
         const titleLimit = Math.min(data.query.length, 30);
         conversation.title = data.query.substring(0, titleLimit) + (data.query.length > 30 ? '...' : '');
       }
-      
+
       // Store the updated conversation
       if (data.threadId) {
         this.storeConversation(data.userId, data.threadId, conversation);
       }
-      
+
       return {
         message: assistantMessage,
         threadId: data.threadId,
@@ -1220,7 +1221,7 @@ Format citations properly by using superscript numbers like [1] at the end of se
       throw new Error('Failed to generate Suna agent response');
     }
   }
-  
+
   /**
    * Store a conversation in memory
    */
@@ -1236,10 +1237,10 @@ Format citations properly by using superscript numbers like [1] at the end of se
   async createThread(userId: string): Promise<any> {
     try {
       console.log('Creating a new conversation thread for user:', userId);
-      
+
       // Generate a unique thread ID
       const threadId = `thread-${uuidv4()}`;
-      
+
       // Create new conversation object
       const conversation: SunaConversation = {
         id: threadId,
@@ -1248,10 +1249,10 @@ Format citations properly by using superscript numbers like [1] at the end of se
         createdAt: new Date().toISOString(),
         userId
       };
-      
+
       // Store the conversation
       this.storeConversation(userId, threadId, conversation);
-      
+
       console.log('Created new conversation thread:', threadId);
       return { threadId };
     } catch (error) {
@@ -1269,14 +1270,14 @@ Format citations properly by using superscript numbers like [1] at the end of se
   async getConversation(userId: string, threadId: string): Promise<any> {
     try {
       console.log('Fetching conversation:', threadId);
-      
+
       // Get conversation from memory
       const key = `${userId}:${threadId}`;
       const conversation = mockConversations[key];
-      
+
       if (!conversation) {
         console.log('Conversation not found, creating new empty conversation');
-        
+
         // Return empty conversation if not found
         return {
           id: threadId,
@@ -1286,7 +1287,7 @@ Format citations properly by using superscript numbers like [1] at the end of se
           userId
         };
       }
-      
+
       return conversation;
     } catch (error) {
       console.error('Error retrieving conversation:', error);
@@ -1307,7 +1308,7 @@ Format citations properly by using superscript numbers like [1] at the end of se
   async getUserConversations(userId: string): Promise<any[]> {
     try {
       console.log('Getting all conversations for user:', userId);
-      
+
       // Filter conversations by user ID
       return Object.values(mockConversations)
         .filter(conv => conv.userId === userId)
@@ -1326,10 +1327,10 @@ Format citations properly by using superscript numbers like [1] at the end of se
 }
 
 // Export a singleton instance
-export const sunaService = new SunaIntegrationService();
+const sunaService = new SunaIntegrationService();
 
 // Express route handlers for Suna integration
-export const sendMessageToSuna = async (req: any, res: Response) => {
+const sendMessageToSuna = async (req: any, res: Response) => {
   try {
     const { message, threadId, model, researchDepth, searchPreferences } = req.body;
     const userId = req.user.claims.sub;
@@ -1337,7 +1338,7 @@ export const sendMessageToSuna = async (req: any, res: Response) => {
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
-    
+
     console.log(`Processing message in conversation/thread: ${threadId} with model: ${model || 'default'}, research depth: ${researchDepth || 1}`);
 
     // Use threadId as the conversationId for consistency
@@ -1361,7 +1362,7 @@ export const sendMessageToSuna = async (req: any, res: Response) => {
   }
 };
 
-export const getSunaConversation = async (req: any, res: Response) => {
+const getSunaConversation = async (req: any, res: Response) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.claims.sub;
@@ -1378,7 +1379,7 @@ export const getSunaConversation = async (req: any, res: Response) => {
   }
 };
 
-export const getUserConversations = async (req: any, res: Response) => {
+const getUserConversations = async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
 
@@ -1392,4 +1393,12 @@ export const getUserConversations = async (req: any, res: Response) => {
     console.error('Error retrieving user conversations:', error);
     return res.status(500).json({ message: 'Failed to retrieve user conversations' });
   }
+};
+
+// Export the service instance and route handlers together
+module.exports = {
+  sunaService,
+  sendMessageToSuna,
+  getSunaConversation,
+  getUserConversations
 };
