@@ -17,7 +17,7 @@ type SunaConversation = {
   createdAt: string;
 };
 
-export type LLMModel = 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
+export type LLMModel = 'auto' | 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
 
 export type SearchPreferences = {
   forceSearch?: boolean;          // Force web search even if not detected automatically
@@ -34,7 +34,7 @@ export function useSuna(initialThreadId?: string) {
   const { user, isAuthenticated } = useAuth();
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
-  const [currentModel, setCurrentModel] = useState<LLMModel>('deepseek-chat');
+  const [currentModel, setCurrentModel] = useState<LLMModel>('auto');
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
     priority: 'relevance',
     maxResults: 5
