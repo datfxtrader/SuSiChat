@@ -60,8 +60,16 @@ async function generateFinancialAnalysis(query: string): Promise<string> {
     throw new Error('DeepSeek API key not available');
   }
 
+  const API_TIMEOUT = 30000;
+  const MAX_RETRIES = 3;
+
   try {
-    const API_TIMEOUT = 30000;
+    // Default sources for financial data - cached for efficiency
+    const defaultSources = [
+      "Investing.com",
+      "FXStreet",
+      "DailyFX"
+    ];
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
       {
@@ -127,4 +135,3 @@ export async function performFinancialResearch(query: string): Promise<ResearchR
     };
   }
 }
-`

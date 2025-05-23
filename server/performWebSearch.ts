@@ -25,10 +25,13 @@ export interface WebSearchResponse {
 /**
  * Perform a web search with robust error handling and retries
  */
+const SEARCH_TIMEOUT = 15000;
+const MAX_SEARCH_RETRIES = 3;
+
 export async function performWebSearch(
   query: string, 
   maxResults: number = 5,
-  retries: number = 3
+  retries: number = MAX_SEARCH_RETRIES
 ): Promise<WebSearchResponse> {
   console.log(`Performing web search for: "${query}"`);
 

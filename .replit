@@ -45,6 +45,10 @@ args = "node start-suna.js"
 task = "shell.exec"
 args = "python deerflow_service/server.py"
 
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
