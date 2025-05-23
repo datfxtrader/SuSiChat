@@ -286,7 +286,21 @@ Your report should include:
 
 Format the report in Markdown."""
         
-        report = await generate_with_deepseek(system_prompt, user_prompt)
+        # Smart model selection based on request parameters
+        model_id = request.model_id if hasattr(request, 'model_id') else "deepseek-chat"
+        
+        # Use appropriate API based on model and research depth  
+        if model_id == "gemini-1.5-flash" or (hasattr(request, 'research_length') and request.research_length == 'comprehensive'):
+            # Use Gemini for comprehensive analysis with high token limit
+            max_tokens = 25000
+            log_entries.append(f"Using Gemini 1.5 Flash for comprehensive analysis with {max_tokens} tokens")
+            report = await generate_with_gemini(system_prompt, user_prompt, max_tokens)
+        else:
+            # Use DeepSeek for standard analysis
+            max_tokens = 8000
+            log_entries.append(f"Using DeepSeek for standard analysis with {max_tokens} tokens")
+            report = await generate_with_deepseek(system_prompt, user_prompt, max_tokens)
+        
         log_entries.append("Research report generated successfully.")
         
         # Update job status
