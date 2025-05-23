@@ -111,7 +111,7 @@ export class DeerFlowClient {
       console.log('Making request to DeerFlow service:', params);
       const serviceUrl = getDeerFlowServiceUrl();
       const response = await axios.post(`${serviceUrl}/research`, params, {
-        timeout: 180000, // 3 minute timeout for comprehensive research
+        timeout: 600000 // 10 minutes for comprehensive research
       });
       
       return response.data;
@@ -257,7 +257,7 @@ export class DeerFlowClient {
       console.log('Executing full DeerFlow agent research:', params);
       const serviceUrl = getDeerFlowServiceUrl();
       const response = await axios.post(`${serviceUrl}/deerflow/full-research`, params, {
-        timeout: 90000, // 90 second timeout for complex multi-agent research
+        timeout: 600000, // 10 minutes for complex multi-agent research
       });
 
       return response.data;
