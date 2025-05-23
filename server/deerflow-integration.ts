@@ -506,21 +506,8 @@ Your report should:
     try {
       console.log('Starting enhanced DeerFlow-Suna research pipeline for query:', params.query);
 
-      // Run Suna and DeerFlow analysis in parallel
-      const [sunaAnalysis, deerflowClient] = await Promise.all([
-        (async () => {
-          const { sendMessageToSuna } = require('./suna-integration');
-          return sendMessageToSuna({
-            query: params.query,
-            researchDepth: 3,
-            model: params.modelId || "deepseek-chat"
-          });
-        })(),
-        Promise.resolve(require('./deerflow-client').deerflowClient)
-      ]);
-
-      // Extract insights from Suna's analysis while DeerFlow processes
-      const sunaResults = sunaAnalysis?.message?.content || '';
+      // Use DeerFlow client directly
+      const deerflowClient = require('./deerflow-client').deerflowClient;
       const taskAnalysis = await deerflowClient.createAgentResearchTask({
         research_question: params.query,
         depth: 'comprehensive',
