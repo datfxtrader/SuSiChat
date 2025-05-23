@@ -590,7 +590,19 @@ Your report should:
 
       // If still processing after retry, wait longer
       if (deerflowResponse.status?.status === 'processing' && deerflowResponse.status?.id) {
-        console.log('Research still processing, waiting longer...');
+        console.log('Research still processing, monitoring progress...');
+      const progressStages = ['planning', 'researching', 'analyzing', 'synthesizing'];
+      let currentStage = 0;
+
+      const progressLog = setInterval(() => {
+        if (currentStage < progressStages.length) {
+          console.log(`Progress: ${progressStages[currentStage]} (${Math.round((currentStage + 1) / progressStages.length * 100)}%)`);
+          currentStage++;
+        }
+      }, 1000);
+
+      // Clear interval when done
+      setTimeout(() => clearInterval(progressLog), maxAttempts * delayBetweenAttempts);
 
         // Wait for research to be completed (with timeout)
         const maxAttempts = 10;
@@ -714,8 +726,31 @@ Your report should:
     } catch (error) {
       console.error('Error performing deep research with DeerFlow:', error);
 
-      // Fall back to enhanced research if DeerFlow fails
-      console.log('DeerFlow service unavailable or error occurred. Falling back to enhanced research...');
+      // Log detailed error information
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        query: params.query,
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error)
+      };
+      console.log('DeerFlow error details:', errorDetails);
+
+      // First try recovery with retries
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.log('Timeout error detected, retrying with longer timeout...');
+        try {
+          const retryResponse = await this.performDeepResearch({
+            ...params,
+            timeout: 60000 // Extended timeout
+          });
+          if (retryResponse.report) return retryResponse;
+        } catch (retryError) {
+          console.error('Retry also failed:', retryError);
+        }
+      }
+
+      // Fall back to enhanced research if recovery fails
+      console.log('DeerFlow service unavailable or recovery failed. Falling back to enhanced research...');
       return this.performEnhancedResearch(params);
     }
   }
