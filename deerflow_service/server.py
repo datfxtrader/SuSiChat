@@ -336,6 +336,13 @@ async def perform_deep_research(research_question: str, research_id: str):
         
         log_entries.append(f"Successfully processed {len(sources)} authentic sources.")
         
+        # Ensure we have data to work with
+        if len(sources) == 0:
+            log_entries.append("No authentic sources found, generating basic analysis...")
+            sources_text = f"Research topic: {research_question}\nNote: Limited source data available for this query."
+        else:
+            log_entries.append(f"Using {len(sources)} authentic sources for comprehensive analysis.")
+        
         # Step 5: Generate comprehensive research report
         log_entries.append("Generating comprehensive research report...")
         
@@ -362,18 +369,26 @@ Your report should:
 Format your report in Markdown, but make it readable and professional."""
         
         report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=4000)
-        log_entries.append("Research report generated successfully.")
+        log_entries.append(f"Research report generated successfully: {len(report)} characters")
         
-        # Step 6: Finalize research response
+        # Step 6: Finalize research response with proper logging
         timestamp = datetime.datetime.now().isoformat()
         
-        return ResearchResponse(
+        # Log what we're returning for debugging
+        logger.info(f"Returning research response - Sources: {len(sources)}, Report length: {len(report)}")
+        log_entries.append(f"Finalizing response with {len(sources)} sources and {len(report)} character report")
+        
+        response = ResearchResponse(
             status={"status": "completed", "message": "Research completed successfully"},
             report=report,
             sources=sources,
             timestamp=timestamp,
             service_process_log=log_entries
         )
+        
+        # Final validation log
+        logger.info(f"Research response ready: {response.status}")
+        return response
         
     except Exception as e:
         logger.error(f"Research error: {e}")
