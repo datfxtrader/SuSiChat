@@ -612,10 +612,13 @@ export class SunaIntegrationService {
       
 
 
-      // Get the research depth level 
+      // Get the research depth level - CRITICAL DEBUG POINT
+      console.log('=== RESEARCH DEPTH DEBUG ===');
+      console.log('data.researchDepth raw value:', data.researchDepth);
+      console.log('typeof data.researchDepth:', typeof data.researchDepth);
       const researchDepth = data.researchDepth || 1;
       console.log(`Research depth detected: ${researchDepth}`);
-      console.log('Full data object:', JSON.stringify(data, null, 2));
+      console.log('=== END DEBUG ===');
 
       // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
       if (researchDepth === 3) {
