@@ -615,6 +615,7 @@ export class SunaIntegrationService {
       // Get the research depth level 
       const researchDepth = data.researchDepth || 1;
       console.log(`Research depth detected: ${researchDepth}`);
+      console.log('Full data object:', JSON.stringify(data, null, 2));
 
       // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
       if (researchDepth === 3) {
