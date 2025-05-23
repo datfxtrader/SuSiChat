@@ -164,10 +164,10 @@ async function performWebSearch(query: string) {
     
     console.log('Performing combined web search for:', query);
     
-    // Run both searches in parallel for faster response
-    const [tavilyResults, braveResults] = await Promise.allSettled([
-      performTavilySearch(query),
-      BRAVE_API_KEY ? performBraveSearch(query) : Promise.resolve({ error: 'Brave API key not configured' })
+    // Run searches with Brave as primary, Tavily as backup
+    const [braveResults, tavilyResults] = await Promise.allSettled([
+      BRAVE_API_KEY ? performBraveSearch(query) : Promise.resolve({ error: 'Brave API key not configured' }),
+      performTavilySearch(query)
     ]);
     
     // Process Tavily results

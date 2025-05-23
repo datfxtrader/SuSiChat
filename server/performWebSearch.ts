@@ -18,8 +18,43 @@ export async function performWebSearch(query: string, maxResults: number = 5) {
     let tavilyResults = null;
     let braveResults = null;
   
-  // Try Tavily first if API key is available
-  if (TAVILY_API_KEY) {
+  // Try Brave first if API key is available
+  if (BRAVE_API_KEY) {
+    try {
+      const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip',
+          'X-Subscription-Token': BRAVE_API_KEY
+        },
+        params: {
+          q: query,
+          count: maxResults,
+          search_lang: 'en'
+        }
+      });
+
+      if (response.data && response.data.web && response.data.web.results) {
+        braveResults = response.data;
+        for (const result of response.data.web.results) {
+          results.push({
+            title: result.title,
+            content: result.description,
+            url: result.url,
+            score: 1.0 - (results.length / maxResults),
+            publishedDate: result.age,
+            source: 'Brave'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Brave search error:', error);
+      braveResults = { error: 'Brave search failed' };
+    }
+  }
+
+  // Backup: Try Tavily if Brave failed or unavailable
+  if (TAVILY_API_KEY && results.length === 0) {
     try {
       const response = await axios.post(
         'https://api.tavily.com/search',

@@ -42,8 +42,20 @@ async function performCombinedWebSearch(query, maxResults = 10) {
   const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
   const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
   
-  // Try Tavily search first if API key is available
-  if (TAVILY_API_KEY) {
+  // Try Brave search first if API key is available
+  if (BRAVE_API_KEY) {
+    try {
+      const braveResults = await searchBrave(query, maxResults);
+      if (braveResults && braveResults.length > 0) {
+        results.push(...braveResults);
+      }
+    } catch (error) {
+      console.error('Brave search error:', error.message);
+    }
+  }
+
+  // Backup: Try Tavily search if we need more results
+  if (results.length < maxResults && TAVILY_API_KEY) {
     try {
       const tavResults = await searchTavily(query, maxResults);
       if (tavResults && tavResults.length > 0) {
