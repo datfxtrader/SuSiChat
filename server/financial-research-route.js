@@ -1,4 +1,3 @@
-
 /**
  * Financial research route for standalone operation
  * This provides specialized financial research when integrated routes fail
@@ -27,7 +26,7 @@ router.post('/generate', async (req, res) => {
   try {
     const { query, depth = 3 } = req.body;
     const requestId = Date.now().toString(36);
-    
+
     if (!query) {
       return res.status(400).json({ 
         error: 'Query is required',
@@ -43,7 +42,7 @@ router.post('/generate', async (req, res) => {
         requestId
       });
     }
-    
+
     console.log(`[${requestId}] Processing financial research request for: ${query} at depth ${depth}`);
 
     // Check cache
@@ -58,7 +57,7 @@ router.post('/generate', async (req, res) => {
     }
 
     const result = await generateFinancialAnalysis(query);
-    
+
     // Cache successful results
     if (result.report && !result.error) {
       cache.set(cacheKey, result);
@@ -73,7 +72,7 @@ router.post('/generate', async (req, res) => {
   } catch (error) {
     const requestId = Date.now().toString(36);
     console.error(`[${requestId}] Error processing financial research request:`, error);
-    
+
     return res.status(500).json({
       error: 'Failed to generate financial research',
       code: error.code || 'INTERNAL_ERROR',
@@ -92,7 +91,7 @@ router.post('/generate', async (req, res) => {
 async function generateFinancialAnalysis(query) {
   const startTime = Date.now();
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  
+
   if (!apiKey) {
     console.warn('DeepSeek API key not available for financial analysis');
     return {
@@ -103,7 +102,7 @@ async function generateFinancialAnalysis(query) {
       code: 'API_KEY_MISSING'
     };
   }
-  
+
   try {
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
@@ -139,13 +138,21 @@ Current date: ${new Date().toISOString().split('T')[0]}`
         timeout: 30000 // 30 second timeout
       }
     );
-    
+
     if (response.data?.choices?.[0]?.message?.content) {
+      // Calculate confidence score based on multiple factors
+      const confidenceScore = calculateConfidenceScore({
+        responseTime: Date.now() - startTime,
+        contentLength: response.data.choices[0].message.content.length,
+        hasNumericalData: /\d+(\.\d+)?%|\$\d+|\d+\.\d+/.test(response.data.choices[0].message.content),
+        hasTechnicalTerms: /support|resistance|trend|volatility|momentum/i.test(response.data.choices[0].message.content)
+      });
+
       return {
         report: response.data.choices[0].message.content,
         sources: getDefaultSources(),
         processingTime: Date.now() - startTime,
-        confidence: 0.8 // Example confidence score
+        confidence: confidenceScore
       };
     } else {
       throw new Error('Invalid API response format');
@@ -188,6 +195,45 @@ function getDefaultSources() {
       domain: "reuters.com" 
     }
   ];
+}
+
+/**
+ * Calculate confidence score based on response characteristics
+ * @param {object} data - Object containing responseTime, contentLength, hasNumericalData, hasTechnicalTerms
+ * @returns {number} - Confidence score between 0 and 1
+ */
+function calculateConfidenceScore(data) {
+  let score = 0;
+
+  // Response time penalty (faster is better, but very fast might be suspicious)
+  if (data.responseTime < 1000) {
+    score += 0.1; // Very fast response, possible canned answer
+  } else if (data.responseTime > 1000 && data.responseTime < 10000) {
+    score += 0.5; // Good response time
+  } else {
+    score += 0.2; // Slow response
+  }
+
+  // Content length (longer is generally better)
+  if (data.contentLength > 500) {
+    score += 0.5;
+  } else {
+    score += 0.2;
+  }
+
+  // Presence of numerical data
+  if (data.hasNumericalData) {
+    score += 0.7;
+  }
+
+  // Presence of technical terms
+  if (data.hasTechnicalTerms) {
+    score += 0.6;
+  }
+
+  // Normalize the score to be between 0 and 1
+  const normalizedScore = Math.min(1, score / 2.3);
+  return normalizedScore;
 }
 
 module.exports = router;
