@@ -29,6 +29,11 @@ export interface ResearchResult {
   sources: ResearchSource[];
   depth: ResearchDepth;
   processingTime: number;
+  progress?: {
+    step: string;
+    percent: number;
+    statusMessage?: string;
+  };
 }
 
 /**
@@ -50,6 +55,15 @@ export interface ResearchParams {
  * Service for performing research at different depth levels
  */
 export class ResearchService {
+  private activeRequests = new Map<string, AbortController>();
+
+  public cancelResearch(researchId: string) {
+    const controller = this.activeRequests.get(researchId);
+    if (controller) {
+      controller.abort();
+      this.activeRequests.delete(researchId);
+    }
+  }
   /**
    * Perform research at the specified depth level
    */
@@ -517,9 +531,31 @@ Your report should:
         min_word_count: params.minWordCount || 1500
       };
 
-      // Call the DeerFlow service
+      // Call the DeerFlow service with retries
       console.log('Sending request to DeerFlow service with params:', deerflowParams);
-      let deerflowResponse = await deerflowClient.performResearch(deerflowParams);
+      const maxRetries = 3;
+      let retryCount = 0;
+      let deerflowResponse;
+
+      while (retryCount < maxRetries) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+          deerflowResponse = await deerflowClient.performResearch(deerflowParams, controller.signal);
+          clearTimeout(timeout);
+          break;
+        } catch (error) {
+          retryCount++;
+          if (error.name === 'AbortError') {
+            console.log('Request timed out, retrying...');
+          } else {
+            console.error('Request failed, retrying...', error);
+          }
+          if (retryCount === maxRetries) throw error;
+          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+        }
+      }
 
       // Check if there was an error with the DeerFlow service
       if (deerflowResponse.status?.status === 'error') {
