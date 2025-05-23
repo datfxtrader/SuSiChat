@@ -17,7 +17,7 @@ interface ResearchResponseProps {
 
 export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources }) => {
   const [showAllSources, setShowAllSources] = useState(false);
-  
+
   // Display first 6 sources, then show more button
   const displaySources = showAllSources ? sources : sources.slice(0, 6);
   const hasMoreSources = sources.length > 6;
@@ -146,7 +146,7 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
               Sources ({sources.length})
             </h4>
           </div>
-          
+
           <div className="grid gap-2">
             {displaySources.map((source, index) => (
               <a

@@ -30,7 +30,7 @@ const MAX_SEARCH_RETRIES = 3;
 
 export async function performWebSearch(
   query: string, 
-  maxResults: number = 5,
+  maxResults: number = 20,
   retries: number = MAX_SEARCH_RETRIES
 ): Promise<WebSearchResponse> {
   console.log(`Performing web search for: "${query}"`);
