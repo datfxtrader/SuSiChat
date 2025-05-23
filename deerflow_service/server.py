@@ -263,13 +263,13 @@ async def perform_deep_research(research_question: str, research_id: str, resear
     log_entries = []
     
     try:
-        # Update the state
+        # Update the state with proper research depth
         research_state[research_id] = {
             "status": "in_progress",
             "start_time": time.time(),
             "log": log_entries,
             "sources": [],
-            "research_depth": 3  # Default to maximum depth for comprehensive reports
+            "research_depth": research_depth  # Use the passed research depth parameter
         }
         
         # Step 1: Generate query variations for broader search
@@ -464,7 +464,7 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
         perform_deep_research,
         request.research_question,
         research_id,
-        request.research_depth
+        int(request.research_depth or 3)
     )
     
     # Return initial response immediately
