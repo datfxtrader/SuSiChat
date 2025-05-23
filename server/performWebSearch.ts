@@ -85,7 +85,7 @@ export async function performWebSearch(
             params: {
               q: query,
               count: Math.min(maxResults * 2, 30), // Get more results to account for filtering
-              freshness: 'month',
+              freshness: 'day', // Prioritize very recent results
               textDecorations: false,
               textFormat: 'raw'
             },

@@ -639,15 +639,25 @@ Your report should:
 
       // Check multiple possible response formats from DeerFlow
       if (deerflowResponse.report) {
-        report = deerflowResponse.report;
+        report = this.formatResearchReport(deerflowResponse.report);
         console.log('Found report in direct property, length:', report.length);
       } else if (deerflowResponse.response?.report) {
-        report = deerflowResponse.response.report;
+        report = this.formatResearchReport(deerflowResponse.response.report);
         console.log('Found report in response.report, length:', report.length);
       } else if (typeof deerflowResponse.response === 'string') {
-        report = deerflowResponse.response;
+        report = this.formatResearchReport(deerflowResponse.response);
         console.log('Found report as string in response, length:', report.length);
       }
+
+  private formatResearchReport(report: string): string {
+    // Fix common formatting issues
+    return report
+      .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newline
+      .replace(/([.!?])\s*\n\s*([A-Z])/g, '$1\n\n$2') // Add proper paragraph breaks
+      .replace(/\s+([.,!?])/g, '$1') // Fix spacing before punctuation
+      .replace(/\[\d+\]\s*(?=\[\d+\])/g, '\n$&') // Fix source reference formatting
+      .trim();
+  }
 
       // Extract sources from multiple possible locations
       let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
