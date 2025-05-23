@@ -4,15 +4,40 @@ import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
 import { researchService, ResearchDepth } from './deerflow-integration';
 
-// Simple in-memory cache for web search results
-interface CacheEntry {
-  results: any;
-  timestamp: number;
-  queryUsed: string;
-}
+import LRU from 'lru-cache';
+import rateLimit from 'express-rate-limit';
+import { validate } from 'class-validator';
 
-// Map of query hash -> cache entry
-const searchCache = new Map<string, CacheEntry>();
+// LRU cache for web search results
+const searchCache = new LRU({
+  max: 100,
+  ttl: 1000 * 60 * 5, // 5 minutes
+  updateAgeOnGet: true
+});
+
+// Rate limiter for API requests
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later'
+});
+
+// Input validation class
+class SunaRequestDTO {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  query: string;
+
+  @IsString()
+  userId: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(3)
+  researchDepth?: number;
+}
 
 // Cache TTL in milliseconds (5 minutes)
 const CACHE_TTL = 5 * 60 * 1000;
@@ -142,8 +167,9 @@ async function performBraveSearch(query: string) {
  * @param query Search query string
  * @returns Combined search results from multiple sources
  */
-async function performWebSearch(query: string) {
-  try {
+async function performWebSearch(query: string, retries = 3, timeout = 10000) {
+  const makeRequest = async (attempt: number) => {
+    try {
     // Normalize query for caching
     const queryHash = hashQuery(query);
     
