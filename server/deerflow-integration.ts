@@ -96,8 +96,17 @@ export class ResearchService {
       }
       
       // If even basic research fails, return an error
+      let errorMessage = 'Unknown error occurred';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      } else if (error) {
+        errorMessage = String(error);
+      }
+      
       return {
-        report: `Error performing research: ${error.message}`,
+        report: `Error performing research: ${errorMessage}`,
         sources: [],
         depth: depth,
         processingTime: Date.now() - startTime
