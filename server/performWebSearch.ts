@@ -112,16 +112,16 @@ export async function performWebSearch(
     }
   }
 
-  // Sort and deduplicate results
-  const uniqueUrls = new Set();
-  const uniqueResults = results
-    .sort((a, b) => (b.score || 0) - (a.score || 0))
-    .filter(result => {
-      if (!result.url || uniqueUrls.has(result.url)) return false;
-      uniqueUrls.add(result.url);
-      return true;
-    })
-    .slice(0, maxResults);
+  // Optimize results processing
+  const seen = new Set();
+  const uniqueResults = results.reduce((acc, result) => {
+    if (!result.url || seen.has(result.url)) return acc;
+    seen.add(result.url);
+    acc.push(result);
+    return acc;
+  }, [])
+  .sort((a, b) => (b.score || 0) - (a.score || 0))
+  .slice(0, maxResults);
 
   return {
     results: uniqueResults,

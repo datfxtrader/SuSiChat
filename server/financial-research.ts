@@ -60,38 +60,37 @@ async function generateFinancialAnalysis(query: string): Promise<string> {
     throw new Error('DeepSeek API key not available');
   }
 
-  const response = await axios.post(
-    'https://api.deepseek.com/v1/chat/completions',
-    {
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert financial analyst specialized in forex markets.'
-        },
-        {
-          role: 'user',
-          content: `Create a detailed analysis for ${query} including:
-1. Current Market Status with price levels and movements
-2. Technical Analysis with support/resistance levels
-3. Fundamental Factors affecting the market
-4. Expert Outlook and key levels to watch
-
-Include specific numerical data where appropriate.
-Current date: ${new Date().toISOString().split('T')[0]}`
-        }
-      ],
-      temperature: 0.4,
-      max_tokens: 2000
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+  try {
+    const API_TIMEOUT = 30000;
+    const response = await axios.post(
+      'https://api.deepseek.com/v1/chat/completions',
+      {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert financial analyst specializing in forex markets. Provide concise, data-driven analysis.'
+          },
+          {
+            role: 'user',
+            content: `Analyze ${query} with:
+1. Current price levels and movements
+2. Key technical levels
+3. Major market drivers
+4. Risk assessment`
+          }
+        ],
+        temperature: 0.4,
+        max_tokens: 1000
       },
-      timeout: API_TIMEOUT
-    }
-  );
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        timeout: API_TIMEOUT
+      }
+    );
 
   if (!response.data?.choices?.[0]?.message?.content) {
     throw new Error('Invalid API response format');
@@ -128,3 +127,4 @@ export async function performFinancialResearch(query: string): Promise<ResearchR
     };
   }
 }
+`
