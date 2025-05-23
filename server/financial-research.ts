@@ -40,7 +40,8 @@ export function isFinancialQuery(query: string): boolean {
     'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad',
     'forex', 'currency', 'exchange rate', 'pip', 'spread',
     'technical analysis', 'fundamental analysis', 'trading',
-    'bitcoin', 'crypto', 'gold', 'silver', 'commodities'
+    'bitcoin', 'crypto', 'gold', 'silver', 'commodities',
+    'stock', 'market', 'price', 'investment'
   ];
 
   return financialTerms.some(term => 
