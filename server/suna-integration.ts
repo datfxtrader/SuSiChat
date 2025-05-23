@@ -663,9 +663,12 @@ export class SunaIntegrationService {
             console.log(`🚀 COMPREHENSIVE RESEARCH MODE ACTIVATED - Using DeerFlow for deep research (level 3) on: "${finalQuery}"`);
             
             try {
-              // Determine model ID based on the selected LLM
-              const modelId = data.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : 
+              // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
+              const modelId = researchDepth === 3 ? 'gemini-1.5-flash' : 
+                             data.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : 
                              data.model === 'gemini-1.0-pro' ? 'gemini-1.5-pro' : 'deepseek-v3';
+              
+              console.log(`🎯 Research Depth ${researchDepth} using model: ${modelId} for unlimited comprehensive analysis`);
               
               // Call DeerFlow research service with depth-based token allocation
               const deerflowResult = await researchService.performResearch({
