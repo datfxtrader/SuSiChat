@@ -10,8 +10,7 @@ const FINANCIAL_SOURCES = [
     domain: "investing.com",
     endpoints: {
       live: "/api/live-rates",
-      news: "/api/news",
-      calendar: "/api/calendar"
+      news: "/api/news"
     }
   },
   {
@@ -19,8 +18,7 @@ const FINANCIAL_SOURCES = [
     url: "https://www.fxstreet.com/",
     domain: "fxstreet.com",
     endpoints: {
-      analysis: "/api/analysis",
-      forecast: "/api/forecast" 
+      analysis: "/api/analysis"
     }
   },
   {
@@ -28,24 +26,22 @@ const FINANCIAL_SOURCES = [
     url: "https://www.dailyfx.com/",
     domain: "dailyfx.com",
     endpoints: {
-      technical: "/api/technical",
-      fundamental: "/api/fundamental"
+      technical: "/api/technical"
     }
   }
 ];
 
 /**
- * Check if a query is finance-related
+ * Check if a query is finance-related 
  */
 export function isFinancialQuery(query: string): boolean {
   if (!query) return false;
   
   const financialTerms = [
-    'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad', 'nzd/usd',
-    'usd/chf', 'forex', 'currency', 'exchange rate', 'pip', 'spread',
-    'technical analysis', 'fundamental analysis', 'trading', 'market',
-    'bitcoin', 'btc', 'eth', 'ethereum', 'crypto', 'cryptocurrency',
-    'gold', 'xau/usd', 'silver', 'xag/usd', 'commodities'
+    'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad',
+    'forex', 'currency', 'exchange rate', 'pip', 'spread',
+    'technical analysis', 'fundamental analysis', 'trading',
+    'bitcoin', 'crypto', 'gold', 'silver', 'commodities'
   ];
 
   return financialTerms.some(term => 
@@ -75,7 +71,14 @@ async function generateFinancialAnalysis(query: string, retryCount = 0): Promise
           },
           {
             role: 'user',
-            content: `Create a detailed analysis for ${query} including current price levels, technical analysis, fundamental factors, and market outlook. Include specific numerical data.`
+            content: `Create a detailed analysis for ${query} including:
+1. Current Market Status with price levels and movements
+2. Technical Analysis with support/resistance levels
+3. Fundamental Factors affecting the market
+4. Expert Outlook and key levels to watch
+
+Include specific numerical data where appropriate.
+Current date: ${new Date().toISOString().split('T')[0]}`
           }
         ],
         temperature: 0.4,
@@ -90,7 +93,11 @@ async function generateFinancialAnalysis(query: string, retryCount = 0): Promise
       }
     );
     
-    return response.data?.choices?.[0]?.message?.content;
+    if (response.data?.choices?.[0]?.message?.content) {
+      return response.data.choices[0].message.content;
+    }
+    
+    throw new Error('Invalid API response format');
   } catch (error) {
     console.error(`Error generating financial analysis (attempt ${retryCount + 1}):`, error);
     
@@ -118,7 +125,8 @@ export async function performFinancialResearch(query: string): Promise<ResearchR
       report,
       sources: FINANCIAL_SOURCES,
       depth: ResearchDepth.Deep,
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
+      success: true
     };
   } catch (error) {
     console.error('Financial research failed:', error);
@@ -126,7 +134,9 @@ export async function performFinancialResearch(query: string): Promise<ResearchR
       report: 'Research generation failed. Please try again.',
       sources: FINANCIAL_SOURCES,
       depth: ResearchDepth.Deep,
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
+      success: false,
+      error: error.message
     };
   }
 }
