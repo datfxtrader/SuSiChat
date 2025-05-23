@@ -52,8 +52,8 @@ export async function startDeerFlowService(): Promise<boolean> {
     console.log('Spawning new DeerFlow process...');
     
     try {
-      // Spawn the Python process with proper environment
-      deerflowProcess = spawn('python', ['run-deerflow-minimal.py'], {
+      // Spawn the comprehensive DeerFlow agent system for full capabilities
+      deerflowProcess = spawn('python', ['deerflow_service/server.py'], {
         env: {
           ...process.env,
           PYTHONUNBUFFERED: '1',  // Force unbuffered output for more immediate logs
