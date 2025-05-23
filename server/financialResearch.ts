@@ -34,6 +34,36 @@ export async function generateForexResearch(query: string): Promise<{
       url: "https://www.investing.com/",
       domain: "investing.com",
       content: "Financial markets data and analysis"
+    },
+    {
+      title: "TradingView",
+      url: "https://www.tradingview.com/",
+      domain: "tradingview.com",
+      content: "Advanced charting and technical analysis"
+    },
+    {
+      title: "FXStreet",
+      url: "https://www.fxstreet.com/",
+      domain: "fxstreet.com",
+      content: "Forex news and market analysis"
+    },
+    {
+      title: "Reuters",
+      url: "https://www.reuters.com/markets/",
+      domain: "reuters.com",
+      content: "Global financial news and market coverage"
+    },
+    {
+      title: "Bloomberg",
+      url: "https://www.bloomberg.com/markets",
+      domain: "bloomberg.com",
+      content: "Real-time financial market data and news"
+    },
+    {
+      title: "MarketWatch",
+      url: "https://www.marketwatch.com/",
+      domain: "marketwatch.com",
+      content: "Stock market news and financial analysis"
     }
   ];
 
