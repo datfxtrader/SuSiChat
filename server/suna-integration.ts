@@ -659,7 +659,7 @@ export class SunaIntegrationService {
                 query: finalQuery,
                 depth: ResearchDepth.Deep,
                 modelId: modelId,
-                researchDepth: researchDepth, // Pass research depth for token allocation
+                researchDepth: researchDepth, // Universal token allocation: 1=8K, 2=15K, 3=25K tokens
                 researchLength: 'comprehensive',
                 researchTone: 'analytical',
                 minWordCount: 1500

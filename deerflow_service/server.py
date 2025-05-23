@@ -384,7 +384,9 @@ Your report should:
 Format your report in Markdown, but make it readable and professional."""
         
         # Use dynamic token allocation based on research depth
-        dynamic_token_limit = get_token_limit_by_depth(request.research_depth)
+        research_depth = research_state[research_id].get("research_depth", 3)  # Default to depth 3
+        dynamic_token_limit = get_token_limit_by_depth(research_depth)
+        logger.info(f"Using {dynamic_token_limit} tokens for research depth {research_depth}")
         report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=dynamic_token_limit)
         log_entries.append(f"Research report generated successfully: {len(report)} characters")
         

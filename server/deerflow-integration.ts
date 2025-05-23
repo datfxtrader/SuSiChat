@@ -43,6 +43,7 @@ export interface ResearchParams {
   researchLength?: string;
   researchTone?: string;
   minWordCount?: number;
+  researchDepth?: number; // For universal token allocation (1=8K, 2=15K, 3=25K tokens)
 }
 
 /**
