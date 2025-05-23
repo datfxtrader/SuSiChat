@@ -25,11 +25,11 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
   return (
     <div className="space-y-4">
       {/* Main research content with enhanced markdown formatting */}
-      <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+      <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed space-y-4">
         <ReactMarkdown
           components={{
             h1: ({children}) => (
-              <h1 className="text-xl font-bold mt-8 mb-4 text-gray-900 border-b-2 border-blue-500 pb-2">
+              <h1 className="text-xl font-bold mt-4 mb-3 text-gray-900 border-b-2 border-blue-500 pb-2">
                 {children}
               </h1>
             ),
@@ -54,7 +54,7 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
               </strong>
             ),
             p: ({children}) => (
-              <p className="mb-4 leading-relaxed text-gray-800">
+              <p className="my-2 leading-relaxed text-gray-800">
                 {children}
               </p>
             ),
@@ -146,7 +146,7 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-start p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                className="group flex items-start p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors no-underline"
               >
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-600 mr-3 mt-0.5">
                   {index + 1}
