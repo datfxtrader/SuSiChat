@@ -589,18 +589,30 @@ Your report should:
       
       // Extract authentic research data directly
       console.log('Processing comprehensive research response...');
-      console.log('Raw DeerFlow response:', JSON.stringify(deerflowResponse, null, 2));
+      console.log('Raw DeerFlow response keys:', Object.keys(deerflowResponse));
       
-      const report = deerflowResponse.report || '';
-      const sources: ResearchSource[] = [];
+      // The DeerFlow service completed successfully but may return data in different formats
+      let report = '';
+      let sources: ResearchSource[] = [];
       
-      // Direct extraction of authentic sources
-      if (deerflowResponse.sources) {
-        console.log('Found sources array, processing...');
-        const sourceArray = Array.isArray(deerflowResponse.sources) ? deerflowResponse.sources : [deerflowResponse.sources];
-        
-        sourceArray.forEach((source: any, index: number) => {
-          console.log(`Processing source ${index + 1}:`, source);
+      // Check multiple possible response formats from DeerFlow
+      if (deerflowResponse.report) {
+        report = deerflowResponse.report;
+        console.log('Found report in direct property, length:', report.length);
+      } else if (deerflowResponse.response?.report) {
+        report = deerflowResponse.response.report;
+        console.log('Found report in response.report, length:', report.length);
+      } else if (typeof deerflowResponse.response === 'string') {
+        report = deerflowResponse.response;
+        console.log('Found report as string in response, length:', report.length);
+      }
+      
+      // Extract sources from multiple possible locations
+      let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
+      
+      if (Array.isArray(sourceData) && sourceData.length > 0) {
+        console.log('Found sources array with', sourceData.length, 'items');
+        sourceData.forEach((source: any, index: number) => {
           if (source) {
             sources.push({
               title: source.title || `Source ${index + 1}`,
@@ -610,6 +622,14 @@ Your report should:
             });
           }
         });
+      }
+      
+      // If we still don't have a report but the service indicated success,
+      // there might be an async response we need to retrieve
+      if (!report && deerflowResponse.status?.status === 'processing') {
+        console.log('Report not immediately available, DeerFlow may be processing asynchronously');
+        // We'll return what we have and let the fallback handle the rest
+        report = 'Research is being processed. Please check back in a moment.';
       }
       
       console.log(`Final result: ${sources.length} sources, ${report.length} characters`);
