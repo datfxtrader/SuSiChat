@@ -16,12 +16,12 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   currentUser
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Scroll to bottom when messages change or when typing
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
-  
+
   return (
     <div className="flex-1 p-4 auto-overflow bg-neutral-50 dark:bg-neutral-950" id="chat-messages">
       {/* System Welcome Message */}
@@ -51,7 +51,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* Message groups */}
       <div className="space-y-6">
         {messages.map((message) => (
@@ -61,10 +61,10 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             currentUser={currentUser} 
           />
         ))}
-        
+
         {/* Typing indicator */}
         {isTyping && <TypingIndicator />}
-        
+
         {/* Invisible div for scrolling to bottom */}
         <div ref={messagesEndRef} />
       </div>
