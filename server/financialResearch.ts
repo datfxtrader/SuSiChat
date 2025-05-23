@@ -39,7 +39,16 @@ export async function generateForexResearch(query: string): Promise<{
 
   try {
     // Generate a research report using DeepSeek
-    if (DEEPSEEK_API_KEY) {
+    if (!DEEPSEEK_API_KEY) {
+      console.warn('DeepSeek API key not available');
+      return {
+        report: createFallbackReport(query),
+        sources: defaultSources
+      };
+    }
+
+    // Check for rate limiting and timeouts
+    const timeoutMs = 30000;
       const systemPrompt = `You are an expert financial analyst specializing in forex markets. 
 You will create a comprehensive, data-driven analysis based on the current date and your knowledge 
 of market fundamentals, technical analysis principles, and macroeconomic factors.`;
@@ -76,12 +85,23 @@ real-time data sources are unavailable, so clearly state this limitation.`;
         }
       );
 
-      if (response.data.choices && response.data.choices[0]) {
-        return {
-          report: response.data.choices[0].message.content,
-          sources: defaultSources
-        };
+      if (!response.data?.choices?.[0]?.message?.content) {
+        throw new Error('Invalid API response format');
       }
+
+      const report = response.data.choices[0].message.content;
+      if (report.length < 100) {
+        throw new Error('Generated report too short');
+      }
+
+      return {
+        report,
+        sources: defaultSources,
+        metadata: {
+          generated: new Date().toISOString(),
+          model: 'deepseek-chat'
+        }
+      };
     }
 
     // Fallback report if API call fails
@@ -91,6 +111,45 @@ real-time data sources are unavailable, so clearly state this limitation.`;
     };
   } catch (error) {
     console.error('Error generating forex research:', error);
+    
+    // Retry once on failure
+    try {
+      console.log('Retrying research generation...');
+      const retryResponse = await axios.post(
+        'https://api.deepseek.com/v1/chat/completions',
+        {
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.4,
+          max_tokens: 2000
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+          },
+          timeout: timeoutMs
+        }
+      );
+
+      if (retryResponse.data?.choices?.[0]?.message?.content) {
+        return {
+          report: retryResponse.data.choices[0].message.content,
+          sources: defaultSources,
+          metadata: {
+            generated: new Date().toISOString(),
+            model: 'deepseek-chat',
+            retried: true
+          }
+        };
+      }
+    } catch (retryError) {
+      console.error('Retry failed:', retryError);
+    }
+
     return {
       report: `# Basic ${query} Analysis\n\nUnable to retrieve detailed market information. Please consider the following general insights:\n\n- Currency pairs are influenced by interest rate differentials\n- Economic data releases impact short-term price movements\n- Central bank policies guide long-term trends\n\nThis information represents general market principles rather than real-time data.`,
       sources: defaultSources
