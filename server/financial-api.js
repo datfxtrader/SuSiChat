@@ -1,4 +1,3 @@
-
 /**
  * Financial research API for forex and market data
  * This module provides specialized financial research capabilities
@@ -16,12 +15,26 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
  */
 async function generateFinancialAnalysis(query, model = 'auto') {
   console.log('Generating financial analysis for:', query);
-  
+
   try {
     // Select model based on availability and preference
     let selectedModel = model;
-    if (model === 'auto') {
-      if (GEMINI_API_KEY) {
+
+    // If model is specified directly, verify API key availability
+    if (model.startsWith('gemini') && !GEMINI_API_KEY) {
+      console.warn('Gemini API key not available, falling back to alternative');
+      selectedModel = 'auto';
+    } else if (model === 'deepseek-chat' && !DEEPSEEK_API_KEY) {
+      console.warn('DeepSeek API key not available, falling back to alternative');
+      selectedModel = 'auto';
+    }
+
+    // Auto-select best available model
+    if (selectedModel === 'auto') {
+      if (GEMINI_API_KEY && DEEPSEEK_API_KEY) {
+        // Randomly alternate between providers for load balancing
+        selectedModel = Math.random() > 0.5 ? 'gemini-1.5-flash' : 'deepseek-chat';
+      } else if (GEMINI_API_KEY) {
         selectedModel = 'gemini-1.5-flash';
       } else if (DEEPSEEK_API_KEY) {
         selectedModel = 'deepseek-chat';
@@ -68,7 +81,7 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
           }
         }
       );
-      
+
       return {
         report: response.data.candidates[0].content.parts[0].text,
         sources: FINANCIAL_SOURCES,
@@ -100,7 +113,7 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
           }
         }
       );
-      
+
       return {
         report: response.data.choices[0].message.content,
         sources: FINANCIAL_SOURCES,
@@ -130,7 +143,7 @@ function getFallbackReport(query) {
  */
 function isFinancialQuery(query) {
   if (!query) return false;
-  
+
   const lowerQuery = query.toLowerCase();
   const financialTerms = [
     'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad', 'nzd/usd',
@@ -141,7 +154,7 @@ function isFinancialQuery(query) {
     'crude oil', 'wti', 'brent', 'natural gas', 'copper', 'aluminum',
     'corn', 'wheat', 'soybean', 'commodities', 'commodity futures'
   ];
-  
+
   return financialTerms.some(term => lowerQuery.includes(term));
 }
 
@@ -150,10 +163,10 @@ function isFinancialQuery(query) {
  */
 async function performFinancialResearch(query, depth = 3, model = 'auto') {
   console.log(`Performing financial research at depth ${depth} for: ${query}`);
-  
+
   const startTime = Date.now();
   const { report, sources, success, model: usedModel } = await generateFinancialAnalysis(query, model);
-  
+
   return {
     report,
     sources,
