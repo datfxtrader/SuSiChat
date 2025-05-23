@@ -26,6 +26,41 @@ const FINANCIAL_SOURCES = [
     title: "DailyFX",
     url: "https://www.dailyfx.com/",
     domain: "dailyfx.com"
+  },
+  {
+    title: "Reuters",
+    url: "https://www.reuters.com/markets/currencies/",
+    domain: "reuters.com"
+  },
+  {
+    title: "Bloomberg",
+    url: "https://www.bloomberg.com/markets/currencies",
+    domain: "bloomberg.com"
+  },
+  {
+    title: "MarketWatch",
+    url: "https://www.marketwatch.com/investing/currencies",
+    domain: "marketwatch.com"
+  },
+  {
+    title: "TradingView",
+    url: "https://www.tradingview.com/markets/currencies/",
+    domain: "tradingview.com"
+  },
+  {
+    title: "Financial Times",
+    url: "https://www.ft.com/markets/currencies",
+    domain: "ft.com"
+  },
+  {
+    title: "ForexLive",
+    url: "https://www.forexlive.com/",
+    domain: "forexlive.com"
+  },
+  {
+    title: "BabyPips",
+    url: "https://www.babypips.com/",
+    domain: "babypips.com"
   }
 ];
 
