@@ -71,19 +71,28 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle research completion (only when actually finished, not during restoration)
+  // Handle research completion with restoration guards (progress-based completion)
   useEffect(() => {
-    if (!isSending && isResearchInProgress && messages.length > 0) {
-      // Only complete if we have actual messages (not just restored state)
+    // Only complete when progress genuinely reaches 95%+ (near completion)
+    const shouldComplete = !isSending && 
+                          isResearchInProgress && 
+                          researchProgress >= 95 && // Explicit progress check
+                          messages.length > 0 && // Ensure we have actual messages
+                          !forceSave && // Guard against restoration state
+                          !forceRestore; // Guard against restoration process
+
+    if (shouldComplete) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.loading) {
-        // Research has actually completed with a response
+        console.log('✅ Research reached 95%+ progress with completed response - completing');
         setTimeout(() => {
           completeResearch();
         }, 1000);
       }
+    } else if (!isSending && isResearchInProgress && researchProgress < 95) {
+      console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
-  }, [isSending, isResearchInProgress, completeResearch, messages]);
+  }, [isSending, isResearchInProgress, researchProgress, messages, completeResearch, forceSave, forceRestore]);
 
   // Auto-resize textarea
   useEffect(() => {

@@ -1,0 +1,81 @@
+# Integration Guide: Fixing the Tab Persistence Bug
+
+## The Problem
+When tab state was restored, the research agent's completion `useEffect` was immediately triggered, causing research to end prematurely at 7.1% instead of continuing.
+
+## The Fix
+
+### 1. Updated Tab Persistence Hook ✅
+The `useDirectTabPersistence.ts` now:
+- Removes completion triggers during restoration
+- Sets `isCompleting: false, shouldComplete: false` 
+- Adds `isRestoring` flag to prevent conflicts
+
+### 2. Research Agent Fix Needed 🔧
+
+In `client/src/pages/research-agent.tsx`, update the research completion logic:
+
+```typescript
+// Get the isRestoring flag from the persistence hook
+const { forceSaveState, forceRestoreState, clearStoredState, isRestoring } = useDirectTabPersistence({
+  state,
+  setState,
+  isResearchInProgress
+});
+
+// REPLACE the existing useEffect (lines 75-82) with:
+useEffect(() => {
+  // CRITICAL FIX: Add guards to prevent completion during restoration
+  const shouldComplete = !isSending && 
+                        isResearchInProgress && 
+                        !isRestoring && // Guard against restoration
+                        !state.wasSaved && // Guard against restored state
+                        state.conversationHistory?.length > 0 && // Ensure we have actual progress
+                        !state.isCompleting; // Prevent double completion
+
+  if (shouldComplete) {
+    console.log('✅ Completing research - all conditions met');
+    setTimeout(() => {
+      completeResearch();
+    }, 1000);
+  } else if (!isSending && isResearchInProgress) {
+    console.log('⏸️ Skipping completion - restoration in progress or invalid state');
+  }
+}, [isSending, isResearchInProgress, isRestoring, state.wasSaved, state.conversationHistory, state.isCompleting, completeResearch]);
+```
+
+## Alternative Approach (Recommended)
+
+For even more safety, use progress-based completion:
+
+```typescript
+useEffect(() => {
+  // Only complete when progress genuinely reaches 100%
+  if (!isSending && 
+      isResearchInProgress && 
+      state.progress >= 100 && // Explicit progress check
+      !isRestoring && 
+      !state.wasSaved) {
+    
+    console.log('✅ Research reached 100% - completing');
+    setTimeout(() => {
+      completeResearch();
+    }, 1000);
+  }
+}, [isSending, isResearchInProgress, state.progress, isRestoring, state.wasSaved, completeResearch]);
+```
+
+## Testing the Fix
+
+1. Start research
+2. Switch tabs when progress is around 10-20%
+3. Switch back - research should continue from where it left off
+4. Research should only complete when it genuinely reaches 100%
+
+## Expected Behavior After Fix
+
+✅ Tab switching preserves research state  
+✅ Research continues from saved progress  
+✅ Research only completes at 100% progress  
+✅ No premature completion during restoration  
+✅ Clean state management throughout the process
