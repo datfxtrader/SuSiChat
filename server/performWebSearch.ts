@@ -78,8 +78,8 @@ export async function performWebSearch(
       (async () => {
         try {
           console.log('Starting optimized Brave search with intelligent rate limiting...');
-          // Enhanced rate limiting: 1.5 second delay to stay well within limits
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Enhanced rate limiting: 2 second delay to prevent 429 errors
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
             params: {

@@ -137,8 +137,8 @@ async function performBraveSearch(query: string) {
   try {
     console.log('Performing Brave web search for:', query);
 
-    // Enhanced rate limiting with intelligent spacing
-    await new Promise(resolve => setTimeout(resolve, 1800)); // Increased to 1.8 seconds
+    // Enhanced rate limiting with intelligent spacing to prevent 429 errors
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds for reliability
     
     const response = await axios.get(
       BRAVE_SEARCH_URL,
@@ -1015,28 +1015,35 @@ When responding to users, be:
 - Knowledgeable about a wide range of topics
 - Professional but conversational in tone
 
-When creating research responses, format your output professionally:
+When creating research responses, format your output professionally with emphasis on data recency:
+
+FINANCIAL RESEARCH PRIORITY:
+- **ALWAYS prioritize the most recent data and news closest to today's date**
+- Cross-reference information across multiple sources to verify accuracy
+- When multiple sources provide different data for the same metric, present both with timestamps
+- Highlight any contradictions between sources and explain potential reasons
+- For financial data, always include the date when the data was published or last updated
 
 STRUCTURE YOUR RESPONSE:
-- Start with an executive summary highlighting key findings
+- Start with an executive summary highlighting key findings with dates
 - Use clear headers (## for main sections, ### for subsections)
 - Organize content with proper spacing and bullet points
-- Include data tables when presenting numerical information
-- End with actionable insights and recommendations
+- Include data tables when presenting numerical information with timestamps
+- End with actionable insights and recommendations based on latest data
 
 FORMATTING GUIDELINES:
-- Use **bold** for important terms and key figures
-- Create tables for comparative data (| Column | Column |)
+- Use **bold** for important terms, key figures, and recent dates
+- Create tables for comparative data (| Metric | Value | Date | Source |)
 - Use bullet points for lists with proper spacing
-- Include blockquotes for significant market insights
+- Include blockquotes for significant market insights with attribution
 - Separate sections with clear headers and spacing
 
 CITATION STANDARDS:
-- Clearly cite sources with proper attribution
+- Clearly cite sources with proper attribution and publication dates
 - Integrate information from multiple sources comprehensively
-- Prioritize recent data and highlight contradictions
-- Create numbered source references for easy tracking
-- Format financial data consistently (percentages, currencies)
+- Prioritize recent data and highlight contradictions with timestamps
+- Create numbered source references for easy tracking with dates
+- Format financial data consistently (percentages, currencies, dates)
 
 ${webSearchContent ? 'I have performed a web search for you and found the following information:' : 'If you need real-time information, I can perform a web search for you.'}
 
