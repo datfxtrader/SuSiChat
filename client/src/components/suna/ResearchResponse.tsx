@@ -27,68 +27,93 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
       return `[${sourceNumber}]`;
     });
 
-    // Fix table formatting - convert ASCII tables to proper HTML tables
-    // Handle both standard tables and the specific Economic Indicators format
+    // Enhanced table detection and conversion - handle all ASCII table formats
     processed = processed.replace(
-      /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*\n\|[-\s]+\|[-\s]+\|[-\s]+\|\s*\n((?:\|[^|]*\|[^|]*\|[^|]*\|\s*\n?)+)/g,
-      (match, header1, header2, header3, rows) => {
+      /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)(?:\s*\|\s*([^|]+))?\s*\|\s*\n\|[-\s]+\|[-\s]+\|[-\s]+(?:\|[-\s]+)?\|\s*\n((?:\|[^|]*\|[^|]*\|[^|]*(?:\|[^|]*)?\|\s*\n?)+)/g,
+      (match, header1, header2, header3, header4, rows) => {
+        const isThreeColumn = !header4;
         const tableRows = rows.split('\n').filter(row => row.trim().startsWith('|')).map(row => {
           const cells = row.split('|').slice(1, -1).map(cell => cell.trim());
-          if (cells.length >= 3) {
-            return `<tr><td class="px-4 py-2 border-b border-slate-700">${cells[0]}</td><td class="px-4 py-2 border-b border-slate-700">${cells[1]}</td><td class="px-4 py-2 border-b border-slate-700">${cells[2]}</td></tr>`;
+          if (isThreeColumn && cells.length >= 3) {
+            return `<tr><td class="px-4 py-3 border-b border-slate-700 font-medium">${cells[0]}</td><td class="px-4 py-3 border-b border-slate-700 text-center">${cells[1]}</td><td class="px-4 py-3 border-b border-slate-700 text-center">${cells[2]}</td></tr>`;
+          } else if (!isThreeColumn && cells.length >= 4) {
+            return `<tr><td class="px-4 py-3 border-b border-slate-700 font-medium">${cells[0]}</td><td class="px-4 py-3 border-b border-slate-700 text-center">${cells[1]}</td><td class="px-4 py-3 border-b border-slate-700 text-center">${cells[2]}</td><td class="px-4 py-3 border-b border-slate-700 text-center">${cells[3]}</td></tr>`;
           }
           return '';
         }).join('');
         
-        return `<div class="my-6 overflow-x-auto">
-          <table class="w-full bg-slate-800/50 rounded-lg border border-slate-700">
-            <thead>
-              <tr class="bg-slate-700/50">
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${header1.trim()}</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${header2.trim()}</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${header3.trim()}</th>
-              </tr>
-            </thead>
-            <tbody class="text-sm text-gray-300">
-              ${tableRows}
-            </tbody>
-          </table>
-        </div>`;
+        if (isThreeColumn) {
+          return `<div class="my-8 overflow-x-auto">
+            <table class="w-full bg-slate-800/40 rounded-xl border border-slate-700/50 shadow-lg">
+              <thead>
+                <tr class="bg-gradient-to-r from-slate-700 to-slate-600">
+                  <th class="px-6 py-4 text-left text-sm font-semibold text-gray-100">${header1.trim()}</th>
+                  <th class="px-6 py-4 text-center text-sm font-semibold text-gray-100">${header2.trim()}</th>
+                  <th class="px-6 py-4 text-center text-sm font-semibold text-gray-100">${header3.trim()}</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-300 text-sm">
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>`;
+        } else {
+          return `<div class="my-8 overflow-x-auto">
+            <table class="w-full bg-slate-800/40 rounded-xl border border-slate-700/50 shadow-lg">
+              <thead>
+                <tr class="bg-gradient-to-r from-slate-700 to-slate-600">
+                  <th class="px-6 py-4 text-left text-sm font-semibold text-gray-100">${header1.trim()}</th>
+                  <th class="px-6 py-4 text-center text-sm font-semibold text-gray-100">${header2.trim()}</th>
+                  <th class="px-6 py-4 text-center text-sm font-semibold text-gray-100">${header3.trim()}</th>
+                  <th class="px-6 py-4 text-center text-sm font-semibold text-gray-100">${header4.trim()}</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-300 text-sm">
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>`;
+        }
       }
     );
 
-    // Handle the specific Economic Indicators format from your screenshot
+    // Also handle simpler table patterns that might not have proper separators
     processed = processed.replace(
-      /(\|\s*Metric\s*\|\s*UK.*?\|\s*US.*?\|\s*\n\|[-\s]+\|[-\s]+\|[-\s]+\|\s*\n(?:\|[^|]*\|[^|]*\|[^|]*\|\s*\n?)+)/g,
+      /(\|\s*[^|]+\s*\|\s*[^|]+\s*\|\s*[^|]+(?:\s*\|\s*[^|]+)?\s*\|\s*(?:\n\|\s*[^|]+\s*\|\s*[^|]+\s*\|\s*[^|]+(?:\s*\|\s*[^|]+)?\s*\|\s*){2,})/g,
       (match) => {
-        const lines = match.split('\n').filter(line => line.trim());
-        const headerLine = lines[0];
-        const separatorLine = lines[1];
-        const dataLines = lines.slice(2).filter(line => line.trim().startsWith('|'));
+        const lines = match.split('\n').filter(line => line.trim().startsWith('|'));
+        if (lines.length < 2) return match;
         
-        // Extract headers
-        const headers = headerLine.split('|').slice(1, -1).map(h => h.trim());
+        const firstLine = lines[0];
+        const headers = firstLine.split('|').slice(1, -1).map(h => h.trim());
         
-        // Process data rows
+        if (headers.length < 3) return match;
+        
+        const dataLines = lines.slice(1);
         const tableRows = dataLines.map(line => {
           const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-          if (cells.length >= 3) {
-            return `<tr><td class="px-4 py-2 border-b border-slate-700 font-medium">${cells[0]}</td><td class="px-4 py-2 border-b border-slate-700 text-center">${cells[1]}</td><td class="px-4 py-2 border-b border-slate-700 text-center">${cells[2]}</td></tr>`;
+          if (cells.length >= headers.length) {
+            const cellsHtml = cells.map((cell, index) => 
+              `<td class="px-4 py-3 border-b border-slate-700 ${index === 0 ? 'font-medium' : 'text-center'}">${cell}</td>`
+            ).join('');
+            return `<tr>${cellsHtml}</tr>`;
           }
           return '';
-        }).join('');
+        }).filter(row => row).join('');
         
-        if (headers.length >= 3 && tableRows) {
-          return `<div class="my-6 overflow-x-auto">
-            <table class="w-full bg-slate-800/50 rounded-lg border border-slate-700">
+        if (tableRows) {
+          const headersHtml = headers.map((header, index) => 
+            `<th class="px-6 py-4 ${index === 0 ? 'text-left' : 'text-center'} text-sm font-semibold text-gray-100">${header}</th>`
+          ).join('');
+          
+          return `<div class="my-8 overflow-x-auto">
+            <table class="w-full bg-slate-800/40 rounded-xl border border-slate-700/50 shadow-lg">
               <thead>
-                <tr class="bg-slate-700/50">
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${headers[0]}</th>
-                  <th class="px-4 py-3 text-center text-sm font-medium text-gray-200">${headers[1]}</th>
-                  <th class="px-4 py-3 text-center text-sm font-medium text-gray-200">${headers[2]}</th>
+                <tr class="bg-gradient-to-r from-slate-700 to-slate-600">
+                  ${headersHtml}
                 </tr>
               </thead>
-              <tbody class="text-sm text-gray-300">
+              <tbody class="text-gray-300 text-sm">
                 ${tableRows}
               </tbody>
             </table>
