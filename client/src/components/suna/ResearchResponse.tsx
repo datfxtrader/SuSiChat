@@ -154,7 +154,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
             )
           }}
         >
-          {content}
+          {processedContent}
         </ReactMarkdown>
       </div>
 
@@ -184,7 +184,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
               const timestamp = getTimestamp(source.url);
               
               return (
-                <div key={index} className="flex items-start space-x-3 text-sm">
+                <div key={index} id={`source-${index + 1}`} className="flex items-start space-x-3 text-sm">
                   <span className="text-cyan-400 font-mono text-xs mt-0.5">[{index + 1}]</span>
                   <div className="flex-1">
                     <a
