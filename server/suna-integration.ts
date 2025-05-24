@@ -215,6 +215,35 @@ export async function storeResearchResultsSafely(
   };
 }
 
+// Save completed research to conversation history
+export async function saveCompletedResearchToHistory(
+  conversationId: string,
+  userId: string,
+  query: string,
+  results: any
+) {
+  console.log('💾 Saving completed research to conversation history...');
+  
+  try {
+    // Store in memory cache
+    await storeResearchResultsSafely(conversationId, results, query, userId);
+    
+    // Also store in crash-safe system
+    const safeStorage = await CrashSafeResearch.store(conversationId, userId, query, results);
+    
+    if (safeStorage.success) {
+      console.log('✅ Research saved to both memory and crash-safe storage');
+      return true;
+    } else {
+      console.log('⚠️ Research saved to memory only');
+      return true;
+    }
+  } catch (error) {
+    console.error('❌ Failed to save research:', error);
+    return false;
+  }
+}
+
 // Get all conversations for user from memory cache
 export function getUserConversationsFromMemory(userId: string) {
   const userConversations: any[] = [];
@@ -233,6 +262,7 @@ export function getUserConversationsFromMemory(userId: string) {
   });
   
   console.log(`💾 Found ${userConversations.length} conversations in memory for user ${userId}`);
+  console.log(`📱 Returning ${userConversations.length} conversations from memory for user ${userId}`);
   return userConversations.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
