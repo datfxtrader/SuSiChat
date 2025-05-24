@@ -24,6 +24,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/', (req, res) => {
     res.sendFile('index.html', { root: './client/dist' });
   });
+
+  // Serve static files from client/dist
+  app.use(express.static('client/dist'));
   
 
   // Mount financial research routes
