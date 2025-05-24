@@ -520,7 +520,7 @@ Your report should:
       // Use the deerflowClient that's already imported at the top of the file
       // This fixes the "require is not defined" error
 
-      // Prepare request parameters for DeerFlow service with enhanced settings
+      // Advanced DeerFlow agent system with full multi-domain capabilities
       const deerflowParams = {
         research_question: params.query,
         model_id: params.modelId || 'deepseek-v3',
@@ -528,11 +528,28 @@ Your report should:
         include_news: params.includeNews !== false,
         research_length: params.researchLength || 'comprehensive',
         research_tone: params.researchTone || 'analytical',
-        min_word_count: params.minWordCount || 1500
+        min_word_count: params.minWordCount || 1500,
+        // Advanced agent orchestration features activated
+        use_advanced_agents: true,
+        enable_domain_expertise: true,
+        enable_reasoning_chains: true,
+        enable_adaptive_planning: true,
+        enable_working_memory: true,
+        enable_multi_agent_orchestration: true,
+        domain_focus: 'auto',
+        reasoning_depth: params.researchDepth || 3,
+        include_intermediate_results: true,
+        enable_cross_domain_analysis: (params.researchDepth || 3) >= 2,
+        use_financial_agent: true,
+        use_scientific_agent: (params.researchDepth || 3) >= 2,
+        use_news_intelligence: true,
+        enable_learning_system: true,
+        complexity: (params.researchDepth || 3) === 3 ? 'high' : (params.researchDepth || 3) === 2 ? 'medium' : 'low'
       };
 
-      // Call the DeerFlow service with retries
-      console.log('Sending request to DeerFlow service with params:', deerflowParams);
+      // Call the DeerFlow service with advanced agent capabilities
+      console.log('Sending request to DeerFlow service with advanced agent system enabled:', deerflowParams);
+      console.log('Advanced features: Multi-agent orchestration, domain expertise, reasoning chains, adaptive planning');
       const maxRetries = 3;
       let retryCount = 0;
       let deerflowResponse;
