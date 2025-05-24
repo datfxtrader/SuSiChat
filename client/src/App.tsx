@@ -14,6 +14,7 @@ import TripPlanning from "@/pages/trip";
 import ResearchBlog from "@/pages/research-blog";
 import ResearchAgent from "@/pages/research-agent";
 import TemplatesPage from "@/pages/templates";
+import DebugTabPersistence from "@/pages/debug-tab-persistence";
 
 import NotFound from "@/pages/not-found";
 
@@ -40,6 +41,7 @@ function App() {
       <Route path="/research-agent" component={ResearchAgent} />
       <Route path="/research-blog" component={ResearchBlog} />
       <Route path="/templates" component={TemplatesPage} />
+      <Route path="/debug-tab-persistence" component={DebugTabPersistence} />
       <Route path="/trip" component={TripPlanning} />
 
       <Route component={NotFound} />
