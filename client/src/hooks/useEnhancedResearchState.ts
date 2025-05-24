@@ -280,58 +280,62 @@ export const useEnhancedResearchState = () => {
     }
   }, [loadEnhancedState, simulateProgress]);
 
-  // Stable visibility change detection with race condition prevention
+  // Simple and reliable tab switching detection
   useEffect(() => {
-    let isRestoring = false;
-    let restoreTimeout: NodeJS.Timeout | null = null;
-    
     const handleVisibilityChange = () => {
-      console.log('Enhanced visibility change. Hidden:', document.hidden);
-      
-      // Clear any pending restore
-      if (restoreTimeout) {
-        clearTimeout(restoreTimeout);
-        restoreTimeout = null;
-      }
-      
       if (document.hidden) {
-        const currentState = stateRef.current;
-        if (currentState?.isInProgress) {
-          console.log('Saving enhanced state on tab hide');
-          saveEnhancedState(currentState);
+        // Save current state when tab becomes hidden
+        const currentState = {
+          isInProgress: isResearchInProgress,
+          query: ongoingResearchQuery,
+          progress: researchProgress,
+          stage: researchStage,
+          stageLabel,
+          startTime: Date.now(),
+          estimatedDuration: 90000,
+          errors,
+          warnings,
+          apiCallCount: 0,
+          lastApiCall: 0
+        };
+        
+        if (currentState.isInProgress) {
+          console.log('Tab hidden - saving state:', currentState);
+          localStorage.setItem('research_tab_state', JSON.stringify(currentState));
         }
       } else {
-        // Prevent race conditions
-        if (isRestoring) {
-          console.log('Already restoring, skipping...');
-          return;
+        // Restore state when tab becomes visible
+        const savedState = localStorage.getItem('research_tab_state');
+        if (savedState) {
+          try {
+            const state = JSON.parse(savedState);
+            console.log('Tab visible - restoring state:', state);
+            
+            // Force immediate UI update
+            setIsResearchInProgress(state.isInProgress);
+            setOngoingResearchQuery(state.query);
+            setResearchProgress(state.progress);
+            setResearchStage(state.stage);
+            setStageLabel(state.stageLabel);
+            setErrors(state.errors || []);
+            setWarnings(state.warnings || []);
+            
+            if (state.isInProgress) {
+              simulateProgress();
+            }
+          } catch (error) {
+            console.warn('Failed to restore tab state:', error);
+          }
         }
-        
-        isRestoring = true;
-        console.log('Tab visible - restoring enhanced state with delay');
-        
-        // Add small delay to ensure DOM is ready
-        restoreTimeout = setTimeout(() => {
-          restoreEnhancedState();
-          
-          // Force UI update after restoration
-          setTimeout(() => {
-            isRestoring = false;
-            console.log('UI restoration complete');
-          }, 100);
-        }, 50);
       }
     };
 
-    console.log('Setting up enhanced visibility listener');
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      console.log('Removing enhanced visibility listener');
-      if (restoreTimeout) clearTimeout(restoreTimeout);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []); // Completely stable
+  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel, errors, warnings, simulateProgress]);
 
   // Initial state restoration
   useEffect(() => {
