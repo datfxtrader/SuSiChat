@@ -125,8 +125,12 @@ export const useResearchState = () => {
 
   // Restore state on mount and when tab becomes visible
   const restoreState = useCallback(() => {
+    console.log('Attempting to restore research state...');
     const savedState = loadResearchState();
+    console.log('Loaded saved state:', savedState);
+    
     if (savedState) {
+      console.log('Restoring state:', savedState);
       setIsResearchInProgress(savedState.isInProgress);
       setOngoingResearchQuery(savedState.query);
       setResearchProgress(savedState.progress);
@@ -159,6 +163,9 @@ export const useResearchState = () => {
   // Handle tab visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
+      console.log('Visibility changed. Hidden:', document.hidden);
+      console.log('Current research state:', { isResearchInProgress, ongoingResearchQuery, researchProgress });
+      
       if (document.hidden) {
         // Tab is hidden - save current state
         if (isResearchInProgress) {
@@ -170,10 +177,12 @@ export const useResearchState = () => {
             startTime: stateRef.current?.startTime || Date.now(),
             estimatedDuration: stateRef.current?.estimatedDuration || 60000
           };
+          console.log('Saving state on tab hide:', currentState);
           saveResearchState(currentState);
         }
       } else {
         // Tab is visible - restore state
+        console.log('Tab visible - restoring state');
         restoreState();
       }
     };
