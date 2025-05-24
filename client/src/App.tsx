@@ -13,6 +13,7 @@ import Profile from "@/pages/profile";
 import SunaAgent from "@/pages/suna-agent";
 import TripPlanning from "@/pages/trip";
 import ResearchBlog from "@/pages/research-blog";
+import SunaClone from "@/pages/suna-clone";
 
 import NotFound from "@/pages/not-found";
 
@@ -38,6 +39,7 @@ function App() {
       <Route path="/profile" component={Profile} />
       <Route path="/suna-agent" component={SunaAgent} />
       <Route path="/research-blog" component={ResearchBlog} />
+      <Route path="/suna-clone" component={SunaClone} />
       <Route path="/trip" component={TripPlanning} />
 
       <Route component={NotFound} />

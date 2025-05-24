@@ -27,6 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
     { path: "/schedule", icon: "event", label: "Schedule" },
     { path: "/family-room", icon: "groups", label: "Family Room" },
     { path: "/suna-agent", icon: "smart_toy", label: "Suna Agent" },
+    { path: "/suna-clone", icon: "auto_awesome", label: "Suna Clone UI" },
     { path: "/research-blog", icon: "article", label: "Research Blog" },
     { path: "/profile", icon: "school", label: "Homework Help" },
     { path: "/trip", icon: "flight_takeoff", label: "Trip Planning" },
