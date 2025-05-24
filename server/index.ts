@@ -37,6 +37,43 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add research results API endpoint for immediate access
+  app.get('/api/research/results/:conversationId', async (req: any, res) => {
+    try {
+      const { conversationId } = req.params;
+      console.log('🔍 API: Retrieving results for conversation:', conversationId);
+      
+      const { getUserConversationsFromMemory } = await import('./suna-integration');
+      const userId = req.user?.claims?.sub || 'anonymous';
+      const conversations = getUserConversationsFromMemory(userId);
+      const conversation = conversations.find((c: any) => c.id === conversationId);
+      
+      if (conversation && conversation.messages.length > 0) {
+        res.json({
+          success: true,
+          data: conversation.messages[0],
+          source: 'memory',
+          timestamp: conversation.createdAt,
+          query: conversation.title
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: 'Results not found',
+          conversationId
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ API: Error retrieving results:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error retrieving results',
+        error: (error as Error).message
+      });
+    }
+  });
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
