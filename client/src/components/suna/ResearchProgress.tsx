@@ -157,25 +157,25 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
             {currentStageInfo.icon}
           </div>
           <div>
-            <div className="text-sm font-medium text-gray-900">
+            <div className="text-sm font-medium text-gray-100">
               {currentStageInfo.name}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-400">
               {currentStageInfo.description}
               {mainTopic && ` for ${mainTopic}`}
             </div>
           </div>
         </div>
-        <div className="flex items-center space-x-2 text-xs text-gray-500">
+        <div className="flex items-center space-x-2 text-xs text-gray-400">
           <Clock className="w-3 h-3" />
           <span>{Math.floor(timeElapsed / 60)}:{(timeElapsed % 60).toString().padStart(2, '0')}</span>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2">
+      <div className="w-full bg-slate-700 rounded-full h-2">
         <div 
-          className="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
+          className="bg-blue-400 h-2 rounded-full transition-all duration-300 ease-out"
           style={{ width: `${animatedProgress}%` }}
         />
       </div>
@@ -226,8 +226,8 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
       </div>
 
       {/* Real-time Status with current search step */}
-      <div className="bg-gray-50 rounded-md py-3 px-4">
-        <div className="flex items-center justify-center space-x-1 text-xs text-gray-500 mb-2">
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-md py-3 px-4">
+        <div className="flex items-center justify-center space-x-1 text-xs text-gray-300 mb-2">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span>
             {isActive ? 'Researching in real-time...' : 'Research paused'}
@@ -236,7 +236,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
         
         {/* Current search step display */}
         {currentSearchStep && (
-          <div className="text-xs text-gray-700 text-center mb-2">
+          <div className="text-xs text-gray-300 text-center mb-2">
             <span className="font-medium">🔍 Current: </span>
             {currentSearchStep}
           </div>
@@ -245,10 +245,10 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
         {/* Recent search history */}
         {searchHistory.length > 0 && (
           <div className="max-h-20 overflow-y-auto">
-            <div className="text-xs text-gray-500 space-y-1">
+            <div className="text-xs text-gray-400 space-y-1">
               {searchHistory.slice(-3).map((step, index) => (
                 <div key={index} className="flex items-center">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-400 mr-2">✓</span>
                   <span className="truncate">{step}</span>
                 </div>
               ))}
