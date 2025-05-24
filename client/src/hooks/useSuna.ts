@@ -174,24 +174,20 @@ export const useSuna = () => {
 
   // Initialize state
   useEffect(() => {
-    const storedState = loadStateFromStorage();
+    const storedInProgress = localStorage.getItem('research-in-progress') === 'true';
+    const storedQuery = localStorage.getItem('ongoing-research-query');
 
-    if (storedState.inProgress && storedState.query) {
+    if (storedInProgress && storedQuery) {
       setIsResearchInProgress(true);
-      setOngoingResearchQuery(storedState.query);
-      setResearchProgress(storedState.progress);
-
-      researchStateRef.current = {
-        inProgress: true,
-        query: storedState.query,
-        startTime: storedState.startTime
-      };
-
-      if (storedState.startTime) {
-        startProgressSimulation(storedState.startTime);
-      }
+      setOngoingResearchQuery(storedQuery);
+      setResearchProgress(0);
+      startProgressSimulation(Date.now());
+    } else {
+      setIsResearchInProgress(false);
+      setOngoingResearchQuery('');
+      setResearchProgress(0);
     }
-  }, [loadStateFromStorage, startProgressSimulation]);
+  }, [startProgressSimulation]);
 
   // Handle visibility change
   useEffect(() => {
