@@ -199,7 +199,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               >
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title || 'Untitled Chat'}</h4>
-                  <span className="text-xs text-gray-500">{formatRelativeTime(conv.createdAt)}</span>
+                  <span className="text-xs text-gray-500">{formatRelativeTime(conv.createdAt || conv.updatedAt || new Date().toISOString())}</span>
                 </div>
                 <p className="text-xs text-gray-400 truncate">
                   {conv.messages && conv.messages.length > 0 

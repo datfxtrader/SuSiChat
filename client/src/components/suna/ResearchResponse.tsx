@@ -77,7 +77,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
       }
     );
 
-    // Also handle simpler table patterns that might not have proper separators
+    // Handle simpler table patterns and any remaining ASCII tables
     processed = processed.replace(
       /(\|\s*[^|]+\s*\|\s*[^|]+\s*\|\s*[^|]+(?:\s*\|\s*[^|]+)?\s*\|\s*(?:\n\|\s*[^|]+\s*\|\s*[^|]+\s*\|\s*[^|]+(?:\s*\|\s*[^|]+)?\s*\|\s*){2,})/g,
       (match) => {
@@ -89,12 +89,14 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
         
         if (headers.length < 3) return match;
         
-        const dataLines = lines.slice(1);
+        // Skip separator lines that are just dashes
+        const dataLines = lines.slice(1).filter(line => !line.match(/^\|[-\s]+\|[-\s]+\|/));
+        
         const tableRows = dataLines.map(line => {
           const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
           if (cells.length >= headers.length) {
             const cellsHtml = cells.map((cell, index) => 
-              `<td class="px-4 py-3 border-b border-slate-700 ${index === 0 ? 'font-medium' : 'text-center'}">${cell}</td>`
+              `<td class="px-4 py-3 border-b border-slate-700 ${index === 0 ? 'font-medium text-left' : 'text-center'}">${cell}</td>`
             ).join('');
             return `<tr>${cellsHtml}</tr>`;
           }
@@ -102,6 +104,57 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
         }).filter(row => row).join('');
         
         if (tableRows) {
+          const headersHtml = headers.map((header, index) => 
+            `<th class="px-6 py-4 ${index === 0 ? 'text-left' : 'text-center'} text-sm font-semibold text-gray-100">${header}</th>`
+          ).join('');
+          
+          return `<div class="my-8 overflow-x-auto">
+            <table class="w-full bg-slate-800/40 rounded-xl border border-slate-700/50 shadow-lg">
+              <thead>
+                <tr class="bg-gradient-to-r from-slate-700 to-slate-600">
+                  ${headersHtml}
+                </tr>
+              </thead>
+              <tbody class="text-gray-300 text-sm">
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>`;
+        }
+        
+        return match;
+      }
+    );
+
+    // Final catch-all for any remaining table-like content with pipes
+    processed = processed.replace(
+      /(\|\s*Metric\s*\|.*?\|[\s\S]*?(?=\n\n|\n#|$))/g,
+      (match) => {
+        // Skip if already converted to HTML
+        if (match.includes('<table')) return match;
+        
+        const lines = match.split('\n').filter(line => line.trim().startsWith('|'));
+        if (lines.length < 3) return match;
+        
+        const headerLine = lines[0];
+        const dataLines = lines.slice(1).filter(line => !line.match(/^\|[-\s]+/));
+        
+        if (dataLines.length === 0) return match;
+        
+        const headers = headerLine.split('|').slice(1, -1).map(h => h.trim());
+        
+        const tableRows = dataLines.map(line => {
+          const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+          if (cells.length >= headers.length) {
+            const cellsHtml = cells.map((cell, index) => 
+              `<td class="px-4 py-3 border-b border-slate-700 ${index === 0 ? 'font-medium text-left' : 'text-center'}">${cell}</td>`
+            ).join('');
+            return `<tr>${cellsHtml}</tr>`;
+          }
+          return '';
+        }).filter(row => row).join('');
+        
+        if (tableRows && headers.length > 0) {
           const headersHtml = headers.map((header, index) => 
             `<th class="px-6 py-4 ${index === 0 ? 'text-left' : 'text-center'} text-sm font-semibold text-gray-100">${header}</th>`
           ).join('');
