@@ -982,10 +982,26 @@ ${numberContradictions.join('\n')}
               }
             }
 
+            // Get current gold price for validation
+            let currentGoldPrice = '';
+            try {
+              // Try to extract current gold price from search results
+              for (const result of sortedResults) {
+                const content = (result.content || '').toLowerCase();
+                const priceMatch = content.match(/gold.*?(?:price|trading).*?\$([0-9,]+)/i);
+                if (priceMatch) {
+                  currentGoldPrice = `\n🔥 CURRENT GOLD PRICE: $${priceMatch[1]} (from live market data)\n`;
+                  break;
+                }
+              }
+            } catch (e) {
+              // Continue without current price if extraction fails
+            }
+
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
-Search query: "${finalQuery}"${dataFreshnessWarning}${priceContext}
+Search query: "${finalQuery}"${currentGoldPrice}${dataFreshnessWarning}${priceContext}
 
 ${diversityInfo ? `${diversityInfo}\n` : ''}
 ${topicsInfo ? `${topicsInfo}\n` : ''}
@@ -1002,17 +1018,28 @@ ${sortedResults.map((result: any, index: number) => {
     }
   }
 
-  // Evaluate recency and credibility (simple heuristics)
-  const recencyIndicator = result.publishedDate ?
-    `Published: ${result.publishedDate}` :
-    '';
+  // Enhanced timestamp extraction
+  let timeInfo = '';
+  if (result.publishedDate) {
+    timeInfo = `📅 Published: ${result.publishedDate}`;
+  } else if (result.content) {
+    // Try to extract date from content
+    const dateMatch = result.content.match(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+202[4-5]/i);
+    if (dateMatch) {
+      timeInfo = `📅 Date found: ${dateMatch[0]}`;
+    } else {
+      timeInfo = `⚠️ No timestamp - verify data freshness`;
+    }
+  }
 
-  // Format the result with better attribution and organization
-  return `[${index + 1}] "${result.title || 'Untitled'}" 
-Source: ${domain} ${result.source ? `via ${result.source}` : ''}
-${recencyIndicator}
-URL: ${result.url || 'No URL available'}
-Content: ${result.content || result.description || 'No content available'}`;
+  // Create clickable hyperlink for the source
+  const sourceLink = result.url ? `[🔗 ${result.title || 'View Source'}](${result.url})` : 'No URL available';
+
+  // Format the result with enhanced attribution and timestamp
+  return `[${index + 1}] ${sourceLink}
+📍 Source: ${domain} ${result.source ? `via ${result.source}` : ''}
+${timeInfo}
+📝 Content: ${result.content || result.description || 'No content available'}`;
 }).join('\n\n') || 'No results found'}
 
 ${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
@@ -1053,11 +1080,13 @@ FINANCIAL RESEARCH PRIORITY:
 - **ALWAYS prioritize the most recent data and news closest to today's date**
 - **CRITICAL: Check current market prices against any forecasts provided**
 - **URGENT: Reject outdated data from 2021-2023 when discussing current 2025 trends**
+- **CRITICAL: Validate current gold price is above $3,200/oz as of May 2025**
 - For price forecasts, validate against current market reality:
-  * If current price exceeds bullish forecasts, seek higher targets from recent sources
-  * If current price is below bearish forecasts, find more realistic downside targets
-  * Always mention the current price vs forecast relationship
+  * Current gold price has exceeded $3,000 - seek targets above $3,200
+  * Dismiss any forecasts below current market levels as outdated
+  * Always state: "Current gold price: $X,XXX vs forecast of $Y,YYY"
 - Flag and dismiss any data older than 6 months when discussing current market conditions
+- Include publication dates and timestamps for all price data sources
 - Cross-reference information across multiple sources to verify accuracy
 - When multiple sources provide different data for the same metric, present both with timestamps
 - Highlight any contradictions between sources and explain potential reasons
