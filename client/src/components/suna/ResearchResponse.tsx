@@ -34,12 +34,12 @@ export const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sou
               </h1>
             ),
             h2: ({children}) => (
-              <h2 className="text-lg font-semibold mt-6 mb-3 text-gray-900 border-l-4 border-blue-400 pl-3">
+              <h2 className="text-xl font-semibold mt-10 mb-6 text-gray-800 border-l-4 border-blue-500 pl-6 bg-gradient-to-r from-blue-50 to-transparent py-3 rounded-r-lg">
                 {children}
               </h2>
             ),
             h3: ({children}) => (
-              <h3 className="text-base font-semibold mt-4 mb-2 text-gray-900 bg-gray-50 px-3 py-1 rounded">
+              <h3 className="text-lg font-medium mt-8 mb-5 text-gray-700 border-l-2 border-gray-400 pl-4 bg-gray-50 py-2 rounded-r">
                 {children}
               </h3>
             ),
