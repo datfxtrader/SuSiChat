@@ -56,7 +56,9 @@
 
 /* Override any white backgrounds in sidebar */
 [class*="md:flex"][class*="md:w-64"],
-[class*="fixed"][class*="w-64"] {
+[class*="fixed"][class*="w-64"],
+.sidebar-dark-theme,
+[class*="border-r"][class*="border-border"] {
   background: rgba(15, 23, 42, 0.95) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
