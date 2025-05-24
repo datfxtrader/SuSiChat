@@ -422,14 +422,14 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Input Area */}
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
             <div className="space-y-3">
-              {/* Compact Research Controls */}
+              {/* Compact Research Controls - Single Line */}
               <div className="space-y-2">
-                {/* Minimal Control Bar */}
+                {/* All Controls in One Row */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     {/* Essential Controls */}
                     <Select value={researchDepth} onValueChange={setResearchDepth}>
-                      <SelectTrigger className="w-40 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
+                      <SelectTrigger className="w-36 h-7 bg-slate-800/50 border-slate-700/50 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -440,7 +440,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     </Select>
 
                     <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
-                      <SelectTrigger className="w-32 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
+                      <SelectTrigger className="w-20 h-7 bg-slate-800/50 border-slate-700/50 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -456,7 +456,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                         variant={searchPreferences.forceSearch ? "default" : "ghost"}
                         size="sm"
                         onClick={toggleForceSearch}
-                        className="h-6 px-2 text-xs"
+                        className="h-5 px-1 text-xs"
                       >
                         <Search className="w-3 h-3" />
                       </Button>
@@ -464,9 +464,39 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                         variant={searchPreferences.disableSearch ? "secondary" : "ghost"}
                         size="sm"
                         onClick={toggleDisableSearch}
-                        className="h-6 px-2 text-xs"
+                        className="h-5 px-1 text-xs"
                       >
                         <Ban className="w-3 h-3" />
+                      </Button>
+                    </div>
+
+                    {/* Compact Templates */}
+                    <div className="flex items-center space-x-1">
+                      {[
+                        { icon: TrendingUp, text: "Market", query: "Analyze current market trends for " },
+                        { icon: Database, text: "Financial", query: "Generate a comprehensive financial analysis of " },
+                        { icon: Search, text: "Competitive", query: "Research competitors and market position for " },
+                        { icon: AlertCircle, text: "Risk", query: "Assess investment risks and opportunities for " }
+                      ].map((template, idx) => (
+                        <Button
+                          key={idx}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMessage(template.query)}
+                          className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 whitespace-nowrap text-xs flex-shrink-0"
+                        >
+                          <template.icon className="w-3 h-3 mr-1" />
+                          {template.text}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/templates', '_blank')}
+                        className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 flex-shrink-0"
+                        title="Manage Templates"
+                      >
+                        <Plus className="w-3 h-3" />
                       </Button>
                     </div>
                   </div>
@@ -478,36 +508,6 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       <span>Research Active</span>
                     </div>
                   )}
-                </div>
-
-                {/* Compact Templates */}
-                <div className="flex items-center space-x-2 overflow-x-auto scrollbar-hide">
-                  {[
-                    { icon: TrendingUp, text: "Market", query: "Analyze current market trends for " },
-                    { icon: Database, text: "Financial", query: "Generate a comprehensive financial analysis of " },
-                    { icon: Search, text: "Competitive", query: "Research competitors and market position for " },
-                    { icon: AlertCircle, text: "Risk", query: "Assess investment risks and opportunities for " }
-                  ].map((template, idx) => (
-                    <Button
-                      key={idx}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMessage(template.query)}
-                      className="h-7 px-3 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 whitespace-nowrap text-xs flex-shrink-0"
-                    >
-                      <template.icon className="w-3 h-3 mr-1" />
-                      {template.text}
-                    </Button>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open('/templates', '_blank')}
-                    className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 flex-shrink-0"
-                    title="Manage Templates"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </Button>
                 </div>
 
                 {/* Clean Input Area */}
