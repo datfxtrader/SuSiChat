@@ -28,6 +28,62 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later'
 });
 
+// In-memory storage for research results to bypass database timeouts
+const researchResultsMemoryCache = new Map<string, {
+  results: any;
+  timestamp: string;
+  query: string;
+  userId: string;
+  conversationData: any;
+}>();
+
+// Enhanced result storage with memory priority (bypasses database entirely)
+export async function storeResearchResultsSafely(
+  conversationId: string, 
+  results: any, 
+  query: string, 
+  userId: string,
+  conversationData?: any
+) {
+  console.log('💾 Storing research results safely in memory...');
+  
+  researchResultsMemoryCache.set(conversationId, {
+    results,
+    timestamp: new Date().toISOString(),
+    query,
+    userId,
+    conversationData: conversationData || {}
+  });
+  
+  console.log('✅ Results cached in memory successfully');
+  return {
+    success: true,
+    storage: 'memory',
+    conversationId
+  };
+}
+
+// Get all conversations for user from memory cache
+export function getUserConversationsFromMemory(userId: string) {
+  const userConversations = [];
+  
+  for (const [conversationId, data] of researchResultsMemoryCache.entries()) {
+    if (data.userId === userId) {
+      userConversations.push({
+        id: conversationId,
+        title: data.query.length > 50 ? data.query.substring(0, 47) + '...' : data.query,
+        userId: userId,
+        createdAt: data.timestamp,
+        updatedAt: data.timestamp,
+        messages: data.results ? [data.results] : []
+      });
+    }
+  }
+  
+  console.log(`💾 Found ${userConversations.length} conversations in memory for user ${userId}`);
+  return userConversations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
 // Input validation class
 class SunaRequestDTO {
   query!: string;

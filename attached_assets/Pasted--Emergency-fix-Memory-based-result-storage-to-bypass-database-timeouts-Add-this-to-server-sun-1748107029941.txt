@@ -1,0 +1,146 @@
+// Emergency fix: Memory-based result storage to bypass database timeouts
+// Add this to server/suna-integration.ts
+
+// In-memory storage for research results
+const researchResultsMemoryCache = new Map<string, {
+  results: any;
+  timestamp: string;
+  query: string;
+  userId: string;
+}>();
+
+// Enhanced result storage with memory fallback
+export async function storeResearchResultsSafely(
+  conversationId: string, 
+  results: any, 
+  query: string, 
+  userId: string
+) {
+  console.log('💾 Storing research results safely...');
+  
+  // ALWAYS store in memory first (immediate backup)
+  researchResultsMemoryCache.set(conversationId, {
+    results,
+    timestamp: new Date().toISOString(),
+    query,
+    userId
+  });
+  
+  console.log('✅ Results cached in memory successfully');
+  
+  // Try database storage with timeout protection
+  const dbPromise = new Promise(async (resolve, reject) => {
+    try {
+      // Quick database storage with aggressive timeout
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Database timeout - using memory cache'));
+      }, 10000); // Only 10 seconds for database
+
+      // Attempt database storage
+      await executeResearchQuery(
+        'INSERT INTO research_results (conversation_id, results, created_at) VALUES ($1, $2, NOW())',
+        [conversationId, JSON.stringify(results)]
+      );
+      
+      clearTimeout(timeoutId);
+      console.log('✅ Results also stored in database');
+      resolve(true);
+      
+    } catch (error) {
+      console.log('⚠️ Database storage failed, memory cache is primary:', error.message);
+      resolve(false); // Don't reject, memory cache is sufficient
+    }
+  });
+
+  // Don't wait for database - return immediately with memory cache
+  dbPromise.catch(() => {}); // Ignore database failures
+  
+  return {
+    success: true,
+    storage: 'memory',
+    conversationId
+  };
+}
+
+// Enhanced result retrieval with memory priority
+export async function getResearchResultsSafely(conversationId: string) {
+  console.log('🔍 Retrieving research results safely...');
+  
+  // Check memory cache first (fastest and most reliable)
+  const memoryResult = researchResultsMemoryCache.get(conversationId);
+  if (memoryResult) {
+    console.log('✅ Found results in memory cache');
+    return {
+      success: true,
+      results: memoryResult.results,
+      source: 'memory',
+      timestamp: memoryResult.timestamp,
+      query: memoryResult.query
+    };
+  }
+
+  // Fallback to database with timeout protection
+  try {
+    const dbTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Database timeout')), 5000);
+    });
+
+    const dbQuery = executeResearchQuery(
+      'SELECT results, created_at FROM research_results WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [conversationId]
+    );
+
+    const result = await Promise.race([dbQuery, dbTimeout]);
+    
+    if (result.rows && result.rows.length > 0) {
+      console.log('✅ Found results in database');
+      return {
+        success: true,
+        results: JSON.parse(result.rows[0].results),
+        source: 'database',
+        timestamp: result.rows[0].created_at
+      };
+    }
+    
+  } catch (error) {
+    console.log('⚠️ Database retrieval failed:', error.message);
+  }
+
+  console.log('❌ No results found');
+  return {
+    success: false,
+    message: 'No results found'
+  };
+}
+
+// Memory cache management
+export function getMemoryCacheStats() {
+  return {
+    totalResults: researchResultsMemoryCache.size,
+    results: Array.from(researchResultsMemoryCache.entries()).map(([id, data]) => ({
+      conversationId: id,
+      query: data.query,
+      timestamp: data.timestamp,
+      userId: data.userId
+    }))
+  };
+}
+
+// Cleanup old memory cache entries (prevent memory leaks)
+export function cleanupMemoryCache() {
+  const oneHourAgo = Date.now() - (60 * 60 * 1000);
+  
+  for (const [id, data] of researchResultsMemoryCache.entries()) {
+    if (new Date(data.timestamp).getTime() < oneHourAgo) {
+      researchResultsMemoryCache.delete(id);
+      console.log('🧹 Cleaned up old cache entry:', id);
+    }
+  }
+}
+
+// Auto-cleanup every 30 minutes
+setInterval(cleanupMemoryCache, 30 * 60 * 1000);
+
+// Replace your existing result storage calls with:
+// await storeResearchResultsSafely(conversationId, results, query, userId);
+// const results = await getResearchResultsSafely(conversationId);
