@@ -24,23 +24,23 @@ const progressStages: ProgressStage[] = [
     name: "Analyzing Query",
     description: "Understanding your research question",
     icon: <Brain className="w-4 h-4" />,
-    color: "text-blue-500",
+    color: "text-cyan-400",
     duration: 3
   },
   {
     id: 2,
-    name: "Web Search",
+    name: "Web Search", 
     description: "Searching multiple sources for information",
     icon: <Search className="w-4 h-4" />,
-    color: "text-green-500",
+    color: "text-cyan-400",
     duration: 8
   },
   {
     id: 3,
     name: "Deep Analysis",
-    description: "Processing and analyzing collected data",
+    description: "Processing and analyzing collected data", 
     icon: <Database className="w-4 h-4" />,
-    color: "text-purple-500",
+    color: "text-cyan-400",
     duration: 12
   },
   {
@@ -48,7 +48,7 @@ const progressStages: ProgressStage[] = [
     name: "AI Synthesis",
     description: "Generating comprehensive research report",
     icon: <Sparkles className="w-4 h-4" />,
-    color: "text-orange-500",
+    color: "text-cyan-400", 
     duration: 8
   },
   {
@@ -56,7 +56,7 @@ const progressStages: ProgressStage[] = [
     name: "Finalizing",
     description: "Preparing results and sources",
     icon: <FileText className="w-4 h-4" />,
-    color: "text-indigo-500",
+    color: "text-cyan-400",
     duration: 3
   }
 ];
@@ -141,9 +141,9 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
 
   if (isComplete) {
     return (
-      <div className="flex items-center space-x-2 text-green-600">
+      <div className="flex items-center space-x-2 text-purple-400">
         <CheckCircle className="w-4 h-4" />
-        <span className="text-sm font-medium">Research Complete</span>
+        <span className="text-sm font-semibold">Research Complete</span>
       </div>
     );
   }
@@ -157,10 +157,10 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
             {currentStageInfo.icon}
           </div>
           <div>
-            <div className="text-sm font-medium text-gray-100">
+            <div className="text-sm font-bold text-white">
               {currentStageInfo.name}
             </div>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-gray-300">
               {currentStageInfo.description}
               {mainTopic && ` for ${mainTopic}`}
             </div>

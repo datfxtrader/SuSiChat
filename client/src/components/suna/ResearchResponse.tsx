@@ -58,20 +58,20 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
               </p>
             ),
             
-            // Beautiful list formatting with dark theme
+            // Clean list formatting without vertical lines
             ul: ({children}) => (
-              <ul className="mb-10 space-y-4 border-l-3 border-blue-400 bg-slate-800/30 pl-8 py-6 rounded-r-lg shadow-sm backdrop-blur-sm">
+              <ul className="mb-8 space-y-3 bg-slate-800/20 pl-6 py-4 rounded-lg">
                 {children}
               </ul>
             ),
             ol: ({children}) => (
-              <ol className="mb-10 space-y-4 border-l-3 border-green-400 bg-slate-800/30 pl-8 py-6 rounded-r-lg shadow-sm list-decimal backdrop-blur-sm">
+              <ol className="mb-8 space-y-3 bg-slate-800/20 pl-6 py-4 rounded-lg list-decimal">
                 {children}
               </ol>
             ),
             li: ({children}) => (
-              <li className="text-gray-300 leading-relaxed text-base pl-3 relative">
-                <span className="absolute -left-6 top-1 text-blue-400 font-bold text-lg">▸</span>
+              <li className="text-gray-300 leading-relaxed text-base relative">
+                <span className="absolute -left-4 top-1 text-cyan-400 font-bold text-sm">•</span>
                 {children}
               </li>
             ),
