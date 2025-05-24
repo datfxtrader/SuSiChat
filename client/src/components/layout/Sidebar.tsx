@@ -42,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
 
   return (
     <div className={cn(
-      "border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900",
+      "border-r border-border bg-background/80 backdrop-blur-sm",
       className
     )}>
       {/* App Logo and Title */}
@@ -56,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
       </div>
 
       {/* User Profile Section */}
-      <div className="p-4 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center space-x-3">
           <Avatar>
             <AvatarImage src={user?.profileImageUrl || ""} alt={user?.firstName || "User"} />
@@ -71,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
             </div>
           </div>
           <Link href="/profile" onClick={handleItemClick}>
-            <a className="ml-auto text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">
+            <a className="ml-auto text-muted-foreground hover:text-foreground">
               <span className="material-icons text-lg">settings</span>
             </a>
           </Link>
@@ -84,8 +84,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
           {navItems.map((item) => (
             <li key={item.path}>
               <div className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
-                isActive(item.path) && "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-foreground hover:bg-muted/50",
+                isActive(item.path) && "bg-muted text-foreground"
               )}>
                 <Link href={item.path} onClick={handleItemClick} className="flex items-center gap-3 w-full">
                   <span className="material-icons">{item.icon}</span>
@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
         {familyRooms && familyRooms.length > 0 && (
           <div className="mt-8">
             <div className="px-4 mb-2 flex items-center justify-between">
-              <h2 className="text-xs uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-medium">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                 Family Rooms
               </h2>
               <Link href="/family-room/new" onClick={handleItemClick}>
@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
                 href={`/family-room/${room.id}`}
                 onClick={handleItemClick}
               >
-                <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-1">
+                <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-muted/50 text-foreground mb-1">
                   <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center">
                     <span className="material-icons text-white text-sm">home</span>
                   </div>
