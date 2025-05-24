@@ -73,14 +73,45 @@ export async function performWebSearch(
     })()
   );
 
-  // Optimized Brave search with intelligent rate limiting
+  // Smart Brave search with caching and intelligent fallbacks
   if (BRAVE_API_KEY) {
     searchPromises.push(
       (async () => {
         try {
-          console.log('Starting optimized Brave search with intelligent rate limiting...');
-          // Extended rate limiting: 4-5 second delay for comprehensive source discovery
-          await new Promise(resolve => setTimeout(resolve, 4500));
+          console.log('Starting smart Brave search with caching...');
+          
+          // Generate cache key for this specific query
+          const cacheKey = `brave_search_${query.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+          
+          // Check cache first (5-minute cache)
+          const cachedResult = apiRateManager.getCachedResponse(cacheKey);
+          if (cachedResult) {
+            console.log('Using cached Brave search results');
+            braveResults = cachedResult;
+            for (const result of cachedResult.web?.results || []) {
+              results.push({
+                title: result.title || 'Untitled',
+                content: result.description || '',
+                url: result.url || '',
+                score: 1.0,
+                source: 'Brave (cached)'
+              });
+            }
+            return;
+          }
+
+          // Check if Brave is currently rate limited
+          const delay = apiRateManager.shouldDelay('brave');
+          if (delay > 30000) { // If delay is more than 30 seconds, skip Brave
+            console.log(`Brave rate limited for ${delay}ms, skipping to fallback sources`);
+            braveResults = { error: 'Rate limited - using alternative sources' };
+            return;
+          }
+
+          if (delay > 0) {
+            console.log(`Waiting ${delay}ms for Brave rate limit...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
           
           // Create precise date range for search freshness
           const today = new Date();
@@ -100,11 +131,17 @@ export async function performWebSearch(
             headers: {
               'Accept': 'application/json',
               'X-Subscription-Token': BRAVE_API_KEY
-            }
+            },
+            timeout: 10000 // 10 second timeout
           });
 
           if (response.data?.web?.results) {
             braveResults = response.data;
+            
+            // Cache successful results for 5 minutes
+            apiRateManager.cacheResponse(cacheKey, response.data, 5 * 60 * 1000);
+            apiRateManager.recordSuccess('brave');
+            
             for (const result of response.data.web.results) {
               results.push({
                 title: result.title || 'Untitled',
@@ -114,10 +151,17 @@ export async function performWebSearch(
                 source: 'Brave'
               });
             }
+            console.log(`Brave search successful: ${response.data.web.results.length} results`);
           }
-        } catch (error) {
-          console.error('Brave search error:', error);
-          braveResults = { error: 'Brave search failed' };
+        } catch (error: any) {
+          if (error.response?.status === 429) {
+            console.log('Brave search rate limited - recording for intelligent backoff');
+            apiRateManager.recordRateLimit('brave');
+            braveResults = { error: 'Rate limited - enhanced fallback active' };
+          } else {
+            console.error('Brave search error:', error.message);
+            braveResults = { error: 'Brave search failed - using alternatives' };
+          }
         }
       })()
     );
@@ -174,22 +218,73 @@ export async function performWebSearch(
   await Promise.allSettled(searchPromises);
   console.log(`Parallel search completed. Found ${results.length} total results.`);
 
-  // Optimize results processing
+  // Enhanced fallback system when primary sources fail
+  if (results.length < 3) {
+    console.log('Low result count detected - activating enhanced fallback search...');
+    
+    // Try additional DuckDuckGo search with different terms
+    try {
+      const fallbackQuery = `${query} news updates market analysis`;
+      const fallbackResponse = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(fallbackQuery)}&format=json&no_html=1&skip_disambig=1`);
+      
+      if (fallbackResponse.data?.RelatedTopics) {
+        for (const topic of fallbackResponse.data.RelatedTopics.slice(0, 3)) {
+          if (topic.FirstURL && topic.Text) {
+            results.push({
+              title: topic.Text.substring(0, 100) + '...',
+              content: topic.Text,
+              url: topic.FirstURL,
+              score: 0.7,
+              source: 'DuckDuckGo Fallback'
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Fallback search failed, but continuing with available results');
+    }
+  }
+
+  // Intelligent result optimization with source diversity
   const seen = new Set();
+  const sourceCount = new Map();
+  
   const uniqueResults = results.reduce((acc, result) => {
     if (!result.url || seen.has(result.url)) return acc;
     seen.add(result.url);
+    
+    // Ensure source diversity (max 3 from same source)
+    const sourceKey = result.source?.split(' ')[0] || 'Unknown';
+    const currentCount = sourceCount.get(sourceKey) || 0;
+    if (currentCount >= 3) return acc;
+    
+    sourceCount.set(sourceKey, currentCount + 1);
     acc.push(result);
     return acc;
   }, [])
-  .sort((a, b) => (b.score || 0) - (a.score || 0))
+  .sort((a, b) => {
+    // Prioritize by score but boost fresh sources
+    const scoreA = (a.score || 0) + (a.source?.includes('cached') ? -0.1 : 0);
+    const scoreB = (b.score || 0) + (b.source?.includes('cached') ? -0.1 : 0);
+    return scoreB - scoreA;
+  })
   .slice(0, maxResults);
+
+  // Add metadata about search success and fallbacks used
+  const searchMetadata = {
+    totalSources: Array.from(sourceCount.keys()).length,
+    sourceBreakdown: Object.fromEntries(sourceCount),
+    braveSuccess: !braveResults?.error,
+    tavilySuccess: !tavilyResults?.error,
+    fallbackUsed: results.some(r => r.source?.includes('Fallback'))
+  };
 
   return {
     results: uniqueResults,
     tavilyResults,
     braveResults,
     query,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    metadata: searchMetadata
   };
 }
