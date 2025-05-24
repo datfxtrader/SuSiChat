@@ -1020,10 +1020,21 @@ ${numberContradictions.join('\n')}
               sortedResults = credibleResults; // Use only premium credible sources
             }
             
-            if (isFinancialForecast) {
-              const currentPriceInfo = this.extractCurrentPriceFromResults(sortedResults, data.query);
-              if (currentPriceInfo) {
-                priceContext = `\nCURRENT MARKET CONTEXT: ${currentPriceInfo}\n`;
+            // Check if this is a financial forecast query
+            const financialKeywords = ['price', 'forecast', 'target', 'btc', 'bitcoin', 'usd', 'trading', 'market'];
+            const isFinancialQuery = financialKeywords.some(keyword => 
+              data.query.toLowerCase().includes(keyword)
+            );
+            
+            if (isFinancialQuery) {
+              // Extract current price context if available
+              const pricePattern = /(?:current|price|trading).*?\$?([0-9,]+)/i;
+              for (const result of sortedResults) {
+                const match = (result.content || '').match(pricePattern);
+                if (match) {
+                  priceContext = `\nCURRENT MARKET CONTEXT: Current price indicators found in sources\n`;
+                  break;
+                }
               }
             }
 
