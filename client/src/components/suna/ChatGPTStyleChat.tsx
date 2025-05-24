@@ -364,7 +364,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   }
 
   return (
-    <div className="flex h-full bg-white text-gray-800">
+    <div className="flex h-full bg-background/50 backdrop-blur-sm text-foreground">
       {/* Mobile sidebar toggle */}
       <button 
         className={cn(
@@ -387,7 +387,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         <div className="p-2 border-b border-gray-200 space-y-2">
           <Button 
             variant="outline" 
-            className="w-full bg-white border border-gray-200 hover:bg-gray-100 text-gray-700" 
+            className="w-full bg-background/80 backdrop-blur-sm border border-border hover:bg-muted/50 text-foreground" 
             onClick={handleNewConversation}
           >
             <PlusIcon className="mr-2 h-4 w-4" /> New chat
@@ -451,7 +451,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 return (
                   <div
                     key={msg.id || index}
-                    className="px-4 md:px-[10%] py-6 flex w-full items-start bg-white"
+                    className="px-4 md:px-[10%] py-6 flex w-full items-start bg-background/30 backdrop-blur-sm"
                   >
                     <div className="flex-shrink-0 mr-4">
                       {isUserMessage ? (
@@ -470,7 +470,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         "text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800 rounded-lg p-3 whitespace-pre-wrap",
                         isUserMessage 
                           ? "bg-blue-100 border border-blue-200" 
-                          : "bg-white border border-gray-200 shadow-sm"
+                          : "bg-background/80 backdrop-blur-sm border border-border shadow-sm"
                       )}>
                         {/* Always use ResearchResponse for assistant messages to ensure proper formatting */}
                         {!isUserMessage ? (
@@ -494,7 +494,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               })}
               
               {isSending && (
-                <div className="px-4 md:px-[10%] py-6 flex w-full items-start bg-white">
+                <div className="px-4 md:px-[10%] py-6 flex w-full items-start bg-background/30 backdrop-blur-sm">
                   <div className="flex-shrink-0 mr-4">
                     <div className="rounded-full bg-blue-500 w-8 h-8 flex items-center justify-center">
                       <Bot className="h-4 w-4 text-white" />
@@ -502,7 +502,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   </div>
                   
                   <div className="flex-grow w-full">
-                    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="bg-background/80 backdrop-blur-sm border border-border rounded-lg p-3 shadow-sm">
                       {researchMode ? (
                         <div className="flex flex-col">
                           <ResearchProgress 
@@ -576,7 +576,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
         </div>
 
         {/* Input area */}
-        <div className="px-2 sm:px-4 pb-4 pt-4 absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-md">
+        <div className="px-2 sm:px-4 pb-4 pt-4 absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t border-border shadow-md">
           <div className="relative max-w-3xl mx-auto">
             {/* Research depth controls removed from here to avoid duplication */}
             
@@ -590,7 +590,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               placeholder={researchMode ? "Ask a research question..." : "Ask anything..."}
               className={cn(
                 "min-h-[56px] max-h-[200px] p-4 pr-24 w-full rounded-2xl border border-gray-300 shadow-sm",
-                "bg-white focus:border-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0",
+                "bg-background/80 backdrop-blur-sm border-border focus:border-ring focus-visible:ring-0 focus-visible:ring-offset-0",
                 "placeholder-gray-500 resize-none text-gray-800 text-sm transition-all"
               )}
               disabled={isSending}
@@ -626,7 +626,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
             
             {/* File upload area (can be expanded later) */}
             {showFileUpload && (
-              <div className="absolute bottom-14 right-3 bg-white border rounded-lg shadow-lg p-3 w-64">
+              <div className="absolute bottom-14 right-3 bg-background/90 backdrop-blur-sm border border-border rounded-lg shadow-lg p-3 w-64">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-sm font-medium">Attach Files</h4>
                   <Button
