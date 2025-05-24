@@ -65,9 +65,9 @@ export async function storeResearchResultsSafely(
 
 // Get all conversations for user from memory cache
 export function getUserConversationsFromMemory(userId: string) {
-  const userConversations = [];
+  const userConversations: any[] = [];
   
-  for (const [conversationId, data] of researchResultsMemoryCache.entries()) {
+  researchResultsMemoryCache.forEach((data, conversationId) => {
     if (data.userId === userId) {
       userConversations.push({
         id: conversationId,
@@ -78,10 +78,10 @@ export function getUserConversationsFromMemory(userId: string) {
         messages: data.results ? [data.results] : []
       });
     }
-  }
+  });
   
   console.log(`💾 Found ${userConversations.length} conversations in memory for user ${userId}`);
-  return userConversations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return userConversations.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 // Input validation class
@@ -1559,8 +1559,15 @@ Format citations properly by using superscript numbers like [1] at the end of se
         conversation.title = data.query.substring(0, titleLimit) + (data.query.length > 30 ? '...' : '');
       }
 
-      // Store the updated conversation
+      // Store the updated conversation in memory cache to bypass database issues
       if (data.threadId) {
+        await storeResearchResultsSafely(
+          data.threadId, 
+          assistantMessage, 
+          data.query, 
+          data.userId,
+          conversation
+        );
         this.storeConversation(data.userId, data.threadId, conversation);
       }
 
@@ -1743,7 +1750,9 @@ const getUserConversations = async (req: any, res: Response) => {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
-    const conversations = await sunaService.getUserConversations(userId);
+    // Use memory-based storage to bypass database issues
+    const conversations = getUserConversationsFromMemory(userId);
+    console.log(`📱 Returning ${conversations.length} conversations from memory for user ${userId}`);
     return res.json(conversations);
   } catch (error) {
     console.error('Error retrieving user conversations:', error);
