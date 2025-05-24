@@ -170,19 +170,37 @@ export const useResearchState = () => {
         const currentState = stateRef.current;
         if (currentState && currentState.isInProgress) {
           console.log('Saving state on tab hide:', currentState);
-          saveResearchState(currentState);
+          try {
+            localStorage.setItem('research_state', JSON.stringify(currentState));
+          } catch (error) {
+            console.warn('Failed to save state on tab hide:', error);
+          }
         }
       } else {
         // Tab is visible - restore state
         console.log('Tab visible - restoring state');
-        restoreState();
+        try {
+          const savedState = localStorage.getItem('research_state');
+          if (savedState) {
+            const state = JSON.parse(savedState);
+            if (state.isInProgress && Date.now() - state.startTime < 30 * 60 * 1000) {
+              console.log('Restoring state from visibility change:', state);
+              setIsResearchInProgress(state.isInProgress);
+              setOngoingResearchQuery(state.query);
+              setResearchProgress(state.progress);
+              setResearchStage(state.stage);
+              stateRef.current = state;
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to restore state on tab visible:', error);
+        }
       }
     };
 
     console.log('Setting up visibility change listener');
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Test if the event listener is working
     console.log('Visibility API supported:', typeof document.hidden !== 'undefined');
     console.log('Current visibility state:', document.hidden ? 'hidden' : 'visible');
     
@@ -190,7 +208,7 @@ export const useResearchState = () => {
       console.log('Removing visibility change listener');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []); // Empty dependency array to prevent constant re-creation
+  }, []); // Empty dependency array - completely independent
 
   // Initial state restoration on mount
   useEffect(() => {
