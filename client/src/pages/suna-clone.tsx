@@ -520,7 +520,9 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => window.open('/templates', '_blank')}
                     className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 flex-shrink-0"
+                    title="Manage Templates"
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
