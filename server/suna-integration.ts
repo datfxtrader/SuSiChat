@@ -694,10 +694,15 @@ class SunaIntegrationService {
         }
       }
 
-      // Determine if we should perform web search
+      // Enhanced web search activation - prioritize financial and current data queries
+      const isFinancialQuery = ['bitcoin', 'btc', 'crypto', 'price', 'forecast', 'market', 'trading', 'usd', 'factors', 'trend'].some(keyword => 
+        data.query.toLowerCase().includes(keyword)
+      );
+      
+      // Force search for financial queries and current information needs
       const shouldSearch = !disableSearch &&
         ((TAVILY_API_KEY || BRAVE_API_KEY) &&
-         (forceSearch || this.needsWebSearch(data.query, conversation.messages)));
+         (forceSearch || isFinancialQuery || this.needsWebSearch(data.query, conversation.messages)));
 
       if (shouldSearch) {
         try {
