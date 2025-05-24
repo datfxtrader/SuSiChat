@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, PlusIcon, MenuIcon, XIcon } from 'lucide-react';
+import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, PlusIcon, MenuIcon, XIcon, Ban, Clock, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -263,50 +263,108 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       <Bot className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1">
-                      <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 p-6 rounded-2xl rounded-tl-sm">
+                      <div className="group bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 p-6 rounded-2xl rounded-tl-sm hover:border-slate-700/60 transition-all duration-200">
+                        {/* Message Header with Actions */}
+                        <div className="flex items-center justify-between mb-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center space-x-2 text-xs text-gray-400">
+                            <Bot className="w-3 h-3" />
+                            <span>AI Response</span>
+                            <span>•</span>
+                            <span>{formatRelativeTime(msg.timestamp)}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-slate-800/50">
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-slate-800/50">
+                              <Share2 className="w-3 h-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-slate-800/50">
+                              <Bookmark className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Enhanced Message Content */}
                         <div className="prose prose-invert max-w-none">
                           <ReactMarkdown 
                             components={{
                               p: ({ children }) => <p className="text-gray-300 leading-relaxed mb-4 last:mb-0">{children}</p>,
-                              h1: ({ children }) => <h1 className="text-xl font-bold text-gray-100 mb-3">{children}</h1>,
-                              h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-100 mb-2">{children}</h2>,
-                              h3: ({ children }) => <h3 className="text-md font-medium text-gray-100 mb-2">{children}</h3>,
-                              ul: ({ children }) => <ul className="list-disc pl-6 mb-4 text-gray-300">{children}</ul>,
-                              ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 text-gray-300">{children}</ol>,
-                              li: ({ children }) => <li className="mb-1">{children}</li>,
-                              strong: ({ children }) => <strong className="font-semibold text-gray-200">{children}</strong>,
-                              em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
-                              code: ({ children }) => <code className="bg-slate-800/50 px-2 py-1 rounded text-gray-200 font-mono text-sm">{children}</code>,
-                              pre: ({ children }) => <pre className="bg-slate-800/50 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>,
+                              h1: ({ children }) => <h1 className="text-xl font-bold text-gray-100 mb-3 border-b border-slate-700/50 pb-2">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-100 mb-2 flex items-center"><TrendingUp className="w-4 h-4 mr-2 text-primary" />{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-md font-medium text-gray-100 mb-2 flex items-center"><AlertCircle className="w-3 h-3 mr-2 text-blue-400" />{children}</h3>,
+                              ul: ({ children }) => <ul className="list-none space-y-2 mb-4 pl-4 border-l-2 border-slate-700/50">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 text-gray-300 space-y-1">{children}</ol>,
+                              li: ({ children }) => <li className="text-gray-300 relative before:content-['•'] before:text-primary before:font-bold before:absolute before:-left-4">{children}</li>,
+                              strong: ({ children }) => <strong className="font-semibold text-gray-200 bg-slate-800/30 px-1 rounded">{children}</strong>,
+                              em: ({ children }) => <em className="italic text-primary">{children}</em>,
+                              code: ({ children }) => <code className="bg-slate-800/70 px-2 py-1 rounded text-primary font-mono text-sm border border-slate-700/50">{children}</code>,
+                              pre: ({ children }) => <pre className="bg-slate-800/70 p-4 rounded-lg overflow-x-auto mb-4 border border-slate-700/50">{children}</pre>,
+                              blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 italic text-gray-300 bg-slate-800/20 py-2 rounded-r">{children}</blockquote>,
                             }}
                           >
                             {msg.content}
                           </ReactMarkdown>
                         </div>
                         
+                        {/* Enhanced Sources Section */}
                         {extractSources(msg.content).length > 0 && (
                           <div className="mt-6 pt-4 border-t border-slate-800/40">
-                            <h4 className="text-sm font-medium text-gray-400 mb-3">Sources</h4>
-                            <div className="space-y-2">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-sm font-medium text-gray-400 flex items-center">
+                                <Search className="w-3 h-3 mr-1" />
+                                Research Sources ({extractSources(msg.content).length})
+                              </h4>
+                              <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                <Clock className="w-3 h-3" />
+                                <span>Real-time data</span>
+                              </div>
+                            </div>
+                            <div className="grid gap-2">
                               {extractSources(msg.content).map((source, idx) => (
-                                <div key={idx} className="flex items-center space-x-2 text-sm">
-                                  <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                                  <a 
-                                    href={source.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-gray-300 hover:text-primary cursor-pointer transition-colors"
-                                  >
-                                    {source.title}
-                                  </a>
-                                  <span className="text-gray-500">• {source.domain}</span>
+                                <div key={idx} className="flex items-start space-x-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/30 hover:border-primary/30 transition-colors group/source">
+                                  <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <a 
+                                      href={source.url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-gray-300 hover:text-primary cursor-pointer transition-colors font-medium text-sm block truncate group-hover/source:text-primary"
+                                    >
+                                      {source.title}
+                                    </a>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      <span className="text-xs text-gray-500">{source.domain}</span>
+                                      <span className="text-xs text-gray-600">•</span>
+                                      <span className="text-xs text-gray-500">Verified source</span>
+                                    </div>
+                                  </div>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity">
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
+
+                        {/* Research Quality Indicator */}
+                        <div className="mt-4 pt-3 border-t border-slate-800/30">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-3 text-gray-500">
+                              <div className="flex items-center space-x-1">
+                                <div className="w-2 h-2 bg-green-400 rounded-full" />
+                                <span>High-quality research</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Database className="w-3 h-3" />
+                                <span>Multi-source verified</span>
+                              </div>
+                            </div>
+                            <div className="text-gray-500">{formatRelativeTime(msg.timestamp)}</div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">{formatRelativeTime(msg.timestamp)}</div>
                     </div>
                   </>
                 )}
@@ -384,52 +442,217 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Input Area */}
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
             <div className="space-y-3">
-              {/* Controls */}
-              <div className="flex items-center space-x-3">
-                <Select value={researchDepth} onValueChange={setResearchDepth}>
-                  <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Quick Research (Depth 1)</SelectItem>
-                    <SelectItem value="2">Standard Research (Depth 2)</SelectItem>
-                    <SelectItem value="3">Deep Research (Depth 3)</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Advanced Research Controls */}
+              <div className="space-y-3">
+                {/* Primary Controls Row */}
+                <div className="flex items-center space-x-3 flex-wrap gap-2">
+                  <Select value={researchDepth} onValueChange={setResearchDepth}>
+                    <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50 hover:border-primary/30 transition-colors">
+                      <SelectValue placeholder="Research Depth" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-400 rounded-full" />
+                          <span>Quick Research (8K tokens)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-yellow-400 rounded-full" />
+                          <span>Standard Research (15K tokens)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="3">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-red-400 rounded-full" />
+                          <span>Deep Research (25K tokens)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
-                  <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto Model</SelectItem>
-                    <SelectItem value="deepseek">DeepSeek</SelectItem>
-                    <SelectItem value="gemini">Gemini Pro</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
+                    <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50 hover:border-primary/30 transition-colors">
+                      <SelectValue placeholder="AI Model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">
+                        <div className="flex items-center space-x-2">
+                          <Sparkles className="w-3 h-3 text-primary" />
+                          <span>Auto Model (Recommended)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="deepseek">
+                        <div className="flex items-center space-x-2">
+                          <Zap className="w-3 h-3 text-blue-400" />
+                          <span>DeepSeek (Fast & Efficient)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="gemini">
+                        <div className="flex items-center space-x-2">
+                          <Database className="w-3 h-3 text-purple-400" />
+                          <span>Gemini Pro (Complex Analysis)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  <span className="text-xs text-gray-400">Research Mode</span>
+                  {/* Search Preferences */}
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleForceSearch}
+                      className={cn(
+                        "bg-slate-800/50 border-slate-700/50 hover:border-primary/30",
+                        searchPreferences.forceSearch && "bg-primary/20 border-primary/50"
+                      )}
+                    >
+                      <Search className="w-3 h-3 mr-1" />
+                      Force Search
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleDisableSearch}
+                      className={cn(
+                        "bg-slate-800/50 border-slate-700/50 hover:border-primary/30",
+                        searchPreferences.disableSearch && "bg-red-500/20 border-red-500/50"
+                      )}
+                    >
+                      <Ban className="w-3 h-3 mr-1" />
+                      No Search
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Research Status Indicator */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-4 text-gray-400">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <span>Research Mode Active</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span>Model:</span>
+                      <span className="text-primary font-medium">
+                        {selectedModel === 'auto' ? `Auto (${currentModel})` : selectedModel}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span>Depth:</span>
+                      <span className="text-primary font-medium">Level {researchDepth}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 text-gray-500">
+                    {searchPreferences.forceSearch && (
+                      <div className="flex items-center space-x-1">
+                        <Search className="w-3 h-3" />
+                        <span>Forced</span>
+                      </div>
+                    )}
+                    {searchPreferences.disableSearch && (
+                      <div className="flex items-center space-x-1">
+                        <Ban className="w-3 h-3" />
+                        <span>No Search</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Message Input */}
-              <div className="flex space-x-3">
-                <Textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Ask me anything about markets, technology, economics..."
-                  className="flex-1 bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none"
-                  rows={3}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  className="bg-slate-700 hover:bg-slate-600 px-6"
-                  disabled={!message.trim()}
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+              {/* Advanced Message Input with Research Templates */}
+              <div className="space-y-3">
+                {/* Quick Research Templates */}
+                <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+                  <span className="text-xs text-gray-400 font-medium whitespace-nowrap">Quick Templates:</span>
+                  {[
+                    { icon: TrendingUp, text: "Market Analysis", query: "Analyze current market trends for " },
+                    { icon: Database, text: "Financial Report", query: "Generate a comprehensive financial analysis of " },
+                    { icon: Search, text: "Competitive Research", query: "Research competitors and market position for " },
+                    { icon: AlertCircle, text: "Risk Assessment", query: "Assess investment risks and opportunities for " },
+                    { icon: Sparkles, text: "Industry Insights", query: "Provide deep industry insights about " }
+                  ].map((template, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMessage(template.query)}
+                      className="bg-slate-800/50 border-slate-700/50 hover:border-primary/30 whitespace-nowrap text-xs"
+                    >
+                      <template.icon className="w-3 h-3 mr-1" />
+                      {template.text}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Enhanced Input Area */}
+                <div className="relative">
+                  <Textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ask me anything about markets, technology, economics, or any research topic..."
+                    className="flex-1 bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none min-h-[80px] pr-16"
+                    rows={3}
+                  />
+                  
+                  {/* Input Actions */}
+                  <div className="absolute bottom-3 right-3 flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 text-xs text-gray-500">
+                      <span>{message.length}</span>
+                      <span>/</span>
+                      <span>2000</span>
+                    </div>
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!message.trim() || isSending}
+                      className="bg-primary hover:bg-primary/80 text-white px-4 py-2 min-w-[80px]"
+                    >
+                      {isSending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-1" />
+                          Send
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Research Quality Indicators */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-4 text-gray-500">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <span>Real-time research active</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Database className="w-3 h-3" />
+                      <span>Multi-source verification</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-3 h-3" />
+                      <span>May 2025 data priority</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 text-gray-500">
+                    <Button variant="ghost" size="sm" className="h-6 text-xs">
+                      <FileText className="w-3 h-3 mr-1" />
+                      Export
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs">
+                      <Settings className="w-3 h-3 mr-1" />
+                      Settings
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
