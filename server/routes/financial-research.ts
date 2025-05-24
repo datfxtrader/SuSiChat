@@ -134,10 +134,11 @@ router.post('/generate', isAuthenticated, async (req: any, res) => {
     }
 
     // Check cache first
-    const cachedData = await FinanceCache.getFinancialNews(query);
-    if (cachedData) {
-      return res.json(JSON.parse(cachedData));
-    }
+    // Cache temporarily disabled
+    // const cachedData = await FinanceCache.getFinancialNews(query);
+    // if (cachedData) {
+    //   return res.json(JSON.parse(cachedData));
+    // }
 
     console.log(`Processing financial research request for: ${query} at depth ${depth}`);
     const result = await generateFinancialAnalysis(query);
@@ -150,7 +151,7 @@ router.post('/generate', isAuthenticated, async (req: any, res) => {
     }
 
      // Store the result in cache
-     await FinanceCache.setFinancialNews(query, JSON.stringify(result));
+     // await FinanceCache.setFinancialNews(query, JSON.stringify(result));
 
     return res.json(result);
   } catch (error) {

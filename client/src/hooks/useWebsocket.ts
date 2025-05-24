@@ -4,110 +4,73 @@ import { WebSocketMessage } from "@/lib/types";
 import { useAuth } from "./useAuth";
 
 export function useWebsocket() {
-  const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const { user } = useAuth();
 
-  // Connect to WebSocket when user is authenticated
+  const handleConnection = useCallback(() => {
+    setIsConnected(true);
+    setError(null);
+    setReconnectAttempts(0);
+    setIsReconnecting(false);
+    console.log("WebSocket connection established");
+  }, []);
+
+  const handleDisconnection = useCallback(() => {
+    setIsConnected(false);
+    console.log("WebSocket connection closed");
+    
+    // Start reconnection attempts
+    if (reconnectAttempts < 5) {
+      setIsReconnecting(true);
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+      console.log(`Attempting to reconnect in ${delay}ms (${reconnectAttempts + 1}/5)`);
+      
+      setTimeout(() => {
+        if (user?.id) {
+          initializeWebSocket(user.id);
+          setReconnectAttempts(prev => prev + 1);
+        }
+      }, delay);
+    } else {
+      setIsReconnecting(false);
+      setError("Failed to reconnect after 5 attempts");
+    }
+  }, [reconnectAttempts, user?.id]);
+
+  const handleError = useCallback((err: Event) => {
+    console.log("WebSocket error:", err);
+    setError("WebSocket connection error");
+  }, []);
+
   useEffect(() => {
-    if (user) {
-      initializeWebSocket(user.id)
-        .then(() => {
-          setIsConnected(true);
-          setError(null);
-        })
-        .catch(err => {
-          setIsConnected(false);
-          setError(err.message || "Failed to connect to WebSocket");
-        });
-
+    if (user?.id) {
+      initializeWebSocket(user.id);
+      
+      addMessageHandler('connection', handleConnection);
+      addMessageHandler('disconnection', handleDisconnection);
+      addMessageHandler('error', handleError);
+      
       return () => {
+        removeMessageHandler('connection', handleConnection);
+        removeMessageHandler('disconnection', handleDisconnection);
+        removeMessageHandler('error', handleError);
         closeWebSocket();
-        setIsConnected(false);
       };
     }
-  }, [user]);
+  }, [user?.id, handleConnection, handleDisconnection, handleError]);
 
-  // Register a message handler
-  const registerMessageHandler = useCallback((handler: (message: WebSocketMessage) => void) => {
-    addMessageHandler(handler);
-    return () => removeMessageHandler(handler);
+  const registerMessageHandler = useCallback((type: string, handler: (message: WebSocketMessage) => void) => {
+    addMessageHandler(type, handler);
+    return () => removeMessageHandler(type, handler);
   }, []);
 
   return {
     isConnected,
-    error,
-    registerMessageHandler
-  };
-}
-```
-
-// text
-The provided code already implements the base WebSocket functionality. The intention is to implement the WebSocket reconnection logic with exponential backoff. Since the original file doesn't include reconnect logic, I will add the reconnection within the initializeWebSocket function.
-```
-
-```typescript
-import { useState, useEffect, useCallback } from "react";
-import { initializeWebSocket, closeWebSocket, addMessageHandler, removeMessageHandler } from "@/lib/ws";
-import { WebSocketMessage } from "@/lib/types";
-import { useAuth } from "./useAuth";
-
-export function useWebsocket() {
-  const { user } = useAuth();
-  const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const connectWebSocket = useCallback(async (userId: string) => {
-    try {
-      await initializeWebSocket(userId);
-      setIsConnected(true);
-      setError(null);
-    } catch (err) {
-      setIsConnected(false);
-      setError(err.message || "Failed to connect to WebSocket");
-      throw err; // Re-throw to be caught by reconnect
-    }
-  }, []);
-
-  const reconnect = useCallback(async (attempt = 1) => {
-    if (attempt > 5) {
-      console.log("Max reconnection attempts reached");
-      return;
-    }
-
-    try {
-      if (user) {
-        await connectWebSocket(user.id);
-      }
-    } catch (error) {
-      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-      console.log(`Attempting to reconnect in ${delay}ms (${attempt}/5)`);
-      setTimeout(() => reconnect(attempt + 1), delay);
-    }
-  }, [connectWebSocket, user]);
-
-
-  useEffect(() => {
-    if (user) {
-      connectWebSocket(user.id).catch(() => {
-        reconnect(); // Initial call to reconnect if the first connection fails
-      });
-
-      return () => {
-        closeWebSocket();
-        setIsConnected(false);
-      };
-    }
-  }, [user, connectWebSocket, reconnect]);
-
-  // Register a message handler
-  const registerMessageHandler = useCallback((handler: (message: WebSocketMessage) => void) => {
-    addMessageHandler(handler);
-    return () => removeMessageHandler(handler);
-  }, []);
-
-  return {
-    isConnected,
+    isReconnecting,
+    reconnectAttempts,
     error,
     registerMessageHandler
   };
