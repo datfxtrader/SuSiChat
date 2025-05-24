@@ -26,7 +26,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const [location, navigate] = useLocation();
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
