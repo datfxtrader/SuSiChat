@@ -232,18 +232,21 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
-  // Handle research state cleanup when switching tabs or completing research
+  // Handle research state persistence
   useEffect(() => {
-    const clearResearchState = () => {
-      setIsResearchInProgress(false);
-      setOngoingResearchQuery('');
-      localStorage.removeItem('research-in-progress');
-      localStorage.removeItem('ongoing-research-query');
-    };
-
-    // Clear on unmount/tab switch
-    return () => clearResearchState();
-  }, []);
+    if (isSending) {
+      localStorage.setItem('research-in-progress', 'true');
+      localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
+    } else if (!isSending && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.role === 'assistant') {
+        setIsResearchInProgress(false);
+        setOngoingResearchQuery('');
+        localStorage.removeItem('research-in-progress');
+        localStorage.removeItem('ongoing-research-query');
+      }
+    }
+  }, [isSending, messages, ongoingResearchQuery]);
 
   // Update research state when new message appears
   useEffect(() => {
