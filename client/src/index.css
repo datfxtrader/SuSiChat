@@ -64,20 +64,42 @@
   -webkit-backdrop-filter: blur(16px) !important;
 }
 
-/* Remove vertical lines from markdown lists and improve highlighting */
-.research-content ul {
+/* Aggressively remove ALL vertical lines from markdown lists */
+.research-content ul,
+.research-content ol,
+.research-content li,
+.research-content li::before,
+.research-content li::after,
+.research-content *::before,
+.research-content *::after {
   border-left: none !important;
+  border-right: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.research-content ul {
+  border: none !important;
   padding-left: 0 !important;
+  margin-left: 0 !important;
 }
 
 .research-content li {
-  border-left: none !important;
+  border: none !important;
   padding-left: 1.5rem !important;
   margin: 0.5rem 0 !important;
+  position: relative !important;
 }
 
 .research-content li::marker {
   color: #06b6d4 !important;
+}
+
+/* Force remove any prose styling that adds lines */
+.prose ul,
+.prose ol,
+.prose li {
+  border: none !important;
 }
 
 /* Enhanced highlighting for better visibility */

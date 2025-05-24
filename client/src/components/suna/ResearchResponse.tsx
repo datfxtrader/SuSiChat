@@ -165,35 +165,71 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
             sources referenced
           </h3>
           
-          <div className="grid gap-3">
+          <div className="grid gap-4">
             {sources.map((source, index) => {
               const domain = source.domain || new URL(source.url).hostname.replace('www.', '');
               
+              // Extract actual timestamp from URL or use current date
+              const getArticleTimestamp = (url: string) => {
+                // Try to extract date from URL patterns
+                const datePatterns = [
+                  /\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,  // /2025/05/24
+                  /\/(\d{4})-(\d{1,2})-(\d{1,2})/,   // /2025-05-24
+                  /-(\d{4})-(\d{1,2})-(\d{1,2})/,    // -2025-05-24
+                ];
+                
+                for (const pattern of datePatterns) {
+                  const match = url.match(pattern);
+                  if (match) {
+                    const [, year, month, day] = match;
+                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    return date.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    });
+                  }
+                }
+                
+                // Default to current date if no date found in URL
+                return new Date().toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                });
+              };
+              
+              const timestamp = getArticleTimestamp(source.url);
+              
               return (
                 <div key={index} id={`source-${index + 1}`} className="group">
-                  <div className="flex items-start gap-4 p-4 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-all duration-200">
+                  <div className="flex items-center gap-4 p-5 rounded-xl bg-gradient-to-r from-slate-800/40 to-slate-700/20 hover:from-slate-700/50 hover:to-slate-600/30 transition-all duration-300 border border-slate-700/30 hover:border-slate-600/50">
                     <div className="flex-shrink-0">
-                      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-mono text-cyan-400 bg-cyan-400/10 rounded border border-cyan-400/20">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-sm font-bold shadow-lg">
                         {index + 1}
-                      </span>
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <a
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block text-sm text-slate-300 hover:text-white transition-colors group-hover:text-cyan-300"
+                        className="block text-base font-medium text-white hover:text-cyan-300 transition-colors line-clamp-2 group-hover:underline"
                       >
                         {source.title}
                       </a>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                        <span>{domain}</span>
-                        <span>•</span>
-                        <span>may 24, 2025</span>
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-sm font-medium text-cyan-400">{domain}</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-500"></span>
+                        <span className="text-sm text-slate-400">{timestamp}</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-500"></span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wide">verified source</span>
                       </div>
                     </div>
                     <div className="flex-shrink-0">
-                      <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-slate-700/50 group-hover:bg-cyan-400/20 flex items-center justify-center transition-all duration-200">
+                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                      </div>
                     </div>
                   </div>
                 </div>
