@@ -1432,8 +1432,24 @@ Use the current date and web search information when responding about current ev
         }
       }
 
+      // Generate conversation title from the user query
+      if (!conversation.title || conversation.title === 'New Conversation') {
+        // Extract key topic from query for a meaningful title
+        let title = data.query;
+        if (title.length > 50) {
+          // Find key financial terms or topics
+          const keyTerms = title.match(/(?:iPhone|Apple|Samsung|Google|Pixel|market|analysis|research|competitive|benchmark)/gi);
+          if (keyTerms && keyTerms.length > 0) {
+            title = keyTerms.slice(0, 3).join(' ') + ' Analysis';
+          } else {
+            title = title.substring(0, 47) + '...';
+          }
+        }
+        conversation.title = title;
+      }
+
       // Create an assistant message with enhanced metadata about model and search
-      const runId = `run-${uuidv4()}`;
+      const runId = `run-${Date.now()}`;
 
       // Add article URLs to response for better source attribution
       if (searchMetadata?.sourceDetails && searchMetadata.sourceDetails.length > 0) {
