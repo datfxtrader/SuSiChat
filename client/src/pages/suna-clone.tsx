@@ -83,12 +83,12 @@ Current market conditions show several critical factors influencing Bitcoin's tr
       title="Suna Agent Clone"
       description="Experience the same beautiful UI and design patterns"
     >
-      <div className="flex h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+      <div className="flex h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950">
         {/* Sidebar - Conversations */}
-        <div className="w-80 border-r border-slate-700/50 bg-slate-900/50 backdrop-blur-md">
-          <div className="p-4 border-b border-slate-700/50">
+        <div className="w-80 border-r border-slate-800/50 bg-slate-950/70 backdrop-blur-md">
+          <div className="p-4 border-b border-slate-800/50">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-slate-800 rounded-xl flex items-center justify-center">
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -97,7 +97,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             </div>
             
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white">
               <Sparkles className="w-4 h-4 mr-2" />
               New Research Chat
             </Button>
@@ -109,7 +109,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
             {mockConversations.map((conv) => (
               <div
                 key={conv.id}
-                className="p-3 rounded-lg bg-slate-800/40 backdrop-blur-sm border border-slate-700/30 hover:bg-slate-800/60 transition-all cursor-pointer"
+                className="p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 transition-all cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="text-sm font-medium text-gray-200 truncate">{conv.title}</h4>
@@ -124,10 +124,10 @@ Current market conditions show several critical factors influencing Bitcoin's tr
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-slate-700/50 bg-slate-900/30 backdrop-blur-md">
+          <div className="p-4 border-b border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -137,7 +137,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
               
               <div className="flex items-center space-x-2">
-                <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-600/30">
+                <Badge variant="secondary" className="bg-slate-800/50 text-gray-300 border-slate-700/50">
                   Online
                 </Badge>
                 <Button variant="ghost" size="sm">
@@ -155,22 +155,22 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   <>
                     <div className="flex-1" />
                     <div className="max-w-2xl">
-                      <div className="bg-blue-600 text-white p-4 rounded-2xl rounded-tr-sm">
+                      <div className="bg-slate-700 text-white p-4 rounded-2xl rounded-tr-sm">
                         {msg.content}
                       </div>
                       <div className="text-xs text-gray-500 mt-1 text-right">{msg.timestamp}</div>
                     </div>
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white text-sm font-medium">U</span>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
                       <Bot className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1">
-                      <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/30 p-6 rounded-2xl rounded-tl-sm">
+                      <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 p-6 rounded-2xl rounded-tl-sm">
                         <div className="prose prose-invert max-w-none">
                           <div className="whitespace-pre-line text-gray-300 leading-relaxed">
                             {msg.content}
@@ -178,13 +178,13 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                         </div>
                         
                         {msg.sources && (
-                          <div className="mt-6 pt-4 border-t border-slate-700/30">
+                          <div className="mt-6 pt-4 border-t border-slate-800/40">
                             <h4 className="text-sm font-medium text-gray-400 mb-3">Sources</h4>
                             <div className="space-y-2">
                               {msg.sources.map((source, idx) => (
                                 <div key={idx} className="flex items-center space-x-2 text-sm">
-                                  <div className="w-2 h-2 bg-blue-400 rounded-full" />
-                                  <span className="text-blue-400 hover:text-blue-300 cursor-pointer">
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                  <span className="text-gray-300 hover:text-gray-200 cursor-pointer">
                                     {source.title}
                                   </span>
                                   <span className="text-gray-500">• {source.domain}</span>
@@ -203,16 +203,16 @@ Current market conditions show several critical factors influencing Bitcoin's tr
 
             {/* Research Progress Demo */}
             <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/30 p-4 rounded-2xl rounded-tl-sm">
+                <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 p-4 rounded-2xl rounded-tl-sm">
                   <div className="space-y-3">
                     {/* Progress Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <div className="animate-pulse text-blue-400">
+                        <div className="animate-pulse text-gray-400">
                           <Search className="w-4 h-4" />
                         </div>
                         <div>
@@ -224,8 +224,8 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-slate-700 rounded-full h-2">
-                      <div className="bg-blue-400 h-2 rounded-full transition-all duration-300 ease-out w-3/4" />
+                    <div className="w-full bg-slate-800 rounded-full h-2">
+                      <div className="bg-gray-400 h-2 rounded-full transition-all duration-300 ease-out w-3/4" />
                     </div>
 
                     {/* Stage Indicators */}
@@ -237,27 +237,27 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                         <span className="text-green-400">Analyzing</span>
                       </div>
                       <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mb-1">
+                        <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center mb-1">
                           <Search className="w-3 h-3 text-white animate-pulse" />
                         </div>
-                        <span className="text-blue-400">Web</span>
+                        <span className="text-gray-400">Web</span>
                       </div>
                       <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center mb-1">
-                          <Sparkles className="w-3 h-3 text-slate-400" />
+                        <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center mb-1">
+                          <Sparkles className="w-3 h-3 text-slate-500" />
                         </div>
-                        <span className="text-slate-400">AI</span>
+                        <span className="text-slate-500">AI</span>
                       </div>
                       <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center mb-1">
-                          <FileText className="w-3 h-3 text-slate-400" />
+                        <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center mb-1">
+                          <FileText className="w-3 h-3 text-slate-500" />
                         </div>
-                        <span className="text-slate-400">Finalizing</span>
+                        <span className="text-slate-500">Finalizing</span>
                       </div>
                     </div>
 
                     {/* Status */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-md py-3 px-4">
+                    <div className="bg-slate-900/60 backdrop-blur-sm rounded-md py-3 px-4">
                       <div className="flex items-center justify-center space-x-1 text-xs text-gray-300 mb-2">
                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                         <span>Researching in real-time...</span>
@@ -270,7 +270,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           </div>
 
           {/* Input Area */}
-          <div className="p-4 border-t border-slate-700/50 bg-slate-900/30 backdrop-blur-md">
+          <div className="p-4 border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
             <div className="space-y-3">
               {/* Controls */}
               <div className="flex items-center space-x-3">
@@ -308,12 +308,12 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Ask me anything about markets, technology, economics..."
-                  className="flex-1 bg-slate-800/50 border-slate-700/50 text-gray-100 placeholder-gray-500 resize-none"
+                  className="flex-1 bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none"
                   rows={3}
                 />
                 <Button
                   onClick={handleSendMessage}
-                  className="bg-blue-600 hover:bg-blue-700 px-6"
+                  className="bg-slate-700 hover:bg-slate-600 px-6"
                   disabled={!message.trim()}
                 >
                   <Send className="w-4 h-4" />
