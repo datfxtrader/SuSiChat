@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import MainLayout from '@/components/layout/MainLayout';
 import { useSuna, type LLMModel } from '@/hooks/useSuna';
 import { useAuth } from '@/hooks/useAuth';
-import { useEnhancedResearchState, enhancedResearchStyles } from '@/hooks/useEnhancedResearchState';
+import { useDirectTabPersistence } from '@/hooks/useDirectTabPersistence';
 import { ResearchProgress } from '@/components/suna/ResearchProgress';
 import ResearchResponse from '@/components/suna/ResearchResponse';
 import { cn } from '@/lib/utils';
@@ -53,18 +53,18 @@ const ResearchAgent = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Use the enhanced research state hook with API rate limiting
+  // Use the direct tab persistence hook
   const {
     isResearchInProgress,
     ongoingResearchQuery,
     researchProgress,
     researchStage,
     stageLabel,
-    errors,
-    warnings,
     startResearch,
-    completeResearch
-  } = useEnhancedResearchState();
+    completeResearch,
+    forceSave,
+    forceRestore
+  } = useDirectTabPersistence();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -465,27 +465,21 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                         <span>Stage {researchStage}/6</span>
                       </div>
                       
-                      {/* Warnings Display */}
-                      {warnings.length > 0 && (
-                        <div className="space-y-1">
-                          {warnings.map((warning, index) => (
-                            <div key={index} className="text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded px-2 py-1">
-                              ⚠️ {warning}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Errors Display */}
-                      {errors.length > 0 && (
-                        <div className="space-y-1">
-                          {errors.map((error, index) => (
-                            <div key={index} className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded px-2 py-1">
-                              ❌ {error}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {/* Debug Controls */}
+                      <div className="flex gap-2 mt-2">
+                        <button 
+                          onClick={forceSave}
+                          className="text-xs px-2 py-1 bg-blue-600 rounded hover:bg-blue-700"
+                        >
+                          Force Save
+                        </button>
+                        <button 
+                          onClick={forceRestore}
+                          className="text-xs px-2 py-1 bg-green-600 rounded hover:bg-green-700"
+                        >
+                          Force Restore
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
