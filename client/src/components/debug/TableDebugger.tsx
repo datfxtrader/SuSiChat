@@ -1,0 +1,155 @@
+import React, { useState } from 'react';
+
+const TableDebugger: React.FC = () => {
+  const [testContent, setTestContent] = useState(`
+# Market Analysis
+
+Current market conditions show the following key metrics:
+
+| Metric | Current Value | Change |
+|--------|---------------|--------|
+| Price | $45,234 | +2.3% |
+| Volume | 1.2M | -5.1% |
+| Market Cap | $890B | +1.8% |
+
+And here's another table without separators:
+
+| Support Level | Price | Strength |
+| S1 | $44,800 | Strong |
+| S2 | $44,200 | Moderate |
+| S3 | $43,500 | Weak |
+
+Technical indicators:
+
+| Indicator | Value | Signal |
+| RSI | 65.2 | Neutral |
+| MACD | 0.125 | Bullish |
+| SMA 20 | $44,950 | Support |
+  `);
+
+  const processContent = (content: string) => {
+    let processed = content;
+    
+    console.log('🔍 ORIGINAL CONTENT:');
+    console.log(content);
+    
+    const pipeLines = content.split('\n').filter(line => line.includes('|'));
+    console.log('🔍 LINES WITH PIPES:', pipeLines);
+    
+    // Pattern 1: Standard markdown tables
+    processed = processed.replace(
+      /(\|[^\n]+\|\s*\n\|[-:\s|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+)/g,
+      (match) => {
+        console.log('🎯 FOUND STANDARD TABLE:', match);
+        return convertTableToHtml(match, 'standard');
+      }
+    );
+    
+    // Pattern 2: Tables without separators
+    processed = processed.replace(
+      /((?:^\|[^\n]+\|\s*$\n?){3,})/gm,
+      (match) => {
+        if (match.includes('<table')) return match;
+        console.log('🎯 FOUND NO-SEPARATOR TABLE:', match);
+        return convertTableToHtml(match, 'no-separator');
+      }
+    );
+    
+    return processed;
+  };
+  
+  const convertTableToHtml = (tableText: string, type: string): string => {
+    console.log(`🔧 CONVERTING ${type.toUpperCase()} TABLE:`, tableText);
+    
+    const lines = tableText.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && line.includes('|'));
+    
+    console.log('📝 TABLE LINES:', lines);
+    
+    if (lines.length < 2) return tableText;
+    
+    let headerRow, dataRows;
+    
+    if (type === 'standard') {
+      headerRow = lines[0];
+      dataRows = lines.slice(2);
+    } else {
+      headerRow = lines[0];
+      dataRows = lines.slice(1);
+    }
+    
+    console.log('📋 HEADER ROW:', headerRow);
+    console.log('📋 DATA ROWS:', dataRows);
+    
+    const parseRow = (row: string) => {
+      return row.replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
+    };
+    
+    const headers = parseRow(headerRow);
+    const data = dataRows.map(parseRow);
+    
+    console.log('🏷️ HEADERS:', headers);
+    console.log('📊 DATA:', data);
+    
+    const headerHtml = headers.map(h => `<th class="px-4 py-2 bg-slate-700 text-white font-bold">${h}</th>`).join('');
+    const dataHtml = data.map(row => {
+      const cells = row.map((cell, i) => {
+        const align = i === 0 ? 'text-left' : 'text-center';
+        return `<td class="px-4 py-2 border-b border-slate-600 ${align}">${cell}</td>`;
+      }).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    
+    return `
+    <div class="my-6 overflow-x-auto">
+      <table class="w-full bg-slate-800 rounded-lg border border-slate-600">
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody class="text-gray-300">${dataHtml}</tbody>
+      </table>
+    </div>`;
+  };
+
+  const processedContent = processContent(testContent);
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 bg-slate-900 text-white">
+      <h2 className="text-2xl font-bold mb-6 text-cyan-400">Table Formatting Debug Tool</h2>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-gray-200">Raw Content</h3>
+          <textarea
+            value={testContent}
+            onChange={(e) => setTestContent(e.target.value)}
+            className="w-full h-80 p-4 bg-slate-800 border border-slate-600 rounded-lg text-sm font-mono text-gray-300"
+            placeholder="Paste your table content here..."
+          />
+        </div>
+        
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-gray-200">Processed Output</h3>
+          <div 
+            className="h-80 p-4 bg-slate-800 border border-slate-600 rounded-lg overflow-auto"
+            dangerouslySetInnerHTML={{ __html: processedContent }}
+          />
+        </div>
+      </div>
+      
+      <div className="mt-6 p-4 bg-slate-800 rounded-lg border border-slate-600">
+        <h4 className="font-semibold mb-2 text-cyan-400">Debug Information</h4>
+        <div className="text-sm text-gray-400 space-y-1">
+          <div>Lines with pipes: {testContent.split('\n').filter(line => line.includes('|')).length}</div>
+          <div>Potential tables detected: {(testContent.match(/\|[^\n]+\|/g) || []).length > 0 ? 'Yes' : 'No'}</div>
+          <div>Contains separators: {testContent.includes('---') || testContent.includes('===') ? 'Yes' : 'No'}</div>
+        </div>
+        
+        <div className="mt-4 text-xs text-slate-400">
+          <strong>Check browser console for detailed table processing logs</strong>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TableDebugger;
