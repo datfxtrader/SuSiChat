@@ -371,72 +371,22 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             ))}
 
-            {/* Research Progress Demo */}
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 p-4 rounded-2xl rounded-tl-sm">
-                  <div className="space-y-3">
-                    {/* Progress Header */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-pulse text-gray-400">
-                          <Search className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-100">Web Search</div>
-                          <div className="text-xs text-gray-400">Searching multiple sources for information</div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-400">0:15</div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-800 rounded-full h-2">
-                      <div className="bg-gray-400 h-2 rounded-full transition-all duration-300 ease-out w-3/4" />
-                    </div>
-
-                    {/* Stage Indicators */}
-                    <div className="flex justify-between text-xs">
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mb-1">
-                          <Database className="w-3 h-3 text-white" />
-                        </div>
-                        <span className="text-green-400">Analyzing</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center mb-1">
-                          <Search className="w-3 h-3 text-white animate-pulse" />
-                        </div>
-                        <span className="text-gray-400">Web</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center mb-1">
-                          <Sparkles className="w-3 h-3 text-slate-500" />
-                        </div>
-                        <span className="text-slate-500">AI</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center mb-1">
-                          <FileText className="w-3 h-3 text-slate-500" />
-                        </div>
-                        <span className="text-slate-500">Finalizing</span>
-                      </div>
-                    </div>
-
-                    {/* Status */}
-                    <div className="bg-slate-900/60 backdrop-blur-sm rounded-md py-3 px-4">
-                      <div className="flex items-center justify-center space-x-1 text-xs text-gray-300 mb-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                        <span>Researching in real-time...</span>
-                      </div>
-                    </div>
-                  </div>
+            {/* Research Progress - Only show when actually researching */}
+            {isSending && (
+              <div className="flex items-start space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <ResearchProgress 
+                    stage={1} 
+                    progress={0}
+                    query={message}
+                    isActive={isSending}
+                  />
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Input Area */}
@@ -491,11 +441,13 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     </div>
                   </div>
                   
-                  {/* Quick Status */}
-                  <div className="flex items-center space-x-2 text-xs text-gray-400">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    <span>Research Active</span>
-                  </div>
+                  {/* Quick Status - Only show when actually researching */}
+                  {isSending && (
+                    <div className="flex items-center space-x-2 text-xs text-gray-400">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <span>Research Active</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Compact Templates */}
