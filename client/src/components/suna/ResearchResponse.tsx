@@ -14,18 +14,37 @@ interface ResearchResponseProps {
 }
 
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [] }) => {
-  // Enhanced content processing for better formatting
+  // FIXED: Enhanced content processing with proper source citation formatting
   const improveResearchFormatting = (content: string) => {
     let processed = content;
     
-    // Convert [Source X] to numbered citations like Perplexity/ChatGPT
-    processed = processed.replace(/\[Source (\d+)\]/g, (match, sourceNumber) => {
+    // STEP 1: Clean up messy source references first
+    // Remove broken or malformed source patterns
+    processed = processed.replace(/\[Source\s*[^\]]*\]\s*\[Source\s*[^\]]*\]/g, '');
+    processed = processed.replace(/\[\s*\]/g, '');
+    processed = processed.replace(/\[Source\s*\]/g, '');
+    
+    // STEP 2: Standardize source citations to clean format
+    // Convert various source formats to standard [1], [2], etc.
+    processed = processed.replace(/\[Source\s*(\d+)\]/gi, '[$1]');
+    processed = processed.replace(/\(Source\s*(\d+)\)/gi, '[$1]');
+    processed = processed.replace(/Source\s*(\d+):/gi, '[$1]');
+    processed = processed.replace(/\[(\d+)\s*\]/g, '[$1]');
+    
+    // STEP 3: Create clean inline citations with proper styling
+    processed = processed.replace(/\[(\d+)\]/g, (match, sourceNumber) => {
       const index = parseInt(sourceNumber) - 1;
       if (sources[index]) {
-        return `<a href="#source-${sourceNumber}" class="inline-citation text-cyan-400 text-xs font-mono hover:text-cyan-300 transition-colors">[${sourceNumber}]</a>`;
+        return `<sup><a href="#source-${sourceNumber}" class="inline-citation bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded text-xs font-medium hover:bg-cyan-500/30 transition-colors border border-cyan-500/30 no-underline">${sourceNumber}</a></sup>`;
       }
-      return `[${sourceNumber}]`;
+      return `<sup><span class="text-slate-400 text-xs">${sourceNumber}</span></sup>`;
     });
+
+    // STEP 4: Clean up multiple spaces and line breaks around citations
+    processed = processed.replace(/\s+<sup>/g, '<sup>');
+    processed = processed.replace(/<\/sup>\s+/g, '</sup> ');
+    processed = processed.replace(/\.\s*<sup>/g, '.<sup>');
+    processed = processed.replace(/,\s*<sup>/g, ',<sup>');
 
     // Enhanced table detection and conversion - handle all ASCII table formats
     processed = processed.replace(
@@ -376,23 +395,41 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
         </ReactMarkdown>
       </div>
 
-      {/* Completely redesigned sources section - clean and professional */}
+      {/* COMPLETELY REDESIGNED: Clean and organized sources section */}
       {sources && sources.length > 0 && (
-        <div className="mt-16 border-t border-slate-700/50 pt-8">
-          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-6">
-            sources referenced
-          </h3>
+        <div className="mt-16 border-t border-slate-700/50 pt-12">
+          <div className="mb-8">
+            <h3 className="text-xl font-semibold text-gray-200 mb-2 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                <ExternalLink className="w-4 h-4 text-white" />
+              </div>
+              Research Sources
+            </h3>
+            <p className="text-sm text-slate-400">
+              {sources.length} source{sources.length !== 1 ? 's' : ''} referenced in this analysis
+            </p>
+          </div>
           
-          <div className="space-y-3">
+          <div className="grid gap-4">
             {sources.map((source, index) => {
-              const domain = source.domain || new URL(source.url).hostname.replace('www.', '');
+              // Clean up source title and URL
+              const cleanTitle = source.title?.trim() || `Source ${index + 1}`;
+              const cleanUrl = source.url?.trim() || '#';
+              const domain = source.domain || (() => {
+                try {
+                  return new URL(cleanUrl).hostname.replace('www.', '');
+                } catch {
+                  return 'Unknown Source';
+                }
+              })();
               
-              // Extract actual timestamp from URL or use current date
+              // Extract timestamp from URL
               const getArticleTimestamp = (url: string) => {
                 const datePatterns = [
-                  /\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,  // /2025/05/24
-                  /\/(\d{4})-(\d{1,2})-(\d{1,2})/,   // /2025-05-24
-                  /-(\d{4})-(\d{1,2})-(\d{1,2})/,    // -2025-05-24
+                  /\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,
+                  /\/(\d{4})-(\d{1,2})-(\d{1,2})/,
+                  /-(\d{4})-(\d{1,2})-(\d{1,2})/,
+                  /(\d{4})[-_](\d{1,2})[-_](\d{1,2})/,
                 ];
                 
                 for (const pattern of datePatterns) {
@@ -400,57 +437,63 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
                   if (match) {
                     const [, year, month, day] = match;
                     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                    return date.toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric', 
-                      year: 'numeric' 
-                    });
+                    if (!isNaN(date.getTime()) && date.getFullYear() >= 2020) {
+                      return date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      });
+                    }
                   }
                 }
                 
                 return 'May 24, 2025';
               };
               
-              const timestamp = getArticleTimestamp(source.url);
+              const timestamp = getArticleTimestamp(cleanUrl);
               
               return (
                 <div key={index} id={`source-${index + 1}`} className="group">
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-all duration-200 border border-slate-700/20 hover:border-slate-600/40">
-                    {/* Source Number */}
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                  <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-r from-slate-800/60 to-slate-700/40 hover:from-slate-700/70 hover:to-slate-600/50 transition-all duration-300 border border-slate-600/30 hover:border-cyan-500/40 shadow-lg hover:shadow-xl backdrop-blur-sm">
+                    {/* Enhanced Source Number */}
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-md">
                         {index + 1}
                       </div>
                     </div>
                     
-                    {/* Source Content */}
+                    {/* Enhanced Source Content */}
                     <div className="flex-1 min-w-0">
-                      {/* Title - Clean and clickable */}
+                      {/* Clean Title with better typography */}
                       <a
-                        href={source.url}
+                        href={cleanUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block text-sm font-medium text-gray-200 hover:text-cyan-300 transition-colors mb-1 group-hover:underline leading-tight"
+                        className="block text-base font-semibold text-gray-100 hover:text-cyan-300 transition-colors mb-2 group-hover:underline leading-normal line-clamp-2"
                       >
-                        {source.title}
+                        {cleanTitle}
                       </a>
                       
-                      {/* Meta info - domain and date */}
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-                        <span className="font-medium text-cyan-400">{domain}</span>
-                        <span>•</span>
-                        <span>{timestamp}</span>
+                      {/* Enhanced Meta info */}
+                      <div className="flex items-center gap-3 text-sm text-slate-300 mb-3">
+                        <span className="inline-flex items-center gap-1 bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded text-xs font-medium">
+                          {domain}
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-400">{timestamp}</span>
                       </div>
                       
-                      {/* Clean URL display */}
-                      <div className="text-xs text-slate-500 font-mono truncate">
-                        {source.url}
+                      {/* Clean URL with better styling */}
+                      <div className="text-xs text-slate-500 font-mono bg-slate-900/50 px-2 py-1 rounded border border-slate-700/50 truncate">
+                        {cleanUrl}
                       </div>
                     </div>
                     
-                    {/* External link icon */}
-                    <div className="flex-shrink-0 mt-0.5">
-                      <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                    {/* Enhanced External link icon */}
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="p-2 rounded-lg bg-slate-700/40 group-hover:bg-cyan-500/20 transition-colors">
+                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                      </div>
                     </div>
                   </div>
                 </div>
