@@ -187,9 +187,15 @@ export const useResearchState = () => {
       }
     };
 
+    console.log('Setting up visibility change listener');
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
+    // Test if the event listener is working
+    console.log('Visibility API supported:', typeof document.hidden !== 'undefined');
+    console.log('Current visibility state:', document.hidden ? 'hidden' : 'visible');
+    
     return () => {
+      console.log('Removing visibility change listener');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, saveResearchState, restoreState]);
