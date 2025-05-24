@@ -49,6 +49,8 @@ const SunaClone = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [researchDepth, setResearchDepth] = useState('3');
   const [selectedModel, setSelectedModel] = useState<LLMModel>('auto');
+  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
+  const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
