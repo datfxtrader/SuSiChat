@@ -1,0 +1,254 @@
+// FIXED: Comprehensive table formatting solution for ResearchResponse
+
+const improveResearchFormatting = (content: string) => {
+  let processed = content;
+  
+  // STEP 1: Clean up source citations first (keeping your existing logic)
+  processed = processed.replace(/\[Source\s*[^\]]*\]\s*\[Source\s*[^\]]*\]/g, '');
+  processed = processed.replace(/\[\s*\]/g, '');
+  processed = processed.replace(/\[Source\s*\]/g, '');
+  processed = processed.replace(/\[Source\s*(\d+)\]/gi, '[$1]');
+  processed = processed.replace(/\(Source\s*(\d+)\)/gi, '[$1]');
+  processed = processed.replace(/Source\s*(\d+):/gi, '[$1]');
+  
+  // STEP 2: COMPREHENSIVE TABLE DETECTION AND CONVERSION
+  
+  // Pattern 1: Standard markdown tables with separators
+  processed = processed.replace(
+    /(\|[^\n]+\|\s*\n\|[-:\s|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+)/g,
+    (match) => {
+      return convertToHtmlTable(match, 'markdown-with-separator');
+    }
+  );
+  
+  // Pattern 2: Tables without separators (most common issue)
+  processed = processed.replace(
+    /((?:^\|[^\n]+\|\s*$\n?){3,})/gm,
+    (match) => {
+      // Skip if already converted to HTML
+      if (match.includes('<table')) return match;
+      return convertToHtmlTable(match, 'no-separator');
+    }
+  );
+  
+  // Pattern 3: Mixed format tables (headers with different formatting)
+  processed = processed.replace(
+    /(\|\s*(?:Metric|Parameter|Item|Factor|Indicator|Aspect|Category)[^\n]+\|\s*\n(?:\|[^\n]+\|\s*\n?){2,})/gi,
+    (match) => {
+      if (match.includes('<table')) return match;
+      return convertToHtmlTable(match, 'mixed-format');
+    }
+  );
+  
+  // Pattern 4: Price/Financial tables with currency symbols
+  processed = processed.replace(
+    /(\|\s*[^\n]*(?:\$|€|£|¥|USD|EUR|GBP)[^\n]*\|\s*\n(?:\|[^\n]+\|\s*\n?){2,})/gi,
+    (match) => {
+      if (match.includes('<table')) return match;
+      return convertToHtmlTable(match, 'financial');
+    }
+  );
+  
+  // Pattern 5: Technical analysis tables (Support/Resistance levels)
+  processed = processed.replace(
+    /(\|\s*[^\n]*(?:Support|Resistance|Level|Target|Stop)[^\n]*\|\s*\n(?:\|[^\n]+\|\s*\n?){2,})/gi,
+    (match) => {
+      if (match.includes('<table')) return match;
+      return convertToHtmlTable(match, 'technical');
+    }
+  );
+
+  return processed;
+};
+
+// MAIN TABLE CONVERSION FUNCTION
+function convertToHtmlTable(tableText: string, tableType: string): string {
+  try {
+    console.log(`🔧 Converting ${tableType} table:`, tableText.substring(0, 100) + '...');
+    
+    // Split into lines and clean up
+    const lines = tableText.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && line.includes('|'));
+    
+    if (lines.length < 2) {
+      console.log('❌ Not enough lines for table');
+      return tableText;
+    }
+    
+    // Identify header and data rows
+    let headerRow = '';
+    let dataRows: string[] = [];
+    
+    if (tableType === 'markdown-with-separator') {
+      // Standard markdown: first line is header, skip separator, rest are data
+      headerRow = lines[0];
+      dataRows = lines.slice(2); // Skip separator line
+    } else {
+      // No separator: first line is header, rest are data
+      headerRow = lines[0];
+      dataRows = lines.slice(1);
+    }
+    
+    // Parse header
+    const headers = parseTableRow(headerRow);
+    if (headers.length < 2) {
+      console.log('❌ Not enough headers');
+      return tableText;
+    }
+    
+    // Parse data rows
+    const parsedDataRows = dataRows
+      .map(row => parseTableRow(row))
+      .filter(row => row.length >= 2 && row.some(cell => cell.trim().length > 0));
+    
+    if (parsedDataRows.length === 0) {
+      console.log('❌ No valid data rows');
+      return tableText;
+    }
+    
+    // Generate HTML table
+    const tableHtml = generateHtmlTable(headers, parsedDataRows, tableType);
+    
+    console.log('✅ Table converted successfully');
+    return `\n\n${tableHtml}\n\n`;
+    
+  } catch (error) {
+    console.error('❌ Table conversion error:', error);
+    return tableText;
+  }
+}
+
+// PARSE TABLE ROW (handles various formats)
+function parseTableRow(row: string): string[] {
+  // Remove leading/trailing pipes and split
+  const cleaned = row.replace(/^\||\|$/g, '').trim();
+  const cells = cleaned.split('|').map(cell => {
+    // Clean up cell content
+    return cell.trim()
+      .replace(/^\s*[-\s]*\s*$/, '') // Remove separator lines
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
+      .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
+      .trim();
+  }).filter(cell => cell.length > 0 || cells.length <= 4); // Keep empty cells if reasonable number of columns
+  
+  return cells;
+}
+
+// GENERATE HTML TABLE
+function generateHtmlTable(headers: string[], dataRows: string[][], tableType: string): string {
+  // Determine table styling based on type
+  const getTableClasses = (type: string) => {
+    switch (type) {
+      case 'financial':
+        return {
+          container: 'my-8 overflow-x-auto rounded-xl shadow-2xl',
+          table: 'w-full bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm border-collapse',
+          thead: 'bg-gradient-to-r from-green-600 to-emerald-700',
+          th: 'px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wide border-b-2 border-green-500',
+          tbody: 'divide-y divide-slate-700',
+          td: 'px-6 py-4 text-gray-300 text-sm font-medium'
+        };
+      case 'technical':
+        return {
+          container: 'my-8 overflow-x-auto rounded-xl shadow-2xl',
+          table: 'w-full bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm border-collapse',
+          thead: 'bg-gradient-to-r from-blue-600 to-cyan-700',
+          th: 'px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wide border-b-2 border-blue-500',
+          tbody: 'divide-y divide-slate-700',
+          td: 'px-6 py-4 text-gray-300 text-sm font-medium'
+        };
+      default:
+        return {
+          container: 'my-8 overflow-x-auto rounded-xl shadow-2xl',
+          table: 'w-full bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm border-collapse',
+          thead: 'bg-gradient-to-r from-slate-700 to-slate-600',
+          th: 'px-6 py-4 text-left text-sm font-bold text-gray-100 uppercase tracking-wide border-b-2 border-slate-500',
+          tbody: 'divide-y divide-slate-700',
+          td: 'px-6 py-4 text-gray-300 text-sm'
+        };
+    }
+  };
+  
+  const classes = getTableClasses(tableType);
+  
+  // Generate header HTML  
+  const headerHtml = headers.map((header, index) => {
+    const alignment = index === 0 ? 'text-left' : 'text-center';
+    return `<th class="${classes.th} ${alignment}">${header}</th>`;
+  }).join('');
+  
+  // Generate data rows HTML
+  const dataRowsHtml = dataRows.map(row => {
+    // Pad row to match header length
+    const paddedRow = [...row];
+    while (paddedRow.length < headers.length) {
+      paddedRow.push('');
+    }
+    
+    const cellsHtml = paddedRow.slice(0, headers.length).map((cell, index) => {
+      const alignment = index === 0 ? 'text-left font-medium' : 'text-center';
+      
+      // Special formatting for different cell types
+      let formattedCell = cell;
+      
+      // Format currency values
+      if (cell.match(/[\$€£¥][\d,]+\.?\d*/)) {
+        formattedCell = `<span class="font-mono text-green-400">${cell}</span>`;
+      }
+      // Format percentages
+      else if (cell.match(/\d+\.?\d*%/)) {
+        const isNegative = cell.includes('-');
+        const colorClass = isNegative ? 'text-red-400' : 'text-green-400';
+        formattedCell = `<span class="font-mono ${colorClass}">${cell}</span>`;
+      }
+      // Format numbers
+      else if (cell.match(/^\d+\.?\d*$/)) {
+        formattedCell = `<span class="font-mono text-cyan-400">${cell}</span>`;
+      }
+      
+      return `<td class="${classes.td} ${alignment}">${formattedCell}</td>`;
+    }).join('');
+    
+    return `<tr class="hover:bg-slate-700/30 transition-colors">${cellsHtml}</tr>`;
+  }).join('');
+  
+  // Return complete table HTML
+  return `<div class="${classes.container}">
+    <table class="${classes.table}">
+      <thead class="${classes.thead}">
+        <tr>${headerHtml}</tr>
+      </thead>
+      <tbody class="${classes.tbody}">
+        ${dataRowsHtml}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ADDITIONAL: Debug function to see what tables are being processed
+function debugTableDetection(content: string) {
+  console.log('🔍 DEBUGGING TABLE DETECTION:');
+  
+  // Find all potential table patterns
+  const patterns = [
+    { name: 'Standard Markdown', regex: /(\|[^\n]+\|\s*\n\|[-:\s|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+)/g },
+    { name: 'No Separator', regex: /((?:^\|[^\n]+\|\s*$\n?){3,})/gm },
+    { name: 'Metric Tables', regex: /(\|\s*(?:Metric|Parameter|Item)[^\n]+\|\s*\n(?:\|[^\n]+\|\s*\n?){2,})/gi },
+    { name: 'Financial Tables', regex: /(\|\s*[^\n]*(?:\$|€|£|¥|USD|EUR|GBP)[^\n]*\|\s*\n(?:\|[^\n]+\|\s*\n?){2,})/gi }
+  ];
+  
+  patterns.forEach(pattern => {
+    const matches = content.match(pattern.regex);
+    if (matches) {
+      console.log(`✅ Found ${matches.length} ${pattern.name} table(s)`);
+      matches.forEach((match, index) => {
+        console.log(`   Table ${index + 1}:`, match.substring(0, 100) + '...');
+      });
+    } else {
+      console.log(`❌ No ${pattern.name} tables found`);
+    }
+  });
+}
+
+export { improveResearchFormatting, debugTableDetection };
