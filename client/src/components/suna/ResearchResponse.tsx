@@ -35,7 +35,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
         </Link>
       </div>
       {/* Premium research content with dark theme formatting */}
-      <div className="prose prose-lg max-w-none text-gray-100">
+      <div className="prose prose-lg max-w-none text-gray-100 research-content">
         <ReactMarkdown
           components={{
             // Premium headers with dark theme styling
@@ -158,46 +158,43 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
         </ReactMarkdown>
       </div>
 
-      {/* Clean sources section with minimal design */}
+      {/* Completely redesigned sources section - clean and professional */}
       {sources && sources.length > 0 && (
-        <div className="mt-12 p-6 bg-slate-800/20 rounded-lg border border-slate-700/30">
-          <h3 className="text-lg font-semibold text-gray-200 mb-4 flex items-center">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            sources used
+        <div className="mt-16 border-t border-slate-700/50 pt-8">
+          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-6">
+            sources referenced
           </h3>
           
-          <div className="space-y-3">
+          <div className="grid gap-3">
             {sources.map((source, index) => {
-              // Extract timestamp if available, otherwise use current date
-              const getTimestamp = (url: string) => {
-                // Try to extract date from URL patterns common in news sites
-                const dateMatch = url.match(/\/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-                if (dateMatch) {
-                  const [, year, month, day] = dateMatch;
-                  return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year}`;
-                }
-                // Default to current date if no date found
-                return "may 24, 2025";
-              };
-              
               const domain = source.domain || new URL(source.url).hostname.replace('www.', '');
-              const timestamp = getTimestamp(source.url);
               
               return (
-                <div key={index} id={`source-${index + 1}`} className="flex items-start space-x-3 text-sm">
-                  <span className="text-cyan-400 font-mono text-xs mt-0.5">[{index + 1}]</span>
-                  <div className="flex-1">
-                    <a
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-gray-300 hover:text-cyan-400 transition-colors lowercase font-normal"
-                    >
-                      {source.title.toLowerCase()}
-                    </a>
-                    <span className="text-gray-500 ml-2">
-                      • {domain} • {timestamp}
-                    </span>
+                <div key={index} id={`source-${index + 1}`} className="group">
+                  <div className="flex items-start gap-4 p-4 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-all duration-200">
+                    <div className="flex-shrink-0">
+                      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-mono text-cyan-400 bg-cyan-400/10 rounded border border-cyan-400/20">
+                        {index + 1}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-sm text-slate-300 hover:text-white transition-colors group-hover:text-cyan-300"
+                      >
+                        {source.title}
+                      </a>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                        <span>{domain}</span>
+                        <span>•</span>
+                        <span>may 24, 2025</span>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                    </div>
                   </div>
                 </div>
               );
