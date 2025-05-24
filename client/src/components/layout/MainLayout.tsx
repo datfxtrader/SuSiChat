@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import { useEffect, useState } from 'react';
+import Sidebar from './Sidebar';
+import MobileNav from './MobileNav';
+import { useMobile } from '@/hooks/use-mobile';
+import React from "react";
 import { useLocation } from "wouter";
-import Sidebar from "./Sidebar";
-import MobileNav from "./MobileNav";
 import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
@@ -24,8 +26,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const [location, navigate] = useLocation();
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  
+  const isMobile = useMobile();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    // Reset sidebar state when switching between mobile/desktop
+    setIsSidebarOpen(false);
+  }, [isMobile]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -52,38 +60,28 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       </div>
     );
   }
-  
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar for desktop */}
-      <Sidebar className="hidden md:flex md:w-64 lg:w-80 flex-col" />
-      
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex h-screen w-full bg-transparent">
+      {/* Sidebar - Fixed position on desktop, absolute on mobile */}
+      <div className={`
+        fixed lg:relative z-40
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        transition-transform duration-300 ease-in-out
+      `}>
+        <Sidebar />
+      </div>
+
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-transparent">
         {/* Mobile header */}
-        <div className="md:hidden border-b border-border bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between p-3">
-            <button 
-              className="text-neutral-500"
-              onClick={() => setShowMobileSidebar(true)}
-            >
-              <span className="material-icons">menu</span>
-            </button>
-            <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center">
-                <span className="material-icons text-white text-sm">assistant</span>
-              </div>
-              <h1 className="font-semibold">Tongkeeper</h1>
-            </div>
-            <button 
-              className="text-neutral-500"
-              onClick={() => navigate('/profile')}
-            >
-              <span className="material-icons">account_circle</span>
-            </button>
-          </div>
-        </div>
-        
+        {isMobile && (
+          <MobileNav 
+            isSidebarOpen={isSidebarOpen}
+            toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          />
+        )}
+
         {/* Desktop header */}
         {showHeader && (
           <div className="border-b border-border bg-background/80 backdrop-blur-sm">
@@ -98,27 +96,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             </div>
           </div>
         )}
-        
-        {/* Main content area */}
-        {children}
-        
-        {/* Mobile navigation */}
-        <MobileNav />
-        
-        {/* Mobile sidebar overlay */}
-        {showMobileSidebar && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50"
-              onClick={() => setShowMobileSidebar(false)}
-            ></div>
-            <div className="fixed inset-y-0 left-0 w-64 bg-background/95 backdrop-blur-md shadow-lg">
-              <Sidebar onItemClick={() => setShowMobileSidebar(false)} />
-            </div>
-          </div>
-        )}
+
+        {/* Content */}
+        <main className="flex-1 overflow-auto bg-transparent">
+          {children}
+        </main>
       </div>
-      
+
+      {/* Mobile sidebar overlay */}
+      {isMobile && isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-30"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       <Toaster />
     </div>
   );
