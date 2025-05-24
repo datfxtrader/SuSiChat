@@ -12,6 +12,7 @@ import FamilyRoomDetail from "@/pages/family-room/[id]";
 import Profile from "@/pages/profile";
 import SunaAgent from "@/pages/suna-agent";
 import TripPlanning from "@/pages/trip";
+import ResearchBlog from "@/pages/research-blog";
 
 import NotFound from "@/pages/not-found";
 
