@@ -364,11 +364,11 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
   }
 
   return (
-    <div className="flex h-full bg-white/50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-200 backdrop-blur-sm">
+    <div className="flex h-full bg-white text-gray-800">
       {/* Mobile sidebar toggle */}
       <button 
         className={cn(
-          "md:hidden fixed z-50 top-3 left-3 p-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-md text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700",
+          "md:hidden fixed z-50 top-3 left-3 p-2 bg-gray-100 rounded-md text-gray-600",
           isSidebarOpen ? "left-[260px]" : "left-3"
         )}
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -379,15 +379,15 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
       {/* Sidebar */}
       <div 
         className={cn(
-          "w-[260px] bg-slate-50/80 dark:bg-slate-800/80 border-r border-slate-200/60 dark:border-slate-700/60 h-full flex flex-col transition-all duration-300 fixed md:static z-40 backdrop-blur-sm",
+          "w-[260px] bg-gray-50 border-r border-gray-200 h-full flex flex-col transition-all duration-300 fixed md:static z-40",
           isSidebarOpen ? "left-0" : "-left-[260px]",
           "md:left-0" // Always visible on desktop
         )}
       >
-        <div className="p-2 border-b border-slate-200/60 dark:border-slate-700/60 space-y-2">
+        <div className="p-2 border-b border-gray-200 space-y-2">
           <Button 
             variant="outline" 
-            className="w-full bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 backdrop-blur-sm" 
+            className="w-full bg-white border border-gray-200 hover:bg-gray-100 text-gray-700" 
             onClick={handleNewConversation}
           >
             <PlusIcon className="mr-2 h-4 w-4" /> New chat
