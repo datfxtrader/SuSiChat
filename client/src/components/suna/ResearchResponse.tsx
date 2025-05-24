@@ -25,68 +25,68 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
           </Button>
         </Link>
       </div>
-      {/* Premium research content with professional formatting */}
-      <div className="prose prose-lg max-w-none text-gray-900">
+      {/* Premium research content with dark theme formatting */}
+      <div className="prose prose-lg max-w-none text-gray-100">
         <ReactMarkdown
           components={{
-            // Premium headers with proper spacing and styling
+            // Premium headers with dark theme styling
             h1: ({children}) => (
-              <h1 className="text-3xl font-bold mt-12 mb-8 text-gray-900 border-b-4 border-blue-600 pb-4 tracking-tight">
+              <h1 className="text-3xl font-bold mt-12 mb-8 text-gray-100 border-b-4 border-blue-400 pb-4 tracking-tight">
                 {children}
               </h1>
             ),
             h2: ({children}) => (
-              <h2 className="text-2xl font-semibold mt-12 mb-8 text-gray-800 border-l-4 border-blue-500 pl-6 bg-gradient-to-r from-blue-50 to-transparent py-4 rounded-r-lg shadow-sm">
+              <h2 className="text-2xl font-semibold mt-12 mb-8 text-gray-200 border-l-4 border-blue-400 pl-6 bg-gradient-to-r from-slate-800/60 to-transparent py-4 rounded-r-lg shadow-sm backdrop-blur-sm">
                 {children}
               </h2>
             ),
             h3: ({children}) => (
-              <h3 className="text-xl font-medium mt-10 mb-6 text-gray-700 border-l-3 border-gray-400 pl-5 bg-gray-50 py-3 rounded-r-md">
+              <h3 className="text-xl font-medium mt-10 mb-6 text-gray-300 border-l-3 border-slate-500 pl-5 bg-slate-800/40 py-3 rounded-r-md backdrop-blur-sm">
                 {children}
               </h3>
             ),
             h4: ({children}) => (
-              <h4 className="text-lg font-medium mt-8 mb-5 text-gray-700 pl-4 border-l-2 border-gray-300">
+              <h4 className="text-lg font-medium mt-8 mb-5 text-gray-300 pl-4 border-l-2 border-slate-600">
                 {children}
               </h4>
             ),
             
-            // Enhanced paragraph spacing and typography
+            // Enhanced paragraph spacing and typography with dark theme
             p: ({children}) => (
-              <p className="mb-8 text-gray-800 leading-loose text-base tracking-wide font-normal">
+              <p className="mb-8 text-gray-300 leading-loose text-base tracking-wide font-normal">
                 {children}
               </p>
             ),
             
-            // Beautiful list formatting with proper spacing
+            // Beautiful list formatting with dark theme
             ul: ({children}) => (
-              <ul className="mb-10 space-y-4 border-l-3 border-blue-200 bg-blue-50 pl-8 py-6 rounded-r-lg shadow-sm">
+              <ul className="mb-10 space-y-4 border-l-3 border-blue-400 bg-slate-800/30 pl-8 py-6 rounded-r-lg shadow-sm backdrop-blur-sm">
                 {children}
               </ul>
             ),
             ol: ({children}) => (
-              <ol className="mb-10 space-y-4 border-l-3 border-green-200 bg-green-50 pl-8 py-6 rounded-r-lg shadow-sm list-decimal">
+              <ol className="mb-10 space-y-4 border-l-3 border-green-400 bg-slate-800/30 pl-8 py-6 rounded-r-lg shadow-sm list-decimal backdrop-blur-sm">
                 {children}
               </ol>
             ),
             li: ({children}) => (
-              <li className="text-gray-800 leading-relaxed text-base pl-3 relative">
-                <span className="absolute -left-6 top-1 text-blue-600 font-bold text-lg">▸</span>
+              <li className="text-gray-300 leading-relaxed text-base pl-3 relative">
+                <span className="absolute -left-6 top-1 text-blue-400 font-bold text-lg">▸</span>
                 {children}
               </li>
             ),
             
-            // Premium blockquote styling
+            // Premium blockquote styling with dark theme
             blockquote: ({children}) => (
-              <blockquote className="border-l-4 border-blue-500 bg-gradient-to-r from-blue-50 to-blue-25 pl-8 pr-6 py-6 italic my-10 text-gray-700 rounded-r-lg shadow-md">
+              <blockquote className="border-l-4 border-blue-400 bg-gradient-to-r from-slate-800/50 to-slate-700/30 pl-8 pr-6 py-6 italic my-10 text-gray-300 rounded-r-lg shadow-md backdrop-blur-sm">
                 {children}
               </blockquote>
             ),
             
-            // Professional table formatting
+            // Professional table formatting with dark theme
             table: ({children}) => (
-              <div className="overflow-x-auto my-12 shadow-xl rounded-xl border border-gray-200">
-                <table className="min-w-full border-collapse bg-white">
+              <div className="overflow-x-auto my-12 shadow-xl rounded-xl border border-slate-600">
+                <table className="min-w-full border-collapse bg-slate-800/50 backdrop-blur-sm">
                   {children}
                 </table>
               </div>
@@ -102,19 +102,19 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
               </th>
             ),
             td: ({children}) => (
-              <td className="px-6 py-4 text-gray-800 border-b border-gray-100 text-sm">
+              <td className="px-6 py-4 text-gray-300 border-b border-slate-600 text-sm">
                 {children}
               </td>
             ),
             
-            // Enhanced text formatting
+            // Enhanced text formatting with dark theme
             strong: ({children}) => (
-              <strong className="font-bold text-gray-900 bg-yellow-100 px-2 py-1 rounded">
+              <strong className="font-bold text-gray-100 bg-yellow-600/30 px-2 py-1 rounded backdrop-blur-sm">
                 {children}
               </strong>
             ),
             em: ({children}) => (
-              <em className="italic text-blue-700 font-medium">
+              <em className="italic text-blue-400 font-medium">
                 {children}
               </em>
             ),
