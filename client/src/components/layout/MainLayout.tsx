@@ -61,7 +61,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile header */}
-        <div className="md:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <div className="md:hidden border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="flex items-center justify-between p-3">
             <button 
               className="text-neutral-500"
@@ -86,7 +86,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         
         {/* Desktop header */}
         {showHeader && (
-          <div className="border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+          <div className="border-b border-border bg-background/80 backdrop-blur-sm">
             <div className="flex items-center justify-between p-4">
               <div>
                 <h2 className="font-semibold">{title}</h2>
@@ -112,7 +112,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               className="fixed inset-0 bg-black bg-opacity-50"
               onClick={() => setShowMobileSidebar(false)}
             ></div>
-            <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-neutral-900 shadow-lg">
+            <div className="fixed inset-y-0 left-0 w-64 bg-background/95 backdrop-blur-md shadow-lg">
               <Sidebar onItemClick={() => setShowMobileSidebar(false)} />
             </div>
           </div>
