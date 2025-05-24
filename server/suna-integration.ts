@@ -1196,7 +1196,7 @@ ${timeInfo}
 📝 Content: ${result.content || result.description || 'No content available'}`;
 }).join('\n\n') || 'No results found'}
 
-${webSearchResults.answer ? `Search Answer: ${webSearchResults.answer}` : ''}
+${(webSearchResults && webSearchResults.answer) ? `Search Answer: ${webSearchResults.answer}` : ''}
 
 Current Date: ${new Date().toISOString().split('T')[0]}
 `;
