@@ -14,6 +14,15 @@ interface ResearchResponseProps {
 }
 
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [] }) => {
+  // Transform content to make inline citations clickable and numbered
+  const processedContent = content.replace(/\[Source (\d+)\]/g, (match, sourceNumber) => {
+    const index = parseInt(sourceNumber) - 1;
+    if (sources[index]) {
+      return `<a href="#source-${sourceNumber}" class="inline-citation text-cyan-400 text-xs font-mono hover:text-cyan-300 transition-colors">[${sourceNumber}]</a>`;
+    }
+    return `[${sourceNumber}]`;
+  });
+
   return (
     <div className="space-y-8 max-w-none">
       {/* Blog View Link */}
@@ -107,9 +116,9 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
               </td>
             ),
             
-            // Enhanced text formatting with dark theme
+            // Enhanced text formatting with high contrast highlighting
             strong: ({children}) => (
-              <strong className="font-bold text-gray-100 bg-yellow-600/30 px-2 py-1 rounded backdrop-blur-sm">
+              <strong className="font-bold text-white bg-cyan-500/40 px-2 py-1 rounded shadow-sm border border-cyan-400/30">
                 {children}
               </strong>
             ),
@@ -149,75 +158,50 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
         </ReactMarkdown>
       </div>
 
-      {/* Premium sources section with enhanced professional formatting */}
+      {/* Clean sources section with minimal design */}
       {sources && sources.length > 0 && (
-        <div className="mt-16 p-10 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border border-gray-200 shadow-xl">
-          <div className="border-b border-gray-300 pb-6 mb-10">
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center mr-4 shadow-sm">
-                <ExternalLink className="w-5 h-5 text-white" />
-              </div>
-              Research Sources & References
-              <span className="ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                {sources.length} Sources
-              </span>
-            </h3>
-            <p className="text-gray-600 mt-3 text-lg">Verified and authenticated data sources from premium institutions</p>
-          </div>
+        <div className="mt-12 p-6 bg-slate-800/20 rounded-lg border border-slate-700/30">
+          <h3 className="text-lg font-semibold text-gray-200 mb-4 flex items-center">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            sources used
+          </h3>
           
-          <div className="grid gap-6">
-            {sources.map((source, index) => (
-              <div 
-                key={index} 
-                className="group flex items-start space-x-6 p-6 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
-              >
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center text-lg font-bold shadow-md group-hover:shadow-lg transition-shadow">
-                    {index + 1}
+          <div className="space-y-3">
+            {sources.map((source, index) => {
+              // Extract timestamp if available, otherwise use current date
+              const getTimestamp = (url: string) => {
+                // Try to extract date from URL patterns common in news sites
+                const dateMatch = url.match(/\/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+                if (dateMatch) {
+                  const [, year, month, day] = dateMatch;
+                  return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year}`;
+                }
+                // Default to current date if no date found
+                return "may 24, 2025";
+              };
+              
+              const domain = source.domain || new URL(source.url).hostname.replace('www.', '');
+              const timestamp = getTimestamp(source.url);
+              
+              return (
+                <div key={index} className="flex items-start space-x-3 text-sm">
+                  <span className="text-cyan-400 font-mono text-xs mt-0.5">[{index + 1}]</span>
+                  <div className="flex-1">
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-300 hover:text-cyan-400 transition-colors lowercase font-normal"
+                    >
+                      {source.title.toLowerCase()}
+                    </a>
+                    <span className="text-gray-500 ml-2">
+                      • {domain} • {timestamp}
+                    </span>
                   </div>
                 </div>
-                
-                <div className="flex-1 min-w-0">
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block group"
-                  >
-                    <h4 className="font-semibold text-lg text-gray-900 group-hover:text-blue-600 transition-colors leading-tight mb-3 break-words">
-                      {source.title}
-                    </h4>
-                    
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-200">
-                        <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                        {source.domain || new URL(source.url).hostname}
-                      </span>
-                      <span className="text-xs text-gray-500 font-medium">• Verified Source</span>
-                    </div>
-                    
-                    <p className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors">
-                      Click to access full article and detailed analysis
-                    </p>
-                  </a>
-                </div>
-                
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                    <ExternalLink className="w-4 h-4 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="mt-10 text-center pt-6 border-t border-gray-200">
-            <div className="inline-flex items-center px-6 py-3 bg-white rounded-full border border-gray-200 shadow-sm">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></div>
-              <span className="text-sm font-medium text-gray-700">
-                All {sources.length} sources verified and accessible • Premium data quality assured
-              </span>
-            </div>
+              );
+            })}
           </div>
         </div>
       )}
