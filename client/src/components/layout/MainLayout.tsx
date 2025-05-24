@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import React from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
