@@ -97,7 +97,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             </div>
             
-            <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white">
+            <Button className="w-full bg-slate-700 hover:bg-slate-600 hover:text-primary hover:shadow-lg transition-all duration-200 text-white">
               <Sparkles className="w-4 h-4 mr-2" />
               New Research Chat
             </Button>
@@ -109,10 +109,10 @@ Current market conditions show several critical factors influencing Bitcoin's tr
             {mockConversations.map((conv) => (
               <div
                 key={conv.id}
-                className="p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 transition-all cursor-pointer"
+                className="group p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 hover:border-primary/20 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-sm font-medium text-gray-200 truncate">{conv.title}</h4>
+                  <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title}</h4>
                   <span className="text-xs text-gray-500">{conv.lastMessage}</span>
                 </div>
                 <p className="text-xs text-gray-400 truncate">{conv.preview}</p>

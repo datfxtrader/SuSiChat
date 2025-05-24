@@ -91,8 +91,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
           {navItems.map((item) => (
             <li key={item.path}>
               <div className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-foreground hover:bg-muted/50",
-                isActive(item.path) && "bg-muted text-foreground"
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:bg-muted/50 hover:shadow-md",
+                isActive(item.path) && "bg-muted text-foreground border-primary/20"
               )}>
                 <Link href={item.path} onClick={handleItemClick} className="flex items-center gap-3 w-full">
                   <span className="material-icons">{item.icon}</span>
@@ -123,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
                 href={`/family-room/${room.id}`}
                 onClick={handleItemClick}
               >
-                <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-muted/50 text-foreground mb-1">
+                <div className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-muted/50 hover:text-primary hover:shadow-md transition-all duration-200 text-foreground mb-1">
                   <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center">
                     <span className="material-icons text-white text-sm">home</span>
                   </div>
