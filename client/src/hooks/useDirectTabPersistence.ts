@@ -213,18 +213,18 @@ export const useDirectTabPersistence = () => {
     };
   }, [forceSaveState, forceRestoreState]);
 
-  // Progress simulation
+  // Progress simulation that can reach 100%
   useEffect(() => {
     if (!isResearchInProgress) return;
     
     const interval = setInterval(() => {
       setResearchProgress(prev => {
-        if (prev >= 95) return prev;
-        const newProgress = prev + Math.random() * 3 + 1;
+        if (prev >= 100) return prev;
+        const newProgress = prev + Math.random() * 2 + 0.5;
         const newStage = Math.min(Math.floor(newProgress / 20) + 1, 5);
         setResearchStage(newStage);
         setStageLabel(`Research stage ${newStage}/5`);
-        return Math.min(newProgress, 95);
+        return Math.min(newProgress, 100); // Allow progress to reach 100%
       });
     }, 2000);
 
