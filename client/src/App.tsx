@@ -41,6 +41,7 @@ function App() {
       <Route path="/suna-agent" component={SunaAgent} />
       <Route path="/research-blog" component={ResearchBlog} />
       <Route path="/suna-clone" component={SunaClone} />
+      <Route path="/templates" component={TemplatesPage} />
       <Route path="/trip" component={TripPlanning} />
 
       <Route component={NotFound} />
