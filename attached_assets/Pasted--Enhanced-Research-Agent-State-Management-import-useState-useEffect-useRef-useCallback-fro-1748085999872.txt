@@ -1,0 +1,421 @@
+// Enhanced Research Agent State Management
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+// Custom hook for research state management
+export const useResearchState = () => {
+  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
+  const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
+  const [researchStartTime, setResearchStartTime] = useState(null);
+  const [researchProgress, setResearchProgress] = useState(0);
+  
+  // Refs to maintain state consistency
+  const researchStateRef = useRef({
+    inProgress: false,
+    query: '',
+    startTime: null
+  });
+  
+  // Progress simulation timer
+  const progressTimerRef = useRef(null);
+  
+  // Storage keys
+  const STORAGE_KEYS = {
+    IN_PROGRESS: 'research-in-progress',
+    QUERY: 'ongoing-research-query',
+    START_TIME: 'research-start-time',
+    PROGRESS: 'research-progress'
+  };
+
+  // Save state to localStorage
+  const saveStateToStorage = useCallback((state) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.IN_PROGRESS, state.inProgress.toString());
+      localStorage.setItem(STORAGE_KEYS.QUERY, state.query || '');
+      localStorage.setItem(STORAGE_KEYS.START_TIME, state.startTime?.toString() || '');
+      localStorage.setItem(STORAGE_KEYS.PROGRESS, state.progress?.toString() || '0');
+    } catch (error) {
+      console.warn('Failed to save research state to localStorage:', error);
+    }
+  }, []);
+
+  // Load state from localStorage
+  const loadStateFromStorage = useCallback(() => {
+    try {
+      const inProgress = localStorage.getItem(STORAGE_KEYS.IN_PROGRESS) === 'true';
+      const query = localStorage.getItem(STORAGE_KEYS.QUERY) || '';
+      const startTime = localStorage.getItem(STORAGE_KEYS.START_TIME);
+      const progress = parseFloat(localStorage.getItem(STORAGE_KEYS.PROGRESS) || '0');
+      
+      return {
+        inProgress,
+        query,
+        startTime: startTime ? parseInt(startTime) : null,
+        progress
+      };
+    } catch (error) {
+      console.warn('Failed to load research state from localStorage:', error);
+      return {
+        inProgress: false,
+        query: '',
+        startTime: null,
+        progress: 0
+      };
+    }
+  }, []);
+
+  // Clear state from localStorage
+  const clearStateFromStorage = useCallback(() => {
+    try {
+      Object.values(STORAGE_KEYS).forEach(key => {
+        localStorage.removeItem(key);
+      });
+    } catch (error) {
+      console.warn('Failed to clear research state from localStorage:', error);
+    }
+  }, []);
+
+  // Progress simulation function
+  const startProgressSimulation = useCallback((startTime) => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+    }
+
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const estimatedDuration = 30000; // 30 seconds estimated duration
+      const newProgress = Math.min((elapsed / estimatedDuration) * 100, 95); // Cap at 95%
+      
+      setResearchProgress(newProgress);
+      
+      // Save progress to storage
+      try {
+        localStorage.setItem(STORAGE_KEYS.PROGRESS, newProgress.toString());
+      } catch (error) {
+        console.warn('Failed to save progress:', error);
+      }
+    }, 500);
+  }, []);
+
+  // Start research function
+  const startResearch = useCallback((query) => {
+    const startTime = Date.now();
+    const newState = {
+      inProgress: true,
+      query,
+      startTime,
+      progress: 0
+    };
+
+    // Update component state
+    setIsResearchInProgress(true);
+    setOngoingResearchQuery(query);
+    setResearchStartTime(startTime);
+    setResearchProgress(0);
+
+    // Update ref
+    researchStateRef.current = newState;
+
+    // Save to storage
+    saveStateToStorage(newState);
+
+    // Start progress simulation
+    startProgressSimulation(startTime);
+  }, [saveStateToStorage, startProgressSimulation]);
+
+  // Complete research function
+  const completeResearch = useCallback(() => {
+    // Clear timers
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+
+    // Update component state
+    setIsResearchInProgress(false);
+    setOngoingResearchQuery('');
+    setResearchStartTime(null);
+    setResearchProgress(100);
+
+    // Update ref
+    researchStateRef.current = {
+      inProgress: false,
+      query: '',
+      startTime: null
+    };
+
+    // Clear storage after a brief delay to show completion
+    setTimeout(() => {
+      clearStateFromStorage();
+      setResearchProgress(0);
+    }, 1000);
+  }, [clearStateFromStorage]);
+
+  // Initialize state on component mount
+  useEffect(() => {
+    const storedState = loadStateFromStorage();
+    
+    if (storedState.inProgress && storedState.query) {
+      setIsResearchInProgress(true);
+      setOngoingResearchQuery(storedState.query);
+      setResearchStartTime(storedState.startTime);
+      setResearchProgress(storedState.progress);
+
+      researchStateRef.current = {
+        inProgress: true,
+        query: storedState.query,
+        startTime: storedState.startTime
+      };
+
+      // Resume progress simulation if we have a start time
+      if (storedState.startTime) {
+        startProgressSimulation(storedState.startTime);
+      }
+    }
+  }, [loadStateFromStorage, startProgressSimulation]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Handle visibility change (tab switching)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden - ensure state is saved
+        if (researchStateRef.current.inProgress) {
+          saveStateToStorage({
+            ...researchStateRef.current,
+            progress: researchProgress
+          });
+        }
+      } else {
+        // Tab is visible - restore state if needed
+        const storedState = loadStateFromStorage();
+        
+        if (storedState.inProgress && storedState.query) {
+          // Only restore if current state doesn't match stored state
+          if (!isResearchInProgress || ongoingResearchQuery !== storedState.query) {
+            setIsResearchInProgress(true);
+            setOngoingResearchQuery(storedState.query);
+            setResearchStartTime(storedState.startTime);
+            setResearchProgress(storedState.progress);
+
+            researchStateRef.current = {
+              inProgress: true,
+              query: storedState.query,
+              startTime: storedState.startTime
+            };
+
+            // Resume progress simulation
+            if (storedState.startTime) {
+              startProgressSimulation(storedState.startTime);
+            }
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, saveStateToStorage, loadStateFromStorage, startProgressSimulation]);
+
+  return {
+    // State
+    isResearchInProgress,
+    ongoingResearchQuery,
+    researchStartTime,
+    researchProgress,
+    
+    // Actions
+    startResearch,
+    completeResearch,
+    
+    // Utilities
+    clearStateFromStorage
+  };
+};
+
+// Enhanced Research Agent Component
+export const ResearchAgentTab = ({ 
+  messages, 
+  isSending, 
+  onSendMessage,
+  // ... other props
+}) => {
+  const {
+    isResearchInProgress,
+    ongoingResearchQuery,
+    researchProgress,
+    startResearch,
+    completeResearch
+  } = useResearchState();
+
+  // Handle message sending
+  const handleSendMessage = useCallback((message) => {
+    // Start research when sending a message
+    startResearch(message);
+    
+    // Call the original send message handler
+    onSendMessage(message);
+  }, [startResearch, onSendMessage]);
+
+  // Handle research completion
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      
+      // If we received an assistant response and research was in progress
+      if (lastMessage?.role === 'assistant' && isResearchInProgress) {
+        completeResearch();
+      }
+    }
+  }, [messages, isResearchInProgress, completeResearch]);
+
+  // Research progress component
+  const ResearchProgressIndicator = () => {
+    if (!isResearchInProgress) return null;
+
+    return (
+      <div className="research-progress-container">
+        <div className="research-status">
+          <div className="research-spinner" />
+          <span>Researching: {ongoingResearchQuery}</span>
+        </div>
+        <div className="progress-bar">
+          <div 
+            className="progress-fill" 
+            style={{ width: `${researchProgress}%` }}
+          />
+        </div>
+        <div className="progress-text">
+          {Math.round(researchProgress)}% Complete
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="research-agent-tab">
+      {/* Research Progress Indicator */}
+      <ResearchProgressIndicator />
+      
+      {/* Your existing chat interface */}
+      <div className="chat-interface">
+        {/* Messages display */}
+        <div className="messages">
+          {messages.map((message, index) => (
+            <div key={index} className={`message ${message.role}`}>
+              {message.content}
+            </div>
+          ))}
+        </div>
+        
+        {/* Input area */}
+        <div className="input-area">
+          <input
+            type="text"
+            placeholder="Ask me anything about financial markets..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target.value.trim()) {
+                handleSendMessage(e.target.value.trim());
+                e.target.value = '';
+              }
+            }}
+            disabled={isSending || isResearchInProgress}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// CSS styles for the progress indicator
+export const researchProgressStyles = `
+.research-progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 1rem;
+  z-index: 1000;
+  border-bottom: 2px solid #007bff;
+}
+
+.research-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.research-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #333;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+`;
+
+// Usage instructions for your main component:
+/*
+1. Import the useResearchState hook and ResearchAgentTab component
+2. Replace your existing research state logic with the useResearchState hook
+3. Use the ResearchAgentTab component instead of your current implementation
+4. Add the CSS styles to your stylesheet
+
+Example integration:
+
+import { useResearchState, ResearchAgentTab, researchProgressStyles } from './research-state-fix';
+
+function YourMainComponent() {
+  // ... your existing code
+  
+  return (
+    <div>
+      <style>{researchProgressStyles}</style>
+      <ResearchAgentTab
+        messages={messages}
+        isSending={isSending}
+        onSendMessage={handleSendMessage}
+      />
+    </div>
+  );
+}
+*/
