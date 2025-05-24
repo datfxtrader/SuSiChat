@@ -20,33 +20,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // API routes
+  // API routes - mount first to take precedence
   app.use('/api/financial-research', financialResearchRoutes);
   app.use('/api/web-search', webSearchRoutes);
 
   // Static file serving
   app.use(express.static('client/dist'));
 
-  // Root and SPA route handler - always serve index.html
+  // SPA fallback - serve index.html for all unmatched routes
   app.get('*', (req, res) => {
     res.sendFile('index.html', { root: './client/dist' });
   });
-
-  // Mount API routes first
-  app.use('/api/financial-research', financialResearchRoutes);
-  app.use('/api/web-search', webSearchRoutes);
-
-  // Serve static files from client/dist
-  app.use(express.static('client/dist'));
-
-  // Handle SPA routes - serve index.html for all unmatched routes
-  app.get('*', (req, res) => {
-    res.sendFile('index.html', { root: './client/dist' });
-  });
-  app.use('/api/financial-research', financialResearchRoutes);
-  
-  // Mount web search routes
-  app.use('/api/web-search', webSearchRoutes);
   
   const httpServer = createServer(app);
   
