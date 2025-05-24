@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, BookOpen } from 'lucide-react';
+import { Link } from 'wouter';
+import { Button } from '@/components/ui/button';
 
 interface ResearchResponseProps {
   content: string;
@@ -14,6 +16,15 @@ interface ResearchResponseProps {
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [] }) => {
   return (
     <div className="space-y-8 max-w-none">
+      {/* Blog View Link */}
+      <div className="flex justify-end mb-4">
+        <Link to="/research-blog">
+          <Button variant="outline" size="sm" className="gap-2">
+            <BookOpen className="w-4 h-4" />
+            View in Blog Format
+          </Button>
+        </Link>
+      </div>
       {/* Premium research content with professional formatting */}
       <div className="prose prose-lg max-w-none text-gray-900">
         <ReactMarkdown
