@@ -160,23 +160,15 @@ export const useResearchState = () => {
     }
   }, [loadResearchState, saveResearchState]);
 
-  // Handle tab visibility changes
+  // Handle tab visibility changes with stable useEffect
   useEffect(() => {
     const handleVisibilityChange = () => {
       console.log('Visibility changed. Hidden:', document.hidden);
-      console.log('Current research state:', { isResearchInProgress, ongoingResearchQuery, researchProgress });
       
       if (document.hidden) {
-        // Tab is hidden - save current state
-        if (isResearchInProgress) {
-          const currentState: ResearchState = {
-            isInProgress: isResearchInProgress,
-            query: ongoingResearchQuery,
-            progress: researchProgress,
-            stage: researchStage,
-            startTime: stateRef.current?.startTime || Date.now(),
-            estimatedDuration: stateRef.current?.estimatedDuration || 60000
-          };
+        // Tab is hidden - save current state using refs
+        const currentState = stateRef.current;
+        if (currentState && currentState.isInProgress) {
           console.log('Saving state on tab hide:', currentState);
           saveResearchState(currentState);
         }
@@ -198,7 +190,7 @@ export const useResearchState = () => {
       console.log('Removing visibility change listener');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, saveResearchState, restoreState]);
+  }, []); // Empty dependency array to prevent constant re-creation
 
   // Initial state restoration on mount
   useEffect(() => {
