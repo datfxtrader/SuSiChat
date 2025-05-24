@@ -997,15 +997,20 @@ ${numberContradictions.join('\n')}
               
               const isFromTrustedSource = trustedDomains.some(domain => url.includes(domain));
               
-              // Prefer articles with current timeframe indicators
+              // PRIORITY: Must have current timeframe indicators for May 2025
               const hasCurrentIndicators = 
                 text.includes('may 2025') || 
+                text.includes('2025') ||
                 text.includes('q2 2025') ||
-                text.includes('current') || 
-                text.includes('latest') || 
-                text.includes('today') || 
+                text.includes('current price') || 
+                text.includes('latest price') || 
+                text.includes('price today') || 
                 text.includes('this week') ||
-                text.includes('recent');
+                text.includes('live price') ||
+                /\$[8-9][0-9],?[0-9]{3}/.test(text) || // Accept current price range $80k+
+                /\$1[0-5][0-9],?[0-9]{3}/.test(text) || // Accept realistic 2025 prices up to $150k
+                /[8-9][0-9]k/.test(text) || // Accept shorthand like "95k"
+                /1[0-5][0-9]k/.test(text); // Accept shorthand like "120k"
               
               // Quality content indicators
               const hasQualityIndicators = 
