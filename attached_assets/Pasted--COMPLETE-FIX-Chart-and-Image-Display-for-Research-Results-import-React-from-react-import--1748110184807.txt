@@ -1,0 +1,331 @@
+// COMPLETE FIX: Chart and Image Display for Research Results
+
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import { ExternalLink, BookOpen, BarChart3, TrendingUp, Image as ImageIcon } from 'lucide-react';
+
+// Enhanced content processing with chart and image support
+const improveResearchFormatting = (content: string) => {
+  let processed = content;
+  
+  console.log('🖼️ Processing content for charts and images...');
+  
+  // STEP 1: Fix image markdown that might be broken
+  // Convert various image formats to proper markdown
+  processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+    console.log('🖼️ Found image:', alt, src);
+    
+    // Clean up the image source
+    const cleanSrc = src.trim();
+    const cleanAlt = alt.trim() || 'Research Chart';
+    
+    // Return proper markdown that ReactMarkdown can process
+    return `![${cleanAlt}](${cleanSrc})`;
+  });
+  
+  // STEP 2: Convert chart descriptions to visual representations
+  // Look for chart-like data and convert to HTML tables or visual elements
+  processed = processed.replace(
+    /(?:Chart|Graph|Figure)\s*\d*:?\s*([^\n]+)\n((?:[\w\s]+:\s*[\d.%$€£¥,]+\s*\n?){3,})/gi,
+    (match, title, data) => {
+      console.log('📊 Found chart data:', title);
+      return convertDataToChart(title, data);
+    }
+  );
+  
+  // STEP 3: Handle embedded chart URLs (TradingView, etc.)
+  processed = processed.replace(
+    /(https?:\/\/[^\s]+(?:tradingview|investing|yahoo|marketwatch)[^\s]*chart[^\s]*)/gi,
+    (match, url) => {
+      console.log('📈 Found chart URL:', url);
+      return createChartEmbed(url);
+    }
+  );
+  
+  // STEP 4: Convert ASCII charts to visual representations
+  processed = processed.replace(
+    /```\s*(chart|graph|plot)\s*\n([\s\S]*?)\n```/gi,
+    (match, type, chartData) => {
+      console.log('📊 Found ASCII chart:', type);
+      return convertAsciiToChart(chartData);
+    }
+  );
+  
+  // STEP 5: Handle price/trend arrows and convert to visual indicators
+  processed = processed.replace(
+    /(↑|↓|⬆|⬇|▲|▼|\+\d+%|-\d+%)/g,
+    (match) => {
+      return formatTrendIndicator(match);
+    }
+  );
+  
+  // STEP 6: Fix base64 images if any exist
+  processed = processed.replace(
+    /!\[([^\]]*)\]\(data:image\/[^)]+\)/g,
+    (match, alt) => {
+      console.log('🖼️ Found base64 image:', alt);
+      return match; // Keep as-is, ReactMarkdown should handle it
+    }
+  );
+  
+  // STEP 7: Convert tabular data to visual charts
+  processed = processed.replace(
+    /\|\s*(?:Price|Level|Support|Resistance|Target)[^\n]+\|\s*\n(?:\|[^\n]+\|\s*\n?){3,}/gi,
+    (match) => {
+      if (match.includes('<table')) return match;
+      console.log('📊 Converting table to visual chart');
+      return convertTableToVisualChart(match);
+    }
+  );
+  
+  return processed;
+};
+
+// Convert data descriptions to visual charts
+function convertDataToChart(title: string, data: string): string {
+  const lines = data.trim().split('\n').filter(line => line.trim());
+  const dataPoints = lines.map(line => {
+    const match = line.match(/([^:]+):\s*([0-9.,%-]+)/);
+    if (match) {
+      return { label: match[1].trim(), value: match[2].trim() };
+    }
+    return null;
+  }).filter(Boolean);
+  
+  if (dataPoints.length === 0) return `**${title}**\n\n${data}`;
+  
+  const chartHtml = `
+    <div class="my-8 p-6 bg-gradient-to-br from-slate-800/60 to-slate-900/60 rounded-xl border border-slate-700/50 shadow-xl">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+          </svg>
+        </div>
+        <h4 class="text-lg font-semibold text-gray-200">${title}</h4>
+      </div>
+      <div class="space-y-4">
+        ${dataPoints.map((point, index) => {
+          const percentage = Math.min(100, (index + 1) * (100 / dataPoints.length));
+          const isPositive = point.value.includes('+') || (!point.value.includes('-') && point.value.includes('%'));
+          const barColor = isPositive ? 'from-green-500 to-emerald-600' : 'from-red-500 to-rose-600';
+          
+          return `
+            <div class="flex items-center gap-4">
+              <div class="w-24 text-sm text-gray-300 font-medium">${point.label}</div>
+              <div class="flex-1 relative">
+                <div class="h-8 bg-slate-700/50 rounded-lg overflow-hidden">
+                  <div class="h-full bg-gradient-to-r ${barColor} rounded-lg transition-all duration-1000" 
+                       style="width: ${percentage}%"></div>
+                </div>
+                <div class="absolute right-2 top-1 text-xs font-bold text-white">${point.value}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>`;
+  
+  return chartHtml;
+}
+
+// Create chart embed for external URLs
+function createChartEmbed(url: string): string {
+  return `
+    <div class="my-8 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-6 h-6 rounded bg-blue-500 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <span class="text-sm font-medium text-gray-300">Interactive Chart</span>
+      </div>
+      <a href="${url}" target="_blank" rel="noopener noreferrer" 
+         class="block p-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-lg border border-blue-500/30 hover:border-blue-400/50 transition-colors">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-blue-400 font-medium">View Chart</div>
+            <div class="text-xs text-gray-400 mt-1">Click to open interactive chart</div>
+          </div>
+          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </div>
+      </a>
+    </div>`;
+}
+
+// Convert ASCII charts to visual representations
+function convertAsciiToChart(chartData: string): string {
+  const lines = chartData.split('\n').filter(line => line.trim());
+  
+  return `
+    <div class="my-8 p-6 bg-slate-800/40 rounded-xl border border-slate-700/50">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-6 h-6 rounded bg-purple-500 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+          </svg>
+        </div>
+        <span class="text-sm font-medium text-gray-300">Data Visualization</span>
+      </div>
+      <pre class="text-sm text-gray-300 font-mono bg-slate-900/50 p-4 rounded-lg overflow-x-auto">
+${chartData}
+      </pre>
+    </div>`;
+}
+
+// Format trend indicators
+function formatTrendIndicator(indicator: string): string {
+  const isPositive = indicator.includes('↑') || indicator.includes('⬆') || indicator.includes('▲') || indicator.includes('+');
+  const color = isPositive ? 'text-green-400' : 'text-red-400';
+  const bgColor = isPositive ? 'bg-green-500/20' : 'bg-red-500/20';
+  const borderColor = isPositive ? 'border-green-500/30' : 'border-red-500/30';
+  
+  return `<span class="inline-flex items-center px-2 py-1 rounded-md ${color} ${bgColor} border ${borderColor} text-sm font-bold">${indicator}</span>`;
+}
+
+// Convert tables to visual charts
+function convertTableToVisualChart(tableText: string): string {
+  const lines = tableText.split('\n').filter(line => line.includes('|'));
+  if (lines.length < 3) return tableText;
+  
+  const headerRow = lines[0];
+  const dataRows = lines.slice(1).filter(line => !line.match(/^[\s\-|]+$/));
+  
+  // If it looks like price levels, make it visual
+  if (headerRow.toLowerCase().includes('price') || headerRow.toLowerCase().includes('level')) {
+    const chartData = dataRows.map(row => {
+      const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
+      return cells;
+    }).filter(row => row.length >= 2);
+    
+    return `
+      <div class="my-8 p-6 bg-gradient-to-br from-slate-800/60 to-slate-900/60 rounded-xl border border-slate-700/50 shadow-xl">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+            </svg>
+          </div>
+          <h4 class="text-lg font-semibold text-gray-200">Price Levels</h4>
+        </div>
+        <div class="space-y-3">
+          ${chartData.map((row, index) => `
+            <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+              <span class="text-gray-300 font-medium">${row[0]}</span>
+              <span class="text-cyan-400 font-mono font-bold">${row[1]}</span>
+              ${row[2] ? `<span class="text-sm text-gray-400">${row[2]}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+  
+  return tableText; // Fall back to original if not price data
+}
+
+// Enhanced ReactMarkdown components with image support
+const markdownComponents = {
+  // FIXED: Enhanced image rendering
+  img: ({ src, alt, title }: { src?: string; alt?: string; title?: string }) => {
+    console.log('🖼️ Rendering image:', { src, alt, title });
+    
+    if (!src) return null;
+    
+    return (
+      <div className="my-8 rounded-xl overflow-hidden shadow-2xl border border-slate-700/50">
+        {/* Image Header */}
+        <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 border-b border-slate-600">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+              <ImageIcon className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-200">{alt || 'Research Chart'}</h4>
+              {title && <p className="text-xs text-gray-400 mt-1">{title}</p>}
+            </div>
+          </div>
+        </div>
+        
+        {/* Image Content */}
+        <div className="relative bg-white p-4">
+          <img
+            src={src}
+            alt={alt || 'Research visualization'}
+            title={title}
+            className="w-full h-auto max-h-96 object-contain rounded-lg shadow-lg"
+            onLoad={() => console.log('✅ Image loaded successfully:', src)}
+            onError={(e) => {
+              console.error('❌ Image failed to load:', src);
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling.style.display = 'block';
+            }}
+          />
+          {/* Fallback for broken images */}
+          <div className="hidden bg-slate-100 rounded-lg p-8 text-center">
+            <ImageIcon className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+            <p className="text-slate-600 text-sm">Image could not be loaded</p>
+            <p className="text-slate-500 text-xs mt-1">{src}</p>
+          </div>
+        </div>
+        
+        {/* Image Footer */}
+        {(alt || title) && (
+          <div className="bg-slate-800/50 px-6 py-3 text-sm text-gray-400">
+            {alt && <div className="font-medium">{alt}</div>}
+            {title && title !== alt && <div className="text-xs mt-1">{title}</div>}
+          </div>
+        )}
+      </div>
+    );
+  },
+  
+  // Enhanced link rendering for chart URLs
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+    if (href && (href.includes('chart') || href.includes('tradingview') || href.includes('investing'))) {
+      return (
+        <div className="my-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <a 
+            href={href} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="font-medium">View Interactive Chart</span>
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+      );
+    }
+    
+    return (
+      <a 
+        href={href} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 underline decoration-2 underline-offset-2 hover:decoration-blue-800 transition-all duration-200 font-medium"
+      >
+        {children}
+        <ExternalLink className="inline w-3 h-3 ml-1" />
+      </a>
+    );
+  },
+  
+  // Keep your existing components...
+  h1: ({children}) => (
+    <h1 className="text-3xl font-bold mt-12 mb-8 text-gray-100 border-b-4 border-blue-400 pb-4 tracking-tight">
+      {children}
+    </h1>
+  ),
+  h2: ({children}) => (
+    <h2 className="text-2xl font-semibold mt-12 mb-8 text-gray-200 border-l-4 border-blue-400 pl-6 bg-gradient-to-r from-slate-800/60 to-transparent py-4 rounded-r-lg shadow-sm backdrop-blur-sm">
+      {children}
+    </h2>
+  ),
+  // ... other components
+};
+
+export { improveResearchFormatting, markdownComponents };

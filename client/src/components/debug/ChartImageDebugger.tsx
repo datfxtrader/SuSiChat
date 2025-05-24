@@ -1,0 +1,219 @@
+// Debug component to identify why charts/images aren't showing
+
+import React, { useState, useEffect } from 'react';
+import { Search, Image, BarChart3, AlertCircle } from 'lucide-react';
+
+interface ChartImageDebuggerProps {
+  content: string;
+}
+
+const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
+  const [analysis, setAnalysis] = useState<any>(null);
+  
+  useEffect(() => {
+    if (content) {
+      analyzeContent(content);
+    }
+  }, [content]);
+  
+  const analyzeContent = (text: string) => {
+    console.log('🔍 Analyzing content for charts and images...');
+    
+    const analysis = {
+      // Image detection
+      images: {
+        markdown: (text.match(/!\[([^\]]*)\]\(([^)]+)\)/g) || []),
+        html: (text.match(/<img[^>]+>/g) || []),
+        base64: (text.match(/data:image\/[^)]+/g) || []),
+        urls: (text.match(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|svg|webp)/gi) || [])
+      },
+      
+      // Chart detection  
+      charts: {
+        tradingview: (text.match(/tradingview[^\s]*/gi) || []),
+        chartUrls: (text.match(/https?:\/\/[^\s]*chart[^\s]*/gi) || []),
+        ascii: (text.match(/```[\s\S]*?```/g) || []).filter(block => 
+          block.includes('│') || block.includes('┌') || block.includes('─')
+        ),
+        dataBlocks: (text.match(/(?:Chart|Graph|Figure)\s*\d*:?\s*([^\n]+)\n((?:[\w\s]+:\s*[\d.%$€£¥,]+\s*\n?){3,})/gi) || [])
+      },
+      
+      // Table detection (potential charts)
+      tables: {
+        markdown: (text.match(/\|[^\n]+\|\s*\n\|[-:\s|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+/g) || []),
+        priceData: (text.match(/\|\s*(?:Price|Level|Support|Resistance|Target)[^\n]+\|\s*\n(?:\|[^\n]+\|\s*\n?){2,}/gi) || [])
+      },
+      
+      // Visual indicators
+      indicators: {
+        arrows: (text.match(/(↑|↓|⬆|⬇|▲|▼)/g) || []),
+        percentages: (text.match(/[+-]?\d+\.?\d*%/g) || []),
+        currency: (text.match(/[\$€£¥]\d+[,\d]*\.?\d*/g) || [])
+      },
+      
+      // Potential issues
+      issues: []
+    };
+    
+    // Identify issues
+    if (analysis.images.markdown.length === 0 && analysis.images.html.length === 0) {
+      analysis.issues.push('No image markdown found - images may be embedded as text descriptions');
+    }
+    
+    if (analysis.charts.tradingview.length > 0 || analysis.charts.chartUrls.length > 0) {
+      analysis.issues.push('Chart URLs found but may not be rendering as embeds');
+    }
+    
+    if (analysis.tables.priceData.length > 0) {
+      analysis.issues.push('Price data tables found - could be converted to visual charts');
+    }
+    
+    if (analysis.charts.dataBlocks.length > 0) {
+      analysis.issues.push('Structured data found - could be visualized as charts');
+    }
+    
+    console.log('📊 Content analysis complete:', analysis);
+    setAnalysis(analysis);
+  };
+  
+  const renderSection = (title: string, icon: React.ReactNode, items: string[], color: string) => {
+    if (items.length === 0) return null;
+    
+    return (
+      <div className={`p-4 rounded-lg border ${color} mb-4`}>
+        <div className="flex items-center gap-2 mb-3">
+          {icon}
+          <h4 className="font-semibold">{title}</h4>
+          <span className="text-sm text-gray-500">({items.length})</span>
+        </div>
+        <div className="space-y-2 max-h-32 overflow-y-auto">
+          {items.map((item, index) => (
+            <div key={index} className="text-sm font-mono bg-slate-700 p-2 rounded text-gray-300 break-all">
+              {item.length > 100 ? item.substring(0, 100) + '...' : item}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
+  if (!analysis) {
+    return (
+      <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+        <div className="flex items-center gap-2 text-gray-400">
+          <Search className="w-4 h-4 animate-spin" />
+          <span>Analyzing content...</span>
+        </div>
+      </div>
+    );
+  }
+  
+  const totalFindings = 
+    analysis.images.markdown.length + 
+    analysis.images.html.length + 
+    analysis.images.urls.length +
+    analysis.charts.tradingview.length + 
+    analysis.charts.chartUrls.length + 
+    analysis.charts.dataBlocks.length +
+    analysis.tables.priceData.length;
+  
+  return (
+    <div className="max-w-4xl mx-auto p-6 bg-slate-900 text-white rounded-xl border border-slate-700">
+      <div className="mb-6">
+        <h3 className="text-xl font-bold mb-2 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-white" />
+          </div>
+          Chart & Image Debug Analysis
+        </h3>
+        <p className="text-gray-400">
+          Found {totalFindings} potential visual elements • {analysis.issues.length} issues identified
+        </p>
+      </div>
+      
+      {/* Images */}
+      {renderSection(
+        'Markdown Images', 
+        <Image className="w-4 h-4 text-green-400" />, 
+        analysis.images.markdown,
+        'border-green-500/30 bg-green-500/10'
+      )}
+      
+      {renderSection(
+        'Image URLs', 
+        <Image className="w-4 h-4 text-blue-400" />, 
+        analysis.images.urls,
+        'border-blue-500/30 bg-blue-500/10'
+      )}
+      
+      {/* Charts */}
+      {renderSection(
+        'Chart URLs', 
+        <BarChart3 className="w-4 h-4 text-purple-400" />, 
+        analysis.charts.chartUrls,
+        'border-purple-500/30 bg-purple-500/10'
+      )}
+      
+      {renderSection(
+        'Data Blocks (Potential Charts)', 
+        <BarChart3 className="w-4 h-4 text-yellow-400" />, 
+        analysis.charts.dataBlocks,
+        'border-yellow-500/30 bg-yellow-500/10'
+      )}
+      
+      {/* Tables */}
+      {renderSection(
+        'Price Data Tables', 
+        <BarChart3 className="w-4 h-4 text-cyan-400" />, 
+        analysis.tables.priceData,
+        'border-cyan-500/30 bg-cyan-500/10'
+      )}
+      
+      {/* Issues */}
+      {analysis.issues.length > 0 && (
+        <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/10">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="w-4 h-4 text-red-400" />
+            <h4 className="font-semibold text-red-400">Issues Found</h4>
+          </div>
+          <div className="space-y-2">
+            {analysis.issues.map((issue, index) => (
+              <div key={index} className="text-sm text-red-300">
+                • {issue}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Raw Content Sample */}
+      <div className="mt-6 p-4 bg-slate-800 rounded-lg border border-slate-700">
+        <h4 className="font-semibold mb-2 text-gray-300">Content Sample (First 500 chars)</h4>
+        <pre className="text-xs text-gray-400 font-mono whitespace-pre-wrap break-all">
+          {content.substring(0, 500)}...
+        </pre>
+      </div>
+      
+      {/* Recommendations */}
+      <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+        <h4 className="font-semibold mb-2 text-blue-400">Recommendations</h4>
+        <div className="space-y-1 text-sm text-blue-300">
+          {totalFindings === 0 && (
+            <div>• Research results may not contain visual elements - check if your research sources include charts</div>
+          )}
+          {analysis.charts.dataBlocks.length > 0 && (
+            <div>• Convert data blocks to visual charts using the enhanced formatting</div>
+          )}
+          {analysis.tables.priceData.length > 0 && (
+            <div>• Convert price tables to visual chart representations</div>
+          )}
+          {analysis.charts.chartUrls.length > 0 && (
+            <div>• Chart URLs found - implement embed functionality for interactive charts</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChartImageDebugger;

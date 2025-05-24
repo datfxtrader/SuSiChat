@@ -1,0 +1,311 @@
+// FIXED: Comprehensive timestamp handling for ResearchResponse component
+
+// Enhanced timestamp extraction and formatting
+const getArticleTimestamp = (url: string, fallbackDate?: string) => {
+  console.log('🕐 Processing timestamp for URL:', url);
+  
+  // Try multiple date extraction patterns
+  const datePatterns = [
+    // Standard URL date patterns
+    /\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,        // /2025/05/24
+    /\/(\d{4})-(\d{1,2})-(\d{1,2})/,          // /2025-05-24  
+    /-(\d{4})-(\d{1,2})-(\d{1,2})/,           // -2025-05-24
+    /(\d{4})(\d{2})(\d{2})/,                  // 20250524
+    /(\d{1,2})-(\d{1,2})-(\d{4})/,            // 05-24-2025
+    /(\d{1,2})\/(\d{1,2})\/(\d{4})/,          // 05/24/2025
+    // News site specific patterns
+    /\/news\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,  // /news/2025/05/24
+    /\/articles\/(\d{4})-(\d{1,2})-(\d{1,2})/, // /articles/2025-05-24
+    /\/blog\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,   // /blog/2025/05/24
+  ];
+  
+  // Try to extract date from URL
+  for (const pattern of datePatterns) {
+    const match = url.match(pattern);
+    if (match) {
+      let year, month, day;
+      
+      // Handle different capture group orders
+      if (pattern.toString().includes('(\d{4})') && pattern.toString().indexOf('(\d{4})') < pattern.toString().indexOf('(\d{1,2})')) {
+        // Year first: YYYY-MM-DD format
+        [, year, month, day] = match;
+      } else {
+        // Month/Day first: MM-DD-YYYY or DD-MM-YYYY format
+        [, month, day, year] = match;
+      }
+      
+      const parsedYear = parseInt(year);
+      const parsedMonth = parseInt(month);
+      const parsedDay = parseInt(day);
+      
+      console.log(`🔍 Extracted date: ${parsedYear}-${parsedMonth}-${parsedDay}`);
+      
+      // Validate date components
+      if (parsedYear >= 2020 && parsedYear <= 2030 && 
+          parsedMonth >= 1 && parsedMonth <= 12 && 
+          parsedDay >= 1 && parsedDay <= 31) {
+        
+        const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
+        
+        // Additional validation - check if date is valid
+        if (!isNaN(date.getTime()) && 
+            date.getFullYear() === parsedYear && 
+            date.getMonth() === parsedMonth - 1 && 
+            date.getDate() === parsedDay) {
+          
+          const formattedDate = date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          });
+          
+          console.log('✅ Valid date extracted:', formattedDate);
+          return formattedDate;
+        }
+      }
+    }
+  }
+  
+  // Try parsing fallback date if provided
+  if (fallbackDate) {
+    console.log('🔄 Trying fallback date:', fallbackDate);
+    
+    try {
+      const fallbackDateObj = new Date(fallbackDate);
+      if (!isNaN(fallbackDateObj.getTime())) {
+        return fallbackDateObj.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric' 
+        });
+      }
+    } catch (error) {
+      console.error('❌ Fallback date parsing failed:', error);
+    }
+  }
+  
+  // Domain-specific fallback dates (based on typical publication patterns)
+  const domainFallbacks = {
+    'reuters.com': 'Recent',
+    'bloomberg.com': 'Recent', 
+    'cnbc.com': 'Recent',
+    'marketwatch.com': 'Recent',
+    'forbes.com': 'Recent',
+    'coindesk.com': 'Recent',
+    'cointelegraph.com': 'Recent',
+    'default': getCurrentDateFormatted()
+  };
+  
+  try {
+    const domain = new URL(url).hostname.replace('www.', '');
+    const fallback = domainFallbacks[domain] || domainFallbacks.default;
+    console.log('🎯 Using domain fallback for', domain, ':', fallback);
+    return fallback;
+  } catch (error) {
+    console.error('❌ URL parsing failed:', error);
+    return getCurrentDateFormatted();
+  }
+};
+
+// Get current date in consistent format
+const getCurrentDateFormatted = () => {
+  try {
+    const now = new Date();
+    return now.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  } catch (error) {
+    console.error('❌ Current date formatting failed:', error);
+    return 'Recent';
+  }
+};
+
+// Enhanced relative time calculation (for "X ago" format)
+const getRelativeTime = (dateString: string) => {
+  try {
+    console.log('⏰ Calculating relative time for:', dateString);
+    
+    if (!dateString || dateString === 'Recent' || dateString === 'Unknown') {
+      return 'Recent';
+    }
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    
+    // Validate both dates
+    if (isNaN(date.getTime()) || isNaN(now.getTime())) {
+      console.warn('⚠️ Invalid date for relative time calculation');
+      return 'Recent';
+    }
+    
+    const diffInMilliseconds = now.getTime() - date.getTime();
+    const diffInSeconds = Math.floor(diffInMilliseconds / 1000);
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    const diffInMonths = Math.floor(diffInDays / 30);
+    
+    console.log(`📊 Time difference: ${diffInDays} days, ${diffInHours} hours, ${diffInMinutes} minutes`);
+    
+    // Return appropriate relative time
+    if (diffInSeconds < 60) {
+      return 'Just now';
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+    } else if (diffInDays < 7) {
+      return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+    } else if (diffInWeeks < 4) {
+      return `${diffInWeeks} week${diffInWeeks !== 1 ? 's' : ''} ago`;
+    } else if (diffInMonths < 12) {
+      return `${diffInMonths} month${diffInMonths !== 1 ? 's' : ''} ago`;
+    } else {
+      // For very old dates, just return the formatted date
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Relative time calculation failed:', error);
+    return 'Recent';
+  }
+};
+
+// FIXED: Source processing with proper timestamp handling
+const processSourcesWithTimestamps = (sources: Array<{title: string; url: string; domain?: string; timestamp?: string}>) => {
+  return sources.map((source, index) => {
+    console.log(`🔧 Processing source ${index + 1}:`, source);
+    
+    // Clean up source data
+    const cleanTitle = source.title?.trim() || `Source ${index + 1}`;
+    const cleanUrl = source.url?.trim() || '#';
+    
+    // Get domain safely
+    const domain = source.domain || (() => {
+      try {
+        return new URL(cleanUrl).hostname.replace('www.', '');
+      } catch {
+        return 'Unknown Source';
+      }
+    })();
+    
+    // Process timestamp - try multiple sources
+    let timestamp;
+    
+    // 1. Use provided timestamp if available
+    if (source.timestamp) {
+      timestamp = getArticleTimestamp(cleanUrl, source.timestamp);
+    } 
+    // 2. Extract from URL
+    else {
+      timestamp = getArticleTimestamp(cleanUrl);
+    }
+    
+    // 3. Final validation
+    if (!timestamp || timestamp === 'Invalid Date' || timestamp.includes('NaN')) {
+      timestamp = 'Recent';
+    }
+    
+    console.log(`✅ Final timestamp for source ${index + 1}:`, timestamp);
+    
+    return {
+      ...source,
+      title: cleanTitle,
+      url: cleanUrl,
+      domain,
+      timestamp,
+      // Optional: Add relative time
+      relativeTime: timestamp !== 'Recent' ? getRelativeTime(timestamp) : 'Recent'
+    };
+  });
+};
+
+// USAGE: Replace in your ResearchResponse component
+// In the sources rendering section:
+
+{sources && sources.length > 0 && (
+  <div className="mt-16 border-t border-slate-700/50 pt-12">
+    <div className="mb-8">
+      <h3 className="text-xl font-semibold text-gray-200 mb-2 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+          <ExternalLink className="w-4 h-4 text-white" />
+        </div>
+        Research Sources
+      </h3>
+      <p className="text-sm text-slate-400">
+        {sources.length} source{sources.length !== 1 ? 's' : ''} referenced in this analysis
+      </p>
+    </div>
+    
+    <div className="grid gap-4">
+      {processSourcesWithTimestamps(sources).map((source, index) => {
+        return (
+          <div 
+            key={index} 
+            id={`source-${index + 1}`} 
+            className="group scroll-mt-24"
+          >
+            <div className="relative p-6 rounded-xl bg-gradient-to-br from-slate-800/50 to-slate-800/30 hover:from-slate-800/70 hover:to-slate-800/50 transition-all duration-300 border border-slate-700/30 hover:border-slate-600/50 shadow-lg hover:shadow-xl backdrop-blur-sm">
+              
+              {/* Source Number Badge */}
+              <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-lg ring-4 ring-slate-900">
+                {index + 1}
+              </div>
+              
+              {/* Main Content */}
+              <div className="pl-6">
+                {/* Title */}
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-lg font-semibold text-gray-100 hover:text-cyan-300 transition-colors mb-3 leading-tight group-hover:underline decoration-2 underline-offset-4"
+                >
+                  {source.title}
+                </a>
+                
+                {/* FIXED: Meta Information with proper timestamp */}
+                <div className="flex items-center gap-4 mb-4 text-sm">
+                  <div className="flex items-center gap-2 text-cyan-400 font-medium">
+                    <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
+                    {source.domain}
+                  </div>
+                  <div className="text-slate-400">
+                    {source.timestamp}
+                  </div>
+                  {/* Optional: Show relative time too */}
+                  {source.relativeTime && source.relativeTime !== source.timestamp && (
+                    <div className="text-slate-500 text-xs">
+                      ({source.relativeTime})
+                    </div>
+                  )}
+                </div>
+                
+                {/* Clean URL Display */}
+                <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                  <div className="text-xs text-slate-400 font-mono break-all leading-relaxed">
+                    {source.url}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Effect Icon */}
+              <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <ExternalLink className="w-5 h-5 text-cyan-400" />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+
+export { getArticleTimestamp, getRelativeTime, processSourcesWithTimestamps, getCurrentDateFormatted };
