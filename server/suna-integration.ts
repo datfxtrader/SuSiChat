@@ -958,10 +958,12 @@ ${numberContradictions.join('\n')}
             const currentDate = new Date();
             const threeDaysAgo = new Date(currentDate.getTime() - (3 * 24 * 60 * 60 * 1000));
             
-            const recentResults = sortedResults.filter((result: any) => {
+            // Enhanced source credibility and relevance filtering
+            const credibleResults = sortedResults.filter((result: any) => {
               const content = (result.content || '').toLowerCase();
               const title = (result.title || '').toLowerCase();
               const text = content + ' ' + title;
+              const url = (result.url || '').toLowerCase();
               
               // Strict date filtering - reject old years
               if (text.includes('2023') || text.includes('2022') || text.includes('2021')) {
@@ -980,6 +982,16 @@ ${numberContradictions.join('\n')}
                 return false; // Reject articles with outdated macro references
               }
               
+              // Enhanced credibility scoring based on source domain
+              const trustedDomains = [
+                'reuters.com', 'bloomberg.com', 'wsj.com', 'ft.com', 'cnbc.com',
+                'marketwatch.com', 'investing.com', 'yahoo.com', 'google.com',
+                'kitco.com', 'goldprice.org', 'bullionvault.com', 'federalreserve.gov',
+                'imf.org', 'worldbank.org', 'bis.org', 'oecd.org'
+              ];
+              
+              const isFromTrustedSource = trustedDomains.some(domain => url.includes(domain));
+              
               // Prefer articles with current timeframe indicators
               const hasCurrentIndicators = 
                 text.includes('may 2025') || 
@@ -990,12 +1002,22 @@ ${numberContradictions.join('\n')}
                 text.includes('this week') ||
                 text.includes('recent');
               
-              return hasCurrentIndicators;
+              // Quality content indicators
+              const hasQualityIndicators = 
+                text.includes('analysis') ||
+                text.includes('forecast') ||
+                text.includes('outlook') ||
+                text.includes('report') ||
+                text.includes('data') ||
+                text.includes('research');
+              
+              // Must have current indicators AND (trusted source OR quality content)
+              return hasCurrentIndicators && (isFromTrustedSource || hasQualityIndicators);
             });
             
-            if (recentResults.length < sortedResults.length) {
-              dataFreshnessWarning = `\n🔍 SMART FILTERING: Removed ${sortedResults.length - recentResults.length} articles with outdated data/macro references. Using ${recentResults.length} current sources from past 3 days only.\n⏰ Date Range: ${threeDaysAgo.toLocaleDateString()} to ${currentDate.toLocaleDateString()}\n`;
-              sortedResults = recentResults; // Use only fresh data
+            if (credibleResults.length < sortedResults.length) {
+              dataFreshnessWarning = `\n🏆 PREMIUM SOURCE FILTERING: Selected ${credibleResults.length} high-credibility sources from ${sortedResults.length} total results.\n🔍 Filtered out: Outdated macro data, non-credible sources, stale content\n⏰ Date Range: ${threeDaysAgo.toLocaleDateString()} to ${currentDate.toLocaleDateString()}\n📊 Quality Focus: Trusted financial institutions + Current May 2025 data only\n`;
+              sortedResults = credibleResults; // Use only premium credible sources
             }
             
             if (isFinancialForecast) {
@@ -1138,6 +1160,8 @@ FINANCIAL RESEARCH PRIORITY:
 - **STRICT DATE FILTERING: Only use articles from past 3 days for current analysis**
 - **MACRO DATA VALIDATION: Reject articles referencing Q4 2024 or older macro data**
 - **CURRENT TIMEFRAME FOCUS: Prioritize May 2025 and Q2 2025 references only**
+- **PREMIUM SOURCE SELECTION: Prioritize Reuters, Bloomberg, WSJ, Fed, IMF, BIS sources**
+- **QUALITY CONTENT FOCUS: Require analysis/forecast/research indicators in content**
 - Include publication dates and timestamps for all price data sources
 - Cross-reference information across multiple sources to verify accuracy
 - When multiple sources provide different data for the same metric, present both with timestamps

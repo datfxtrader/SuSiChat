@@ -78,8 +78,8 @@ export async function performWebSearch(
       (async () => {
         try {
           console.log('Starting optimized Brave search with intelligent rate limiting...');
-          // Enhanced rate limiting: 2 second delay to prevent 429 errors
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Extended rate limiting: 3-4 second delay for quality source selection
+          await new Promise(resolve => setTimeout(resolve, 3500));
           
           // Create precise date range for search freshness
           const today = new Date();
