@@ -218,6 +218,60 @@ Current market conditions show several critical factors influencing Bitcoin's tr
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {/* Welcome Screen - Show when no messages */}
+            {messages.length === 0 && (
+              <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+                <div className="text-center max-w-4xl mx-auto px-8">
+                  <h1 className="text-3xl font-semibold text-gray-100 mb-8">
+                    Hello Dat, where should we begin?
+                  </h1>
+                  
+                  {/* Predefined Prompt Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+                    {[
+                      {
+                        title: "Market Analysis Research",
+                        description: "Deep dive into current market trends and opportunities",
+                        prompt: "Analyze current market trends and identify emerging investment opportunities with detailed financial data and forecasts"
+                      },
+                      {
+                        title: "Financial Data Analysis", 
+                        description: "Comprehensive financial metrics and performance review",
+                        prompt: "Generate a comprehensive financial analysis including key metrics, ratios, and performance indicators with latest quarterly data"
+                      },
+                      {
+                        title: "Competitive Intelligence",
+                        description: "Research competitors and market positioning",
+                        prompt: "Research competitive landscape, market positioning, and strategic advantages with detailed competitor analysis"
+                      },
+                      {
+                        title: "Risk Assessment Report",
+                        description: "Evaluate investment risks and opportunities",
+                        prompt: "Assess investment risks, market volatility, and potential opportunities with risk-adjusted return analysis"
+                      }
+                    ].map((card, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setMessage(card.prompt)}
+                        className="group p-6 bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 rounded-xl hover:bg-slate-900/90 hover:border-primary/30 hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1"
+                      >
+                        <h3 className="text-lg font-semibold text-gray-100 mb-2 group-hover:text-primary transition-colors">
+                          {card.title}
+                        </h3>
+                        <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">
+                          {card.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <p className="text-sm text-gray-500 mt-8">
+                    Click any card above or type your own research question below
+                  </p>
+                </div>
+              </div>
+            )}
+
             {messages.map((msg) => (
               <div key={msg.id} className="flex items-start space-x-3">
                 {msg.role === 'user' ? (

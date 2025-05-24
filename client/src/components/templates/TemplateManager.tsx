@@ -309,8 +309,118 @@ const TemplateManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Templates Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Personal Favorites Section */}
+      <div className="mb-8">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-8 h-8 bg-gradient-to-br from-primary/20 to-primary/40 rounded-lg flex items-center justify-center">
+            <Star className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-100">Personal Favorites</h2>
+            <p className="text-sm text-gray-400">Your most-used research prompts</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            {
+              title: "Market Analysis Research",
+              description: "Deep dive into current market trends and opportunities",
+              prompt: "Analyze current market trends and identify emerging investment opportunities with detailed financial data and forecasts",
+              icon: "TrendingUp",
+              usage: 45
+            },
+            {
+              title: "Financial Data Analysis", 
+              description: "Comprehensive financial metrics and performance review",
+              prompt: "Generate a comprehensive financial analysis including key metrics, ratios, and performance indicators with latest quarterly data",
+              icon: "Database",
+              usage: 38
+            },
+            {
+              title: "Competitive Intelligence",
+              description: "Research competitors and market positioning",
+              prompt: "Research competitive landscape, market positioning, and strategic advantages with detailed competitor analysis",
+              icon: "Search",
+              usage: 29
+            },
+            {
+              title: "Risk Assessment Report",
+              description: "Evaluate investment risks and opportunities",
+              prompt: "Assess investment risks, market volatility, and potential opportunities with risk-adjusted return analysis",
+              icon: "AlertCircle",
+              usage: 22
+            }
+          ].map((favorite, idx) => {
+            const IconComponent = getIconComponent(favorite.icon);
+            return (
+              <Card key={idx} className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 border-primary/20 hover:border-primary/40 transition-all duration-200 group">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                        <IconComponent className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-100">{favorite.title}</h3>
+                        <p className="text-xs text-gray-400">{favorite.description}</p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                      {favorite.usage} uses
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(favorite.prompt);
+                        toast({
+                          title: "Copied!",
+                          description: "Template copied to clipboard. Paste it into your research chat.",
+                        });
+                      }}
+                      className="flex-1 bg-primary/20 hover:bg-primary/30 text-primary text-xs border border-primary/30"
+                      variant="outline"
+                    >
+                      Use Template
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="p-2 border-slate-600 hover:border-primary/30"
+                      onClick={() => {
+                        navigator.clipboard.writeText(favorite.prompt);
+                        toast({
+                          title: "Copied!",
+                          description: "Prompt copied to clipboard.",
+                        });
+                      }}
+                    >
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Custom Templates Section */}
+      <div>
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-8 h-8 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg flex items-center justify-center">
+            <FileText className="w-4 h-4 text-gray-300" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-100">Custom Templates</h2>
+            <p className="text-sm text-gray-400">Templates you've created</p>
+          </div>
+        </div>
+
+        {/* Templates Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => (
             <Card key={i} className="bg-slate-900/50 border-slate-700/50">
