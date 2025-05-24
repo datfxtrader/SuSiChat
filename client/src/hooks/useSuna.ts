@@ -232,27 +232,39 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
-  // Handle research state persistence
+  // Handle research state cleanup when switching tabs or completing research
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // On mount, restore state from localStorage if it exists
-      const savedProgress = localStorage.getItem('research-in-progress');
-      const savedQuery = localStorage.getItem('ongoing-research-query');
+    const clearResearchState = () => {
+      setIsResearchInProgress(false);
+      setOngoingResearchQuery('');
+      localStorage.removeItem('research-in-progress');
+      localStorage.removeItem('ongoing-research-query');
+    };
+
+    // Clear on unmount/tab switch
+    return () => clearResearchState();
+  }, []);
+
+  // Update research state when new message appears
+  useEffect(() => {
+    if (!isSending && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
       
-      if (savedProgress === 'true' && savedQuery) {
+      if (lastMessage?.role === 'assistant') {
+        // Clear research state when assistant responds
+        setIsResearchInProgress(false);
+        setOngoingResearchQuery('');
+        localStorage.removeItem('research-in-progress');
+        localStorage.removeItem('ongoing-research-query');
+      } else if (lastMessage?.role === 'user') {
+        // Set research state when user sends message
         setIsResearchInProgress(true);
-        setOngoingResearchQuery(savedQuery);
+        setOngoingResearchQuery(lastMessage.content);
+        localStorage.setItem('research-in-progress', 'true');
+        localStorage.setItem('ongoing-research-query', lastMessage.content);
       }
     }
-  }, []); // Empty dependency array means this runs once on mount
-
-  // Update localStorage when research state changes
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isResearchInProgress) {
-      localStorage.setItem('research-in-progress', isResearchInProgress.toString());
-      localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
-    }
-  }, [isResearchInProgress, ongoingResearchQuery]);
+  }, [isSending, messages]);
 
   // Handle research state persistence
   useEffect(() => {
