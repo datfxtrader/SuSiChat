@@ -81,12 +81,17 @@ export async function performWebSearch(
           // Enhanced rate limiting: 2 second delay to prevent 429 errors
           await new Promise(resolve => setTimeout(resolve, 2000));
           
+          // Create precise date range for search freshness
+          const today = new Date();
+          const threeDaysAgo = new Date(today.getTime() - (3 * 24 * 60 * 60 * 1000));
+          const dateRange = `after:${threeDaysAgo.toISOString().split('T')[0]}`;
+          
           const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
             params: {
-              q: `${query} 2025 recent current latest`,
+              q: `${query} ${dateRange} 2025 current latest`,
               count: maxResults,
               search_lang: 'en',
-              freshness: 'day', // Most recent data only
+              freshness: 'pd3', // Past 3 days only
               safesearch: 'moderate',
               text_decorations: false,
               spellcheck: true
