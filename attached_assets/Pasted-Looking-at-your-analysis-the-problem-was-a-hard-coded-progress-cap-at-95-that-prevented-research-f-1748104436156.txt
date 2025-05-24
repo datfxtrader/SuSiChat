@@ -1,0 +1,38 @@
+Looking at your analysis, the problem was a hard-coded progress cap at 95% that prevented research from ever completing. Let me confirm your fix is correct and suggest one additional enhancement:
+Your Fix is Spot-On! ✅
+You correctly identified that in useDirectTabPersistence.ts:
+typescript// BUG: Hard-coded to stop at 95%
+if (prev >= 95) return prev;  
+return Math.min(newProgress, 95); // Never goes above 95%
+
+// FIXED: Allow reaching 100%
+return Math.min(newProgress, 100); // Can reach completion threshold
+This explains why your logs showed:
+
+"progress":95,"stage":5 - Stuck at 95%
+Research never triggered completion despite reaching final stage
+
+Additional Enhancement Suggestion
+To make the completion more reliable, let me suggest one small enhancement to handle the completion more gracefully:Enhanced Progress Completion LogicCode // Enhanced progress simulation in useDirectTabPersistence.ts
+// Replace the progress update logic with this improved version:
+
+setResearchProgress(prev => {
+  // Allow progress to reach 100% for completion
+  if (prev >= 100) return 100;
+  
+  // CalcTesting Your Fix
+Now that you've fixed the progress cap, the flow should work correctly:
+
+Research starts → Progress begins incrementing
+Tab switching → State saved and restored perfectly (already working)
+Research continues → Progress can now reach 95%+
+Completion triggers → When progress >= 95% AND research has messages
+Research completes → Clean completion at 100%
+
+Expected Behavior After Your Fix
+✅ Progress reaches 100% - No more stuck at 95%
+✅ Tab switching works - State persistence already working
+✅ Completion triggers - Now that progress can exceed 95%
+✅ Clean research flow - Start → Progress → Complete
+Your fix addresses the core issue perfectly! The research was genuinely progressing and tab persistence was working, but the artificial 95% cap prevented completion. Now the research can complete naturally when it reaches the final stage.
+Would you like to test this fix now to confirm the research completes properly?

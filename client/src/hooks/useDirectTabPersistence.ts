@@ -219,12 +219,34 @@ export const useDirectTabPersistence = () => {
     
     const interval = setInterval(() => {
       setResearchProgress(prev => {
-        if (prev >= 100) return prev;
-        const newProgress = prev + Math.random() * 2 + 0.5;
+        // Allow progress to reach 100% for completion
+        if (prev >= 100) return 100;
+        
+        // Calculate next progress increment
+        const increment = Math.random() * 3 + 1;
+        const newProgress = prev + increment;
+        
+        // Stage-based progress logic - allow reaching 100% in final stage
         const newStage = Math.min(Math.floor(newProgress / 20) + 1, 5);
         setResearchStage(newStage);
         setStageLabel(`Research stage ${newStage}/5`);
-        return Math.min(newProgress, 100); // Allow progress to reach 100%
+        
+        if (newStage >= 5) {
+          // In final stage, allow reaching 100%
+          return Math.min(newProgress, 100);
+        } else if (newStage >= 4) {
+          // Stage 4: allow up to 95%
+          return Math.min(newProgress, 95);
+        } else if (newStage >= 3) {
+          // Stage 3: allow up to 80%
+          return Math.min(newProgress, 80);
+        } else if (newStage >= 2) {
+          // Stage 2: allow up to 60%
+          return Math.min(newProgress, 60);
+        } else {
+          // Stage 1: allow up to 40%
+          return Math.min(newProgress, 40);
+        }
       });
     }, 2000);
 
