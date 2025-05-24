@@ -133,26 +133,26 @@ const SunaClone = () => {
       id: '2',
       role: 'assistant',
       content: `# Bitcoin Price Analysis: Key Driving Factors in 2025
-
-## Executive Summary
-Current market conditions show several critical factors influencing Bitcoin's trajectory through 2025...
-
-## Key Market Drivers
-
-### 1. Institutional Adoption
-- Major corporations continuing to add BTC to balance sheets
-- ETF inflows reaching record levels
-- Traditional banks offering crypto services
-
-### 2. Regulatory Clarity
-- Clearer regulatory frameworks emerging globally
-- Reduced uncertainty driving institutional confidence
-- Compliance infrastructure maturing
-
-### 3. Macroeconomic Factors
-- Federal Reserve policy decisions
-- Global inflation trends
-- Dollar strength dynamics`,
+136:
+137:## Executive Summary
+138:Current market conditions show several critical factors influencing Bitcoin's trajectory through 2025...
+139:
+140:## Key Market Drivers
+141:
+142:### 1. Institutional Adoption
+143:- Major corporations continuing to add BTC to balance sheets
+144:- ETF inflows reaching record levels
+145:- Traditional banks offering crypto services
+146:
+147:### 2. Regulatory Clarity
+148:- Clearer regulatory frameworks emerging globally
+149:- Reduced uncertainty driving institutional confidence
+150:- Compliance infrastructure maturing
+151:
+152:### 3. Macroeconomic Factors
+153:- Federal Reserve policy decisions
+154:- Global inflation trends
+155:- Dollar strength dynamics`,
       timestamp: '10:31 AM',
       sources: [
         { title: 'Bloomberg Crypto Analysis', url: '#', domain: 'bloomberg.com' },
@@ -542,12 +542,9 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 </div>
               </div>
             </div>
-            </div>
-          </div>
           </div>
         </div>
       </div>
-    </div>
     </MainLayout>
   );
 };
