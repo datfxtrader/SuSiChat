@@ -137,8 +137,8 @@ async function performBraveSearch(query: string) {
   try {
     console.log('Performing Brave web search for:', query);
 
-    // Add delay to respect Brave's rate limit
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    // Enhanced rate limiting with intelligent spacing
+    await new Promise(resolve => setTimeout(resolve, 1800)); // Increased to 1.8 seconds
     
     const response = await axios.get(
       BRAVE_SEARCH_URL,

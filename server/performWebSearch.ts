@@ -72,21 +72,24 @@ export async function performWebSearch(
     })()
   );
 
-  // Brave search with rate limiting
+  // Optimized Brave search with intelligent rate limiting
   if (BRAVE_API_KEY) {
     searchPromises.push(
       (async () => {
         try {
-          console.log('Starting Brave search...');
-          // Small delay for Brave rate limiting
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log('Starting optimized Brave search with intelligent rate limiting...');
+          // Enhanced rate limiting: 1.5 second delay to stay well within limits
+          await new Promise(resolve => setTimeout(resolve, 1500));
           
           const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
             params: {
               q: query,
-              count: Math.ceil(maxResults / 2),
+              count: maxResults, // Use full count for better quality
               search_lang: 'en',
-              freshness: 'month',
+              freshness: 'week', // More recent data
+              safesearch: 'moderate',
+              text_decorations: false,
+              spellcheck: true
             },
             headers: {
               'Accept': 'application/json',
