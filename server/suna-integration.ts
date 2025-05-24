@@ -1088,16 +1088,29 @@ ${sortedResults.map((result: any, index: number) => {
     }
   }
 
-  // Enhanced timestamp extraction
+  // Enhanced timestamp extraction with multiple date patterns
   let timeInfo = '';
   if (result.publishedDate) {
     timeInfo = `📅 Published: ${result.publishedDate}`;
   } else if (result.content) {
-    // Try to extract date from content
-    const dateMatch = result.content.match(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+202[4-5]/i);
-    if (dateMatch) {
-      timeInfo = `📅 Date found: ${dateMatch[0]}`;
-    } else {
+    // Try multiple date extraction patterns
+    const datePatterns = [
+      /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+202[4-5]/i,
+      /202[4-5][-\/]\d{1,2}[-\/]\d{1,2}/,
+      /\d{1,2}[-\/]\d{1,2}[-\/]202[4-5]/,
+      /(?:today|yesterday|this week|last week)/i,
+      /\d{1,2}\s+(?:hours?|days?)\s+ago/i
+    ];
+    
+    for (const pattern of datePatterns) {
+      const dateMatch = result.content.match(pattern);
+      if (dateMatch) {
+        timeInfo = `📅 Date found: ${dateMatch[0]}`;
+        break;
+      }
+    }
+    
+    if (!timeInfo) {
       timeInfo = `⚠️ No timestamp - verify data freshness`;
     }
   }
@@ -1162,7 +1175,15 @@ FINANCIAL RESEARCH PRIORITY:
 - **CURRENT TIMEFRAME FOCUS: Prioritize May 2025 and Q2 2025 references only**
 - **PREMIUM SOURCE SELECTION: Prioritize Reuters, Bloomberg, WSJ, Fed, IMF, BIS sources**
 - **QUALITY CONTENT FOCUS: Require analysis/forecast/research indicators in content**
-- Include publication dates and timestamps for all price data sources
+- **MANDATORY: Include publication dates and timestamps for ALL cited sources**
+- **MACRO DATA REQUIREMENTS: Back every statement with current numbers:**
+  * Fed Rate Decisions: Current rate X.XX%, next meetings Jun 18/July 30, 2025
+  * Inflation Data: Current CPI X.X% (Month Year), Core CPI X.X%
+  * Employment: Current unemployment X.X% (Month Year), NFP +XXXk jobs
+  * GDP Growth: Current Q2 2025 estimate X.X% annualized
+  * Dollar Index: Current DXY XXX.XX level
+  * 10-Year Treasury: Current yield X.XX%
+- **NO INCOMPLETE STATEMENTS: Every macro factor must include current numbers and next event dates**
 - Cross-reference information across multiple sources to verify accuracy
 - When multiple sources provide different data for the same metric, present both with timestamps
 - Highlight any contradictions between sources and explain potential reasons
