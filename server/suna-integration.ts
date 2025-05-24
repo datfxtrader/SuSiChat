@@ -950,10 +950,19 @@ ${numberContradictions.join('\n')}
               `Key topics: ${topPhrases}` : '';
 
             // Format the search results with improved organization and analysis
+            // Add current price context for financial forecasts
+            let priceContext = '';
+            if (isFinancialForecast) {
+              const currentPriceInfo = this.extractCurrentPriceFromResults(sortedResults, data.query);
+              if (currentPriceInfo) {
+                priceContext = `\nCURRENT MARKET CONTEXT: ${currentPriceInfo}\n`;
+              }
+            }
+
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
-Search query: "${finalQuery}"
+Search query: "${finalQuery}"${priceContext}
 
 ${diversityInfo ? `${diversityInfo}\n` : ''}
 ${topicsInfo ? `${topicsInfo}\n` : ''}
@@ -1019,6 +1028,11 @@ When creating research responses, format your output professionally with emphasi
 
 FINANCIAL RESEARCH PRIORITY:
 - **ALWAYS prioritize the most recent data and news closest to today's date**
+- **CRITICAL: Check current market prices against any forecasts provided**
+- For price forecasts, validate against current market reality:
+  * If current price exceeds bullish forecasts, seek higher targets from recent sources
+  * If current price is below bearish forecasts, find more realistic downside targets
+  * Always mention the current price vs forecast relationship
 - Cross-reference information across multiple sources to verify accuracy
 - When multiple sources provide different data for the same metric, present both with timestamps
 - Highlight any contradictions between sources and explain potential reasons
