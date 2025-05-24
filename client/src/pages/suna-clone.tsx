@@ -1,42 +1,112 @@
-import React, { useState } from 'react';
-import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, PlusIcon, MenuIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import MainLayout from '@/components/layout/MainLayout';
+import { useSuna, type LLMModel } from '@/hooks/useSuna';
+import { useAuth } from '@/hooks/useAuth';
+import { ResearchProgress } from '@/components/suna/ResearchProgress';
+import ResearchResponse from '@/components/suna/ResearchResponse';
+import { formatRelativeTime, cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
 
 const SunaClone = () => {
+  const { isAuthenticated, user } = useAuth();
+  const {
+    conversation,
+    allConversations,
+    threadId,
+    messages,
+    currentModel,
+    searchPreferences,
+    isLoadingConversation,
+    isLoadingConversations,
+    sendMessage,
+    isSending,
+    selectConversation,
+    createNewChat,
+    changeModel,
+    updateSearchPreferences,
+    toggleForceSearch,
+    toggleDisableSearch
+  } = useSuna();
+
   const [message, setMessage] = useState('');
-  const [researchDepth, setResearchDepth] = useState('3');
-  const [selectedModel, setSelectedModel] = useState('auto');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [message]);
 
   const handleSendMessage = () => {
-    // This is just UI - no actual functionality
-    console.log('Message sent (UI only):', message);
+    if (!message.trim() || isSending) return;
+    
+    sendMessage({ 
+      message, 
+      model: currentModel,
+      customSearchPrefs: searchPreferences,
+      researchDepth: 3
+    });
+    
     setMessage('');
+    
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
-  const mockConversations = [
-    {
-      id: '1',
-      title: 'Market Analysis Research',
-      lastMessage: '2 hours ago',
-      preview: 'Bitcoin price trends and institutional adoption...'
-    },
-    {
-      id: '2', 
-      title: 'Economic Policy Impact',
-      lastMessage: '1 day ago',
-      preview: 'Federal Reserve decisions affecting crypto markets...'
-    },
-    {
-      id: '3',
-      title: 'Technology Forecast',
-      lastMessage: '3 days ago',
-      preview: 'AI development trends and market implications...'
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
-  ];
+  };
+
+  const handleNewConversation = () => {
+    createNewChat();
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  // Extract sources from research responses
+  const extractSources = (content: string) => {
+    const sources: Array<{ title: string; url: string; domain: string }> = [];
+    
+    if (content.includes('Sources:') || content.includes('**Sources:**')) {
+      const lines = content.split('\n');
+      lines.forEach(line => {
+        const urlMatch = line.match(/https?:\/\/[^\s)]+/);
+        if (urlMatch) {
+          try {
+            const url = new URL(urlMatch[0]);
+            sources.push({
+              title: line.replace(/^\d+\.\s*/, '').replace(/\*\*/g, '').replace(urlMatch[0], '').trim(),
+              url: urlMatch[0],
+              domain: url.hostname
+            });
+          } catch (e) {
+            // Invalid URL, skip
+          }
+        }
+      });
+    }
+    
+    return sources;
+  };
 
   const mockMessages = [
     {
@@ -97,7 +167,10 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             </div>
             
-            <Button className="w-full bg-slate-700 hover:bg-slate-600 hover:text-primary hover:shadow-lg transition-all duration-200 text-white">
+            <Button 
+              onClick={handleNewConversation}
+              className="w-full bg-slate-700 hover:bg-slate-600 hover:text-primary hover:shadow-lg transition-all duration-200 text-white"
+            >
               <Sparkles className="w-4 h-4 mr-2" />
               New Research Chat
             </Button>
@@ -106,16 +179,22 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Conversations List */}
           <div className="p-4 space-y-2">
             <h3 className="text-sm font-medium text-gray-400 mb-3">Recent Conversations</h3>
-            {mockConversations.map((conv) => (
+            {allConversations && Array.isArray(allConversations) && allConversations.map((conv: any) => (
               <div
                 key={conv.id}
+                onClick={() => selectConversation(conv.id)}
                 className="group p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 hover:border-primary/20 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title}</h4>
-                  <span className="text-xs text-gray-500">{conv.lastMessage}</span>
+                  <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title || 'Untitled Chat'}</h4>
+                  <span className="text-xs text-gray-500">{formatRelativeTime(conv.createdAt)}</span>
                 </div>
-                <p className="text-xs text-gray-400 truncate">{conv.preview}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  {conv.messages && conv.messages.length > 0 
+                    ? conv.messages[conv.messages.length - 1].content.substring(0, 60) + '...'
+                    : 'No messages yet'
+                  }
+                </p>
               </div>
             ))}
           </div>
