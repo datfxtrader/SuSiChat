@@ -142,3 +142,10 @@ export function sendChatMessage(content: string, familyRoomId?: number) {
     content
   });
 }
+
+export function initWebSocket() {
+  const ws = new WebSocket(getWebSocketURL());
+  ws.onopen = () => console.log('WebSocket connected');
+  ws.onerror = (error) => console.error('WebSocket error:', error);
+  return ws;
+}

@@ -6,9 +6,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getBaseUrl() {
+  const port = 5000;
+  return `ws://0.0.0.0:${port}`;
+}
+
 export function formatDateTime(date: Date | string): string {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
+
   if (isSameDay(dateObj, new Date())) {
     return format(dateObj, "'Today at' h:mm a");
   } else if (isSameDay(dateObj, new Date(Date.now() + 24 * 60 * 60 * 1000))) {
@@ -21,18 +26,18 @@ export function formatDateTime(date: Date | string): string {
 export function formatRelativeTime(date: Date | string): string {
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    
+
     // Check if date is valid
     if (!dateObj || isNaN(dateObj.getTime())) {
       return 'just now';
     }
-    
+
     const now = new Date();
     const diffInMs = now.getTime() - dateObj.getTime();
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffInMinutes < 1) {
       return 'just now';
     } else if (diffInMinutes < 60) {
@@ -49,7 +54,7 @@ export function formatRelativeTime(date: Date | string): string {
 
 export function getInitials(name: string): string {
   if (!name) return '';
-  
+
   const parts = name.split(' ');
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
@@ -67,7 +72,7 @@ export function generateAvatarColor(id: string): string {
     hash = ((hash << 5) - hash) + id.charCodeAt(i);
     hash |= 0; // Convert to 32bit integer
   }
-  
+
   // Predefined set of nice colors suitable for avatars
   const colors = [
     'bg-blue-500',
@@ -81,7 +86,7 @@ export function generateAvatarColor(id: string): string {
     'bg-orange-500',
     'bg-emerald-500',
   ];
-  
+
   const index = Math.abs(hash) % colors.length;
   return colors[index];
 }
