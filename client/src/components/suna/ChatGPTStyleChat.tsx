@@ -404,10 +404,10 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               <button
                 key={conv.id}
                 className={cn(
-                  "w-full text-left px-3 py-3 transition-colors text-sm flex items-center",
+                  "w-full text-left px-3 py-3 transition-colors text-sm flex items-center rounded-lg mx-2",
                   currentThreadId === conv.id 
-                    ? "bg-gray-100 hover:bg-gray-100" 
-                    : "hover:bg-gray-100"
+                    ? "bg-muted/50 backdrop-blur-sm hover:bg-muted/60" 
+                    : "hover:bg-muted/30 backdrop-blur-sm"
                 )}
                 onClick={() => {
                   selectConversation(conv.id);
@@ -416,18 +416,18 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   }
                 }}
               >
-                <MessageSquareIcon className="mr-3 h-4 w-4 shrink-0 text-gray-500" />
-                <span className="truncate text-gray-600">{conv.title || 'New chat'}</span>
+                <MessageSquareIcon className="mr-3 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-foreground">{conv.title || 'New chat'}</span>
               </button>
             ))
           ) : (
-            <div className="text-center py-4 text-gray-400 text-sm">
+            <div className="text-center py-4 text-muted-foreground text-sm">
               No previous chats
             </div>
           )}
         </div>
         
-        <div className="p-2 border-t border-gray-200 mt-auto">
+        <div className="p-2 border-t border-border mt-auto">
           {/* Removed home button to focus on Suna functionality */}
         </div>
       </div>
@@ -455,8 +455,8 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                   >
                     <div className="flex-shrink-0 mr-4">
                       {isUserMessage ? (
-                        <div className="rounded-full bg-gray-300 w-8 h-8 flex items-center justify-center">
-                          <UserIcon className="h-4 w-4 text-gray-700" />
+                        <div className="rounded-full bg-muted w-8 h-8 flex items-center justify-center">
+                          <UserIcon className="h-4 w-4 text-muted-foreground" />
                         </div>
                       ) : (
                         <div className="rounded-full bg-blue-500 w-8 h-8 flex items-center justify-center">
@@ -467,9 +467,9 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     
                     <div className="flex-grow w-full overflow-visible">
                       <div className={cn(
-                        "text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-gray-800 rounded-lg p-3 whitespace-pre-wrap",
+                        "text-[15px] leading-relaxed prose max-w-none prose-headings:my-2 prose-p:my-1 text-foreground rounded-lg p-3 whitespace-pre-wrap",
                         isUserMessage 
-                          ? "bg-blue-100 border border-blue-200" 
+                          ? "bg-primary/10 border border-primary/20" 
                           : "bg-background/80 backdrop-blur-sm border border-border shadow-sm"
                       )}>
                         {/* Always use ResearchResponse for assistant messages to ensure proper formatting */}
@@ -479,11 +479,11 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                             sources={getSourcesFromMetadata(msg)}
                           />
                         ) : (
-                          <div className="text-gray-800">{msg.content}</div>
+                          <div className="text-foreground">{msg.content}</div>
                         )}
                         {/* Show model and search info if it's an assistant message */}
                         {!isUserMessage && msg.modelUsed && (
-                          <div className="text-xs text-gray-400 mt-2 italic">
+                          <div className="text-xs text-muted-foreground mt-2 italic">
                             Model: {msg.modelUsed} {msg.webSearchUsed ? '• Web search used' : ''}
                           </div>
                         )}
@@ -528,47 +528,47 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <h2 className="text-3xl font-semibold mb-10 text-gray-800">Hello Dat, where should we begin?</h2>
+              <h2 className="text-3xl font-semibold mb-10 text-foreground">Hello Dat, where should we begin?</h2>
               <div className="grid gap-4 md:grid-cols-2 max-w-3xl w-full">
                 <button
-                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  className="bg-background/80 backdrop-blur-sm hover:bg-muted/50 text-left p-6 rounded-xl transition-colors border border-border shadow-sm"
                   onClick={() => {
                     setMessage("What can you help me with?");
                     handleSendMessage();
                   }}
                 >
-                  <div className="font-medium mb-1 text-gray-800">What can you help me with?</div>
-                  <div className="text-sm text-gray-500">Learn about my capabilities</div>
+                  <div className="font-medium mb-1 text-foreground">What can you help me with?</div>
+                  <div className="text-sm text-muted-foreground">Learn about my capabilities</div>
                 </button>
                 <button
-                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  className="bg-background/80 backdrop-blur-sm hover:bg-muted/50 text-left p-6 rounded-xl transition-colors border border-border shadow-sm"
                   onClick={() => {
                     setMessage("Write a short story about a robot learning to feel emotions");
                     handleSendMessage();
                   }}
                 >
-                  <div className="font-medium mb-1 text-gray-800">Write a short story</div>
-                  <div className="text-sm text-gray-500">About a robot learning to feel emotions</div>
+                  <div className="font-medium mb-1 text-foreground">Write a short story</div>
+                  <div className="text-sm text-muted-foreground">About a robot learning to feel emotions</div>
                 </button>
                 <button
-                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  className="bg-background/80 backdrop-blur-sm hover:bg-muted/50 text-left p-6 rounded-xl transition-colors border border-border shadow-sm"
                   onClick={() => {
                     setMessage("How do I create a family room in Tongkeeper?");
                     handleSendMessage();
                   }}
                 >
-                  <div className="font-medium mb-1 text-gray-800">How do I create a family room?</div>
-                  <div className="text-sm text-gray-500">Learn about Tongkeeper features</div>
+                  <div className="font-medium mb-1 text-foreground">How do I create a family room?</div>
+                  <div className="text-sm text-muted-foreground">Learn about Tongkeeper features</div>
                 </button>
                 <button
-                  className="bg-transparent hover:bg-gray-100 text-left p-6 rounded-xl transition-colors border border-gray-200"
+                  className="bg-background/80 backdrop-blur-sm hover:bg-muted/50 text-left p-6 rounded-xl transition-colors border border-border shadow-sm"
                   onClick={() => {
                     setMessage("Explain AI in simple terms a child would understand");
                     handleSendMessage();
                   }}
                 >
-                  <div className="font-medium mb-1 text-gray-800">Explain AI to me</div>
-                  <div className="text-sm text-gray-500">In simple terms a child would understand</div>
+                  <div className="font-medium mb-1 text-foreground">Explain AI to me</div>
+                  <div className="text-sm text-muted-foreground">In simple terms a child would understand</div>
                 </button>
               </div>
             </div>
@@ -589,9 +589,9 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               onBlur={() => setIsTextareaFocused(false)}
               placeholder={researchMode ? "Ask a research question..." : "Ask anything..."}
               className={cn(
-                "min-h-[56px] max-h-[200px] p-4 pr-24 w-full rounded-2xl border border-gray-300 shadow-sm",
+                "min-h-[56px] max-h-[200px] p-4 pr-24 w-full rounded-2xl border shadow-sm",
                 "bg-background/80 backdrop-blur-sm border-border focus:border-ring focus-visible:ring-0 focus-visible:ring-offset-0",
-                "placeholder-gray-500 resize-none text-gray-800 text-sm transition-all"
+                "placeholder-muted-foreground resize-none text-foreground text-sm transition-all"
               )}
               disabled={isSending}
               rows={1}
@@ -600,7 +600,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
               {/* File attachment button */}
               <Button
                 onClick={() => setShowFileUpload(!showFileUpload)}
-                className="h-8 w-8 p-0 rounded-full bg-transparent hover:bg-gray-100 text-gray-500"
+                className="h-8 w-8 p-0 rounded-full bg-transparent hover:bg-muted/50 text-muted-foreground"
                 variant="ghost"
                 type="button"
               >
@@ -638,11 +638,11 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                     <XIcon className="h-3 w-3" />
                   </Button>
                 </div>
-                <div className="border-2 border-dashed rounded-md p-4 text-center">
-                  <File className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-xs text-gray-500">Drag and drop files here or click to browse</p>
+                <div className="border-2 border-dashed border-border rounded-md p-4 text-center">
+                  <File className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground">Drag and drop files here or click to browse</p>
                 </div>
-                <div className="mt-2 text-xs text-gray-500">
+                <div className="mt-2 text-xs text-muted-foreground">
                   Supported formats: PDF, DOC, TXT, images
                 </div>
               </div>
@@ -654,7 +654,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 value={currentModel} 
                 onValueChange={(value) => changeModel(value as LLMModel)}
               >
-                <SelectTrigger className="h-7 text-xs px-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
+                <SelectTrigger className="h-7 text-xs px-2 bg-background/80 backdrop-blur-sm border-border text-foreground hover:bg-muted/50">
                   <div className="flex items-center">
                     <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center mr-1 text-[10px] font-bold">AI</span>
                     <SelectValue placeholder="Select model" />
@@ -710,7 +710,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`px-2 py-0 ${researchDepth === 1 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              className={`px-2 py-0 ${researchDepth === 1 ? 'bg-primary text-primary-foreground' : 'bg-background/80 backdrop-blur-sm text-foreground'}`}
                               onClick={() => setResearchDepth(1)}
                             >
                               <div className="flex items-center justify-center">
@@ -728,7 +728,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`px-2 py-0 ${researchDepth === 2 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              className={`px-2 py-0 ${researchDepth === 2 ? 'bg-primary text-primary-foreground' : 'bg-background/80 backdrop-blur-sm text-foreground'}`}
                               onClick={() => setResearchDepth(2)}
                             >
                               <div className="flex items-center justify-center">
@@ -746,7 +746,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`px-2 py-0 ${researchDepth === 3 ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                              className={`px-2 py-0 ${researchDepth === 3 ? 'bg-primary text-primary-foreground' : 'bg-background/80 backdrop-blur-sm text-foreground'}`}
                               onClick={() => setResearchDepth(3)}
                             >
                               <div className="flex items-center justify-center">
@@ -764,7 +764,7 @@ export function ChatGPTStyleChat({ threadId }: ChatGPTStyleChatProps) {
                 )}
               </div>
             </div>
-            <p className="text-[10px] text-gray-500 flex items-center justify-center">
+            <p className="text-[10px] text-muted-foreground flex items-center justify-center">
               Made with <span className="mx-1 text-red-500"><HeartIcon className="h-3 w-3 inline" /></span> and <span className="mx-1"><Coffee className="h-3 w-3 inline text-amber-700" /></span>
             </p>
           </div>
