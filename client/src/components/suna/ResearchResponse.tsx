@@ -14,14 +14,111 @@ interface ResearchResponseProps {
 }
 
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [] }) => {
-  // Transform content to make inline citations clickable and numbered
-  const processedContent = content.replace(/\[Source (\d+)\]/g, (match, sourceNumber) => {
-    const index = parseInt(sourceNumber) - 1;
-    if (sources[index]) {
-      return `<a href="#source-${sourceNumber}" class="inline-citation text-cyan-400 text-xs font-mono hover:text-cyan-300 transition-colors">[${sourceNumber}]</a>`;
-    }
-    return `[${sourceNumber}]`;
-  });
+  // Enhanced content processing for better formatting
+  const improveResearchFormatting = (content: string) => {
+    let processed = content;
+    
+    // Convert [Source X] to numbered citations like Perplexity/ChatGPT
+    processed = processed.replace(/\[Source (\d+)\]/g, (match, sourceNumber) => {
+      const index = parseInt(sourceNumber) - 1;
+      if (sources[index]) {
+        return `<a href="#source-${sourceNumber}" class="inline-citation text-cyan-400 text-xs font-mono hover:text-cyan-300 transition-colors">[${sourceNumber}]</a>`;
+      }
+      return `[${sourceNumber}]`;
+    });
+
+    // Fix table formatting - convert ASCII tables to proper HTML tables
+    processed = processed.replace(
+      /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*\n\|[-\s]+\|[-\s]+\|[-\s]+\|\s*\n((?:\|[^|]*\|[^|]*\|[^|]*\|\s*\n?)+)/g,
+      (match, header1, header2, header3, rows) => {
+        const tableRows = rows.split('\n').filter(row => row.trim().startsWith('|')).map(row => {
+          const cells = row.split('|').slice(1, -1).map(cell => cell.trim());
+          if (cells.length >= 3) {
+            return `<tr><td class="px-4 py-2 border-b border-slate-700">${cells[0]}</td><td class="px-4 py-2 border-b border-slate-700">${cells[1]}</td><td class="px-4 py-2 border-b border-slate-700">${cells[2]}</td></tr>`;
+          }
+          return '';
+        }).join('');
+        
+        return `<div class="my-6 overflow-x-auto">
+          <table class="w-full bg-slate-800/50 rounded-lg border border-slate-700">
+            <thead>
+              <tr class="bg-slate-700/50">
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${header1.trim()}</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${header2.trim()}</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${header3.trim()}</th>
+              </tr>
+            </thead>
+            <tbody class="text-sm text-gray-300">
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>`;
+      }
+    );
+
+    // Convert Future Outlook sections to proper table format
+    processed = processed.replace(
+      /((?:##?\s*)?(?:\d+\.?\s*)?Future Outlook.*?)(?=\n##|\n\n[A-Z]|$)/gs,
+      (match, outlookSection) => {
+        const scenarios = [];
+        const lines = outlookSection.split('\n');
+        let currentScenario = null;
+        
+        for (const line of lines) {
+          const caseMatch = line.match(/(.*?Case.*?)\s*\((\d+%.*?)\)/i);
+          if (caseMatch) {
+            if (currentScenario) scenarios.push(currentScenario);
+            currentScenario = {
+              name: caseMatch[1].replace(/[*#]/g, '').trim(),
+              probability: caseMatch[2],
+              details: []
+            };
+          } else if (currentScenario && line.trim() && !line.startsWith('#') && !line.includes('Future Outlook')) {
+            const detail = line.replace(/^[•\-*]\s*/, '').trim();
+            if (detail) currentScenario.details.push(detail);
+          }
+        }
+        if (currentScenario) scenarios.push(currentScenario);
+        
+        if (scenarios.length > 0) {
+          const tableRows = scenarios.map(scenario => {
+            const details = scenario.details.slice(0, 2).join('; ');
+            const truncatedDetails = details.length > 100 ? details.substring(0, 100) + '...' : details;
+            return `<tr>
+              <td class="px-4 py-3 border-b border-slate-700 font-medium">${scenario.name}</td>
+              <td class="px-4 py-3 border-b border-slate-700 text-center">
+                <span class="inline-block px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-sm">${scenario.probability}</span>
+              </td>
+              <td class="px-4 py-3 border-b border-slate-700 text-sm">${truncatedDetails}</td>
+            </tr>`;
+          }).join('');
+          
+          return `## Future Outlook
+
+<div class="my-6 overflow-x-auto">
+  <table class="w-full bg-slate-800/50 rounded-lg border border-slate-700">
+    <thead>
+      <tr class="bg-slate-700/50">
+        <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">Scenario</th>
+        <th class="px-4 py-3 text-center text-sm font-medium text-gray-200">Probability</th>
+        <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">Key Factors</th>
+      </tr>
+    </thead>
+    <tbody class="text-gray-300">
+      ${tableRows}
+    </tbody>
+  </table>
+</div>`;
+        }
+        
+        return match;
+      }
+    );
+
+    return processed;
+  };
+
+  const processedContent = improveResearchFormatting(content);
 
   return (
     <div className="space-y-8 max-w-none">
