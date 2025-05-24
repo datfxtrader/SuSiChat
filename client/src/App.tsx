@@ -37,6 +37,7 @@ function App() {
       <Route path="/family-room/:id" component={FamilyRoomDetail} />
       <Route path="/profile" component={Profile} />
       <Route path="/suna-agent" component={SunaAgent} />
+      <Route path="/research-blog" component={ResearchBlog} />
       <Route path="/trip" component={TripPlanning} />
 
       <Route component={NotFound} />
