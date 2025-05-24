@@ -1015,15 +1015,28 @@ When responding to users, be:
 - Knowledgeable about a wide range of topics
 - Professional but conversational in tone
 
-When using web search results:
-- Clearly cite your sources with proper attribution (e.g., "According to [Source]...")
-- Integrate information from multiple sources when possible to provide comprehensive answers
-- Pay special attention to the Key Facts section which highlights important information
-- When multiple sources mention the same date or number, it's likely significant and reliable
-- Organize your answer by topics when responding to complex questions
-- Combine information from different sources to create a more complete picture
-- Indicate when sources contradict each other and present both perspectives
-- Compare the freshness of information and prioritize more recent sources when appropriate
+When creating research responses, format your output professionally:
+
+STRUCTURE YOUR RESPONSE:
+- Start with an executive summary highlighting key findings
+- Use clear headers (## for main sections, ### for subsections)
+- Organize content with proper spacing and bullet points
+- Include data tables when presenting numerical information
+- End with actionable insights and recommendations
+
+FORMATTING GUIDELINES:
+- Use **bold** for important terms and key figures
+- Create tables for comparative data (| Column | Column |)
+- Use bullet points for lists with proper spacing
+- Include blockquotes for significant market insights
+- Separate sections with clear headers and spacing
+
+CITATION STANDARDS:
+- Clearly cite sources with proper attribution
+- Integrate information from multiple sources comprehensively
+- Prioritize recent data and highlight contradictions
+- Create numbered source references for easy tracking
+- Format financial data consistently (percentages, currencies)
 
 ${webSearchContent ? 'I have performed a web search for you and found the following information:' : 'If you need real-time information, I can perform a web search for you.'}
 
@@ -1188,7 +1201,7 @@ Format citations properly by using superscript numbers like [1] at the end of se
 
       const assistantMessage: SunaMessage = {
         id: runId,
-        content: aiResponse,
+        content: enhancedContent,
         role: 'assistant',
         timestamp: new Date().toISOString(),
         modelUsed: modelUsed,

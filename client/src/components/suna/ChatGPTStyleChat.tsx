@@ -27,7 +27,7 @@ import {
   Coffee
 } from 'lucide-react';
 import { ResearchProgress } from './ResearchProgress';
-import { ResearchResponse } from './ResearchResponse';
+import ResearchResponse from './ResearchResponse';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import {
