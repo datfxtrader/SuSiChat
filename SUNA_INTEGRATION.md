@@ -49,20 +49,20 @@ SUNA_API_URL=http://localhost:8000  # Replace with your Suna backend URL
 
 1. Start the Suna backend service
 2. Start the Tongkeeper application
-3. Navigate to the "Suna Agent" section in the Tongkeeper UI
-4. Interact with Suna through the provided chat interface
+3. Navigate to the "Research Agent" section in the Tongkeeper UI
+4. Interact with the Research Agent through the enhanced chat interface
 
 ## API Endpoints
 
-The following endpoints have been added to the Tongkeeper API to facilitate Suna integration:
+The following endpoints have been added to the Tongkeeper API to facilitate research integration:
 
-- `POST /api/suna/message` - Send a message to the Suna agent
+- `POST /api/suna/message` - Send a message to the research agent
 - `GET /api/suna/conversations/:conversationId` - Retrieve conversation history
 
 ## Frontend Components
 
-- `SunaChat` - Main chat interface component for interacting with Suna
-- `useSuna` - React hook for managing Suna state and API communication
+- `ResearchAgent` - Enhanced research interface with depth controls and source formatting
+- `useSuna` - React hook for managing research state and API communication
 
 ## Future Enhancements
 
