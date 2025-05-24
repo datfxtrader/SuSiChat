@@ -437,8 +437,8 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             ))}
 
-            {/* Research Progress - Show when researching or when research state is persisted */}
-            {(isSending || isResearchInProgress) && !messages.find(m => m.role === 'assistant') && (
+            {/* Research Progress - Show only when actively sending a message */}
+            {isSending && !messages.find(m => m.role === 'assistant') && (
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
                   <Bot className="w-5 h-5 text-white" />
@@ -448,12 +448,6 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     stage={1} 
                     progress={0}
                   />
-                  {isResearchInProgress && !isSending && (
-                    <div className="mt-2 text-xs text-blue-400 flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                      <span>Research continues in background...</span>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
