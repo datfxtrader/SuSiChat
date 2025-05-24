@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { researchService, ResearchDepth } from './deerflow-integration';
 
 import LRU from 'lru-cache';
+import { getCurrentBitcoinPrice, getBitcoinMarketContext, enhanceBitcoinQuery } from './yahoo-finance-integration';
 import rateLimit from 'express-rate-limit';
 import { validate } from 'class-validator';
 import { IsString, MinLength, MaxLength, IsOptional, IsNumber, Min, Max } from 'class-validator';
@@ -706,6 +707,18 @@ class SunaIntegrationService {
 
       if (shouldSearch) {
         try {
+          // Get current Bitcoin price data for financial queries
+          let bitcoinContext = '';
+          if (isFinancialQuery) {
+            console.log('🪙 Fetching current Bitcoin market data...');
+            try {
+              bitcoinContext = await getBitcoinMarketContext();
+              console.log('✅ Bitcoin market data retrieved successfully');
+            } catch (error) {
+              console.warn('⚠️ Could not fetch Bitcoin market data:', error);
+            }
+          }
+
           // Track search start time for metrics
           const searchStartTime = Date.now();
 
@@ -1149,7 +1162,10 @@ ${numberContradictions.join('\n')}
               // Continue without advanced analysis if extraction fails
             }
 
-            webSearchContent = `
+            // Include Bitcoin market context if available
+            const marketContextSection = bitcoinContext ? `${bitcoinContext}\n\n` : '';
+            
+            webSearchContent = `${marketContextSection}
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
 Search query: "${finalQuery}"${advancedAnalysis}${dataFreshnessWarning}${priceContext}
