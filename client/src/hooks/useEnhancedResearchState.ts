@@ -244,31 +244,55 @@ export const useEnhancedResearchState = () => {
     }
   }, []);
 
-  // Restore enhanced state
+  // Restore enhanced state with forced UI synchronization
   const restoreEnhancedState = useCallback(() => {
     console.log('Attempting to restore enhanced state...');
     const savedState = loadEnhancedState();
     
     if (savedState) {
       console.log('Restoring enhanced state:', savedState);
-      setIsResearchInProgress(savedState.isInProgress);
-      setOngoingResearchQuery(savedState.query);
-      setResearchProgress(savedState.progress);
-      setResearchStage(savedState.stage);
-      setStageLabel(savedState.stageLabel || STAGE_LABELS[savedState.stage - 1]);
-      setErrors(savedState.errors || []);
-      setWarnings(savedState.warnings || []);
+      
+      // Use React's flushSync to force immediate UI updates
+      const updateUI = () => {
+        setIsResearchInProgress(savedState.isInProgress);
+        setOngoingResearchQuery(savedState.query);
+        setResearchProgress(savedState.progress);
+        setResearchStage(savedState.stage);
+        setStageLabel(savedState.stageLabel || STAGE_LABELS[savedState.stage - 1]);
+        setErrors(savedState.errors || []);
+        setWarnings(savedState.warnings || []);
+      };
+      
+      // Force immediate state update
+      updateUI();
+      
+      // Also schedule a follow-up update to ensure it sticks
+      setTimeout(updateUI, 10);
       
       if (savedState.isInProgress) {
+        console.log('Resuming progress simulation...');
         simulateProgress();
       }
+      
+      console.log('State restoration applied to UI');
+    } else {
+      console.log('No saved state found to restore');
     }
   }, [loadEnhancedState, simulateProgress]);
 
-  // Stable visibility change detection
+  // Stable visibility change detection with race condition prevention
   useEffect(() => {
+    let isRestoring = false;
+    let restoreTimeout: NodeJS.Timeout | null = null;
+    
     const handleVisibilityChange = () => {
       console.log('Enhanced visibility change. Hidden:', document.hidden);
+      
+      // Clear any pending restore
+      if (restoreTimeout) {
+        clearTimeout(restoreTimeout);
+        restoreTimeout = null;
+      }
       
       if (document.hidden) {
         const currentState = stateRef.current;
@@ -277,8 +301,25 @@ export const useEnhancedResearchState = () => {
           saveEnhancedState(currentState);
         }
       } else {
-        console.log('Tab visible - restoring enhanced state');
-        restoreEnhancedState();
+        // Prevent race conditions
+        if (isRestoring) {
+          console.log('Already restoring, skipping...');
+          return;
+        }
+        
+        isRestoring = true;
+        console.log('Tab visible - restoring enhanced state with delay');
+        
+        // Add small delay to ensure DOM is ready
+        restoreTimeout = setTimeout(() => {
+          restoreEnhancedState();
+          
+          // Force UI update after restoration
+          setTimeout(() => {
+            isRestoring = false;
+            console.log('UI restoration complete');
+          }, 100);
+        }, 50);
       }
     };
 
@@ -287,6 +328,7 @@ export const useEnhancedResearchState = () => {
     
     return () => {
       console.log('Removing enhanced visibility listener');
+      if (restoreTimeout) clearTimeout(restoreTimeout);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []); // Completely stable
