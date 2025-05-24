@@ -19,6 +19,11 @@ type ClientConnection = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Root route handler
+  app.get('/', (req, res) => {
+    res.sendFile('index.html', { root: './client/dist' });
+  });
   
 
   // Mount financial research routes
