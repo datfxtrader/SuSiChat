@@ -9,8 +9,20 @@ import { useSuna, type LLMModel } from '@/hooks/useSuna';
 import { useAuth } from '@/hooks/useAuth';
 import { ResearchProgress } from '@/components/suna/ResearchProgress';
 import ResearchResponse from '@/components/suna/ResearchResponse';
-import { formatRelativeTime, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+
+// Utility function to format relative time
+const formatRelativeTime = (timestamp: string | number) => {
+  const now = new Date();
+  const messageTime = new Date(timestamp);
+  const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
+  
+  if (diffInMinutes < 1) return 'Just now';
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+  return `${Math.floor(diffInMinutes / 1440)}d ago`;
+};
 
 const SunaClone = () => {
   const { isAuthenticated, user } = useAuth();
@@ -35,6 +47,8 @@ const SunaClone = () => {
 
   const [message, setMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [researchDepth, setResearchDepth] = useState('3');
+  const [selectedModel, setSelectedModel] = useState<LLMModel>('auto');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -56,9 +70,9 @@ const SunaClone = () => {
     
     sendMessage({ 
       message, 
-      model: currentModel,
+      model: selectedModel === 'auto' ? currentModel : selectedModel,
       customSearchPrefs: searchPreferences,
-      researchDepth: 3
+      researchDepth: parseInt(researchDepth)
     });
     
     setMessage('');
@@ -179,7 +193,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Conversations List */}
           <div className="p-4 space-y-2">
             <h3 className="text-sm font-medium text-gray-400 mb-3">Recent Conversations</h3>
-            {allConversations && Array.isArray(allConversations) && allConversations.map((conv: any) => (
+            {allConversations && Array.isArray(allConversations) && (allConversations as any[]).map((conv: any) => (
               <div
                 key={conv.id}
                 onClick={() => selectConversation(conv.id)}
@@ -228,7 +242,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {mockMessages.map((msg) => (
+            {messages.map((msg) => (
               <div key={msg.id} className="flex items-start space-x-3">
                 {msg.role === 'user' ? (
                   <>
@@ -237,7 +251,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       <div className="bg-slate-700 text-white p-4 rounded-2xl rounded-tr-sm">
                         {msg.content}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1 text-right">{msg.timestamp}</div>
+                      <div className="text-xs text-gray-500 mt-1 text-right">{formatRelativeTime(msg.timestamp)}</div>
                     </div>
                     <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white text-sm font-medium">U</span>
@@ -251,21 +265,40 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     <div className="flex-1">
                       <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 p-6 rounded-2xl rounded-tl-sm">
                         <div className="prose prose-invert max-w-none">
-                          <div className="whitespace-pre-line text-gray-300 leading-relaxed">
+                          <ReactMarkdown 
+                            components={{
+                              p: ({ children }) => <p className="text-gray-300 leading-relaxed mb-4 last:mb-0">{children}</p>,
+                              h1: ({ children }) => <h1 className="text-xl font-bold text-gray-100 mb-3">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-100 mb-2">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-md font-medium text-gray-100 mb-2">{children}</h3>,
+                              ul: ({ children }) => <ul className="list-disc pl-6 mb-4 text-gray-300">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 text-gray-300">{children}</ol>,
+                              li: ({ children }) => <li className="mb-1">{children}</li>,
+                              strong: ({ children }) => <strong className="font-semibold text-gray-200">{children}</strong>,
+                              em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
+                              code: ({ children }) => <code className="bg-slate-800/50 px-2 py-1 rounded text-gray-200 font-mono text-sm">{children}</code>,
+                              pre: ({ children }) => <pre className="bg-slate-800/50 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>,
+                            }}
+                          >
                             {msg.content}
-                          </div>
+                          </ReactMarkdown>
                         </div>
                         
-                        {msg.sources && (
+                        {extractSources(msg.content).length > 0 && (
                           <div className="mt-6 pt-4 border-t border-slate-800/40">
                             <h4 className="text-sm font-medium text-gray-400 mb-3">Sources</h4>
                             <div className="space-y-2">
-                              {msg.sources.map((source, idx) => (
+                              {extractSources(msg.content).map((source, idx) => (
                                 <div key={idx} className="flex items-center space-x-2 text-sm">
                                   <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                                  <span className="text-gray-300 hover:text-gray-200 cursor-pointer">
+                                  <a 
+                                    href={source.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-gray-300 hover:text-primary cursor-pointer transition-colors"
+                                  >
                                     {source.title}
-                                  </span>
+                                  </a>
                                   <span className="text-gray-500">• {source.domain}</span>
                                 </div>
                               ))}
@@ -273,7 +306,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                           </div>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">{msg.timestamp}</div>
+                      <div className="text-xs text-gray-500 mt-1">{formatRelativeTime(msg.timestamp)}</div>
                     </div>
                   </>
                 )}
@@ -364,7 +397,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
                   <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50">
                     <SelectValue />
                   </SelectTrigger>
