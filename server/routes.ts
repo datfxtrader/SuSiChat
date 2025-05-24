@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
+import * as templateRoutes from "./template-integration";
 
 import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
