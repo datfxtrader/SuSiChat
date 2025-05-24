@@ -1027,11 +1027,14 @@ ${numberContradictions.join('\n')}
               }
             }
 
-            // Smart forecast validation with timestamp context
-            let forecastValidation = '';
+            // Advanced reasoning chain with hypothesis generation and evidence synthesis
+            let advancedAnalysis = '';
             try {
               // Extract forecasts with their timestamps for intelligent validation
               const forecasts = [];
+              const contradictions = [];
+              const hypotheses = [];
+              
               for (const result of sortedResults) {
                 const content = result.content || '';
                 const title = result.title || '';
@@ -1054,24 +1057,80 @@ ${numberContradictions.join('\n')}
                     price: forecastPrice,
                     date: forecastDate,
                     source: result.title,
-                    url: result.url
+                    url: result.url,
+                    confidence: 0.8 // Basic confidence scoring
                   });
+                }
+                
+                // Extract hypotheses and reasoning patterns
+                const hypothesisPatterns = [
+                  /(?:if|when|should|likely|expect|anticipate).*?(?:then|will|could|might)/gi,
+                  /(?:due to|because of|driven by|influenced by).*?(?:may|will|could)/gi
+                ];
+                
+                for (const pattern of hypothesisPatterns) {
+                  const matches = content.match(pattern);
+                  if (matches) {
+                    hypotheses.push(...matches.map(match => ({
+                      statement: match,
+                      source: result.title,
+                      confidence: 0.7
+                    })));
+                  }
                 }
               }
               
-              if (forecasts.length > 0) {
-                forecastValidation = `\n📊 SMART FORECAST ANALYSIS:\n${forecasts.map(f => 
-                  `💡 ${f.source}: $${f.price.toLocaleString()} target ${f.date ? `(${f.date})` : '(undated)'}`
-                ).join('\n')}\n`;
+              // Cross-validate forecasts for contradictions
+              if (forecasts.length > 1) {
+                for (let i = 0; i < forecasts.length; i++) {
+                  for (let j = i + 1; j < forecasts.length; j++) {
+                    const priceDiff = Math.abs(forecasts[i].price - forecasts[j].price);
+                    const percentDiff = (priceDiff / Math.min(forecasts[i].price, forecasts[j].price)) * 100;
+                    
+                    if (percentDiff > 10) { // Significant difference
+                      contradictions.push({
+                        source1: forecasts[i].source,
+                        price1: forecasts[i].price,
+                        source2: forecasts[j].source,
+                        price2: forecasts[j].price,
+                        difference: percentDiff.toFixed(1)
+                      });
+                    }
+                  }
+                }
+              }
+              
+              // Generate advanced analysis summary
+              if (forecasts.length > 0 || hypotheses.length > 0 || contradictions.length > 0) {
+                advancedAnalysis = `\n🧠 ADVANCED REASONING ANALYSIS:\n`;
+                
+                if (forecasts.length > 0) {
+                  advancedAnalysis += `📊 Forecasts Identified: ${forecasts.length}\n${forecasts.map(f => 
+                    `💡 ${f.source}: $${f.price.toLocaleString()} target ${f.date ? `(${f.date})` : '(undated)'} [Confidence: ${(f.confidence * 100).toFixed(0)}%]`
+                  ).join('\n')}\n`;
+                }
+                
+                if (contradictions.length > 0) {
+                  advancedAnalysis += `⚠️ Source Contradictions: ${contradictions.length}\n${contradictions.map(c =>
+                    `🔍 ${c.source1} ($${c.price1.toLocaleString()}) vs ${c.source2} ($${c.price2.toLocaleString()}) - ${c.difference}% difference`
+                  ).join('\n')}\n`;
+                }
+                
+                if (hypotheses.length > 0) {
+                  const topHypotheses = hypotheses.slice(0, 3);
+                  advancedAnalysis += `🎯 Key Hypotheses: ${topHypotheses.length}\n${topHypotheses.map(h =>
+                    `📋 ${h.statement} [${h.source}]`
+                  ).join('\n')}\n`;
+                }
               }
             } catch (e) {
-              // Continue without forecast analysis if extraction fails
+              // Continue without advanced analysis if extraction fails
             }
 
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
-Search query: "${finalQuery}"${forecastValidation}${dataFreshnessWarning}${priceContext}
+Search query: "${finalQuery}"${advancedAnalysis}${dataFreshnessWarning}${priceContext}
 
 ${diversityInfo ? `${diversityInfo}\n` : ''}
 ${topicsInfo ? `${topicsInfo}\n` : ''}

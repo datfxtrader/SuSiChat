@@ -544,7 +544,14 @@ Your report should:
         use_scientific_agent: (params.researchDepth || 3) >= 2,
         use_news_intelligence: true,
         enable_learning_system: true,
-        // Formatting and styling agents for beautiful data presentation
+        // Enhanced reasoning and analysis capabilities
+        enable_hypothesis_generation: true,
+        enable_evidence_synthesis: true,
+        enable_logical_inference: true,
+        enable_confidence_scoring: true,
+        enable_contradiction_analysis: true,
+        enable_cross_source_validation: true,
+        // Advanced professional features
         use_formatting_agent: true,
         use_styling_agent: true,
         use_data_visualization_agent: true,
@@ -552,6 +559,8 @@ Your report should:
         enable_markdown_enhancement: true,
         enable_table_formatting: true,
         enable_chart_generation: true,
+        enable_academic_integration: true,
+        enable_memory_persistence: true,
         // Financial fact validation
         enable_fact_checking: true,
         validate_financial_data: true,
