@@ -46,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
       className
     )}>
       {/* App Logo and Title */}
-      <div className="p-4 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
             <span className="material-icons text-white text-xl">assistant</span>
