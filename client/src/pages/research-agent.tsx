@@ -49,8 +49,12 @@ const ResearchAgent = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [researchDepth, setResearchDepth] = useState('3');
   const [selectedModel, setSelectedModel] = useState<LLMModel>('auto');
-  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
-  const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
+  const [isResearchInProgress, setIsResearchInProgress] = useState(() => {
+    return localStorage.getItem('research-in-progress') === 'true';
+  });
+  const [ongoingResearchQuery, setOngoingResearchQuery] = useState(() => {
+    return localStorage.getItem('ongoing-research-query') || '';
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +62,28 @@ const ResearchAgent = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Persist research state to localStorage
+  useEffect(() => {
+    localStorage.setItem('research-in-progress', isResearchInProgress.toString());
+  }, [isResearchInProgress]);
+
+  useEffect(() => {
+    localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
+  }, [ongoingResearchQuery]);
+
+  // Clean up research state when research completes
+  useEffect(() => {
+    if (!isSending && isResearchInProgress) {
+      // Research has completed, clear the persistent state
+      setTimeout(() => {
+        setIsResearchInProgress(false);
+        setOngoingResearchQuery('');
+        localStorage.removeItem('research-in-progress');
+        localStorage.removeItem('ongoing-research-query');
+      }, 1000); // Small delay to ensure UI updates properly
+    }
+  }, [isSending, isResearchInProgress]);
 
   // Auto-resize textarea
   useEffect(() => {
