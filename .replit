@@ -8,8 +8,8 @@ packages = ["jq", "libxcrypt"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+build = ["sh", "-c", "npm run build"]
+run = ["sh", "-c", "node server/index.js"]
 
 [workflows]
 runButton = "Start Full Stack"
