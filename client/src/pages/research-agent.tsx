@@ -71,15 +71,19 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle research completion
+  // Handle research completion (only when actually finished, not during restoration)
   useEffect(() => {
-    if (!isSending && isResearchInProgress) {
-      // Research has completed, clear the persistent state
-      setTimeout(() => {
-        completeResearch();
-      }, 1000); // Small delay to ensure UI updates properly
+    if (!isSending && isResearchInProgress && messages.length > 0) {
+      // Only complete if we have actual messages (not just restored state)
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.loading) {
+        // Research has actually completed with a response
+        setTimeout(() => {
+          completeResearch();
+        }, 1000);
+      }
     }
-  }, [isSending, isResearchInProgress, completeResearch]);
+  }, [isSending, isResearchInProgress, completeResearch, messages]);
 
   // Auto-resize textarea
   useEffect(() => {

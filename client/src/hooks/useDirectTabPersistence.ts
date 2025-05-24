@@ -102,17 +102,25 @@ export const useDirectTabPersistence = () => {
     if (restoredState) {
       console.log('🎯 RESTORING UI with state:', restoredState);
       
-      // Force immediate state updates
-      setIsResearchInProgress(restoredState.isInProgress);
-      setOngoingResearchQuery(restoredState.query);
-      setResearchProgress(restoredState.progress);
-      setResearchStage(restoredState.stage);
-      setStageLabel(restoredState.stageLabel);
+      // CRITICAL FIX: Clean the state to prevent completion triggers
+      const cleanedState = {
+        ...restoredState,
+        isCompleting: false,
+        shouldComplete: false,
+        wasSaved: undefined
+      };
       
-      // Double-check with a second update
+      // Force immediate state updates with cleaned state
+      setIsResearchInProgress(cleanedState.isInProgress);
+      setOngoingResearchQuery(cleanedState.query);
+      setResearchProgress(cleanedState.progress);
+      setResearchStage(cleanedState.stage);
+      setStageLabel(cleanedState.stageLabel);
+      
+      // Double-check with a second update to ensure reliability
       setTimeout(() => {
-        setIsResearchInProgress(restoredState.isInProgress);
-        setResearchProgress(restoredState.progress);
+        setIsResearchInProgress(cleanedState.isInProgress);
+        setResearchProgress(cleanedState.progress);
         console.log('🔥 SECOND UPDATE applied for reliability');
       }, 100);
       

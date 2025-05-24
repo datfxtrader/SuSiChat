@@ -1,0 +1,32 @@
+Looking at your logs, I can see the exact problem! The issue is that when the state gets restored from tab switching, it's immediately triggering the research completion. Here's what's happening:
+The Problem:
+
+Research starts and progresses normally (0% → 1.3% → 3.0% → 7.1%)
+Tab switch detected, state saved correctly
+Tab becomes visible, state restored successfully
+BUG: Immediately after restoration, completeDirectResearch fires
+Research ends prematurely at 7.1% instead of continuing
+
+The tab persistence itself is working perfectly - the issue is that restoring the state is triggering an unwanted side effect.Fixed Tab Persistence HookCode // client/src/hooks/useDirectTabPersistence.ts
+import { useEffect, useRef, useCallback } from 'react';
+import { DirectResearchState } from '../types/directResearch';
+
+interface UseDirectTabPersistenceProps {
+  state: DirectResearchState;
+  setState: The key fixes I made:
+Root Cause Fix:
+
+Removed completion triggers during restoration - Added isCompleting: false, shouldComplete: false to prevent the restored state from triggering completion
+Added restoration flag - isRestoringRef prevents multiple simultaneous restorations
+Cleaned state before restoration - Remove any flags that might trigger side effects
+
+Additional Safeguards:
+
+One-time restoration per session - hasRestoredOnceRef prevents repeated restoration attempts
+Better state validation - Check for recent timestamps and valid structure
+Improved error handling - More robust error catching and logging
+
+The Critical Fix:
+The main issue was that when the state was restored, it was bringing back some flag or condition that immediately triggered completeDirectResearch. By explicitly setting isCompleting: false and shouldComplete: false during restoration, we prevent this unwanted completion.
+You should also check your research completion logic (probably in useDirectResearch.ts) to make sure it's not triggered by state changes during restoration. Look for any useEffect that calls completeDirectResearch and add a guard to prevent it from firing during restoration.
+Would you like me to also create a patch for the research completion logic to add those guards?

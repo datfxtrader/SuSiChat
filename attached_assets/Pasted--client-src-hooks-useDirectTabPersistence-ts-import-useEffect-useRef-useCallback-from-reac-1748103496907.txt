@@ -1,0 +1,219 @@
+// client/src/hooks/useDirectTabPersistence.ts
+import { useEffect, useRef, useCallback } from 'react';
+import { DirectResearchState } from '../types/directResearch';
+
+interface UseDirectTabPersistenceProps {
+  state: DirectResearchState;
+  setState: (state: DirectResearchState) => void;
+  isResearchInProgress: boolean;
+}
+
+export const useDirectTabPersistence = ({
+  state,
+  setState,
+  isResearchInProgress
+}: UseDirectTabPersistenceProps) => {
+  const lastSavedState = useRef<string>('');
+  const isRestoringRef = useRef(false);
+  const hasRestoredOnceRef = useRef(false);
+
+  // Generate storage keys
+  const getStorageKeys = useCallback(() => {
+    const baseKey = 'direct_tab_state';
+    return [
+      `${baseKey}_1`,
+      `${baseKey}_2`, 
+      `${baseKey}_3`,
+      `${baseKey}_backup`
+    ];
+  }, []);
+
+  // Force save state to multiple locations
+  const forceSaveState = useCallback(() => {
+    if (!isResearchInProgress && !state.conversationHistory?.length) {
+      console.log('🚫 Skipping save - no research in progress and no conversation');
+      return;
+    }
+
+    try {
+      const stateToSave = {
+        ...state,
+        timestamp: Date.now(),
+        isResearchInProgress,
+        // Add flag to indicate this is a saved state
+        wasSaved: true
+      };
+      
+      const serialized = JSON.stringify(stateToSave);
+      
+      // Only save if state has actually changed
+      if (serialized === lastSavedState.current) {
+        console.log('🔄 State unchanged, skipping save');
+        return;
+      }
+      
+      const keys = getStorageKeys();
+      let savedCount = 0;
+      
+      keys.forEach(key => {
+        try {
+          localStorage.setItem(key, serialized);
+          savedCount++;
+        } catch (error) {
+          console.warn(`❌ Failed to save to ${key}:`, error);
+        }
+      });
+      
+      if (savedCount > 0) {
+        lastSavedState.current = serialized;
+        console.log(`🔒 FORCE SAVING state to ${savedCount} locations - Progress: ${state.progress}%`);
+      }
+    } catch (error) {
+      console.error('❌ Error in forceSaveState:', error);
+    }
+  }, [state, isResearchInProgress, getStorageKeys]);
+
+  // Force restore state from storage
+  const forceRestoreState = useCallback(() => {
+    // Prevent multiple restorations
+    if (isRestoringRef.current) {
+      console.log('🔄 Already restoring, skipping...');
+      return false;
+    }
+
+    console.log('🔓 FORCE RESTORING state from storage...');
+    isRestoringRef.current = true;
+
+    try {
+      const keys = getStorageKeys();
+      let restoredState: DirectResearchState | null = null;
+      let foundKey = '';
+
+      // Try to restore from each storage location
+      for (const key of keys) {
+        try {
+          const saved = localStorage.getItem(key);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            
+            // Validate the restored state
+            if (parsed && typeof parsed === 'object' && parsed.timestamp) {
+              // Check if state is recent (within last hour)
+              const age = Date.now() - parsed.timestamp;
+              if (age < 60 * 60 * 1000) {
+                restoredState = parsed;
+                foundKey = key;
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`❌ Failed to restore from ${key}:`, error);
+        }
+      }
+
+      if (restoredState && foundKey) {
+        console.log(`✅ Found valid state in ${foundKey} - Progress: ${restoredState.progress}%`);
+        
+        // CRITICAL FIX: Remove the wasSaved flag and prevent completion triggers
+        const stateToRestore = {
+          ...restoredState,
+          wasSaved: undefined,
+          // Ensure we don't trigger completion during restoration
+          isCompleting: false,
+          shouldComplete: false
+        };
+        
+        // Set a flag to indicate we're in restoration mode
+        console.log('🎯 RESTORING UI with state');
+        setState(stateToRestore);
+        
+        // Double-check restoration worked
+        setTimeout(() => {
+          console.log('🔥 SECOND UPDATE applied for reliability');
+          setState(prev => ({ ...prev, ...stateToRestore }));
+          isRestoringRef.current = false;
+        }, 100);
+        
+        hasRestoredOnceRef.current = true;
+        return true;
+      } else {
+        console.log('❌ No valid state found to restore');
+        isRestoringRef.current = false;
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error in forceRestoreState:', error);
+      isRestoringRef.current = false;
+      return false;
+    }
+  }, [setState, getStorageKeys]);
+
+  // Clear stored state
+  const clearStoredState = useCallback(() => {
+    const keys = getStorageKeys();
+    keys.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn(`❌ Failed to clear ${key}:`, error);
+      }
+    });
+    lastSavedState.current = '';
+    console.log('🧹 Cleared all stored states');
+  }, [getStorageKeys]);
+
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ Tab hidden - force saving');
+        forceSaveState();
+      } else {
+        console.log('👁️ Tab visible - force restoring');
+        // Only restore if we haven't restored yet in this session
+        if (!hasRestoredOnceRef.current) {
+          forceRestoreState();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [forceSaveState, forceRestoreState]);
+
+  // Auto-save every 5 seconds during research
+  useEffect(() => {
+    if (!isResearchInProgress) return;
+
+    const interval = setInterval(() => {
+      forceSaveState();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isResearchInProgress, forceSaveState]);
+
+  // Save when research completes
+  useEffect(() => {
+    if (!isResearchInProgress && state.conversationHistory?.length) {
+      console.log('💾 Research completed - final save');
+      forceSaveState();
+    }
+  }, [isResearchInProgress, state.conversationHistory?.length, forceSaveState]);
+
+  // Initial restoration attempt on mount
+  useEffect(() => {
+    // Only restore on initial mount if no research is active
+    if (!isResearchInProgress && !hasRestoredOnceRef.current) {
+      console.log('🔄 Initial restoration attempt on mount');
+      forceRestoreState();
+    }
+  }, []); // Empty dependency array for mount only
+
+  return {
+    forceSaveState,
+    forceRestoreState,
+    clearStoredState,
+    isRestoring: isRestoringRef.current
+  };
+};
