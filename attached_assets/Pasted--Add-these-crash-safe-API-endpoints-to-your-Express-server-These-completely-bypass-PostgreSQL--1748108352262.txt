@@ -1,0 +1,175 @@
+// Add these crash-safe API endpoints to your Express server
+// These completely bypass PostgreSQL and use file-based storage
+
+import { CrashSafeResearch } from './crash-safe-research-storage';
+
+// Initialize crash-safe storage on server start
+app.listen(PORT, async () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  
+  // Initialize crash-safe storage system
+  await CrashSafeResearch.initialize();
+  console.log('🛡️ Crash-safe research storage ready');
+});
+
+// CRASH-SAFE: Store research results
+app.post('/api/research/store-safe', async (req, res) => {
+  try {
+    const { conversationId, userId, query, results } = req.body;
+    
+    console.log('💾 API: Storing research results crash-safe');
+    
+    const result = await CrashSafeResearch.store(conversationId, userId, query, results);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Research results stored safely',
+        filename: result.filename,
+        storageType: 'crash-safe-file'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to store research results'
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ API: Error storing research results:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error storing results',
+      error: error.message
+    });
+  }
+});
+
+// CRASH-SAFE: Retrieve research results  
+app.get('/api/research/results-safe/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    
+    console.log('🔍 API: Retrieving research results crash-safe:', conversationId);
+    
+    const result = await CrashSafeResearch.retrieve(conversationId);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        results: result.results,
+        source: result.source,
+        storageType: 'crash-safe'
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Research results not found',
+        conversationId
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ API: Error retrieving research results:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error retrieving results',
+      error: error.message
+    });
+  }
+});
+
+// CRASH-SAFE: Get all user research
+app.get('/api/research/user-research-safe/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    console.log('🔍 API: Getting all research for user:', userId);
+    
+    const research = await CrashSafeResearch.getUserResearch(userId);
+    
+    res.json({
+      success: true,
+      research,
+      count: research.length,
+      storageType: 'crash-safe'
+    });
+    
+  } catch (error) {
+    console.error('❌ API: Error getting user research:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error getting user research',
+      error: error.message
+    });
+  }
+});
+
+// CRASH-SAFE: System status
+app.get('/api/research/system-status', async (req, res) => {
+  try {
+    const backupDir = path.join(process.cwd(), 'research-backups');
+    
+    // Check if backup directory exists and get file count
+    let fileCount = 0;
+    let indexExists = false;
+    
+    try {
+      const files = await fs.readdir(backupDir);
+      fileCount = files.filter(f => f.endsWith('.json')).length;
+      indexExists = files.includes('research-index.json');
+    } catch (error) {
+      // Directory doesn't exist yet
+    }
+    
+    res.json({
+      success: true,
+      system: {
+        crashSafeStorageActive: true,
+        postgresqlBypassed: true,
+        backupDirectory: backupDir,
+        researchFilesCount: fileCount,
+        indexFileExists: indexExists,
+        status: 'operational'
+      },
+      message: 'Crash-safe research storage is active and operational'
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Frontend integration functions
+export const CrashSafeAPI = {
+  // Store research results safely
+  async storeResults(conversationId: string, userId: string, query: string, results: any) {
+    const response = await fetch('/api/research/store-safe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId, userId, query, results })
+    });
+    return response.json();
+  },
+  
+  // Get research results safely
+  async getResults(conversationId: string) {
+    const response = await fetch(`/api/research/results-safe/${conversationId}`);
+    return response.json();
+  },
+  
+  // Get all user research
+  async getUserResearch(userId: string) {
+    const response = await fetch(`/api/research/user-research-safe/${userId}`);
+    return response.json();
+  },
+  
+  // Check system status
+  async getSystemStatus() {
+    const response = await fetch('/api/research/system-status');
+    return response.json();
+  }
+};
