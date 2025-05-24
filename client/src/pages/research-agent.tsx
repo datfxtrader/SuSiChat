@@ -434,15 +434,31 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 </div>
                 <div className="flex-1">
                   <ResearchProgress 
-                    stage={1} 
-                    progress={0}
+                    stage={researchStage} 
+                    progress={researchProgress}
                     query={ongoingResearchQuery || message}
                     isActive={isSending || isResearchInProgress}
                   />
                   {isResearchInProgress && !isSending && (
-                    <div className="mt-2 text-xs text-blue-400 flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                      <span>Research continues in background...</span>
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-blue-400 flex items-center space-x-1">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                        <span>Research continues in background...</span>
+                      </div>
+                      
+                      {/* Enhanced Progress Bar */}
+                      <div className="w-full bg-slate-800/50 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-1000 ease-out"
+                          style={{ width: `${Math.max(researchProgress, 10)}%` }}
+                        />
+                      </div>
+                      
+                      {/* Progress Percentage */}
+                      <div className="text-xs text-gray-400 flex justify-between">
+                        <span>Progress: {Math.round(researchProgress)}%</span>
+                        <span>Stage {researchStage}</span>
+                      </div>
                     </div>
                   )}
                 </div>
