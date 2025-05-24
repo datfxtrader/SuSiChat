@@ -552,6 +552,9 @@ Your report should:
         enable_markdown_enhancement: true,
         enable_table_formatting: true,
         enable_chart_generation: true,
+        // Financial fact validation
+        enable_fact_checking: true,
+        validate_financial_data: true,
         enable_code_highlighting: true,
         enable_visual_structuring: true,
         format_for_web_display: true,
