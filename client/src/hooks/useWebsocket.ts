@@ -3,7 +3,7 @@ import { initializeWebSocket, closeWebSocket, addMessageHandler, removeMessageHa
 import { WebSocketMessage } from "@/lib/types";
 import { useAuth } from "./useAuth";
 
-export function useWebSocket() {
+export function useWebsocket() {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);

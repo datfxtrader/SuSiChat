@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 interface ResearchProgressProps {
   stage: number;
   progress: number;
+  query?: string;
+  isActive?: boolean;
 }
 
 interface ProgressStage {

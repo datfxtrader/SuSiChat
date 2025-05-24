@@ -17,7 +17,7 @@ const formatRelativeTime = (timestamp: string | number) => {
   const now = new Date();
   const messageTime = new Date(timestamp);
   const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-
+  
   if (diffInMinutes < 1) return 'Just now';
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
@@ -63,16 +63,10 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle initial research state
+  // Persist research state to localStorage
   useEffect(() => {
-    const storedInProgress = localStorage.getItem('research-in-progress') === 'true';
-    const storedQuery = localStorage.getItem('ongoing-research-query');
-    
-    if (storedInProgress && storedQuery) {
-      setIsResearchInProgress(true);
-      setOngoingResearchQuery(storedQuery);
-    }
-  }, []);
+    localStorage.setItem('research-in-progress', isResearchInProgress.toString());
+  }, [isResearchInProgress]);
 
   useEffect(() => {
     localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
@@ -105,20 +99,20 @@ const ResearchAgent = () => {
 
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
-
+    
     // Set research in progress state
     setIsResearchInProgress(true);
     setOngoingResearchQuery(message);
-
+    
     sendMessage({ 
       message, 
       model: selectedModel === 'auto' ? currentModel : selectedModel,
       customSearchPrefs: searchPreferences,
       researchDepth: parseInt(researchDepth)
     });
-
+    
     setMessage('');
-
+    
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -141,7 +135,7 @@ const ResearchAgent = () => {
   // Extract sources from research responses
   const extractSources = (content: string) => {
     const sources: Array<{ title: string; url: string; domain: string }> = [];
-
+    
     if (content.includes('Sources:') || content.includes('**Sources:**')) {
       const lines = content.split('\n');
       lines.forEach(line => {
@@ -160,7 +154,7 @@ const ResearchAgent = () => {
         }
       });
     }
-
+    
     return sources;
   };
 
@@ -220,7 +214,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 <h2 className="text-sm font-semibold text-gray-100">Research Agent</h2>
               </div>
             </div>
-
+            
             <Button 
               onClick={handleNewConversation}
               className="w-full h-8 bg-slate-700 hover:bg-slate-600 hover:text-primary transition-all duration-200 text-white text-sm"
@@ -267,7 +261,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   <h1 className="text-3xl font-semibold text-gray-100 mb-8">
                     Hello Dat, where should we begin?
                   </h1>
-
+                  
                   {/* Predefined Prompt Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
                     {[
@@ -306,7 +300,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       </div>
                     ))}
                   </div>
-
+                  
                   <p className="text-sm text-gray-500 mt-8">
                     Click any card above or type your own research question below
                   </p>
@@ -378,7 +372,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                             {msg.content}
                           </ReactMarkdown>
                         </div>
-
+                        
                         {/* Enhanced Sources Section */}
                         {extractSources(msg.content).length > 0 && (
                           <div className="mt-6 pt-4 border-t border-slate-800/40">
@@ -443,8 +437,8 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             ))}
 
-            {/* Research Progress - Show only when actively sending a message */}
-            {isSending && !messages.find(m => m.role === 'assistant') && (
+            {/* Research Progress - Show when researching or when research state is persisted */}
+            {(isSending || isResearchInProgress) && (
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
                   <Bot className="w-5 h-5 text-white" />
@@ -453,7 +447,15 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   <ResearchProgress 
                     stage={1} 
                     progress={0}
+                    query={ongoingResearchQuery || message}
+                    isActive={isSending || isResearchInProgress}
                   />
+                  {isResearchInProgress && !isSending && (
+                    <div className="mt-2 text-xs text-blue-400 flex items-center space-x-1">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                      <span>Research continues in background...</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -540,7 +542,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       </Button>
                     </div>
                   </div>
-
+                  
 
                 </div>
 
@@ -555,7 +557,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     className="w-full bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none min-h-[60px] pr-20 text-sm"
                     rows={2}
                   />
-
+                  
                   {/* Input Actions */}
                   <div className="absolute bottom-2 right-2 flex items-center space-x-2">
                     <span className="text-xs text-gray-500">{message.length}/2000</span>

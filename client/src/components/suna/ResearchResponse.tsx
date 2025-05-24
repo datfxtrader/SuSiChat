@@ -463,12 +463,4 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
   );
 };
 
-export default function ResearchResponse({ content, timestamp }: { content: string; timestamp: string }) {
-  if (!content) return null;
-
-  return (
-    <div className="prose prose-invert max-w-none">
-      <ReactMarkdown>{content}</ReactMarkdown>
-    </div>
-  );
-}ponse;
+export default ResearchResponse;
