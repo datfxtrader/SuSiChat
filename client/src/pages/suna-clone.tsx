@@ -510,9 +510,9 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   </div>
                 )}
               </div>
-
-                {/* Clean Input Area */}
-                <div className="relative">
+              
+              {/* Clean Input Area */}
+              <div className="relative">
                   <Textarea
                     ref={textareaRef}
                     value={message}
@@ -542,9 +542,12 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 </div>
               </div>
             </div>
+            </div>
+          </div>
           </div>
         </div>
       </div>
+    </div>
     </MainLayout>
   );
 };
