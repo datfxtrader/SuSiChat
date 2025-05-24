@@ -42,9 +42,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
 
   return (
     <div className={cn(
-      "border-r border-border bg-background/80 backdrop-blur-sm",
+      "border-r border-border",
       className
-    )}>
+    )} style={{ 
+      background: 'rgba(15, 23, 42, 0.8)', 
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)'
+    }}>
       {/* App Logo and Title */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center space-x-3">
