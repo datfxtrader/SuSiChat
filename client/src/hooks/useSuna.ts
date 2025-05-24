@@ -234,16 +234,26 @@ export function useSuna(initialThreadId?: string) {
 
   // Handle research state persistence
   useEffect(() => {
+    const storedInProgress = localStorage.getItem('research-in-progress') === 'true';
+    const storedQuery = localStorage.getItem('ongoing-research-query');
+
+    if (storedInProgress && storedQuery && !isResearchInProgress) {
+      setIsResearchInProgress(true);
+      setOngoingResearchQuery(storedQuery);
+    }
+  }, []);
+
+  useEffect(() => {
     if (isSending) {
       localStorage.setItem('research-in-progress', 'true');
       localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
     } else if (!isSending && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.role === 'assistant') {
-        setIsResearchInProgress(false);
-        setOngoingResearchQuery('');
         localStorage.removeItem('research-in-progress');
         localStorage.removeItem('ongoing-research-query');
+        setIsResearchInProgress(false);
+        setOngoingResearchQuery('');
       }
     }
   }, [isSending, messages, ongoingResearchQuery]);

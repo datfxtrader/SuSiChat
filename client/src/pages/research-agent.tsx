@@ -63,10 +63,16 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Persist research state to localStorage
+  // Handle initial research state
   useEffect(() => {
-    localStorage.setItem('research-in-progress', isResearchInProgress.toString());
-  }, [isResearchInProgress]);
+    const storedInProgress = localStorage.getItem('research-in-progress') === 'true';
+    const storedQuery = localStorage.getItem('ongoing-research-query');
+    
+    if (storedInProgress && storedQuery) {
+      setIsResearchInProgress(true);
+      setOngoingResearchQuery(storedQuery);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
