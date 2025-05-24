@@ -566,6 +566,14 @@ Your report should:
         enable_markdown_enhancement: true,
         enable_table_formatting: true,
         enable_chart_generation: true,
+        // Formatting and styling agents
+        use_formatting_agent: true,
+        use_styling_agent: true,
+        use_data_visualization_agent: true,
+        use_programming_format_agent: true,
+        enable_markdown_enhancement: true,
+        enable_table_formatting: true,
+        enable_chart_generation: true,
         // Financial fact validation
         enable_fact_checking: true,
         validate_financial_data: true,
