@@ -39,17 +39,24 @@ export const useSuna = () => {
 
   // WebSocket connection
   const { sendMessage } = useWebSocket({
-    url: WEBSOCKET_URL,
+    url: getWebSocketURL(),
     onMessage: (data) => {
       try {
         const parsed = JSON.parse(data);
         if (parsed.role === 'assistant') {
           setMessages(prev => [...prev, parsed]);
           setIsSending(false);
+          setIsResearchInProgress(false);
+          setResearchProgress(100);
         }
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
       }
+    },
+    onError: () => {
+      setIsSending(false);
+      setIsResearchInProgress(false);
+      setResearchProgress(0);
     }
   });
 
