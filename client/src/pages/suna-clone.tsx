@@ -216,29 +216,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
 
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-100">Research Assistant</h3>
-                  <p className="text-sm text-gray-400">Advanced AI-powered market analysis</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Badge variant="secondary" className="bg-slate-800/50 text-gray-300 border-slate-700/50">
-                  Online
-                </Badge>
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
+
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
