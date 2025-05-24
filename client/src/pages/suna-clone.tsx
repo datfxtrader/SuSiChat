@@ -422,93 +422,94 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Input Area */}
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
             <div className="space-y-3">
-              {/* Compact Research Controls */}
-              <div className="space-y-2">
-                {/* Minimal Control Bar */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    {/* Essential Controls */}
-                    <Select value={researchDepth} onValueChange={setResearchDepth}>
-                      <SelectTrigger className="w-40 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Quick (8K)</SelectItem>
-                        <SelectItem value="2">Standard (15K)</SelectItem>
-                        <SelectItem value="3">Deep (25K)</SelectItem>
-                      </SelectContent>
-                    </Select>
+              {/* Single-Line Research Controls */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {/* Essential Controls */}
+                  <Select value={researchDepth} onValueChange={setResearchDepth}>
+                    <SelectTrigger className="w-32 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Quick (8K)</SelectItem>
+                      <SelectItem value="2">Standard (15K)</SelectItem>
+                      <SelectItem value="3">Deep (25K)</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                    <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
-                      <SelectTrigger className="w-32 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="deepseek">DeepSeek</SelectItem>
-                        <SelectItem value="gemini">Gemini</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
+                    <SelectTrigger className="w-24 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto</SelectItem>
+                      <SelectItem value="deepseek">DeepSeek</SelectItem>
+                      <SelectItem value="gemini">Gemini</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                    {/* Search Mode Toggle */}
-                    <div className="flex items-center bg-slate-800/30 rounded-md p-1">
-                      <Button
-                        variant={searchPreferences.forceSearch ? "default" : "ghost"}
-                        size="sm"
-                        onClick={toggleForceSearch}
-                        className="h-6 px-2 text-xs"
-                      >
-                        <Search className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={searchPreferences.disableSearch ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={toggleDisableSearch}
-                        className="h-6 px-2 text-xs"
-                      >
-                        <Ban className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Quick Status - Only show when actually researching */}
-                  {isSending && (
-                    <div className="flex items-center space-x-2 text-xs text-gray-400">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                      <span>Research Active</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Compact Templates */}
-                <div className="flex items-center space-x-2 overflow-x-auto scrollbar-hide">
-                  {[
-                    { icon: TrendingUp, text: "Market", query: "Analyze current market trends for " },
-                    { icon: Database, text: "Financial", query: "Generate a comprehensive financial analysis of " },
-                    { icon: Search, text: "Competitive", query: "Research competitors and market position for " },
-                    { icon: AlertCircle, text: "Risk", query: "Assess investment risks and opportunities for " }
-                  ].map((template, idx) => (
+                  {/* Search Mode Toggle */}
+                  <div className="flex items-center bg-slate-800/30 rounded-md p-1">
                     <Button
-                      key={idx}
+                      variant={searchPreferences.forceSearch ? "default" : "ghost"}
+                      size="sm"
+                      onClick={toggleForceSearch}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Search className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant={searchPreferences.disableSearch ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={toggleDisableSearch}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Ban className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-6 w-px bg-slate-600/50"></div>
+
+                  {/* Compact Templates */}
+                  <div className="flex items-center space-x-2">
+                    {[
+                      { icon: TrendingUp, text: "Market", query: "Analyze current market trends for " },
+                      { icon: Database, text: "Financial", query: "Generate a comprehensive financial analysis of " },
+                      { icon: Search, text: "Competitive", query: "Research competitors and market position for " },
+                      { icon: AlertCircle, text: "Risk", query: "Assess investment risks and opportunities for " }
+                    ].map((template, idx) => (
+                      <Button
+                        key={idx}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMessage(template.query)}
+                        className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 text-xs flex items-center space-x-1"
+                      >
+                        <template.icon className="w-3 h-3" />
+                        <span className="hidden sm:inline">{template.text}</span>
+                      </Button>
+                    ))}
+                    <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setMessage(template.query)}
-                      className="h-7 px-3 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 whitespace-nowrap text-xs flex-shrink-0"
+                      onClick={() => window.open('/templates', '_blank')}
+                      className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30"
+                      title="Manage Templates"
                     >
-                      <template.icon className="w-3 h-3 mr-1" />
-                      {template.text}
+                      <Plus className="w-3 h-3" />
                     </Button>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open('/templates', '_blank')}
-                    className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 flex-shrink-0"
-                    title="Manage Templates"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </Button>
+                  </div>
                 </div>
+                
+                {/* Quick Status - Only show when actually researching */}
+                {isSending && (
+                  <div className="flex items-center space-x-2 text-xs text-gray-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span>Research Active</span>
+                  </div>
+                )}
+              </div>
 
                 {/* Clean Input Area */}
                 <div className="relative">
