@@ -47,6 +47,15 @@ logger = logging.getLogger("deerflow_service")
 # Initialize FastAPI app
 app = FastAPI(title="DeerFlow Research Service")
 
+@app.get("/")
+async def read_root():
+    """Root endpoint handler"""
+    return {
+        "status": "ok",
+        "service": "DeerFlow Research Service",
+        "message": "Welcome to the DeerFlow Research API"
+    }
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
