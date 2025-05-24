@@ -164,8 +164,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
 
   return (
     <MainLayout
-      title="Suna Agent Clone"
-      description="Experience the same beautiful UI and design patterns"
+      showHeader={false}
     >
       <div className="flex h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950">
         {/* Sidebar - Conversations */}
