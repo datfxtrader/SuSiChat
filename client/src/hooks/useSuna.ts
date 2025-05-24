@@ -232,75 +232,30 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
-  // Handle research state persistence
-  useEffect(() => {
-    const storedInProgress = localStorage.getItem('research-in-progress') === 'true';
-    const storedQuery = localStorage.getItem('ongoing-research-query');
-
-    if (storedInProgress && storedQuery && !isResearchInProgress) {
-      setIsResearchInProgress(true);
-      setOngoingResearchQuery(storedQuery);
-    }
-  }, []);
-
+  // Single effect to handle all research state changes
   useEffect(() => {
     if (isSending) {
+      setIsResearchInProgress(true);
       localStorage.setItem('research-in-progress', 'true');
       localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
-    } else if (!isSending && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.role === 'assistant') {
-        localStorage.removeItem('research-in-progress');
-        localStorage.removeItem('ongoing-research-query');
-        setIsResearchInProgress(false);
-        setOngoingResearchQuery('');
-      }
+      return;
+    }
+
+    if (messages.length === 0) return;
+    
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'assistant') {
+      setIsResearchInProgress(false);
+      setOngoingResearchQuery('');
+      localStorage.removeItem('research-in-progress');
+      localStorage.removeItem('ongoing-research-query');
+    } else if (lastMessage?.role === 'user') {
+      setIsResearchInProgress(true);
+      setOngoingResearchQuery(lastMessage.content);
+      localStorage.setItem('research-in-progress', 'true');
+      localStorage.setItem('ongoing-research-query', lastMessage.content);
     }
   }, [isSending, messages, ongoingResearchQuery]);
-
-  // Update research state when new message appears
-  useEffect(() => {
-    if (!isSending && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      
-      if (lastMessage?.role === 'assistant') {
-        // Clear research state when assistant responds
-        setIsResearchInProgress(false);
-        setOngoingResearchQuery('');
-        localStorage.removeItem('research-in-progress');
-        localStorage.removeItem('ongoing-research-query');
-      } else if (lastMessage?.role === 'user') {
-        // Set research state when user sends message
-        setIsResearchInProgress(true);
-        setOngoingResearchQuery(lastMessage.content);
-        localStorage.setItem('research-in-progress', 'true');
-        localStorage.setItem('ongoing-research-query', lastMessage.content);
-      }
-    }
-  }, [isSending, messages]);
-
-  // Handle research state persistence
-  useEffect(() => {
-    if (!isSending && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      
-      if (lastMessage?.role === 'assistant' && isResearchInProgress) {
-        // Research completed with response
-        setTimeout(() => {
-          setIsResearchInProgress(false);
-          setOngoingResearchQuery('');
-          localStorage.removeItem('research-in-progress');
-          localStorage.removeItem('ongoing-research-query');
-        }, 2000);
-      } else if (lastMessage?.role === 'user' && !isResearchInProgress) {
-        // New research started
-        setIsResearchInProgress(true);
-        setOngoingResearchQuery(lastMessage.content);
-        localStorage.setItem('research-in-progress', 'true');
-        localStorage.setItem('ongoing-research-query', lastMessage.content);
-      }
-    }
-  }, [isSending, messages, isResearchInProgress]);
 
   return {
     conversation,
