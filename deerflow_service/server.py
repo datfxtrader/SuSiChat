@@ -1,8 +1,5 @@
 """
-DeerFlow Research Service
-
-This service provides a FastAPI server to handle deep research requests using DeerFlow.
-Enhanced with intelligent agent capabilities for advanced planning and reasoning.
+The code has been modified to fix a syntax error in the Python code, specifically within the `full_deerflow_research` function.
 """
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -847,7 +844,6 @@ async def full_deerflow_research(request: FullAgentResearchRequest):
         logger.info(f"Full DeerFlow research request: {request.research_question}")
 
         # Execute with full agent capabilities
-```python
         result = await full_agent_system.process_complex_research(
             query=request.research_question,
             user_id=request.user_id,
@@ -858,7 +854,7 @@ async def full_deerflow_research(request: FullAgentResearchRequest):
             "message": "Full DeerFlow agent research completed",
             "capabilities": [
                 "Multi-agent orchestration",
-                "Advanced reasoning engine", 
+                "Advanced reasoning engine",
                 "Domain expertise",
                 "Tool use and integration",
                 "Continuous learning"
@@ -929,3 +925,4 @@ async def list_available_tools():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+`
