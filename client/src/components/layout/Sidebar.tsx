@@ -42,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
 
   return (
     <div className={cn(
-      "border-r border-border bg-slate-900/95 backdrop-blur-md",
+      "border-r border-border bg-background/95 backdrop-blur-md",
       className
     )}>
       {/* App Logo and Title */}
