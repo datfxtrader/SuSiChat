@@ -232,30 +232,45 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
-  // Single effect to handle all research state changes
+  // Initialize research state from localStorage
   useEffect(() => {
-    if (isSending) {
+    const storedInProgress = localStorage.getItem('research-in-progress') === 'true';
+    const storedQuery = localStorage.getItem('ongoing-research-query');
+    
+    if (storedInProgress && storedQuery) {
       setIsResearchInProgress(true);
+      setOngoingResearchQuery(storedQuery);
+    }
+  }, []);
+
+  // Handle research state changes
+  useEffect(() => {
+    // When sending a message
+    if (isSending) {
+      const lastMessage = messages[messages.length - 1];
+      const query = lastMessage?.content || ongoingResearchQuery;
+      
+      setIsResearchInProgress(true);
+      setOngoingResearchQuery(query);
       localStorage.setItem('research-in-progress', 'true');
-      localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
+      localStorage.setItem('ongoing-research-query', query);
       return;
     }
 
-    if (messages.length === 0) return;
-    
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === 'assistant') {
-      setIsResearchInProgress(false);
-      setOngoingResearchQuery('');
-      localStorage.removeItem('research-in-progress');
-      localStorage.removeItem('ongoing-research-query');
-    } else if (lastMessage?.role === 'user') {
-      setIsResearchInProgress(true);
-      setOngoingResearchQuery(lastMessage.content);
-      localStorage.setItem('research-in-progress', 'true');
-      localStorage.setItem('ongoing-research-query', lastMessage.content);
+    // When receiving a response
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      
+      if (lastMessage?.role === 'assistant') {
+        setTimeout(() => {
+          setIsResearchInProgress(false);
+          setOngoingResearchQuery('');
+          localStorage.removeItem('research-in-progress');
+          localStorage.removeItem('ongoing-research-query');
+        }, 1000);
+      }
     }
-  }, [isSending, messages, ongoingResearchQuery]);
+  }, [isSending, messages]);
 
   return {
     conversation,
