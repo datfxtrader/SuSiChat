@@ -37,6 +37,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize crash-safe storage system
+  const { CrashSafeResearch } = await import('./crash-safe-storage');
+  await CrashSafeResearch.initialize();
+  console.log('🛡️ Crash-safe research storage initialized');
+
   // Add research results API endpoint for immediate access
   app.get('/api/research/results/:conversationId', async (req: any, res) => {
     try {

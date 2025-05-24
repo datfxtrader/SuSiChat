@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
 import { researchService, ResearchDepth } from './deerflow-integration';
+import { CrashSafeResearch } from './crash-safe-storage';
 
 import LRU from 'lru-cache';
 import { getCurrentBitcoinPrice, getBitcoinMarketContext, enhanceBitcoinQuery } from './yahoo-finance-integration';
