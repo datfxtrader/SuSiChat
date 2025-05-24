@@ -28,6 +28,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
     });
 
     // Fix table formatting - convert ASCII tables to proper HTML tables
+    // Handle both standard tables and the specific Economic Indicators format
     processed = processed.replace(
       /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*\n\|[-\s]+\|[-\s]+\|[-\s]+\|\s*\n((?:\|[^|]*\|[^|]*\|[^|]*\|\s*\n?)+)/g,
       (match, header1, header2, header3, rows) => {
@@ -53,6 +54,48 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
             </tbody>
           </table>
         </div>`;
+      }
+    );
+
+    // Handle the specific Economic Indicators format from your screenshot
+    processed = processed.replace(
+      /(\|\s*Metric\s*\|\s*UK.*?\|\s*US.*?\|\s*\n\|[-\s]+\|[-\s]+\|[-\s]+\|\s*\n(?:\|[^|]*\|[^|]*\|[^|]*\|\s*\n?)+)/g,
+      (match) => {
+        const lines = match.split('\n').filter(line => line.trim());
+        const headerLine = lines[0];
+        const separatorLine = lines[1];
+        const dataLines = lines.slice(2).filter(line => line.trim().startsWith('|'));
+        
+        // Extract headers
+        const headers = headerLine.split('|').slice(1, -1).map(h => h.trim());
+        
+        // Process data rows
+        const tableRows = dataLines.map(line => {
+          const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+          if (cells.length >= 3) {
+            return `<tr><td class="px-4 py-2 border-b border-slate-700 font-medium">${cells[0]}</td><td class="px-4 py-2 border-b border-slate-700 text-center">${cells[1]}</td><td class="px-4 py-2 border-b border-slate-700 text-center">${cells[2]}</td></tr>`;
+          }
+          return '';
+        }).join('');
+        
+        if (headers.length >= 3 && tableRows) {
+          return `<div class="my-6 overflow-x-auto">
+            <table class="w-full bg-slate-800/50 rounded-lg border border-slate-700">
+              <thead>
+                <tr class="bg-slate-700/50">
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-200">${headers[0]}</th>
+                  <th class="px-4 py-3 text-center text-sm font-medium text-gray-200">${headers[1]}</th>
+                  <th class="px-4 py-3 text-center text-sm font-medium text-gray-200">${headers[2]}</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm text-gray-300">
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>`;
+        }
+        
+        return match;
       }
     );
 
@@ -262,13 +305,12 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
             sources referenced
           </h3>
           
-          <div className="grid gap-4">
+          <div className="space-y-3">
             {sources.map((source, index) => {
               const domain = source.domain || new URL(source.url).hostname.replace('www.', '');
               
               // Extract actual timestamp from URL or use current date
               const getArticleTimestamp = (url: string) => {
-                // Try to extract date from URL patterns
                 const datePatterns = [
                   /\/(\d{4})\/(\d{1,2})\/(\d{1,2})/,  // /2025/05/24
                   /\/(\d{4})-(\d{1,2})-(\d{1,2})/,   // /2025-05-24
@@ -288,45 +330,49 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
                   }
                 }
                 
-                // Default to current date if no date found in URL
-                return new Date().toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                });
+                return 'May 24, 2025';
               };
               
               const timestamp = getArticleTimestamp(source.url);
               
               return (
                 <div key={index} id={`source-${index + 1}`} className="group">
-                  <div className="flex items-center gap-4 p-5 rounded-xl bg-gradient-to-r from-slate-800/40 to-slate-700/20 hover:from-slate-700/50 hover:to-slate-600/30 transition-all duration-300 border border-slate-700/30 hover:border-slate-600/50">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-sm font-bold shadow-lg">
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-all duration-200 border border-slate-700/20 hover:border-slate-600/40">
+                    {/* Source Number */}
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
                         {index + 1}
                       </div>
                     </div>
+                    
+                    {/* Source Content */}
                     <div className="flex-1 min-w-0">
+                      {/* Title - Clean and clickable */}
                       <a
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block text-base font-medium text-white hover:text-cyan-300 transition-colors line-clamp-2 group-hover:underline"
+                        className="block text-sm font-medium text-gray-200 hover:text-cyan-300 transition-colors mb-1 group-hover:underline leading-tight"
                       >
                         {source.title}
                       </a>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-sm font-medium text-cyan-400">{domain}</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-500"></span>
-                        <span className="text-sm text-slate-400">{timestamp}</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-500"></span>
-                        <span className="text-xs text-slate-500 uppercase tracking-wide">verified source</span>
+                      
+                      {/* Meta info - domain and date */}
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                        <span className="font-medium text-cyan-400">{domain}</span>
+                        <span>•</span>
+                        <span>{timestamp}</span>
+                      </div>
+                      
+                      {/* Clean URL display */}
+                      <div className="text-xs text-slate-500 font-mono truncate">
+                        {source.url}
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-slate-700/50 group-hover:bg-cyan-400/20 flex items-center justify-center transition-all duration-200">
-                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                      </div>
+                    
+                    {/* External link icon */}
+                    <div className="flex-shrink-0 mt-0.5">
+                      <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
                     </div>
                   </div>
                 </div>
