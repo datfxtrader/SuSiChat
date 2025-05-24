@@ -982,26 +982,51 @@ ${numberContradictions.join('\n')}
               }
             }
 
-            // Get current gold price for validation
-            let currentGoldPrice = '';
+            // Smart forecast validation with timestamp context
+            let forecastValidation = '';
             try {
-              // Try to extract current gold price from search results
+              // Extract forecasts with their timestamps for intelligent validation
+              const forecasts = [];
               for (const result of sortedResults) {
-                const content = (result.content || '').toLowerCase();
-                const priceMatch = content.match(/gold.*?(?:price|trading).*?\$([0-9,]+)/i);
-                if (priceMatch) {
-                  currentGoldPrice = `\n🔥 CURRENT GOLD PRICE: $${priceMatch[1]} (from live market data)\n`;
-                  break;
+                const content = result.content || '';
+                const title = result.title || '';
+                
+                // Look for forecast patterns with prices
+                const forecastMatch = content.match(/(?:forecast|target|expects?|predicts?).*?\$([0-9,]+)/i) ||
+                                     title.match(/(?:forecast|target|expects?|predicts?).*?\$([0-9,]+)/i);
+                
+                if (forecastMatch) {
+                  const forecastPrice = parseInt(forecastMatch[1].replace(',', ''));
+                  
+                  // Extract timestamp
+                  let forecastDate = result.publishedDate;
+                  if (!forecastDate && content) {
+                    const dateMatch = content.match(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+202[4-5]/i);
+                    if (dateMatch) forecastDate = dateMatch[0];
+                  }
+                  
+                  forecasts.push({
+                    price: forecastPrice,
+                    date: forecastDate,
+                    source: result.title,
+                    url: result.url
+                  });
                 }
               }
+              
+              if (forecasts.length > 0) {
+                forecastValidation = `\n📊 SMART FORECAST ANALYSIS:\n${forecasts.map(f => 
+                  `💡 ${f.source}: $${f.price.toLocaleString()} target ${f.date ? `(${f.date})` : '(undated)'}`
+                ).join('\n')}\n`;
+              }
             } catch (e) {
-              // Continue without current price if extraction fails
+              // Continue without forecast analysis if extraction fails
             }
 
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
-Search query: "${finalQuery}"${currentGoldPrice}${dataFreshnessWarning}${priceContext}
+Search query: "${finalQuery}"${forecastValidation}${dataFreshnessWarning}${priceContext}
 
 ${diversityInfo ? `${diversityInfo}\n` : ''}
 ${topicsInfo ? `${topicsInfo}\n` : ''}
@@ -1080,11 +1105,13 @@ FINANCIAL RESEARCH PRIORITY:
 - **ALWAYS prioritize the most recent data and news closest to today's date**
 - **CRITICAL: Check current market prices against any forecasts provided**
 - **URGENT: Reject outdated data from 2021-2023 when discussing current 2025 trends**
-- **CRITICAL: Validate current gold price is above $3,200/oz as of May 2025**
-- For price forecasts, validate against current market reality:
-  * Current gold price has exceeded $3,000 - seek targets above $3,200
-  * Dismiss any forecasts below current market levels as outdated
-  * Always state: "Current gold price: $X,XXX vs forecast of $Y,YYY"
+- **CRITICAL: Smart forecast validation using timestamp analysis**
+- For price forecasts, validate using intelligent context:
+  * Check forecast publication date and market price at that time
+  * If forecast target REACHED: Mark as "✅ Forecast achieved" with timeline
+  * If forecast target NOT REACHED: Keep as valid with progress tracking
+  * Always state: "Forecast: $X,XXX (made when gold was $Y,YYY) | Current: $Z,ZZZ"
+  * Show forecast progress: "Target $X,XXX is XX% above current $Y,YYY"
 - Flag and dismiss any data older than 6 months when discussing current market conditions
 - Include publication dates and timestamps for all price data sources
 - Cross-reference information across multiple sources to verify accuracy
