@@ -230,24 +230,35 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Conversations List */}
           <div className="p-4 space-y-2">
             <h3 className="text-sm font-medium text-gray-400 mb-3">Recent Conversations</h3>
-            {allConversations && Array.isArray(allConversations) && (allConversations as any[]).map((conv: any) => (
-              <div
-                key={conv.id}
-                onClick={() => selectConversation(conv.id)}
-                className="group p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 hover:border-primary/20 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title || 'Untitled Chat'}</h4>
-                  <span className="text-xs text-gray-500">{formatRelativeTime(conv.createdAt || conv.updatedAt || new Date().toISOString())}</span>
+{Array.isArray(allConversations) ? allConversations.map((conv: any) => {
+              if (!conv || typeof conv.id !== 'string') {
+                console.warn('⚠️ Invalid conversation object:', conv);
+                return null;
+              }
+              
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => selectConversation(conv.id)}
+                  className="group p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 hover:border-primary/20 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title || 'Untitled Research'}</h4>
+                    <span className="text-xs text-gray-500">{formatRelativeTime(conv.createdAt || conv.updatedAt || new Date().toISOString())}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 truncate">
+                    {conv.messages && conv.messages.length > 0 
+                      ? String(conv.messages[conv.messages.length - 1]?.content || '').substring(0, 60) + '...'
+                      : 'No messages yet'
+                    }
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 truncate">
-                  {conv.messages && conv.messages.length > 0 
-                    ? conv.messages[conv.messages.length - 1].content.substring(0, 60) + '...'
-                    : 'No messages yet'
-                  }
-                </p>
+              );
+            }).filter(Boolean) : (
+              <div className="text-sm text-gray-500 p-4">
+                {allConversations === null ? 'Loading conversations...' : 'No research conversations found'}
               </div>
-            ))}
+            )}
           </div>
         </div>
 

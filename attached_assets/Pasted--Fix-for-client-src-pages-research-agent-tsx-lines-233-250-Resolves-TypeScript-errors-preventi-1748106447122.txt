@@ -1,0 +1,130 @@
+// Fix for client/src/pages/research-agent.tsx lines 233-250
+// Resolves TypeScript errors preventing message rendering
+
+// BEFORE: Unsafe type casting causing render failures
+// (allConversations as any[])
+
+// AFTER: Proper TypeScript typing with error handling
+
+// 1. Define proper interfaces at the top of the file
+interface ConversationMessage {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: string;
+  metadata?: any;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  messages: ConversationMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 2. Fix the conversation mapping (around line 233)
+const renderConversations = () => {
+  // Proper type checking instead of unsafe casting
+  if (!Array.isArray(allConversations)) {
+    console.warn('⚠️ allConversations is not an array:', allConversations);
+    return <div>No conversations available</div>;
+  }
+
+  return allConversations.map((conversation: Conversation) => {
+    // Type-safe conversation rendering
+    if (!conversation || typeof conversation.id !== 'string') {
+      console.warn('⚠️ Invalid conversation object:', conversation);
+      return null;
+    }
+
+    return (
+      <div key={conversation.id} className="conversation-item">
+        <h3>{conversation.title || 'Untitled Research'}</h3>
+        {conversation.messages && conversation.messages.length > 0 ? (
+          conversation.messages.map((message: ConversationMessage) => (
+            <div key={message.id} className={`message ${message.role}`}>
+              {renderMessageContent(message.content, message.role)}
+            </div>
+          ))
+        ) : (
+          <div className="no-messages">No messages in this conversation</div>
+        )}
+      </div>
+    );
+  }).filter(Boolean); // Remove null entries
+};
+
+// 3. Fix the message content rendering with proper ReactNode typing
+const renderMessageContent = (content: string, role: string): React.ReactNode => {
+  try {
+    // Handle different content types safely
+    if (typeof content !== 'string') {
+      console.warn('⚠️ Message content is not a string:', content);
+      return <div>Invalid message content</div>;
+    }
+
+    if (role === 'assistant') {
+      // For assistant messages, render as markdown
+      return (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            // Custom components to handle any rendering issues
+            p: ({ children }) => <p className="message-paragraph">{children}</p>,
+            h3: ({ children }) => <h3 className="message-heading">{children}</h3>,
+            ul: ({ children }) => <ul className="message-list">{children}</ul>,
+            li: ({ children }) => <li className="message-list-item">{children}</li>,
+            code: ({ children }) => <code className="message-code">{children}</code>,
+            pre: ({ children }) => <pre className="message-pre">{children}</pre>,
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+      );
+    } else {
+      // For user messages, render as plain text
+      return <div className="user-message-content">{content}</div>;
+    }
+  } catch (error) {
+    console.error('❌ Error rendering message content:', error);
+    return <div className="error-message">Error displaying message content</div>;
+  }
+};
+
+// 4. Add error boundary for the entire conversation rendering
+const ConversationRenderer: React.FC = () => {
+  try {
+    return (
+      <div className="conversations-container">
+        {renderConversations()}
+      </div>
+    );
+  } catch (error) {
+    console.error('❌ Error rendering conversations:', error);
+    return (
+      <div className="error-container">
+        <h3>Display Error</h3>
+        <p>There was an error displaying the research results. Check console for details.</p>
+        <button onClick={() => window.location.reload()}>Refresh Page</button>
+      </div>
+    );
+  }
+};
+
+// 5. Debug helper - add this temporarily to see what data you're getting
+const debugConversations = () => {
+  console.log('🔍 DEBUG: All conversations:', allConversations);
+  console.log('🔍 DEBUG: Conversations type:', typeof allConversations);
+  console.log('🔍 DEBUG: Is array?', Array.isArray(allConversations));
+  
+  if (Array.isArray(allConversations) && allConversations.length > 0) {
+    console.log('🔍 DEBUG: First conversation:', allConversations[0]);
+    console.log('🔍 DEBUG: First conversation messages:', allConversations[0]?.messages);
+  }
+};
+
+// Call this in useEffect to debug
+useEffect(() => {
+  debugConversations();
+}, [allConversations]);

@@ -1,0 +1,71 @@
+// Add this diagnostic component to your research-agent.tsx
+// This will help us see if results are being received but not displayed
+
+const ResearchResultsDiagnostic: React.FC = () => {
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+
+  useEffect(() => {
+    // Check what data is available
+    const diagnostic = {
+      conversationsCount: allConversations?.length || 0,
+      conversationsType: typeof allConversations,
+      isArray: Array.isArray(allConversations),
+      hasCurrentConversation: !!currentConversation,
+      currentConversationId: currentConversation?.id,
+      messagesCount: currentConversation?.messages?.length || 0,
+      lastMessage: currentConversation?.messages?.[currentConversation.messages.length - 1],
+      researchState: {
+        isResearchInProgress,
+        progress: state.progress,
+        stage: state.stage,
+        conversationHistoryLength: state.conversationHistory?.length || 0
+      }
+    };
+
+    setDiagnosticInfo(diagnostic);
+    console.log('🔍 DIAGNOSTIC INFO:', diagnostic);
+  }, [allConversations, currentConversation, isResearchInProgress, state]);
+
+  // Only show diagnostic in development
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+
+  return (
+    <div style={{ 
+      position: 'fixed', 
+      bottom: '10px', 
+      right: '10px', 
+      background: '#1a1a1a', 
+      color: '#00ff00', 
+      padding: '10px', 
+      fontSize: '12px',
+      borderRadius: '4px',
+      maxWidth: '300px',
+      maxHeight: '200px',
+      overflow: 'auto',
+      zIndex: 9999,
+      border: '1px solid #333'
+    }}>
+      <strong>🔍 Research Results Diagnostic</strong>
+      <pre>{JSON.stringify(diagnosticInfo, null, 2)}</pre>
+    </div>
+  );
+};
+
+// Add this component to your main render function:
+// <ResearchResultsDiagnostic />
+
+// Also add this effect to force re-render when research completes
+useEffect(() => {
+  if (!isResearchInProgress && state.progress >= 100) {
+    console.log('✅ Research completed, forcing conversation refresh...');
+    
+    // Force refresh conversations to pick up new results
+    setTimeout(() => {
+      // Trigger conversation list refresh
+      // This might be a function like refreshConversations() or fetchConversations()
+      window.location.reload(); // Temporary force refresh - replace with proper refresh function
+    }, 1000);
+  }
+}, [isResearchInProgress, state.progress]);
