@@ -167,25 +167,24 @@ Current market conditions show several critical factors influencing Bitcoin's tr
       showHeader={false}
     >
       <div className="flex h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950">
-        {/* Sidebar - Conversations */}
-        <div className="w-80 border-r border-slate-800/50 bg-slate-950/70 backdrop-blur-md">
-          <div className="p-4 border-b border-slate-800/50">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-slate-800 rounded-xl flex items-center justify-center">
-                <Bot className="w-6 h-6 text-white" />
+        {/* Compact Sidebar - Conversations */}
+        <div className="w-60 border-r border-slate-800/50 bg-slate-950/70 backdrop-blur-md">
+          <div className="p-3 border-b border-slate-800/50">
+            <div className="flex items-center space-x-2 mb-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-slate-800 rounded-lg flex items-center justify-center">
+                <Bot className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-100">Suna Agent Clone</h2>
-                <p className="text-sm text-gray-400">UI Experience Demo</p>
+                <h2 className="text-sm font-semibold text-gray-100">Research Agent</h2>
               </div>
             </div>
             
             <Button 
               onClick={handleNewConversation}
-              className="w-full bg-slate-700 hover:bg-slate-600 hover:text-primary hover:shadow-lg transition-all duration-200 text-white"
+              className="w-full h-8 bg-slate-700 hover:bg-slate-600 hover:text-primary transition-all duration-200 text-white text-sm"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              New Research Chat
+              <Sparkles className="w-3 h-3 mr-2" />
+              New Chat
             </Button>
           </div>
 
