@@ -501,13 +501,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     </div>
                   </div>
                   
-                  {/* Quick Status - Only show when actually researching */}
-                  {isSending && (
-                    <div className="flex items-center space-x-2 text-xs text-gray-400">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                      <span>Research Active</span>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Clean Input Area */}
