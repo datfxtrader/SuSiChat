@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { useWebsocket } from "@/hooks/useWebsocket";
+import { useWebSocket } from "@/hooks/useWebsocket";
 import { useEffect } from "react";
 
 // Pages
@@ -19,7 +19,7 @@ import NotFound from "@/pages/not-found";
 
 function App() {
   const { user, isAuthenticated } = useAuth();
-  const { isConnected } = useWebsocket();
+  const { isConnected } = useWebSocket();
 
   // Initialize WebSocket connection when authenticated
   useEffect(() => {
