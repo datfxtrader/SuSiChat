@@ -1,7 +1,11 @@
 import { WebSocketMessage } from "./types";
-import { getBaseUrl } from './utils';
 
-export const WEBSOCKET_URL = `${getBaseUrl().replace('http', 'ws')}/ws`;
+const getWebSocketBaseUrl = () => {
+  const port = 5000;
+  return `ws://0.0.0.0:${port}`;
+};
+
+export const WEBSOCKET_URL = `${getWebSocketBaseUrl()}/ws`;
 
 export const getWebSocketURL = (threadId?: string) => {
   const url = new URL(WEBSOCKET_URL);
