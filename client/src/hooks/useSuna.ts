@@ -35,6 +35,18 @@ export function useSuna(initialThreadId?: string) {
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
   const [currentModel, setCurrentModel] = useState<LLMModel>('auto');
+  const [isResearchInProgress, setIsResearchInProgress] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('research-in-progress') === 'true';
+    }
+    return false;
+  });
+  const [ongoingResearchQuery, setOngoingResearchQuery] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ongoing-research-query') || '';
+    }
+    return '';
+  });
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
     priority: 'relevance',
     maxResults: 5
@@ -220,6 +232,27 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
+  // Update localStorage when research state changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('research-in-progress', isResearchInProgress.toString());
+      localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
+    }
+  }, [isResearchInProgress, ongoingResearchQuery]);
+
+  // Clean up research state when complete
+  useEffect(() => {
+    if (!isSending && isResearchInProgress && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        setTimeout(() => {
+          setIsResearchInProgress(false);
+          setOngoingResearchQuery('');
+        }, 2000);
+      }
+    }
+  }, [isSending, isResearchInProgress, messages]);
+
   return {
     conversation,
     allConversations,
@@ -236,6 +269,10 @@ export function useSuna(initialThreadId?: string) {
     changeModel,
     updateSearchPreferences,
     toggleForceSearch,
-    toggleDisableSearch
+    toggleDisableSearch,
+    isResearchInProgress,
+    setIsResearchInProgress,
+    ongoingResearchQuery,
+    setOngoingResearchQuery
   };
 }
