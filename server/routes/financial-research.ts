@@ -9,12 +9,12 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { ResearchParams, ResearchResult, ResearchSource, ResearchDepth } from '../deerflow-integration';
 import { isAuthenticated } from '../replitAuth';
-import { FinanceCache } from '../cache/financeCache';
-import { YahooFinanceProvider } from '../providers/YahooFinanceProvider';
+// import { FinanceCache } from '../cache/financeCache';
+// import { YahooFinanceProvider } from '../providers/YahooFinanceProvider';
 
 const router = express.Router();
 
-const yahooFinance = new YahooFinanceProvider();
+// const yahooFinance = new YahooFinanceProvider();
 
 // Financial data sources
 const FINANCIAL_SOURCES: ResearchSource[] = [

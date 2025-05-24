@@ -42,7 +42,7 @@ export function useWebsocket() {
 }
 ```
 
-```text
+// text
 The provided code already implements the base WebSocket functionality. The intention is to implement the WebSocket reconnection logic with exponential backoff. Since the original file doesn't include reconnect logic, I will add the reconnection within the initializeWebSocket function.
 ```
 
