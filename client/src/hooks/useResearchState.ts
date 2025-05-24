@@ -69,6 +69,8 @@ export const useResearchState = () => {
 
   // Start research with state persistence
   const startResearch = useCallback((query: string) => {
+    console.log('Starting research with query:', query);
+    
     const newState: ResearchState = {
       isInProgress: true,
       query,
@@ -83,6 +85,8 @@ export const useResearchState = () => {
     setResearchProgress(0);
     setResearchStage(1);
     saveResearchState(newState);
+    
+    console.log('Research state set:', newState);
 
     // Start progress simulation
     if (progressIntervalRef.current) {

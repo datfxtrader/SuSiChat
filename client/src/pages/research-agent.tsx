@@ -90,6 +90,8 @@ const ResearchAgent = () => {
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
     
+    console.log('handleSendMessage called with message:', message);
+    
     // Start research with persistent state
     startResearch(message);
     
