@@ -28,6 +28,12 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later'
 });
 
+// File-based persistent storage for research results to survive server restarts
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+
+const RESULTS_BACKUP_FILE = join(process.cwd(), 'research-results-backup.json');
+
 // In-memory storage for research results to bypass database timeouts
 const researchResultsMemoryCache = new Map<string, {
   results: any;
@@ -36,6 +42,40 @@ const researchResultsMemoryCache = new Map<string, {
   userId: string;
   conversationData: any;
 }>();
+
+// Load research results from backup file on startup
+function loadResultsFromBackup() {
+  try {
+    if (existsSync(RESULTS_BACKUP_FILE)) {
+      const backupData = JSON.parse(readFileSync(RESULTS_BACKUP_FILE, 'utf8'));
+      console.log('🔄 Loading research results from backup:', Object.keys(backupData).length, 'results');
+      
+      for (const [conversationId, data] of Object.entries(backupData)) {
+        researchResultsMemoryCache.set(conversationId, data as any);
+        console.log(`💾 Restored research result: ${conversationId} for user ${(data as any).userId}`);
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not load results backup:', error);
+  }
+}
+
+// Save research results to backup file
+function saveResultsToBackup() {
+  try {
+    const backupData: Record<string, any> = {};
+    for (const [conversationId, data] of researchResultsMemoryCache.entries()) {
+      backupData[conversationId] = data;
+    }
+    writeFileSync(RESULTS_BACKUP_FILE, JSON.stringify(backupData, null, 2));
+    console.log('💾 Research results backed up to file');
+  } catch (error) {
+    console.error('❌ Failed to backup research results:', error);
+  }
+}
+
+// Initialize backup system
+loadResultsFromBackup();
 
 // Enhanced result storage with memory priority (bypasses database entirely)
 export async function storeResearchResultsSafely(
