@@ -20,8 +20,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Root route handler
-  app.get('/', (req, res) => {
+  // API routes
+  app.use('/api/financial-research', financialResearchRoutes);
+  app.use('/api/web-search', webSearchRoutes);
+
+  // Static file serving
+  app.use(express.static('client/dist'));
+
+  // Root and SPA route handler - always serve index.html
+  app.get('*', (req, res) => {
     res.sendFile('index.html', { root: './client/dist' });
   });
 
