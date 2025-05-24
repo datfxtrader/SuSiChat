@@ -1017,7 +1017,8 @@ ${numberContradictions.join('\n')}
             
             if (credibleResults.length < sortedResults.length) {
               dataFreshnessWarning = `\n🏆 PREMIUM SOURCE FILTERING: Selected ${credibleResults.length} high-credibility sources from ${sortedResults.length} total results.\n🔍 Filtered out: Outdated macro data, non-credible sources, stale content\n⏰ Date Range: ${threeDaysAgo.toLocaleDateString()} to ${currentDate.toLocaleDateString()}\n📊 Quality Focus: Trusted financial institutions + Current May 2025 data only\n`;
-              sortedResults = credibleResults; // Use only premium credible sources
+              let freshResults = credibleResults; // Use only premium credible sources
+        sortedResults = freshResults;
             }
             
             // Check if this is a financial forecast query
@@ -1325,7 +1326,7 @@ Use the current date and web search information when responding about current ev
         'auto': 'Auto'
       };
 
-      let modelUsed = modelDisplayNames[selectedModel] || selectedModel;
+      let modelUsed = modelDisplayNames[selectedModel as keyof typeof modelDisplayNames] || selectedModel;
 
       // Log which model we're actually using, for clarity
       console.log(`Using ${modelUsed} (${selectedModel}) to generate response`);
@@ -1443,7 +1444,7 @@ Format citations properly by using superscript numbers like [1] at the end of se
 
       const assistantMessage: SunaMessage = {
         id: runId,
-        content: enhancedContent,
+        content: aiResponse,
         role: 'assistant',
         timestamp: new Date().toISOString(),
         modelUsed: modelUsed,
