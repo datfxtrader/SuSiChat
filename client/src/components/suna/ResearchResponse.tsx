@@ -11,7 +11,7 @@ interface ResearchResponseProps {
   }>;
 }
 
-const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [], charts = [], tables = [] }) => {
+const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [] }) => {
   return (
     <div className="space-y-8 max-w-none">
       {/* Premium research content with professional formatting */}
@@ -137,34 +137,6 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = 
           {content}
         </ReactMarkdown>
       </div>
-
-      {/* Render charts if available */}
-      {charts && charts.length > 0 && (
-        <div className="my-8 space-y-6">
-          {charts.map((chart, index) => (
-            <div key={index} className="p-4 bg-white rounded-lg shadow-lg">
-              <h4 className="text-lg font-semibold mb-4">{chart.title}</h4>
-              <ChartContainer config={chart.config}>
-                {chart.component}
-              </ChartContainer>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Render tables if available */}
-      {tables && tables.length > 0 && (
-        <div className="my-8 space-y-6">
-          {tables.map((table, index) => (
-            <div key={index} className="p-4 bg-white rounded-lg shadow-lg overflow-x-auto">
-              <h4 className="text-lg font-semibold mb-4">{table.title}</h4>
-              <Table>
-                {table.content}
-              </Table>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Premium sources section with enhanced professional formatting */}
       {sources && sources.length > 0 && (

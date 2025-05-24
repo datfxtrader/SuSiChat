@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -20,18 +19,13 @@ type ClientConnection = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  
 
-  // API routes - mount first to take precedence
+  // Mount financial research routes
   app.use('/api/financial-research', financialResearchRoutes);
+  
+  // Mount web search routes
   app.use('/api/web-search', webSearchRoutes);
-
-  // Static file serving
-  app.use(express.static('client/dist'));
-
-  // SPA fallback - serve index.html for all unmatched routes
-  app.get('*', (req, res) => {
-    res.sendFile('index.html', { root: './client/dist' });
-  });
   
   const httpServer = createServer(app);
   

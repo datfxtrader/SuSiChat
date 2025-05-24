@@ -9,12 +9,8 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { ResearchParams, ResearchResult, ResearchSource, ResearchDepth } from '../deerflow-integration';
 import { isAuthenticated } from '../replitAuth';
-// import { FinanceCache } from '../cache/financeCache';
-// import { YahooFinanceProvider } from '../providers/YahooFinanceProvider';
 
 const router = express.Router();
-
-// const yahooFinance = new YahooFinanceProvider();
 
 // Financial data sources
 const FINANCIAL_SOURCES: ResearchSource[] = [
@@ -38,13 +34,13 @@ const FINANCIAL_SOURCES: ResearchSource[] = [
 // Check if query is financial/forex related
 function isFinancialQuery(query: string): boolean {
   if (!query) return false;
-
+  
   const lowerQuery = query.toLowerCase();
   const financialTerms = [
     'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'nzd/usd', 'usd/cad', 'forex',
     'currency', 'exchange rate', 'financial market', 'stock market', 'trading'
   ];
-
+  
   return financialTerms.some(term => lowerQuery.includes(term));
 }
 
@@ -53,7 +49,7 @@ async function generateFinancialAnalysis(query: string): Promise<ResearchResult>
   console.log(`Generating specialized financial analysis for: ${query}`);
   const startTime = Date.now();
   const apiKey = process.env.DEEPSEEK_API_KEY;
-
+  
   if (!apiKey) {
     console.warn('DeepSeek API key not available for financial analysis');
     return {
@@ -63,7 +59,7 @@ async function generateFinancialAnalysis(query: string): Promise<ResearchResult>
       processingTime: Date.now() - startTime
     };
   }
-
+  
   try {
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
@@ -98,7 +94,7 @@ Current date: ${new Date().toISOString().split('T')[0]}`
         }
       }
     );
-
+    
     if (response.data?.choices?.[0]?.message?.content) {
       return {
         report: response.data.choices[0].message.content,
@@ -124,35 +120,25 @@ Current date: ${new Date().toISOString().split('T')[0]}`
 router.post('/generate', isAuthenticated, async (req: any, res) => {
   try {
     const { query, depth = ResearchDepth.Deep } = req.body as ResearchParams;
-
+    
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
     }
-
+    
     if (!isFinancialQuery(query)) {
       return res.status(400).json({ error: 'Query must be financial in nature' });
     }
-
-    // Check cache first
-    // Cache temporarily disabled
-    // const cachedData = await FinanceCache.getFinancialNews(query);
-    // if (cachedData) {
-    //   return res.json(JSON.parse(cachedData));
-    // }
-
+    
     console.log(`Processing financial research request for: ${query} at depth ${depth}`);
     const result = await generateFinancialAnalysis(query);
-
+    
     // Add research to history if user is authenticated
     const userId = req.user?.claims?.sub;
     if (userId) {
       // Here you could save the research to a database if needed
       console.log(`Saving research for user ${userId}`);
     }
-
-     // Store the result in cache
-     // await FinanceCache.setFinancialNews(query, JSON.stringify(result));
-
+    
     return res.json(result);
   } catch (error) {
     console.error('Error processing financial research request:', error);

@@ -1,13 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { startFinancialDataUpdates } from './tasks/updateFinancialData';
 
 const app = express();
-
-// Start financial data update tasks
-startFinancialDataUpdates();
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -47,13 +42,10 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    
+
+    res.status(status).json({ message });
     console.error('Server error:', err);
-    
-    // Avoid headers already sent error
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
+  return res.status(500).json({ message: 'Internal server error' });
   });
 
   // importantly only setup vite in development and after
@@ -68,7 +60,7 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = process.env.PORT || 5000;
+  const port = 5000;
   server.listen({
     port,
     host: "0.0.0.0",
