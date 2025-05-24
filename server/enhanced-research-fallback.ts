@@ -36,8 +36,9 @@ export class EnhancedResearchFallback {
       
     } catch (error) {
       console.error('Enhanced research error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       return {
-        content: `I encountered an error while performing research: ${error.message}`,
+        content: `I encountered an error while performing research: ${errorMessage}`,
         sources: [],
         success: false
       };
