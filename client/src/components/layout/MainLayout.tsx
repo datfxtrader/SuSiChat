@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
-import { useMediaQuery } from '@/hooks/use-media-query';
+import { useIsMobile } from '@/hooks/use-mobile';
 import React from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +26,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const [location, navigate] = useLocation();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
