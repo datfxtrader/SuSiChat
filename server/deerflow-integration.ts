@@ -544,12 +544,24 @@ Your report should:
         use_scientific_agent: (params.researchDepth || 3) >= 2,
         use_news_intelligence: true,
         enable_learning_system: true,
+        // Formatting and styling agents for beautiful data presentation
+        use_formatting_agent: true,
+        use_styling_agent: true,
+        use_data_visualization_agent: true,
+        use_programming_format_agent: true,
+        enable_markdown_enhancement: true,
+        enable_table_formatting: true,
+        enable_chart_generation: true,
+        enable_code_highlighting: true,
+        enable_visual_structuring: true,
+        format_for_web_display: true,
         complexity: (params.researchDepth || 3) === 3 ? 'high' : (params.researchDepth || 3) === 2 ? 'medium' : 'low'
       };
 
       // Call the DeerFlow service with advanced agent capabilities
       console.log('Sending request to DeerFlow service with advanced agent system enabled:', deerflowParams);
       console.log('Advanced features: Multi-agent orchestration, domain expertise, reasoning chains, adaptive planning');
+      console.log('Formatting agents: Data visualization, styling, programming format, markdown enhancement enabled');
       const maxRetries = 3;
       let retryCount = 0;
       let deerflowResponse;
