@@ -232,14 +232,17 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
-  // Clear research state on mount and handle updates
+  // Handle research state persistence
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Clear on mount
-      localStorage.removeItem('research-in-progress');
-      localStorage.removeItem('ongoing-research-query');
-      setIsResearchInProgress(false);
-      setOngoingResearchQuery('');
+      // On mount, restore state from localStorage if it exists
+      const savedProgress = localStorage.getItem('research-in-progress');
+      const savedQuery = localStorage.getItem('ongoing-research-query');
+      
+      if (savedProgress === 'true' && savedQuery) {
+        setIsResearchInProgress(true);
+        setOngoingResearchQuery(savedQuery);
+      }
     }
   }, []); // Empty dependency array means this runs once on mount
 
