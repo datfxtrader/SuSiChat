@@ -280,60 +280,92 @@ export const useEnhancedResearchState = () => {
     }
   }, [loadEnhancedState, simulateProgress]);
 
-  // Simple and reliable tab switching detection
+  // Direct tab switching with forced UI updates and React state batching
   useEffect(() => {
+    let isRestoring = false;
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Save current state when tab becomes hidden
+        // Save exact current state
         const currentState = {
           isInProgress: isResearchInProgress,
           query: ongoingResearchQuery,
           progress: researchProgress,
           stage: researchStage,
           stageLabel,
-          startTime: Date.now(),
-          estimatedDuration: 90000,
           errors,
           warnings,
-          apiCallCount: 0,
-          lastApiCall: 0
+          timestamp: Date.now()
         };
         
         if (currentState.isInProgress) {
-          console.log('Tab hidden - saving state:', currentState);
+          console.log('Tab hidden - saving exact state:', currentState);
           localStorage.setItem('research_tab_state', JSON.stringify(currentState));
+          localStorage.setItem('research_tab_backup', JSON.stringify(currentState));
         }
       } else {
-        // Restore state when tab becomes visible
-        const savedState = localStorage.getItem('research_tab_state');
+        // Prevent multiple restore attempts
+        if (isRestoring) return;
+        isRestoring = true;
+        
+        console.log('Tab visible - attempting state restoration');
+        
+        // Try primary then backup storage
+        const savedState = localStorage.getItem('research_tab_state') || 
+                          localStorage.getItem('research_tab_backup');
+        
         if (savedState) {
           try {
             const state = JSON.parse(savedState);
-            console.log('Tab visible - restoring state:', state);
+            console.log('Restoring state - forcing UI updates:', state);
             
-            // Force immediate UI update
-            setIsResearchInProgress(state.isInProgress);
-            setOngoingResearchQuery(state.query);
-            setResearchProgress(state.progress);
-            setResearchStage(state.stage);
-            setStageLabel(state.stageLabel);
-            setErrors(state.errors || []);
-            setWarnings(state.warnings || []);
+            // Use React's synchronous updates with immediate effect
+            setTimeout(() => {
+              setIsResearchInProgress(state.isInProgress);
+              setOngoingResearchQuery(state.query);
+              setResearchProgress(state.progress);
+              setResearchStage(state.stage);
+              setStageLabel(state.stageLabel);
+              setErrors(state.errors || []);
+              setWarnings(state.warnings || []);
+              
+              // Force a second update to ensure it sticks
+              setTimeout(() => {
+                setIsResearchInProgress(state.isInProgress);
+                setResearchProgress(state.progress);
+                console.log('UI state forcibly updated');
+                
+                if (state.isInProgress) {
+                  simulateProgress();
+                }
+                isRestoring = false;
+              }, 50);
+            }, 0);
             
-            if (state.isInProgress) {
-              simulateProgress();
-            }
           } catch (error) {
-            console.warn('Failed to restore tab state:', error);
+            console.error('State restoration failed:', error);
+            isRestoring = false;
           }
+        } else {
+          console.log('No saved state to restore');
+          isRestoring = false;
         }
       }
     };
 
+    // Use both visibility change and focus events for maximum reliability
+    const handleFocus = () => {
+      if (!document.hidden) {
+        handleVisibilityChange();
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel, errors, warnings, simulateProgress]);
 
