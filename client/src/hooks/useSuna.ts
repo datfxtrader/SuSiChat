@@ -240,18 +240,28 @@ export function useSuna(initialThreadId?: string) {
     }
   }, [isResearchInProgress, ongoingResearchQuery]);
 
-  // Clean up research state when complete
+  // Handle research state persistence
   useEffect(() => {
-    if (!isSending && isResearchInProgress && messages.length > 0) {
+    if (!isSending && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant') {
+      
+      if (lastMessage?.role === 'assistant' && isResearchInProgress) {
+        // Research completed with response
         setTimeout(() => {
           setIsResearchInProgress(false);
           setOngoingResearchQuery('');
+          localStorage.removeItem('research-in-progress');
+          localStorage.removeItem('ongoing-research-query');
         }, 2000);
+      } else if (lastMessage?.role === 'user' && !isResearchInProgress) {
+        // New research started
+        setIsResearchInProgress(true);
+        setOngoingResearchQuery(lastMessage.content);
+        localStorage.setItem('research-in-progress', 'true');
+        localStorage.setItem('ongoing-research-query', lastMessage.content);
       }
     }
-  }, [isSending, isResearchInProgress, messages]);
+  }, [isSending, messages, isResearchInProgress]);
 
   return {
     conversation,

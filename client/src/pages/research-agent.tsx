@@ -438,7 +438,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
             ))}
 
             {/* Research Progress - Show when researching or when research state is persisted */}
-            {(isSending || isResearchInProgress) && (
+            {(isSending || isResearchInProgress) && !messages.find(m => m.role === 'assistant') && (
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
                   <Bot className="w-5 h-5 text-white" />
