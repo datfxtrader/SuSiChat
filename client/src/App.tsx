@@ -14,6 +14,7 @@ import SunaAgent from "@/pages/suna-agent";
 import TripPlanning from "@/pages/trip";
 import ResearchBlog from "@/pages/research-blog";
 import SunaClone from "@/pages/suna-clone";
+import TemplatesPage from "@/pages/templates";
 
 import NotFound from "@/pages/not-found";
 

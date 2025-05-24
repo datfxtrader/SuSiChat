@@ -28,6 +28,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount web search routes
   app.use('/api/web-search', webSearchRoutes);
   
+  // Template management routes
+  app.get('/api/templates/categories', isAuthenticated, templateRoutes.getTemplateCategories);
+  app.get('/api/templates/category/:category', isAuthenticated, templateRoutes.getTemplatesByCategory);
+  app.get('/api/templates/user', isAuthenticated, templateRoutes.getUserTemplates);
+  app.post('/api/templates/create', isAuthenticated, templateRoutes.createTemplate);
+  app.post('/api/templates/generate', isAuthenticated, templateRoutes.generateTemplateFromQuery);
+  app.get('/api/templates/:templateId/improvements', isAuthenticated, templateRoutes.getTemplateImprovements);
+  app.get('/api/templates/search', isAuthenticated, templateRoutes.searchTemplates);
+  app.post('/api/templates/:templateId/usage', isAuthenticated, templateRoutes.trackTemplateUsage);
+  app.get('/api/templates/popular', isAuthenticated, templateRoutes.getPopularTemplates);
+  app.post('/api/templates/fill', isAuthenticated, templateRoutes.fillTemplate);
+  
   const httpServer = createServer(app);
   
   // Set up WebSocket server for real-time chat
