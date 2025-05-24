@@ -526,6 +526,8 @@ Format your report in Markdown, but make it readable and professional."""
         
         asyncio.create_task(cleanup_research_state())
 
+from contextlib import asynccontextmanager
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events"""

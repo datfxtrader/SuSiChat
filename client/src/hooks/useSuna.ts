@@ -38,7 +38,7 @@ export const useSuna = () => {
   };
 
   // WebSocket connection
-  const { sendMessage } = useWebSocket({
+  const { sendMessage, isConnected } = useWebSocket({
     url: getWebSocketURL(),
     onMessage: (data) => {
       try {
@@ -59,6 +59,15 @@ export const useSuna = () => {
       setResearchProgress(0);
     }
   });
+
+  // Don't allow sending if not connected
+  const sendWithConnection = useCallback((message: string) => {
+    if (!isConnected) {
+      console.error('WebSocket not connected');
+      return;
+    }
+    send(message);
+  }, [isConnected, send]);
 
   // Save state to localStorage
   const saveStateToStorage = useCallback((state: typeof researchStateRef.current & { progress?: number }) => {
