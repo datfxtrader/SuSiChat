@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { log } from './utils/logger';
+import { apiRateManager } from './apiRateManager';
 
 // Environment variables for API keys
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
