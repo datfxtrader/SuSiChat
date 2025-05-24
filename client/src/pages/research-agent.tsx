@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import MainLayout from '@/components/layout/MainLayout';
 import { useSuna, type LLMModel } from '@/hooks/useSuna';
 import { useAuth } from '@/hooks/useAuth';
+import { useResearchState } from '@/hooks/useResearchState';
 import { ResearchProgress } from '@/components/suna/ResearchProgress';
 import ResearchResponse from '@/components/suna/ResearchResponse';
 import { cn } from '@/lib/utils';
@@ -49,41 +50,34 @@ const ResearchAgent = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [researchDepth, setResearchDepth] = useState('3');
   const [selectedModel, setSelectedModel] = useState<LLMModel>('auto');
-  const [isResearchInProgress, setIsResearchInProgress] = useState(() => {
-    return localStorage.getItem('research-in-progress') === 'true';
-  });
-  const [ongoingResearchQuery, setOngoingResearchQuery] = useState(() => {
-    return localStorage.getItem('ongoing-research-query') || '';
-  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Use the robust research state hook
+  const {
+    isResearchInProgress,
+    ongoingResearchQuery,
+    researchProgress,
+    researchStage,
+    startResearch,
+    completeResearch,
+    clearResearchState
+  } = useResearchState();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Persist research state to localStorage
-  useEffect(() => {
-    localStorage.setItem('research-in-progress', isResearchInProgress.toString());
-  }, [isResearchInProgress]);
-
-  useEffect(() => {
-    localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
-  }, [ongoingResearchQuery]);
-
-  // Clean up research state when research completes
+  // Handle research completion
   useEffect(() => {
     if (!isSending && isResearchInProgress) {
       // Research has completed, clear the persistent state
       setTimeout(() => {
-        setIsResearchInProgress(false);
-        setOngoingResearchQuery('');
-        localStorage.removeItem('research-in-progress');
-        localStorage.removeItem('ongoing-research-query');
+        completeResearch();
       }, 1000); // Small delay to ensure UI updates properly
     }
-  }, [isSending, isResearchInProgress]);
+  }, [isSending, isResearchInProgress, completeResearch]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -96,9 +90,8 @@ const ResearchAgent = () => {
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
     
-    // Set research in progress state
-    setIsResearchInProgress(true);
-    setOngoingResearchQuery(message);
+    // Start research with persistent state
+    startResearch(message);
     
     sendMessage({ 
       message, 
