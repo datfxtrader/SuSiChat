@@ -83,10 +83,10 @@ export async function performWebSearch(
           
           const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
             params: {
-              q: query,
-              count: maxResults, // Use full count for better quality
+              q: `${query} 2025 recent current latest`,
+              count: maxResults,
               search_lang: 'en',
-              freshness: 'week', // More recent data
+              freshness: 'day', // Most recent data only
               safesearch: 'moderate',
               text_decorations: false,
               spellcheck: true

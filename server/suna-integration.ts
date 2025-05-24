@@ -950,8 +950,31 @@ ${numberContradictions.join('\n')}
               `Key topics: ${topPhrases}` : '';
 
             // Format the search results with improved organization and analysis
-            // Add current price context for financial forecasts
+            // Add current price context and validate data freshness
             let priceContext = '';
+            let dataFreshnessWarning = '';
+            
+            // Filter out outdated results and add freshness validation
+            const currentYear = new Date().getFullYear();
+            const recentResults = sortedResults.filter((result: any) => {
+              const content = (result.content || '').toLowerCase();
+              const title = (result.title || '').toLowerCase();
+              const text = content + ' ' + title;
+              
+              // Reject results that explicitly mention old years
+              if (text.includes('2023') || text.includes('2022') || text.includes('2021')) {
+                return false;
+              }
+              
+              // Prefer results with current year or recent indicators
+              return text.includes('2025') || text.includes('current') || text.includes('latest') || text.includes('today') || text.includes('recent');
+            });
+            
+            if (recentResults.length < sortedResults.length) {
+              dataFreshnessWarning = `\n⚠️ FILTERED OUTDATED DATA: Removed ${sortedResults.length - recentResults.length} outdated results from 2021-2023. Using ${recentResults.length} current sources only.\n`;
+              sortedResults = recentResults; // Use only fresh data
+            }
+            
             if (isFinancialForecast) {
               const currentPriceInfo = this.extractCurrentPriceFromResults(sortedResults, data.query);
               if (currentPriceInfo) {
@@ -962,7 +985,7 @@ ${numberContradictions.join('\n')}
             webSearchContent = `
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
-Search query: "${finalQuery}"${priceContext}
+Search query: "${finalQuery}"${dataFreshnessWarning}${priceContext}
 
 ${diversityInfo ? `${diversityInfo}\n` : ''}
 ${topicsInfo ? `${topicsInfo}\n` : ''}
@@ -1029,10 +1052,12 @@ When creating research responses, format your output professionally with emphasi
 FINANCIAL RESEARCH PRIORITY:
 - **ALWAYS prioritize the most recent data and news closest to today's date**
 - **CRITICAL: Check current market prices against any forecasts provided**
+- **URGENT: Reject outdated data from 2021-2023 when discussing current 2025 trends**
 - For price forecasts, validate against current market reality:
   * If current price exceeds bullish forecasts, seek higher targets from recent sources
   * If current price is below bearish forecasts, find more realistic downside targets
   * Always mention the current price vs forecast relationship
+- Flag and dismiss any data older than 6 months when discussing current market conditions
 - Cross-reference information across multiple sources to verify accuracy
 - When multiple sources provide different data for the same metric, present both with timestamps
 - Highlight any contradictions between sources and explain potential reasons
