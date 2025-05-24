@@ -195,7 +195,7 @@ class ApiRateManager {
         backoffDelay: rateInfo.backoffDelay,
         lastCall: new Date(rateInfo.lastCall)
       };
-    }
+    });
 
     return status;
   }
