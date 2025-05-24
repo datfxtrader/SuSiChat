@@ -232,9 +232,20 @@ export function useSuna(initialThreadId?: string) {
     }));
   };
 
-  // Update localStorage when research state changes
+  // Clear research state on mount and handle updates
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Clear on mount
+      localStorage.removeItem('research-in-progress');
+      localStorage.removeItem('ongoing-research-query');
+      setIsResearchInProgress(false);
+      setOngoingResearchQuery('');
+    }
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Update localStorage when research state changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isResearchInProgress) {
       localStorage.setItem('research-in-progress', isResearchInProgress.toString());
       localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
     }
