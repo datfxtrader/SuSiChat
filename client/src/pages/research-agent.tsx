@@ -72,18 +72,22 @@ const ResearchAgent = () => {
     localStorage.setItem('ongoing-research-query', ongoingResearchQuery);
   }, [ongoingResearchQuery]);
 
-  // Clean up research state when research completes
+  // Clean up research state when research completes (only when we have new messages)
   useEffect(() => {
-    if (!isSending && isResearchInProgress) {
-      // Research has completed, clear the persistent state
-      setTimeout(() => {
-        setIsResearchInProgress(false);
-        setOngoingResearchQuery('');
-        localStorage.removeItem('research-in-progress');
-        localStorage.removeItem('ongoing-research-query');
-      }, 1000); // Small delay to ensure UI updates properly
+    if (!isSending && isResearchInProgress && messages.length > 0) {
+      // Check if the last message is from assistant (research completed)
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        // Research has completed, clear the persistent state
+        setTimeout(() => {
+          setIsResearchInProgress(false);
+          setOngoingResearchQuery('');
+          localStorage.removeItem('research-in-progress');
+          localStorage.removeItem('ongoing-research-query');
+        }, 2000); // Longer delay to ensure UI is stable
+      }
     }
-  }, [isSending, isResearchInProgress]);
+  }, [isSending, isResearchInProgress, messages]);
 
   // Auto-resize textarea
   useEffect(() => {
