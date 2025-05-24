@@ -25,11 +25,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile('index.html', { root: './client/dist' });
   });
 
+  // Mount API routes first
+  app.use('/api/financial-research', financialResearchRoutes);
+  app.use('/api/web-search', webSearchRoutes);
+
   // Serve static files from client/dist
   app.use(express.static('client/dist'));
-  
 
-  // Mount financial research routes
+  // Handle SPA routes - serve index.html for all unmatched routes
+  app.get('*', (req, res) => {
+    res.sendFile('index.html', { root: './client/dist' });
+  });
   app.use('/api/financial-research', financialResearchRoutes);
   
   // Mount web search routes
