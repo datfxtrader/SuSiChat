@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ExternalLink, BookOpen } from 'lucide-react';
+import { ExternalLink, BookOpen, BarChart3, TrendingUp, Image as ImageIcon } from 'lucide-react';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 
@@ -13,10 +13,174 @@ interface ResearchResponseProps {
   }>;
 }
 
+// Helper functions for chart and image processing
+const convertDataToChart = (title: string, data: string): string => {
+  const lines = data.trim().split('\n').filter(line => line.trim());
+  const dataPoints = lines.map(line => {
+    const match = line.match(/([^:]+):\s*([0-9.,%-]+)/);
+    if (match) {
+      return { label: match[1].trim(), value: match[2].trim() };
+    }
+    return null;
+  }).filter(Boolean);
+  
+  if (dataPoints.length === 0) return `**${title}**\n\n${data}`;
+  
+  return `
+    <div class="my-8 p-6 bg-gradient-to-br from-slate-800/60 to-slate-900/60 rounded-xl border border-slate-700/50 shadow-xl">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+          </svg>
+        </div>
+        <h4 class="text-lg font-semibold text-gray-200">${title}</h4>
+      </div>
+      <div class="space-y-4">
+        ${dataPoints.map((point: any, index: number) => {
+          const percentage = Math.min(100, (index + 1) * (100 / dataPoints.length));
+          const isPositive = point.value.includes('+') || (!point.value.includes('-') && point.value.includes('%'));
+          const barColor = isPositive ? 'from-green-500 to-emerald-600' : 'from-red-500 to-rose-600';
+          
+          return `
+            <div class="flex items-center gap-4">
+              <div class="w-24 text-sm text-gray-300 font-medium">${point.label}</div>
+              <div class="flex-1 relative">
+                <div class="h-8 bg-slate-700/50 rounded-lg overflow-hidden">
+                  <div class="h-full bg-gradient-to-r ${barColor} rounded-lg transition-all duration-1000" 
+                       style="width: ${percentage}%"></div>
+                </div>
+                <div class="absolute right-2 top-1 text-xs font-bold text-white">${point.value}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>`;
+};
+
+const createChartEmbed = (url: string): string => {
+  return `
+    <div class="my-8 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-6 h-6 rounded bg-blue-500 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <span class="text-sm font-medium text-gray-300">Interactive Chart</span>
+      </div>
+      <a href="${url}" target="_blank" rel="noopener noreferrer" 
+         class="block p-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-lg border border-blue-500/30 hover:border-blue-400/50 transition-colors">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-blue-400 font-medium">View Chart</div>
+            <div class="text-xs text-gray-400 mt-1">Click to open interactive chart</div>
+          </div>
+          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </div>
+      </a>
+    </div>`;
+};
+
+const convertTableToVisualChart = (tableText: string): string => {
+  const lines = tableText.split('\n').filter(line => line.includes('|'));
+  if (lines.length < 3) return tableText;
+  
+  const headerRow = lines[0];
+  const dataRows = lines.slice(1).filter(line => !line.match(/^[\s\-|]+$/));
+  
+  if (headerRow.toLowerCase().includes('price') || headerRow.toLowerCase().includes('level')) {
+    const chartData = dataRows.map(row => {
+      const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
+      return cells;
+    }).filter(row => row.length >= 2);
+    
+    return `
+      <div class="my-8 p-6 bg-gradient-to-br from-slate-800/60 to-slate-900/60 rounded-xl border border-slate-700/50 shadow-xl">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+            </svg>
+          </div>
+          <h4 class="text-lg font-semibold text-gray-200">Price Levels</h4>
+        </div>
+        <div class="space-y-3">
+          ${chartData.map((row: any) => `
+            <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+              <span class="text-gray-300 font-medium">${row[0]}</span>
+              <span class="text-cyan-400 font-mono font-bold">${row[1]}</span>
+              ${row[2] ? `<span class="text-sm text-gray-400">${row[2]}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+  
+  return tableText;
+};
+
+const formatTrendIndicator = (indicator: string): string => {
+  const isPositive = indicator.includes('↑') || indicator.includes('⬆') || indicator.includes('▲') || indicator.includes('+');
+  const color = isPositive ? 'text-green-400' : 'text-red-400';
+  const bgColor = isPositive ? 'bg-green-500/20' : 'bg-red-500/20';
+  const borderColor = isPositive ? 'border-green-500/30' : 'border-red-500/30';
+  
+  return `<span class="inline-flex items-center px-2 py-1 rounded-md ${color} ${bgColor} border ${borderColor} text-sm font-bold">${indicator}</span>`;
+};
+
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, sources = [] }) => {
-  // FIXED: Enhanced content processing with proper source citation formatting
+  // FIXED: Enhanced content processing with chart/image support and proper source citation formatting
   const improveResearchFormatting = (content: string) => {
     let processed = content;
+    
+    console.log('🖼️ Processing content for charts and images...');
+    
+    // STEP 0: Enhanced image and chart processing
+    // Convert various image formats to proper markdown
+    processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+      console.log('🖼️ Found image:', alt, src);
+      const cleanSrc = src.trim();
+      const cleanAlt = alt.trim() || 'Research Chart';
+      return `![${cleanAlt}](${cleanSrc})`;
+    });
+    
+    // Convert chart descriptions to visual representations
+    processed = processed.replace(
+      /(?:Chart|Graph|Figure)\s*\d*:?\s*([^\n]+)\n((?:[\w\s]+:\s*[\d.%$€£¥,]+\s*\n?){3,})/gi,
+      (match, title, data) => {
+        console.log('📊 Found chart data:', title);
+        return convertDataToChart(title, data);
+      }
+    );
+    
+    // Handle chart URLs (TradingView, etc.)
+    processed = processed.replace(
+      /(https?:\/\/[^\s]+(?:tradingview|investing|yahoo|marketwatch)[^\s]*chart[^\s]*)/gi,
+      (match, url) => {
+        console.log('📈 Found chart URL:', url);
+        return createChartEmbed(url);
+      }
+    );
+    
+    // Convert tabular data to visual charts
+    processed = processed.replace(
+      /\|\s*(?:Price|Level|Support|Resistance|Target)[^\n]+\|\s*\n(?:\|[^\n]+\|\s*\n?){3,}/gi,
+      (match) => {
+        if (match.includes('<table')) return match;
+        console.log('📊 Converting table to visual chart');
+        return convertTableToVisualChart(match);
+      }
+    );
+    
+    // Format trend indicators
+    processed = processed.replace(
+      /(↑|↓|⬆|⬇|▲|▼|\+\d+%|-\d+%)/g,
+      (indicator) => formatTrendIndicator(indicator)
+    );
     
     // STEP 1: Clean up messy source references first
     // Remove broken or malformed source patterns
