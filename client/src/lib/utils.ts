@@ -85,10 +85,3 @@ export function generateAvatarColor(id: string): string {
   const index = Math.abs(hash) % colors.length;
   return colors[index];
 }
-
-export function getBaseUrl(): string {
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  return '';
-}
