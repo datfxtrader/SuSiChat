@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import MainLayout from '@/components/layout/MainLayout';
 import { useSuna, type LLMModel } from '@/hooks/useSuna';
 import { useAuth } from '@/hooks/useAuth';
-import { useResearchState } from '@/hooks/useResearchState';
+import { useEnhancedResearchState, enhancedResearchStyles } from '@/hooks/useEnhancedResearchState';
 import { ResearchProgress } from '@/components/suna/ResearchProgress';
 import ResearchResponse from '@/components/suna/ResearchResponse';
 import { cn } from '@/lib/utils';
@@ -53,16 +53,18 @@ const ResearchAgent = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Use the robust research state hook
+  // Use the enhanced research state hook with API rate limiting
   const {
     isResearchInProgress,
     ongoingResearchQuery,
     researchProgress,
     researchStage,
+    stageLabel,
+    errors,
+    warnings,
     startResearch,
-    completeResearch,
-    clearResearchState
-  } = useResearchState();
+    completeResearch
+  } = useEnhancedResearchState();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -442,25 +444,48 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     isActive={isSending || isResearchInProgress}
                   />
                   {isResearchInProgress && !isSending && (
-                    <div className="mt-3 space-y-2">
-                      <div className="text-xs text-blue-400 flex items-center space-x-1">
+                    <div className="mt-3 space-y-3">
+                      {/* Enhanced Stage Indicator */}
+                      <div className="text-xs text-blue-400 flex items-center space-x-2">
                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                        <span>Research continues in background...</span>
+                        <span>{stageLabel}</span>
                       </div>
                       
                       {/* Enhanced Progress Bar */}
-                      <div className="w-full bg-slate-800/50 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
                         <div 
-                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${Math.max(researchProgress, 10)}%` }}
+                          className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out animate-pulse"
+                          style={{ width: `${Math.max(researchProgress, 5)}%` }}
                         />
                       </div>
                       
-                      {/* Progress Percentage */}
-                      <div className="text-xs text-gray-400 flex justify-between">
+                      {/* Progress Info */}
+                      <div className="text-xs text-gray-400 flex justify-between items-center">
                         <span>Progress: {Math.round(researchProgress)}%</span>
-                        <span>Stage {researchStage}</span>
+                        <span>Stage {researchStage}/6</span>
                       </div>
+                      
+                      {/* Warnings Display */}
+                      {warnings.length > 0 && (
+                        <div className="space-y-1">
+                          {warnings.map((warning, index) => (
+                            <div key={index} className="text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded px-2 py-1">
+                              ⚠️ {warning}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Errors Display */}
+                      {errors.length > 0 && (
+                        <div className="space-y-1">
+                          {errors.map((error, index) => (
+                            <div key={index} className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded px-2 py-1">
+                              ❌ {error}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
