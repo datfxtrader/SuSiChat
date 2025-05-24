@@ -442,214 +442,116 @@ Current market conditions show several critical factors influencing Bitcoin's tr
           {/* Input Area */}
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-md">
             <div className="space-y-3">
-              {/* Advanced Research Controls */}
-              <div className="space-y-3">
-                {/* Primary Controls Row */}
-                <div className="flex items-center space-x-3 flex-wrap gap-2">
-                  <Select value={researchDepth} onValueChange={setResearchDepth}>
-                    <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50 hover:border-primary/30 transition-colors">
-                      <SelectValue placeholder="Research Depth" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full" />
-                          <span>Quick Research (8K tokens)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="2">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-yellow-400 rounded-full" />
-                          <span>Standard Research (15K tokens)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="3">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-red-400 rounded-full" />
-                          <span>Deep Research (25K tokens)</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Compact Research Controls */}
+              <div className="space-y-2">
+                {/* Minimal Control Bar */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {/* Essential Controls */}
+                    <Select value={researchDepth} onValueChange={setResearchDepth}>
+                      <SelectTrigger className="w-40 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Quick (8K)</SelectItem>
+                        <SelectItem value="2">Standard (15K)</SelectItem>
+                        <SelectItem value="3">Deep (25K)</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                  <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
-                    <SelectTrigger className="w-48 bg-slate-800/50 border-slate-700/50 hover:border-primary/30 transition-colors">
-                      <SelectValue placeholder="AI Model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">
-                        <div className="flex items-center space-x-2">
-                          <Sparkles className="w-3 h-3 text-primary" />
-                          <span>Auto Model (Recommended)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="deepseek">
-                        <div className="flex items-center space-x-2">
-                          <Zap className="w-3 h-3 text-blue-400" />
-                          <span>DeepSeek (Fast & Efficient)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="gemini">
-                        <div className="flex items-center space-x-2">
-                          <Database className="w-3 h-3 text-purple-400" />
-                          <span>Gemini Pro (Complex Analysis)</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <Select value={selectedModel} onValueChange={(value: LLMModel) => setSelectedModel(value)}>
+                      <SelectTrigger className="w-32 h-8 bg-slate-800/50 border-slate-700/50 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="deepseek">DeepSeek</SelectItem>
+                        <SelectItem value="gemini">Gemini</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                  {/* Search Preferences */}
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={toggleForceSearch}
-                      className={cn(
-                        "bg-slate-800/50 border-slate-700/50 hover:border-primary/30",
-                        searchPreferences.forceSearch && "bg-primary/20 border-primary/50"
-                      )}
-                    >
-                      <Search className="w-3 h-3 mr-1" />
-                      Force Search
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={toggleDisableSearch}
-                      className={cn(
-                        "bg-slate-800/50 border-slate-700/50 hover:border-primary/30",
-                        searchPreferences.disableSearch && "bg-red-500/20 border-red-500/50"
-                      )}
-                    >
-                      <Ban className="w-3 h-3 mr-1" />
-                      No Search
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Research Status Indicator */}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center space-x-4 text-gray-400">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                      <span>Research Mode Active</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <span>Model:</span>
-                      <span className="text-primary font-medium">
-                        {selectedModel === 'auto' ? `Auto (${currentModel})` : selectedModel}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <span>Depth:</span>
-                      <span className="text-primary font-medium">Level {researchDepth}</span>
+                    {/* Search Mode Toggle */}
+                    <div className="flex items-center bg-slate-800/30 rounded-md p-1">
+                      <Button
+                        variant={searchPreferences.forceSearch ? "default" : "ghost"}
+                        size="sm"
+                        onClick={toggleForceSearch}
+                        className="h-6 px-2 text-xs"
+                      >
+                        <Search className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={searchPreferences.disableSearch ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={toggleDisableSearch}
+                        className="h-6 px-2 text-xs"
+                      >
+                        <Ban className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2 text-gray-500">
-                    {searchPreferences.forceSearch && (
-                      <div className="flex items-center space-x-1">
-                        <Search className="w-3 h-3" />
-                        <span>Forced</span>
-                      </div>
-                    )}
-                    {searchPreferences.disableSearch && (
-                      <div className="flex items-center space-x-1">
-                        <Ban className="w-3 h-3" />
-                        <span>No Search</span>
-                      </div>
-                    )}
+                  {/* Quick Status */}
+                  <div className="flex items-center space-x-2 text-xs text-gray-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span>Research Active</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Advanced Message Input with Research Templates */}
-              <div className="space-y-3">
-                {/* Quick Research Templates */}
-                <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-                  <span className="text-xs text-gray-400 font-medium whitespace-nowrap">Quick Templates:</span>
+                {/* Compact Templates */}
+                <div className="flex items-center space-x-2 overflow-x-auto scrollbar-hide">
                   {[
-                    { icon: TrendingUp, text: "Market Analysis", query: "Analyze current market trends for " },
-                    { icon: Database, text: "Financial Report", query: "Generate a comprehensive financial analysis of " },
-                    { icon: Search, text: "Competitive Research", query: "Research competitors and market position for " },
-                    { icon: AlertCircle, text: "Risk Assessment", query: "Assess investment risks and opportunities for " },
-                    { icon: Sparkles, text: "Industry Insights", query: "Provide deep industry insights about " }
+                    { icon: TrendingUp, text: "Market", query: "Analyze current market trends for " },
+                    { icon: Database, text: "Financial", query: "Generate a comprehensive financial analysis of " },
+                    { icon: Search, text: "Competitive", query: "Research competitors and market position for " },
+                    { icon: AlertCircle, text: "Risk", query: "Assess investment risks and opportunities for " }
                   ].map((template, idx) => (
                     <Button
                       key={idx}
                       variant="outline"
                       size="sm"
                       onClick={() => setMessage(template.query)}
-                      className="bg-slate-800/50 border-slate-700/50 hover:border-primary/30 whitespace-nowrap text-xs"
+                      className="h-7 px-3 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 whitespace-nowrap text-xs flex-shrink-0"
                     >
                       <template.icon className="w-3 h-3 mr-1" />
                       {template.text}
                     </Button>
                   ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 bg-slate-800/30 border-slate-700/50 hover:border-primary/30 flex-shrink-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
                 </div>
 
-                {/* Enhanced Input Area */}
+                {/* Clean Input Area */}
                 <div className="relative">
                   <Textarea
                     ref={textareaRef}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Ask me anything about markets, technology, economics, or any research topic..."
-                    className="flex-1 bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none min-h-[80px] pr-16"
-                    rows={3}
+                    placeholder="Ask me anything about markets, technology, economics..."
+                    className="w-full bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none min-h-[60px] pr-20 text-sm"
+                    rows={2}
                   />
                   
                   {/* Input Actions */}
-                  <div className="absolute bottom-3 right-3 flex items-center space-x-2">
-                    <div className="flex items-center space-x-1 text-xs text-gray-500">
-                      <span>{message.length}</span>
-                      <span>/</span>
-                      <span>2000</span>
-                    </div>
+                  <div className="absolute bottom-2 right-2 flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">{message.length}/2000</span>
                     <Button
                       onClick={handleSendMessage}
                       disabled={!message.trim() || isSending}
-                      className="bg-primary hover:bg-primary/80 text-white px-4 py-2 min-w-[80px]"
+                      size="sm"
+                      className="h-7 px-3 bg-primary hover:bg-primary/80"
                     >
                       {isSending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-1" />
-                          Send
-                        </>
+                        <Send className="w-3 h-3" />
                       )}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Research Quality Indicators */}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center space-x-4 text-gray-500">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                      <span>Real-time research active</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Database className="w-3 h-3" />
-                      <span>Multi-source verification</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>May 2025 data priority</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 text-gray-500">
-                    <Button variant="ghost" size="sm" className="h-6 text-xs">
-                      <FileText className="w-3 h-3 mr-1" />
-                      Export
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs">
-                      <Settings className="w-3 h-3 mr-1" />
-                      Settings
                     </Button>
                   </div>
                 </div>
