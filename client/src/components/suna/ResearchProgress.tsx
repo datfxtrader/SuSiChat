@@ -199,9 +199,9 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
               <div 
                 className={cn(
                   "w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300",
-                  isCompleted && "bg-green-500 text-white",
-                  isCurrentStage && "bg-blue-500 text-white animate-pulse",
-                  isUpcoming && "bg-gray-200 text-gray-400"
+                  isCompleted && "bg-purple-500 text-white shadow-lg",
+                  isCurrentStage && "bg-cyan-400 text-white animate-pulse shadow-lg",
+                  isUpcoming && "bg-gray-600 text-gray-300"
                 )}
               >
                 {isCompleted ? (
@@ -212,10 +212,10 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
               </div>
               <span 
                 className={cn(
-                  "text-center transition-all duration-300",
-                  isCurrentStage && "font-medium text-gray-900",
-                  isCompleted && "text-green-600",
-                  isUpcoming && "text-gray-400"
+                  "text-center transition-all duration-300 font-semibold",
+                  isCurrentStage && "text-white",
+                  isCompleted && "text-purple-400",
+                  isUpcoming && "text-gray-500"
                 )}
               >
                 {stageInfo.name.split(' ')[0]}
