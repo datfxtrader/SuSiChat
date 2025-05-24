@@ -24,7 +24,7 @@ const formatRelativeTime = (timestamp: string | number) => {
   return `${Math.floor(diffInMinutes / 1440)}d ago`;
 };
 
-const SunaClone = () => {
+const ResearchAgent = () => {
   const { isAuthenticated, user } = useAuth();
   const {
     conversation,
@@ -544,4 +544,4 @@ Current market conditions show several critical factors influencing Bitcoin's tr
   );
 };
 
-export default SunaClone;
+export default ResearchAgent;

@@ -10,10 +10,9 @@ import Schedule from "@/pages/schedule";
 import FamilyRoom from "@/pages/family-room";
 import FamilyRoomDetail from "@/pages/family-room/[id]";
 import Profile from "@/pages/profile";
-import SunaAgent from "@/pages/suna-agent";
 import TripPlanning from "@/pages/trip";
 import ResearchBlog from "@/pages/research-blog";
-import SunaClone from "@/pages/suna-clone";
+import ResearchAgent from "@/pages/research-agent";
 import TemplatesPage from "@/pages/templates";
 
 import NotFound from "@/pages/not-found";
@@ -38,9 +37,8 @@ function App() {
       <Route path="/family-room" component={FamilyRoom} />
       <Route path="/family-room/:id" component={FamilyRoomDetail} />
       <Route path="/profile" component={Profile} />
-      <Route path="/suna-agent" component={SunaAgent} />
+      <Route path="/research-agent" component={ResearchAgent} />
       <Route path="/research-blog" component={ResearchBlog} />
-      <Route path="/suna-clone" component={SunaClone} />
       <Route path="/templates" component={TemplatesPage} />
       <Route path="/trip" component={TripPlanning} />
 
