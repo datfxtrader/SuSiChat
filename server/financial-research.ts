@@ -1,7 +1,8 @@
+
 import axios from 'axios';
 import { ResearchResult, ResearchDepth } from './deerflow-integration';
 
-// Unified financial sources
+// Unified financial sources 
 const FINANCIAL_SOURCES = [
   {
     title: "Investing.com",
@@ -15,7 +16,7 @@ const FINANCIAL_SOURCES = [
   {
     title: "FXStreet",
     url: "https://www.fxstreet.com/",
-    domain: "fxstreet.com",
+    domain: "fxstreet.com", 
     endpoints: {
       analysis: "/api/analysis"
     }
@@ -25,7 +26,7 @@ const FINANCIAL_SOURCES = [
     url: "https://www.dailyfx.com/",
     domain: "dailyfx.com",
     endpoints: {
-      technical: "/api/technical" 
+      technical: "/api/technical"
     }
   }
 ];
@@ -55,19 +56,12 @@ export function isFinancialQuery(query: string): boolean {
 async function generateFinancialAnalysis(query: string): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   const API_TIMEOUT = 30000;
-  const MAX_RETRIES = 3;
 
   if (!apiKey) {
     throw new Error('DeepSeek API key not available');
   }
 
   try {
-    // Default sources for financial data - cached for efficiency
-    const defaultSources = [
-      "Investing.com",
-      "FXStreet",
-      "DailyFX"
-    ];
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
       {
@@ -98,11 +92,15 @@ async function generateFinancialAnalysis(query: string): Promise<string> {
       }
     );
 
-  if (!response.data?.choices?.[0]?.message?.content) {
-    throw new Error('Invalid API response format');
-  }
+    if (!response.data?.choices?.[0]?.message?.content) {
+      throw new Error('Invalid API response format');
+    }
 
-  return response.data.choices[0].message.content;
+    return response.data.choices[0].message.content;
+  } catch (error) {
+    console.error('Financial analysis generation failed:', error);
+    throw error;
+  }
 }
 
 /**
@@ -131,9 +129,5 @@ export async function performFinancialResearch(query: string): Promise<ResearchR
       success: false,
       error: error.message
     };
-  } finally {
-    // Cleanup code here if needed
-    console.log('Financial research completed in', Date.now() - startTime, 'ms');
   }
-}
 }
