@@ -119,6 +119,7 @@ async def search_news(query: str, max_results: int = 8):
             "pageSize": max_results,
             "language": "en",
             "sortBy": "relevancy",
+            "from": (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d"),
             "apiKey": NEWS_API_KEY
         }
         
