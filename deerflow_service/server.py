@@ -4,6 +4,7 @@ DeerFlow Research Service
 This service provides a FastAPI server to handle deep research requests using DeerFlow.
 Enhanced with intelligent agent capabilities for advanced planning and reasoning.
 """
+import os
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -13,7 +14,6 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 
 import uvicorn
 from typing import Optional, List, Dict, Any
-import os
 import asyncio
 import requests
 import json
@@ -803,7 +803,7 @@ async def submit_feedback(request: FeedbackRequest):
         )
         
         # Process feedback through learning system
-        learning_results = learning_system.feedback_processor.process_feedback(feedback)
+        learning_results =learning_system.feedback_processor.process_feedback(feedback)
         
         return {
             "message": "Feedback processed successfully",
@@ -985,4 +985,5 @@ async def list_available_tools():
         return {"error": str(e)}
 
 if __name__ == "__main__":
+    print("Starting DeerFlow service on port 9000...")
     uvicorn.run(app, host="0.0.0.0", port=9000)

@@ -1,15 +1,6 @@
-/**
- * Client for interacting with the DeerFlow research service
- */
-
 import axios from 'axios';
-import { checkDeerFlowService, startDeerFlowService, getDeerFlowServiceUrl } from './deerflow-manager';
-
-// Create axios instance with extended timeout for comprehensive research
-const deerflowAxios = axios.create({
-  timeout: 600000, // 10 minutes for comprehensive research
-  validateStatus: (status) => status >= 200 && status < 500, // Handle HTTP errors properly
-});
+import { DeerFlowResearchParams, DeerFlowResearchResponse } from './types';
+import { getDeerFlowServiceUrl } from './deerflow-manager';
 
 /**
  * Parameters for the DeerFlow research API
@@ -105,258 +96,31 @@ export interface AgentTaskStatus {
   };
 }
 
-/**
- * Client for interacting with the DeerFlow research service
- */
 export class DeerFlowClient {
-  /**
-   * Ensure DeerFlow service is running and then execute a research query
-   */
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = getDeerFlowServiceUrl();
+    console.log(`DeerFlow Client configured for: ${this.baseUrl}`);
+  }
+
   async performResearch(params: DeerFlowResearchParams): Promise<DeerFlowResearchResponse> {
     try {
-      // Check if DeerFlow service is running, with retry logic
-      let serviceRunning = await checkDeerFlowService();
+      console.log(`Making request to DeerFlow service: ${this.baseUrl}/research`);
 
-      if (!serviceRunning) {
-        console.log('DeerFlow service not running, starting it now...');
-
-        // Start the service
-        const started = await startDeerFlowService();
-        if (!started) {
-          console.log('Failed to start DeerFlow service, checking if already running...');
-          // Wait a moment and double-check if service might have been started by another process
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          serviceRunning = await checkDeerFlowService();
-          if (!serviceRunning) {
-            console.log('DeerFlow service still not available after retry, will use existing service');
-            // Don't throw error - try to use existing service
-          }
+      const response = await axios.post(`${this.baseUrl}/research`, params, {
+        timeout: 600000, // 10 minutes
+        headers: {
+          'Content-Type': 'application/json'
         }
-      }
-
-      // Make the actual API call to DeerFlow
-      console.log('Making request to DeerFlow service:', params);
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await deerflowAxios.post(`${serviceUrl}/research`, params);
-
-      return response.data;
-    } catch (error) {
-      console.error('Error performing DeerFlow research:', error);
-
-      // Handle timeout errors specifically
-      const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
-
-      // Return error response
-      return {
-        status: { status: 'error', message: error instanceof Error ? error.message : 'Unknown error' },
-        report: 'Failed to perform deep research due to a service error.',
-        service_process_log: ['Error connecting to or using the DeerFlow service']
-      };
-    }
-  }
-
-  /**
-   * Check the status of a research request
-   */
-  async checkResearchStatus(researchId: string): Promise<any> {
-    try {
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      // Updated endpoint path to match our Python service implementation
-      const response = await axios.get(`${serviceUrl}/research/${researchId}`, {
-        timeout: 5000,
       });
 
       return response.data;
     } catch (error) {
-      console.error('Error checking research status:', error);
+      console.error('Error performing DeerFlow research:', error instanceof Error ? error.message : String(error));
       throw error;
-    }
-  }
-
-  /**
-   * Create an advanced agent research task with planning and reasoning
-   */
-  async createAgentResearchTask(params: AgentResearchParams): Promise<AgentResearchResponse> {
-    try {
-      // Ensure DeerFlow service is running
-      if (!(await checkDeerFlowService())) {
-        console.log('DeerFlow service not running, starting it now...');
-        const started = await startDeerFlowService();
-        if (!started) {
-          throw new Error('Failed to start DeerFlow service');
-        }
-      }
-
-      console.log('Creating agent research task:', params);
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.post(`${serviceUrl}/agent/research`, params, {
-        timeout: 30000,
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error creating agent research task:', error);
-      return {
-        task_id: '',
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * Get the detailed status of an agent research task
-   */
-  async getAgentTaskStatus(taskId: string): Promise<AgentTaskStatus | null> {
-    try {
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.get(`${serviceUrl}/agent/task/${taskId}`, {
-        timeout: 10000,
-      });
-
-      if (response.data.error) {
-        console.error('Agent task status error:', response.data.error);
-        return null;
-      }
-
-      return response.data;
-    } catch (error) {
-      console.error('Error getting agent task status:', error);
-      return null;
-    }
-  }
-
-  /**
-   * List all active agent tasks
-   */
-  async listAgentTasks(): Promise<{ tasks: any[]; total: number }> {
-    try {
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.get(`${serviceUrl}/agent/tasks`, {
-        timeout: 10000,
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error listing agent tasks:', error);
-      return { tasks: [], total: 0 };
-    }
-  }
-
-  /**
-   * Clean up completed agent tasks
-   */
-  async cleanupAgentTasks(maxAgeHours: number = 24): Promise<{ message: string; remaining_tasks: number }> {
-    try {
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.post(`${serviceUrl}/agent/cleanup`, 
-        { max_age_hours: maxAgeHours },
-        { timeout: 10000 }
-      );
-
-      return response.data;
-    } catch (error) {
-      console.error('Error cleaning up agent tasks:', error);
-      return { message: 'Cleanup failed', remaining_tasks: 0 };
-    }
-  }
-
-  /**
-   * Execute research using the complete DeerFlow agent system with multi-agent orchestration
-   */
-  async executeFullAgentResearch(params: {
-    research_question: string;
-    user_id: string;
-    complexity?: string;
-    enable_multi_agent?: boolean;
-    enable_reasoning?: boolean;
-    preferences?: any;
-  }): Promise<any> {
-    try {
-      // Ensure DeerFlow service is running
-      if (!(await checkDeerFlowService())) {
-        console.log('DeerFlow service not running, starting it now...');
-        const started = await startDeerFlowService();
-        if (!started) {
-          throw new Error('Failed to start DeerFlow service');
-        }
-      }
-
-      console.log('Executing full DeerFlow agent research:', params);
-      //const serviceUrl = getDeerFlowServiceUrl();
-       const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.post(`${serviceUrl}/deerflow/full-research`, params, {
-        timeout: 600000, // 10 minutes for complex multi-agent research
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error executing full agent research:', error);
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        capabilities: []
-      };
-    }
-  }
-
-  /**
-   * Get DeerFlow system capabilities and status
-   */
-  async getCapabilities(): Promise<{
-    service: string;
-    status: string;
-    capabilities: Record<string, any>;
-    error?: string;
-  }> {
-    try {
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.get(`${serviceUrl}/deerflow/capabilities`, {
-        timeout: 10000,
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error getting DeerFlow capabilities:', error);
-      return {
-        service: 'DeerFlow Agent System',
-        status: 'Service unavailable',
-        capabilities: {},
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * List all available tools for DeerFlow agents
-   */
-  async getAvailableTools(): Promise<any> {
-    try {
-      //const serviceUrl = getDeerFlowServiceUrl();
-      const serviceUrl = 'http://0.0.0.0:9000';
-      const response = await axios.get(`${serviceUrl}/deerflow/tools`, {
-        timeout: 10000,
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error getting DeerFlow tools:', error);
-      return {
-        available_tools: 0,
-        tool_categories: [],
-        tools: {},
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
     }
   }
 }
 
-// Export a singleton instance
 export const deerflowClient = new DeerFlowClient();
