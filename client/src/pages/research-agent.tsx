@@ -18,7 +18,7 @@ const formatRelativeTime = (timestamp: string | number) => {
   const now = new Date();
   const messageTime = new Date(timestamp);
   const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-  
+
   if (diffInMinutes < 1) return 'Just now';
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
@@ -77,7 +77,7 @@ const ResearchAgent = () => {
     // Complete when progress reaches 100% OR when we have assistant messages at 95%+
     const hasCompletedMessage = messages.length > 0 && 
                                messages[messages.length - 1]?.role === 'assistant';
-    
+
     const shouldComplete = !isSending && 
                           isResearchInProgress && 
                           (researchProgress >= 100 || (researchProgress >= 95 && hasCompletedMessage));
@@ -102,21 +102,21 @@ const ResearchAgent = () => {
 
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
-    
+
     console.log('handleSendMessage called with message:', message);
-    
+
     // Start research with persistent state
     startResearch(message);
-    
+
     sendMessage({ 
       message, 
       model: selectedModel === 'auto' ? currentModel : selectedModel,
       customSearchPrefs: searchPreferences,
       researchDepth: parseInt(researchDepth)
     });
-    
+
     setMessage('');
-    
+
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -141,7 +141,7 @@ const ResearchAgent = () => {
   // Extract sources from research responses
   const extractSources = (content: string) => {
     const sources: Array<{ title: string; url: string; domain: string }> = [];
-    
+
     if (content.includes('Sources:') || content.includes('**Sources:**')) {
       const lines = content.split('\n');
       lines.forEach(line => {
@@ -160,7 +160,7 @@ const ResearchAgent = () => {
         }
       });
     }
-    
+
     return sources;
   };
 
@@ -221,7 +221,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 <p className="text-xs text-zinc-400">AI-Powered Research</p>
               </div>
             </div>
-            
+
             <Button 
               onClick={handleNewConversation}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
@@ -242,7 +242,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 console.warn('⚠️ Invalid conversation object:', conv);
                 return null;
               }
-              
+
               return (
                 <div
                   key={conv.id}
@@ -282,7 +282,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                   <h1 className="text-3xl font-semibold text-zinc-100 mb-8">
                     Hello Dat, where should we begin?
                   </h1>
-                  
+
                   {/* Predefined Prompt Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
                     {[
@@ -321,7 +321,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       </div>
                     ))}
                   </div>
-                  
+
                   <p className="text-sm text-gray-500 mt-8">
                     Click any card above or type your own research question below
                   </p>
@@ -393,7 +393,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                             {msg.content}
                           </ReactMarkdown>
                         </div>
-                        
+
                         {/* Enhanced Sources Section */}
                         {extractSources(msg.content).length > 0 && (
                           <div className="mt-6 pt-4 border-t border-slate-800/40">
@@ -478,7 +478,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
                         <span>{stageLabel}</span>
                       </div>
-                      
+
                       {/* Enhanced Progress Bar */}
                       <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
                         <div 
@@ -486,13 +486,13 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                           style={{ width: `${Math.max(researchProgress, 5)}%` }}
                         />
                       </div>
-                      
+
                       {/* Progress Info */}
                       <div className="text-xs text-gray-400 flex justify-between items-center">
                         <span>Progress: {Math.round(researchProgress)}%</span>
                         <span>Stage {researchStage}/6</span>
                       </div>
-                      
+
                       {/* Debug Controls */}
                       <div className="flex gap-2 mt-2">
                         <button 
@@ -527,7 +527,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     <Select value={researchDepth} onValueChange={setResearchDepth}>
                       <SelectTrigger className="w-36 h-7 bg-slate-800/50 border-slate-700/50 text-xs">
                         <SelectValue />
-                      </SelectTrigger>
+                      </SelectTrigger
                       <SelectContent>
                         <SelectItem value="1">Quick (8K)</SelectItem>
                         <SelectItem value="2">Standard (15K)</SelectItem>
@@ -596,7 +596,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       </Button>
                     </div>
                   </div>
-                  
+
 
                 </div>
 
@@ -611,7 +611,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     className="w-full bg-slate-900/70 border-slate-800/60 text-gray-100 placeholder-gray-500 resize-none min-h-[60px] pr-20 text-sm"
                     rows={2}
                   />
-                  
+
                   {/* Input Actions */}
                   <div className="absolute bottom-2 right-2 flex items-center space-x-2">
                     <span className="text-xs text-gray-500">{message.length}/2000</span>

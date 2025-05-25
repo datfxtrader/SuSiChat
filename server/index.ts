@@ -1,6 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import financialResearchRoutes from './routes/financial-research';
+import webSearchRoutes from './routes/webSearch';
+import enhancedWebSearchRoutes from './routes/enhanced-web-search';
 
 const app = express();
 app.use(express.json());
@@ -46,11 +49,11 @@ app.use((req, res, next) => {
   app.post('/api/research/store-safe', async (req: any, res) => {
     try {
       const { conversationId, userId, query, results } = req.body;
-      
+
       console.log('💾 API: Storing research results crash-safe');
-      
+
       const result = await CrashSafeResearch.store(conversationId, userId, query, results);
-      
+
       if (result.success) {
         res.json({
           success: true,
@@ -64,7 +67,7 @@ app.use((req, res, next) => {
           message: 'Failed to store research results'
         });
       }
-      
+
     } catch (error) {
       console.error('❌ API: Error storing research results:', error);
       res.status(500).json({
@@ -79,11 +82,11 @@ app.use((req, res, next) => {
   app.get('/api/research/results-safe/:conversationId', async (req: any, res) => {
     try {
       const { conversationId } = req.params;
-      
+
       console.log('🔍 API: Retrieving research results crash-safe:', conversationId);
-      
+
       const result = await CrashSafeResearch.retrieve(conversationId);
-      
+
       if (result.success) {
         res.json({
           success: true,
@@ -98,7 +101,7 @@ app.use((req, res, next) => {
           conversationId
         });
       }
-      
+
     } catch (error) {
       console.error('❌ API: Error retrieving research results:', error);
       res.status(500).json({
@@ -113,18 +116,18 @@ app.use((req, res, next) => {
   app.get('/api/research/user-research-safe/:userId', async (req: any, res) => {
     try {
       const { userId } = req.params;
-      
+
       console.log('🔍 API: Getting all research for user:', userId);
-      
+
       const research = await CrashSafeResearch.getUserResearch(userId);
-      
+
       res.json({
         success: true,
         research,
         count: research.length,
         storageType: 'crash-safe'
       });
-      
+
     } catch (error) {
       console.error('❌ API: Error getting user research:', error);
       res.status(500).json({
@@ -140,12 +143,12 @@ app.use((req, res, next) => {
     try {
       const { join } = await import('path');
       const { readdir } = await import('fs/promises');
-      
+
       const backupDir = join(process.cwd(), 'research-backups');
-      
+
       let fileCount = 0;
       let indexExists = false;
-      
+
       try {
         const files = await readdir(backupDir);
         fileCount = files.filter(f => f.endsWith('.json')).length;
@@ -153,7 +156,7 @@ app.use((req, res, next) => {
       } catch (error) {
         // Directory doesn't exist yet
       }
-      
+
       res.json({
         success: true,
         system: {
@@ -166,7 +169,7 @@ app.use((req, res, next) => {
         },
         message: 'Crash-safe research storage is active and operational'
       });
-      
+
     } catch (error) {
       res.status(500).json({
         success: false,
@@ -180,9 +183,9 @@ app.use((req, res, next) => {
     try {
       const { conversationId } = req.params;
       console.log('🔍 API: Legacy endpoint - redirecting to crash-safe retrieval');
-      
+
       const result = await CrashSafeResearch.retrieve(conversationId);
-      
+
       if (result.success) {
         res.json({
           success: true,
@@ -197,7 +200,7 @@ app.use((req, res, next) => {
           conversationId
         });
       }
-      
+
     } catch (error) {
       console.error('❌ API: Error retrieving results:', error);
       res.status(500).json({
@@ -209,6 +212,10 @@ app.use((req, res, next) => {
   });
 
   const server = await registerRoutes(app);
+
+  app.use('/api/financial-research', financialResearchRoutes);
+  app.use('/api/web-search', webSearchRoutes);
+  app.use('/api/enhanced-search', enhancedWebSearchRoutes);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

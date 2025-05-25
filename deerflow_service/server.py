@@ -17,6 +17,7 @@ import json
 import logging
 import time
 import datetime
+import aiohttp
 
 # Import the new agent core and learning system
 from agent_core import agent_core, TaskStatus
@@ -106,30 +107,67 @@ def get_token_limit_by_depth(research_depth: int) -> int:
 
 # Helper functions for research
 async def search_web(query: str, max_results: int = 8):
-    """Search the web using available search engines with DuckDuckGo as primary."""
-    logger.info(f"Searching web for: {query}")
+    """Enhanced web search using multiple providers with intelligent fallback."""
+    logger.info(f"Enhanced web search for: {query} with {max_results} results")
 
-    # Primary: Use DuckDuckGo (no API key required)
-    try:
-        results = await search_duckduckgo(query, max_results)
-        if results:
-            return results
-    except Exception as e:
-        logger.error(f"DuckDuckGo search error: {e}")
+    all_results = []
+    search_engines_used = []
 
-    # Backup: Try Brave if available 
-    if BRAVE_API_KEY:
+    # Try Tavily first if available (most comprehensive)
+    if TAVILY_API_KEY:
         try:
-            return await search_brave(query, max_results)
+            tavily_results = await search_tavily(query, max_results // 2)
+            if tavily_results:
+                all_results.extend(tavily_results)
+                search_engines_used.append("Tavily")
+                logger.info(f"Tavily search returned {len(tavily_results)} results")
+        except Exception as e:
+            logger.error(f"Tavily search error: {e}")
+
+    # Try Brave search
+    if BRAVE_API_KEY and len(all_results) < max_results:
+        try:
+            brave_results = await search_brave(query, max_results - len(all_results))
+            if brave_results:
+                all_results.extend(brave_results)
+                search_engines_used.append("Brave")
+                logger.info(f"Brave search returned {len(brave_results)} results")
         except Exception as e:
             if "RATE_LIMITED" in str(e):
                 logger.warning("Brave search rate limited, skipping")
             else:
                 logger.error(f"Brave search error: {e}")
 
-    # Return empty results if all searches fail
-    logger.warning("All search methods failed")
-    return []
+    # Fallback to DuckDuckGo if we need more results
+    if len(all_results) < max_results:
+        try:
+            duckduckgo_results = await search_duckduckgo(query, max_results - len(all_results))
+            if duckduckgo_results:
+                all_results.extend(duckduckgo_results)
+                search_engines_used.append("DuckDuckGo")
+                logger.info(f"DuckDuckGo search returned {len(duckduckgo_results)} results")
+        except Exception as e:
+            logger.error(f"DuckDuckGo search error: {e}")
+
+    # Remove duplicates and format results
+    seen_urls = set()
+    unique_results = []
+    for result in all_results:
+        url = result.get('url', '')
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            # Standardize result format
+            formatted_result = {
+                'title': result.get('title', 'Untitled'),
+                'url': url,
+                'content': result.get('content', result.get('snippet', '')),
+                'score': result.get('score', 1.0),
+                'source': result.get('source', 'web_search')
+            }
+            unique_results.append(formatted_result)
+
+    logger.info(f"Web search completed: {len(unique_results)} unique results from {search_engines_used}")
+    return unique_results[:max_results]
 
 async def search_tavily(query: str, max_results: int = 8):
     """Search using Tavily API."""
@@ -212,7 +250,7 @@ async def search_duckduckgo(query: str, max_results: int = 8):
         return []
 
 async def search_brave(query: str, max_results: int = 8):
-    """Search using Brave Search API."""
+    """Search using Brave Search API with enhanced features."""
     url = "https://api.search.brave.com/res/v1/web/search"
     headers = {
         "Accept": "application/json",
@@ -222,26 +260,66 @@ async def search_brave(query: str, max_results: int = 8):
     params = {
         "q": query,
         "count": max_results,
-        "search_lang": "en"
+        "search_lang": "en",
+        "freshness": "pw",  # Past week for freshness
+        "safesearch": "moderate"
     }
 
-    response = requests.get(url, headers=headers, params=params, timeout=20)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers, params=params, timeout=20) as response:
+            if response.status == 200:
+                data = await response.json()
+                results = data.get("web", {}).get("results", [])
+                return [
+                    {
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "content": r.get("description", ""),
+                        "score": 1.0 - (idx / len(results)) if len(results) > 0 else 0,
+                        "source": "brave"
+                    }
+                    for idx, r in enumerate(results)
+                ]
+            else:
+                logger.error(f"Brave search failed: {response.status}")
+                return []
 
-    if response.status_code == 200:
-        data = response.json()
-        results = data.get("web", {}).get("results", [])
-        return [
-            {
-                "title": r.get("title", ""),
-                "url": r.get("url", ""),
-                "content": r.get("description", ""),
-                "score": 1.0 - (idx / len(results)) if len(results) > 0 else 0,
-                "source": "brave"
-            }
-            for idx, r in enumerate(results)
-        ]
-    else:
-        logger.error(f"Brave search failed: {response.status_code} - {response.text}")
+async def search_newsdata(query: str, max_results: int = 5):
+    """Search for news using NewsData.io API for current events."""
+    if not os.getenv("NEWSDATA_API_KEY"):
+        return []
+    
+    try:
+        url = "https://newsdata.io/api/1/news"
+        params = {
+            "apikey": os.getenv("NEWSDATA_API_KEY"),
+            "q": query,
+            "language": "en",
+            "size": max_results,
+            "prioritydomain": "top"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, timeout=15) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    articles = data.get("results", [])
+                    return [
+                        {
+                            "title": article.get("title", ""),
+                            "url": article.get("link", ""),
+                            "content": article.get("description", ""),
+                            "score": 1.0,
+                            "source": "newsdata",
+                            "published_date": article.get("pubDate", "")
+                        }
+                        for article in articles if article.get("link")
+                    ]
+                else:
+                    logger.error(f"NewsData search failed: {response.status}")
+                    return []
+    except Exception as e:
+        logger.error(f"NewsData search error: {e}")
         return []
 
 async def generate_gemini_response(system_prompt: str, user_prompt: str, max_tokens: int = 25000):
@@ -385,20 +463,36 @@ async def perform_deep_research(research_question: str, research_id: str, resear
             f"{research_question} fundamental analysis"
         ]
 
-        # Step 2: Search for information using multiple queries
-        log_entries.append("Searching for information from multiple sources...")
+        # Step 2: Enhanced multi-source search with news integration
+        log_entries.append("Searching across web, news, and specialized sources...")
         all_search_results = []
 
-        for query in query_variations:
+        # First, search for current news if query seems news-related
+        news_keywords = ["news", "latest", "recent", "current", "today", "breaking"]
+        if any(keyword in research_question.lower() for keyword in news_keywords):
             try:
-                search_results = await search_web(query, max_results=8)
+                news_results = await search_newsdata(research_question, max_results=5)
+                if news_results:
+                    all_search_results.extend(news_results)
+                    log_entries.append(f"Found {len(news_results)} recent news articles")
+            except Exception as e:
+                logger.error(f"News search error: {e}")
+
+        # Then search with multiple query variations
+        for idx, query in enumerate(query_variations[:8]):  # Limit to prevent overload
+            try:
+                search_results = await search_web(query, max_results=6)
                 if search_results and isinstance(search_results, list):
                     all_search_results.extend(search_results)
+                    log_entries.append(f"Query {idx+1}: Found {len(search_results)} results")
                 elif search_results:
                     all_search_results.append(search_results)
             except Exception as e:
                 logger.error(f"Search error for query '{query}': {e}")
                 continue
+            
+            # Add small delay to prevent rate limiting
+            await asyncio.sleep(0.5)
 
         # Step 3: Process and validate results
         sources = []
