@@ -75,8 +75,21 @@ export class ResearchService {
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
     try {
-      // For ALL research depths, use DeerFlow to ensure consistent access to external search engines
-      console.log(`🔍 Using DeerFlow system with Brave/Tavily/Yahoo search engines for depth ${depth}`);
+      if (depth === ResearchDepth.Basic) {
+        // Use enhanced free research service for basic depth
+        console.log('🔍 Using enhanced free research service');
+        const { enhancedResearchService } = await import('./enhanced-research-service');
+        const results = await enhancedResearchService.performResearch(params.query);
+        
+        return {
+          ...results,
+          depth: depth,
+          processingTime: Date.now() - startTime
+        };
+      }
+
+      // For higher depths, use DeerFlow
+      console.log(`🔍 Using DeerFlow system for depth ${depth}`);
       return await this.performDeepResearch(params);
 
     } catch (error) {
