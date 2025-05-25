@@ -53,8 +53,7 @@ function App() {
 export default App;
 ```
 
-```
-/research-agent" component={ResearchAgentPage} />
+<Route path="/research-agent" component={ResearchAgentPage} />
         <Route path="/system-health" component={() => import('./pages/system-health')} />
         <Route path="/schedule" component={SchedulePage} />
 ```
