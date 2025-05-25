@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '../ui/select';
 import { ResearchProgress } from './ResearchProgress';
 
 const formatRelativeTime = (timestamp: string) => {
@@ -56,10 +56,12 @@ export const ResearchAgent = () => {
         setMessages(prev => [...prev, completedMessage]);
       }, 1000);
     }
-  }, [isResearchInProgress, isSending, researchProgress, message]);
+  }, [isResearchInProgress, isSending, researchProgress]);
 
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
+    
+    console.log('🚀 Starting research:', message);
     
     const userMessage = {
       id: Date.now().toString(),
