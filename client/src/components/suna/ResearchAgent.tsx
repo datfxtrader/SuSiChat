@@ -4,14 +4,25 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 
 const formatRelativeTime = (timestamp: string) => {
-  const now = new Date();
-  const messageTime = new Date(timestamp);
-  const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
+  try {
+    const now = new Date();
+    const messageTime = new Date(timestamp);
+    
+    // Check for invalid dates
+    if (isNaN(messageTime.getTime())) {
+      return 'Just now';
+    }
+    
+    const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
 
-  if (diffInMinutes < 1) return 'Just now';
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-  return `${Math.floor(diffInMinutes / 1440)}d ago`;
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return 'Just now';
+  }
 };
 
 // Simple UI components
@@ -245,6 +256,7 @@ export const ResearchAgent = () => {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCompletingRef = useRef<boolean>(false); // Add ref to prevent duplicate completions
 
   // Auto-resize textarea
   useEffect(() => {
@@ -395,9 +407,13 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
         }
 
         // Complete research after reaching 100%
-        setTimeout(() => {
-          completeResearch();
-        }, 200);
+        if (!isCompletingRef.current) {
+          isCompletingRef.current = true;
+          setTimeout(() => {
+            completeResearch();
+            isCompletingRef.current = false;
+          }, 200);
+        }
       }
 
       setResearchProgress(Math.min(currentProgress, targetProgress));
