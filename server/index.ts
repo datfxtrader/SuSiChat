@@ -214,6 +214,55 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
+  // Suna research integration endpoint
+  app.post('/api/suna-research', async (req, res) => {
+    try {
+      console.log('📡 Received research request from frontend:', req.body);
+
+      const { query, depth = 3, model = 'auto' } = req.body;
+
+      if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+      }
+
+      // Make request to DeerFlow service
+      const deerflowResponse = await fetch('http://localhost:8000/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          depth: depth.toString(),
+          model_preference: model
+        }),
+      });
+
+      if (!deerflowResponse.ok) {
+        throw new Error(`DeerFlow service error: ${deerflowResponse.status}`);
+      }
+
+      const deerflowData = await deerflowResponse.json();
+      console.log('✅ DeerFlow research completed, sending to frontend');
+
+      // Return the research results to frontend
+      res.json({
+        status: 'completed',
+        report: deerflowData.report,
+        sources: deerflowData.sources || [],
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Research API error:', error);
+      res.status(500).json({ 
+        error: 'Research request failed',
+        message: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   app.use('/api/financial-research', financialResearchRoutes);
   // Use enhanced web search as the primary search system
   app.use('/api/web-search', enhancedWebSearchRoutes);
