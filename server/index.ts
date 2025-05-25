@@ -1,6 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { DatabaseTimeoutHandler } from "./database-resilience";
+
+// Initialize database crash prevention
+DatabaseTimeoutHandler.preventDatabaseCrash();
+console.log('🛡️ Database resilience system activated');
 
 const app = express();
 app.use(express.json());
