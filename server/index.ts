@@ -225,6 +225,8 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: 'Query is required' });
       }
 
+      console.log('🔄 Starting DeerFlow research request...');
+
       // Make request to DeerFlow service
       const deerflowResponse = await fetch('http://localhost:8000/research', {
         method: 'POST',
@@ -232,33 +234,56 @@ app.use((req, res, next) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query,
-          depth: depth.toString(),
-          model_preference: model
+          research_question: query,
+          research_depth: parseInt(depth),
+          model_id: model === 'auto' ? 'deepseek-v3' : model
         }),
       });
 
       if (!deerflowResponse.ok) {
-        throw new Error(`DeerFlow service error: ${deerflowResponse.status}`);
+        const errorText = await deerflowResponse.text();
+        console.error('❌ DeerFlow service error:', deerflowResponse.status, errorText);
+        throw new Error(`DeerFlow service error: ${deerflowResponse.status} - ${errorText}`);
       }
 
       const deerflowData = await deerflowResponse.json();
-      console.log('✅ DeerFlow research completed, sending to frontend');
+      console.log('✅ DeerFlow research completed successfully');
+      console.log('📊 Report length:', deerflowData.report?.length || 0);
+      console.log('📊 Sources count:', deerflowData.sources?.length || 0);
 
-      // Return the research results to frontend
-      res.json({
+      // Format sources properly
+      const formattedSources = (deerflowData.sources || []).map((source, index) => ({
+        title: source.title || `Source ${index + 1}`,
+        url: source.url || '',
+        domain: source.domain || (source.url ? new URL(source.url).hostname : 'unknown'),
+        content: source.content || ''
+      }));
+
+      const response = {
         status: 'completed',
-        report: deerflowData.report,
-        sources: deerflowData.sources || [],
-        timestamp: new Date().toISOString()
+        report: deerflowData.report || 'Research completed but no content was generated.',
+        content: deerflowData.report || 'Research completed but no content was generated.',
+        sources: formattedSources,
+        timestamp: new Date().toISOString(),
+        query: query,
+        depth: depth
+      };
+
+      console.log('📤 Sending response to frontend:', {
+        status: response.status,
+        reportLength: response.report.length,
+        sourcesCount: response.sources.length
       });
+
+      res.json(response);
 
     } catch (error) {
       console.error('❌ Research API error:', error);
       res.status(500).json({ 
         error: 'Research request failed',
         message: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        status: 'error'
       });
     }
   });

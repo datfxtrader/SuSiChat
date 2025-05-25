@@ -459,42 +459,46 @@ Please try submitting your research query again, or check the server logs for de
         }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
       console.log('📊 Research completed successfully:', data);
+      console.log('📄 Report content:', data.report?.substring(0, 200) + '...');
+      console.log('📚 Sources received:', data.sources?.length || 0);
 
-      // Clear progress interval
+      // Clear progress interval immediately
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
       
-      // Complete progress and show results
+      // Set progress to 100% and show completion
       setResearchProgress(100);
+      setResearchStage(6);
       
+      // Add the research result message immediately
+      const completedMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant' as const,
+        content: data.report || data.content || 'Research completed successfully.',
+        timestamp: new Date().toISOString(),
+        sources: data.sources || []
+      };
+      
+      setMessages(prev => [...prev, completedMessage]);
+      console.log('✅ Research message added to UI');
+      
+      // Clean up research state after a short delay
       setTimeout(() => {
-        // Create message with real research content
-        const completedMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant' as const,
-          content: data.report || data.content || 'Research completed successfully.',
-          timestamp: new Date().toISOString(),
-          sources: data.sources || []
-        };
-        
-        setMessages(prev => [...prev, completedMessage]);
-        
-        // Clear research state
         setIsResearchInProgress(false);
         setResearchProgress(0);
         setResearchStage(1);
         setCurrentResearchQuery('');
-        
-        console.log('✅ Research results displayed in UI');
-      }, 500);
+        console.log('🧹 Research state cleaned up');
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Research request failed:', error);
