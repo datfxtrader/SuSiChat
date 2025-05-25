@@ -2,6 +2,12 @@ from fastapi import HTTPException, Request
 from typing import Optional
 import jwt
 from jwt.exceptions import PyJWTError
+import os
+
+# Get JWT secret from environment
+JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
+if not JWT_SECRET:
+    raise ValueError("SUPABASE_JWT_SECRET environment variable is required")
 
 # This function extracts the user ID from Supabase JWT
 async def get_current_user_id_from_jwt(request: Request) -> str:
@@ -32,9 +38,8 @@ async def get_current_user_id_from_jwt(request: Request) -> str:
     token = auth_header.split(' ')[1]
     
     try:
-        # For Supabase JWT, we just need to decode and extract the user ID
-        # The actual validation is handled by Supabase's RLS
-        payload = jwt.decode(token, options={"verify_signature": False})
+        # Properly verify JWT signature with secret key
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         
         # Supabase stores the user ID in the 'sub' claim
         user_id = payload.get('sub')
@@ -116,8 +121,8 @@ async def get_user_id_from_stream_auth(
     # Try to get user_id from token in query param (for EventSource which can't set headers)
     if token:
         try:
-            # For Supabase JWT, we just need to decode and extract the user ID
-            payload = jwt.decode(token, options={"verify_signature": False})
+            # Properly verify JWT signature with secret key
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             user_id = payload.get('sub')
             if user_id:
                 return user_id
@@ -130,7 +135,7 @@ async def get_user_id_from_stream_auth(
         try:
             # Extract token from header
             header_token = auth_header.split(' ')[1]
-            payload = jwt.decode(header_token, options={"verify_signature": False})
+            payload = jwt.decode(header_token, JWT_SECRET, algorithms=["HS256"])
             user_id = payload.get('sub')
             if user_id:
                 return user_id
@@ -205,8 +210,8 @@ async def get_optional_user_id(request: Request) -> Optional[str]:
     token = auth_header.split(' ')[1]
     
     try:
-        # For Supabase JWT, we just need to decode and extract the user ID
-        payload = jwt.decode(token, options={"verify_signature": False})
+        # Properly verify JWT signature with secret key
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         
         # Supabase stores the user ID in the 'sub' claim
         user_id = payload.get('sub')
