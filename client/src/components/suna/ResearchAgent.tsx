@@ -4,7 +4,6 @@ import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { ResearchProgress } from './ResearchProgress';
 
 const formatRelativeTime = (timestamp: string) => {
@@ -21,13 +20,13 @@ const formatRelativeTime = (timestamp: string) => {
 export const ResearchAgent = () => {
   const [message, setMessage] = useState('');
   const [researchDepth, setResearchDepth] = useState('3');
-  const [selectedModel, setSelectedModel] = useState<string>('auto');
+  const [selectedModel, setSelectedModel] = useState('auto');
   const [isSending, setIsSending] = useState(false);
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [researchProgress, setResearchProgress] = useState(0);
   const [researchStage, setResearchStage] = useState(1);
+  const [messages, setMessages] = useState([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -36,8 +35,39 @@ export const ResearchAgent = () => {
     }
   }, [message]);
 
+  useEffect(() => {
+    if (isResearchInProgress && !isSending && researchProgress >= 95) {
+      console.log('✅ Research completed - clearing progress');
+      setTimeout(() => {
+        setIsResearchInProgress(false);
+        setResearchProgress(0);
+        setResearchStage(1);
+        
+        const completedMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `# Research Analysis Complete\n\n## Executive Summary\nYour research has been completed with comprehensive analysis.\n\n## Key Findings\n\n### Market Overview\n- Current trends analyzed\n- Key patterns identified\n- Risk factors assessed`,
+          timestamp: new Date().toISOString(),
+          sources: [
+            { title: 'Market Analysis', url: '#', domain: 'example.com' }
+          ]
+        };
+        
+        setMessages(prev => [...prev, completedMessage]);
+      }, 1000);
+    }
+  }, [isResearchInProgress, isSending, researchProgress, message]);
+
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
+    
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: message,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, userMessage]);
     
     setIsSending(true);
     setIsResearchInProgress(true);
@@ -49,12 +79,17 @@ export const ResearchAgent = () => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsSending(false);
-          setIsResearchInProgress(false);
           return 100;
         }
-        return prev + Math.random() * 15;
+        const newProgress = prev + Math.random() * 12 + 3;
+        if (newProgress >= 80) setResearchStage(6);
+        else if (newProgress >= 65) setResearchStage(5);
+        else if (newProgress >= 50) setResearchStage(4);
+        else if (newProgress >= 30) setResearchStage(3);
+        else if (newProgress >= 15) setResearchStage(2);
+        return Math.min(newProgress, 100);
       });
-    }, 500);
+    }, 800);
     
     setMessage('');
     
@@ -70,170 +105,119 @@ export const ResearchAgent = () => {
     }
   };
 
+  const handleNewResearch = () => {
+    setMessages([]);
+    setIsResearchInProgress(false);
+    setResearchProgress(0);
+    setResearchStage(1);
+    setIsSending(false);
+    setMessage('');
+  };
+
   const predefinedPrompts = [
     {
-      title: "Market Analysis Research",
-      description: "Deep dive into current market trends, opportunities, and risk assessment",
-      prompt: "Analyze current market trends and identify emerging investment opportunities with detailed financial data and forecasts",
+      title: "Market Analysis",
+      description: "Deep dive into market trends",
+      prompt: "Analyze current market trends",
       icon: TrendingUp,
       gradient: "from-emerald-500 to-teal-600"
     },
     {
-      title: "Financial Data Analysis",
-      description: "Comprehensive financial metrics, ratios, and performance evaluation",
-      prompt: "Generate a comprehensive financial analysis including key metrics, ratios, and performance indicators with latest quarterly data",
+      title: "Financial Data",
+      description: "Comprehensive metrics analysis",
+      prompt: "Generate financial analysis",
       icon: Database,
       gradient: "from-blue-500 to-indigo-600"
-    },
-    {
-      title: "Competitive Intelligence",
-      description: "Research competitors, market positioning, and strategic advantages",
-      prompt: "Research competitive landscape, market positioning, and strategic advantages with detailed competitor analysis",
-      icon: Search,
-      gradient: "from-purple-500 to-pink-600"
-    },
-    {
-      title: "Risk Assessment Report",
-      description: "Evaluate investment risks, opportunities, and risk-adjusted returns",
-      prompt: "Assess investment risks, market volatility, and potential opportunities with risk-adjusted return analysis",
-      icon: AlertCircle,
-      gradient: "from-orange-500 to-red-600"
     }
   ];
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Research Area */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {isResearchInProgress && (
-          <ResearchProgress 
-            stage={researchStage}
-            progress={researchProgress}
-            query={message}
-            isActive={true}
-          />
-        )}
-
-        {/* Welcome Screen */}
-        {!isResearchInProgress && (
-          <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-4xl mx-auto px-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
-                <Bot className="w-8 h-8 text-white" />
-              </div>
-              
-              <h1 className="text-3xl font-bold text-zinc-100 mb-3">
-                Welcome to Research Agent
-              </h1>
-              <p className="text-lg text-zinc-400 mb-12">
-                Get comprehensive, AI-powered research on any topic with real-time data and expert analysis
-              </p>
-              
-              {/* Predefined Prompt Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                {predefinedPrompts.map((card, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setMessage(card.prompt)}
-                    className="group p-6 bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 rounded-2xl hover:bg-zinc-800/70 hover:border-zinc-700/70 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] hover:shadow-2xl"
-                  >
-                    <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-shadow`}>
-                      <card.icon className="w-6 h-6 text-white" />
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold text-zinc-100 mb-2 group-hover:text-white transition-colors">
-                      {card.title}
-                    </h3>
-                    <p className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors leading-relaxed">
-                      {card.description}
-                    </p>
-                    
-                    <div className="flex items-center mt-4 text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      <span>AI-Powered Research</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <p className="text-sm text-zinc-500 mt-8 flex items-center justify-center">
-                <Zap className="w-4 h-4 mr-2" />
-                Click any card above or type your own research question below
-              </p>
-            </div>
-          </div>
-        )}
+    <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
+      <div className="w-64 border-r border-zinc-800/60 bg-zinc-950/80 backdrop-blur-xl">
+        <div className="p-4 border-b border-zinc-800/60">
+          <Button onClick={handleNewResearch} className="w-full">
+            <Plus className="w-4 h-4 mr-2" />
+            New Research
+          </Button>
+        </div>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-zinc-800/60 bg-zinc-900/80 backdrop-blur-xl p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center space-x-4 mb-4">
-            <Select value={researchDepth} onValueChange={setResearchDepth}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Research Depth" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Quick Analysis</SelectItem>
-                <SelectItem value="2">Standard Research</SelectItem>
-                <SelectItem value="3">Deep Research</SelectItem>
-                <SelectItem value="4">Comprehensive Study</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="AI Model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Auto-select</SelectItem>
-                <SelectItem value="gpt4">GPT-4</SelectItem>
-                <SelectItem value="claude">Claude</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="relative">
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask a research question..."
-              className="min-h-[100px] pr-24"
-              rows={1}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!message.trim() || isSending}
-              className="absolute bottom-4 right-4"
-            >
-              {isSending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
-            <div className="flex items-center space-x-4">
-              <span className="flex items-center">
-                <Database className="w-3 h-3 mr-1" />
-                Real-time data
-              </span>
-              <span className="flex items-center">
-                <Sparkles className="w-3 h-3 mr-1" />
-                AI-enhanced
-              </span>
-              <span className="flex items-center">
-                <FileText className="w-3 h-3 mr-1" />
-                Multi-source
-              </span>
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-6">
+          {messages.map((msg) => (
+            <div key={msg.id} className="mb-4">
+              <div className="flex items-start space-x-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'
+                }`}>
+                  {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
+                </div>
+                <div className="flex-1">
+                  <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
+                    {msg.content}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center">
-              <Settings className="w-3 h-3 mr-1" />
-              Advanced settings
+          ))}
+
+          {isResearchInProgress && (
+            <ResearchProgress 
+              stage={researchStage}
+              progress={researchProgress}
+              query={message}
+              isActive={true}
+            />
+          )}
+        </div>
+
+        <div className="border-t border-zinc-800/60 bg-zinc-900/80 backdrop-blur-xl p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center space-x-4 mb-4">
+              <Select value={researchDepth} onValueChange={setResearchDepth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Research Depth" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Quick Analysis</SelectItem>
+                  <SelectItem value="2">Standard Research</SelectItem>
+                  <SelectItem value="3">Deep Research</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="AI Model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-select</SelectItem>
+                  <SelectItem value="gpt4">GPT-4</SelectItem>
+                  <SelectItem value="claude">Claude</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="relative">
+              <Textarea
+                ref={textareaRef}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a research question..."
+                className="min-h-[100px] pr-24"
+                rows={1}
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!message.trim() || isSending}
+                className="absolute bottom-4 right-4"
+              >
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
             </div>
           </div>
         </div>
