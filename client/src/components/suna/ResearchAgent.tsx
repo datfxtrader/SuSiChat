@@ -21,12 +21,13 @@ const formatRelativeTime = (timestamp: string) => {
 export const ResearchAgent = () => {
   const [message, setMessage] = useState('');
   const [researchDepth, setResearchDepth] = useState('3');
-  const [selectedModel, setSelectedModel] = useState('auto');
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
   const [isSending, setIsSending] = useState(false);
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [researchProgress, setResearchProgress] = useState(0);
   const [researchStage, setResearchStage] = useState(1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -69,6 +70,37 @@ export const ResearchAgent = () => {
     }
   };
 
+  const predefinedPrompts = [
+    {
+      title: "Market Analysis Research",
+      description: "Deep dive into current market trends, opportunities, and risk assessment",
+      prompt: "Analyze current market trends and identify emerging investment opportunities with detailed financial data and forecasts",
+      icon: TrendingUp,
+      gradient: "from-emerald-500 to-teal-600"
+    },
+    {
+      title: "Financial Data Analysis",
+      description: "Comprehensive financial metrics, ratios, and performance evaluation",
+      prompt: "Generate a comprehensive financial analysis including key metrics, ratios, and performance indicators with latest quarterly data",
+      icon: Database,
+      gradient: "from-blue-500 to-indigo-600"
+    },
+    {
+      title: "Competitive Intelligence",
+      description: "Research competitors, market positioning, and strategic advantages",
+      prompt: "Research competitive landscape, market positioning, and strategic advantages with detailed competitor analysis",
+      icon: Search,
+      gradient: "from-purple-500 to-pink-600"
+    },
+    {
+      title: "Risk Assessment Report",
+      description: "Evaluate investment risks, opportunities, and risk-adjusted returns",
+      prompt: "Assess investment risks, market volatility, and potential opportunities with risk-adjusted return analysis",
+      icon: AlertCircle,
+      gradient: "from-orange-500 to-red-600"
+    }
+  ];
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
       {/* Research Area */}
@@ -80,6 +112,56 @@ export const ResearchAgent = () => {
             query={message}
             isActive={true}
           />
+        )}
+
+        {/* Welcome Screen */}
+        {!isResearchInProgress && (
+          <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+            <div className="text-center max-w-4xl mx-auto px-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <Bot className="w-8 h-8 text-white" />
+              </div>
+              
+              <h1 className="text-3xl font-bold text-zinc-100 mb-3">
+                Welcome to Research Agent
+              </h1>
+              <p className="text-lg text-zinc-400 mb-12">
+                Get comprehensive, AI-powered research on any topic with real-time data and expert analysis
+              </p>
+              
+              {/* Predefined Prompt Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                {predefinedPrompts.map((card, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setMessage(card.prompt)}
+                    className="group p-6 bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 rounded-2xl hover:bg-zinc-800/70 hover:border-zinc-700/70 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] hover:shadow-2xl"
+                  >
+                    <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-shadow`}>
+                      <card.icon className="w-6 h-6 text-white" />
+                    </div>
+                    
+                    <h3 className="text-lg font-semibold text-zinc-100 mb-2 group-hover:text-white transition-colors">
+                      {card.title}
+                    </h3>
+                    <p className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors leading-relaxed">
+                      {card.description}
+                    </p>
+                    
+                    <div className="flex items-center mt-4 text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      <span>AI-Powered Research</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <p className="text-sm text-zinc-500 mt-8 flex items-center justify-center">
+                <Zap className="w-4 h-4 mr-2" />
+                Click any card above or type your own research question below
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
