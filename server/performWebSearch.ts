@@ -215,20 +215,24 @@ export async function performWebSearch(
     );
   }
 
-  // Add Yahoo search to parallel execution
+  // Add Yahoo search to parallel execution with retries
   searchPromises.push(
     (async () => {
-      try {
-        console.log('Starting Yahoo search...');
-        const yahooResponse = await axios.get('https://search.yahoo.com/search', {
-          params: {
-            p: query,
-            n: Math.ceil(maxResults / 3)
-          },
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          timeout: 10000
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          console.log(`Starting Yahoo search (attempt ${attempt + 1})...`);
+          const yahooResponse = await axios.get('https://search.yahoo.com/finance/search', {
+            params: {
+              p: query,
+              n: Math.ceil(maxResults / 3),
+              property: "finance_intl"
+            },
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'text/html,application/xhtml+xml'
+            },
+            timeout: 15000
         });
 
         if (yahooResponse.data) {
