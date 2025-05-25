@@ -77,15 +77,9 @@ export class ResearchService {
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
     try {
-      // Handle different research depths
-      if (depth === ResearchDepth.Comprehensive) {
-        console.log(`🔍 Using comprehensive multi-source research (News + Wikipedia + Academic + DeerFlow)`);
-        return await this.performComprehensiveResearch(params);
-      } else {
-        // For other depths, use DeerFlow agent intelligence with external search engines
-        console.log(`🔍 Using DeerFlow agent intelligence with Brave/Tavily/Yahoo search engines for depth ${depth}`);
-        return await this.performDeepResearch(params);
-      }
+      // For ALL research depths, use DeerFlow agent intelligence with external search engines
+      console.log(`🔍 Using DeerFlow agent intelligence with Brave/Tavily/Yahoo search engines for depth ${depth}`);
+      return await this.performDeepResearch(params);
 
     } catch (error) {
       console.error(`Research error at depth ${depth}:`, error);
