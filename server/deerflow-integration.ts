@@ -135,6 +135,7 @@ export class ResearchService {
 
       // Prepare DeerFlow parameters
       const deerflowParams: DeerFlowResearchParams = {
+        research_question: params.query,
         query: params.query,
         model_id: params.modelId || 'deepseek-chat',
         research_depth: params.researchDepth || 3,

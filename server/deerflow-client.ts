@@ -16,7 +16,9 @@ const deerflowAxios = axios.create({
  */
 export interface DeerFlowResearchParams {
   research_question: string;
+  query?: string; // Add query property to match usage
   model_id?: string;
+  research_depth?: number;
   include_market_data?: boolean;
   include_news?: boolean;
   research_length?: string;
@@ -30,6 +32,8 @@ export interface DeerFlowResearchParams {
 export interface DeerFlowResearchResponse {
   status?: any;
   report?: string;
+  content?: string; // Add content property
+  analysis?: any; // Add analysis property
   response?: {
     report?: string;
     sources?: Array<{
