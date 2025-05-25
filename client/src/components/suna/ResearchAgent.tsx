@@ -476,16 +476,30 @@ export default function ResearchAgent() {
     {
       title: "Market Analysis",
       description: "Deep dive into market trends",
-      prompt: "Analyze current market trends for BTCUSD",
+      prompt: "Analyze current market trends for EUR/USD including technical and fundamental factors",
       icon: TrendingUp,
       gradient: "from-emerald-500 to-teal-600"
     },
     {
       title: "Financial Data",
       description: "Comprehensive metrics analysis",
-      prompt: "Generate financial analysis report for Q4 2024",
+      prompt: "Generate comprehensive financial analysis report for cryptocurrency market trends",
       icon: Database,
       gradient: "from-blue-500 to-indigo-600"
+    },
+    {
+      title: "Technology Research",
+      description: "Latest tech developments",
+      prompt: "Research latest developments in artificial intelligence and machine learning",
+      icon: Zap,
+      gradient: "from-purple-500 to-pink-600"
+    },
+    {
+      title: "Industry Insights",
+      description: "Business intelligence",
+      prompt: "Analyze renewable energy industry trends and investment opportunities",
+      icon: FileText,
+      gradient: "from-orange-500 to-red-600"
     }
   ];
 
