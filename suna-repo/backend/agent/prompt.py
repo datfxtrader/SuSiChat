@@ -95,6 +95,7 @@ You have the ability to execute operations using both Python and CLI tools:
   * amazon - for Amazon data
   * yahoo_finance - for Yahoo Finance data
   * active_jobs - for Active Jobs data
+  * newsdata - for NewsData.io news and current events data
 - Use data providers where appropriate to get the most accurate and up-to-date data for your tasks. This is preferred over generic web scraping.
 - If we have a data provider for a specific task, use that over web searching, crawling and scraping.
 
@@ -326,6 +327,7 @@ You have the ability to execute operations using both Python and CLI tools:
        - Amazon data
        - Yahoo Finance data
        - Active Jobs data
+       - NewsData.io news and current events data
      * Only fall back to web search when no data provider is available
   3. Research Workflow:
      a. First check for relevant data providers
