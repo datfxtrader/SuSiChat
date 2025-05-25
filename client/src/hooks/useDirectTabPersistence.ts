@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface DirectTabState {
@@ -16,7 +17,7 @@ const STORAGE_KEYS = [
   'direct_tab_state_backup'
 ];
 
-export const useDirectTabPersistence = () => {
+export const useDirectTabPersistence = (isSending?: boolean) => {
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
   const [researchProgress, setResearchProgress] = useState(0);
@@ -213,35 +214,32 @@ export const useDirectTabPersistence = () => {
     };
   }, [forceSaveState, forceRestoreState]);
 
-  // Enhanced progress management with auto-completion
+  // Enhanced progress management with proper isSending detection
   useEffect(() => {
     if (!isResearchInProgress) return;
     
     let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
-        // Auto-complete when research is done
-        if (!isSending && prev >= 85) {
+        // Auto-complete when research is actually done
+        if (isSending === false && prev >= 85) {
           clearInterval(progressInterval);
-          // Trigger completion after brief delay
           setTimeout(() => {
             completeDirectResearch();
           }, 1000);
           return 100;
         }
         
-        // Stop progression if already complete
         if (prev >= 100) {
           clearInterval(progressInterval);
           return 100;
         }
         
-        // Dynamic increment based on actual status
+        // Dynamic increment based on actual sending status
         const baseIncrement = isSending ? Math.random() * 4 + 2 : Math.random() * 8 + 4;
         const newProgress = prev + baseIncrement;
         
-        // Stage-based caps with research completion detection
-        if (!isSending && newProgress >= 85) {
-          // Research is complete, allow final progression
+        // Stage-based caps with proper research completion detection
+        if (isSending === false && newProgress >= 85) {
           return Math.min(newProgress, 100);
         } else if (researchStage >= 5) {
           return Math.min(newProgress, isSending ? 90 : 100);
@@ -255,7 +253,7 @@ export const useDirectTabPersistence = () => {
           return Math.min(newProgress, 35);
         }
       });
-    }, 1500); // Slightly faster updates
+    }, 1500);
     
     return () => {
       if (progressInterval) {
