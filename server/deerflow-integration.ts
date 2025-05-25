@@ -1,6 +1,7 @@
 // server/deerflow-integration.ts
 import { deerflowClient, DeerFlowResearchParams, DeerFlowResearchResponse } from './deerflow-client';
 import { llmService } from './llm';
+import { checkDeerFlowService } from './deerflow-manager';
 
 /**
  * Research depth levels
