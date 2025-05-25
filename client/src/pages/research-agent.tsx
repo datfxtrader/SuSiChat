@@ -52,19 +52,6 @@ const ResearchAgent = () => {
     isSendingRef.current = isSending;
   }, [isSending]);
 
-  useEffect(() => {
-    // Prevent unnecessary refreshes
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isSending || researchProgress > 0) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isSending, isResearchInProgress]);
-
   const [message, setMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [researchDepth, setResearchDepth] = useState('3');
@@ -91,6 +78,19 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Prevent unnecessary refreshes during research
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSending || researchProgress > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isSending, researchProgress]);
+
   // Handle research completion with restoration guards (progress-based completion)
   useEffect(() => {
     // Complete when progress reaches 100% OR when we have assistant messages at 95%+
@@ -98,7 +98,7 @@ const ResearchAgent = () => {
                                messages[messages.length - 1]?.role === 'assistant';
 
     const shouldComplete = !isSending && 
-                          isResearchInProgress && 
+                          researchProgress > 0 && 
                           (researchProgress >= 100 || (researchProgress >= 95 && hasCompletedMessage));
 
     if (shouldComplete) {
@@ -106,10 +106,10 @@ const ResearchAgent = () => {
       setTimeout(() => {
         completeResearch();
       }, 1000);
-    } else if (!isSending && isResearchInProgress && researchProgress < 95) {
+    } else if (!isSending && researchProgress > 0 && researchProgress < 95) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
-  }, [isSending, isResearchInProgress, researchProgress, messages, completeResearch]);
+  }, [isSending, researchProgress, messages, completeResearch]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -478,7 +478,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
             ))}
 
             {/* Research Progress - Show when researching or when research state is persisted */}
-            {(isSending || isResearchInProgress) && (
+            {(isSending || researchProgress > 0) && (
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
                   <Bot className="w-5 h-5 text-white" />
@@ -488,9 +488,9 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     stage={researchStage} 
                     progress={researchProgress}
                     query={ongoingResearchQuery || message}
-                    isActive={isSending || isResearchInProgress}
+                    isActive={isSending || researchProgress > 0}
                   />
-                  {isResearchInProgress && !isSending && (
+                  {researchProgress > 0 && !isSending && (
                     <div className="mt-3 space-y-3">
                       {/* Enhanced Stage Indicator */}
                       <div className="text-xs text-blue-400 flex items-center space-x-2">

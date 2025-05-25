@@ -239,7 +239,7 @@ app.use((req, res, next) => {
   const port = process.env.PORT || 5000;
   
   // Force close any existing listeners on this port
-  process.on('uncaughtException', (err) => {
+  process.on('uncaughtException', (err: any) => {
     if (err.code === 'EADDRINUSE') {
       console.log('Port conflict detected, retrying with different port...');
       const altPort = parseInt(port.toString()) + Math.floor(Math.random() * 100);
