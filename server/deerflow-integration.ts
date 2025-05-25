@@ -1,5 +1,6 @@
 // server/deerflow-integration.ts
 import { deerflowClient, DeerFlowResearchParams, DeerFlowResearchResponse } from './deerflow-client';
+import { enhancedResearchService, EnhancedResearchResult } from './enhanced-research-service';
 import { llmService } from './llm';
 
 /**
@@ -8,7 +9,8 @@ import { llmService } from './llm';
 export enum ResearchDepth {
   Basic = 1,      // Simple web search
   Enhanced = 2,   // More comprehensive web search with better processing
-  Deep = 3        // Full DeerFlow research capabilities
+  Deep = 3,       // Full DeerFlow research capabilities
+  Comprehensive = 4 // Enhanced multi-source research (News + Wikipedia + Academic + DeerFlow)
 }
 
 /**
@@ -75,9 +77,15 @@ export class ResearchService {
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
     try {
-      // For ALL research depths, use DeerFlow agent intelligence with external search engines
-      console.log(`🔍 Using DeerFlow agent intelligence with Brave/Tavily/Yahoo search engines for depth ${depth}`);
-      return await this.performDeepResearch(params);
+      // Handle different research depths
+      if (depth === ResearchDepth.Comprehensive) {
+        console.log(`🔍 Using comprehensive multi-source research (News + Wikipedia + Academic + DeerFlow)`);
+        return await this.performComprehensiveResearch(params);
+      } else {
+        // For other depths, use DeerFlow agent intelligence with external search engines
+        console.log(`🔍 Using DeerFlow agent intelligence with Brave/Tavily/Yahoo search engines for depth ${depth}`);
+        return await this.performDeepResearch(params);
+      }
 
     } catch (error) {
       console.error(`Research error at depth ${depth}:`, error);
@@ -231,7 +239,145 @@ export class ResearchService {
     }
   }
 
+  /**
+   * Perform comprehensive research using multiple data sources
+   */
+  private async performComprehensiveResearch(params: ResearchParams): Promise<ResearchResult> {
+    const startTime = Date.now();
 
+    try {
+      console.log('🚀 Starting comprehensive multi-source research...');
+
+      // Execute enhanced research with multiple data providers
+      const enhancedResult = await enhancedResearchService.performResearch(params.query);
+
+      // Also get DeerFlow analysis for deeper insights
+      const deerflowResult = await this.performDeepResearch(params);
+
+      // Combine results from both enhanced research and DeerFlow
+      const combinedSources = [
+        ...enhancedResult.sources,
+        ...deerflowResult.sources
+      ];
+
+      // Create comprehensive report combining both analyses
+      const combinedReport = this.combineResearchResults(
+        enhancedResult.report,
+        deerflowResult.report,
+        params.query,
+        enhancedResult.sourceBreakdown
+      );
+
+      return {
+        report: combinedReport,
+        sources: combinedSources,
+        depth: ResearchDepth.Comprehensive,
+        processingTime: Math.max(enhancedResult.processingTime, deerflowResult.processingTime)
+      };
+
+    } catch (error) {
+      console.error('Comprehensive research error:', error);
+      
+      // Fallback to enhanced research only if DeerFlow fails
+      try {
+        console.log('🔄 Falling back to enhanced multi-source research...');
+        const enhancedResult = await enhancedResearchService.performResearch(params.query);
+        
+        return {
+          report: enhancedResult.report,
+          sources: enhancedResult.sources,
+          depth: ResearchDepth.Comprehensive,
+          processingTime: enhancedResult.processingTime
+        };
+      } catch (fallbackError) {
+        console.error('Enhanced research fallback error:', fallbackError);
+        
+        return {
+          report: `# Comprehensive Research: ${params.query}\n\nTo enable comprehensive research with multiple data sources, please provide the necessary API keys for NewsAPI and other external services.`,
+          sources: [],
+          depth: ResearchDepth.Basic,
+          processingTime: Date.now() - startTime
+        };
+      }
+    }
+  }
+
+  /**
+   * Combine results from enhanced research and DeerFlow analysis
+   */
+  private combineResearchResults(
+    enhancedReport: string,
+    deerflowReport: string,
+    query: string,
+    sourceBreakdown: { web: number; news: number; wikipedia: number; academic: number }
+  ): string {
+    let combinedReport = `# Comprehensive Research Analysis: ${query}\n\n`;
+
+    // Research Overview
+    combinedReport += `## Research Overview\n\n`;
+    combinedReport += `This comprehensive analysis combines multiple data sources with AI-powered research:\n`;
+    combinedReport += `- **News Sources**: ${sourceBreakdown.news} current articles\n`;
+    combinedReport += `- **Wikipedia**: ${sourceBreakdown.wikipedia} reference articles\n`;
+    combinedReport += `- **Academic Papers**: ${sourceBreakdown.academic} scholarly sources\n`;
+    combinedReport += `- **Web Research**: ${sourceBreakdown.web} additional sources\n`;
+    combinedReport += `- **AI Analysis**: Deep research with external search engines\n\n`;
+
+    // Extract sections from enhanced report
+    const enhancedSections = this.extractReportSections(enhancedReport);
+    
+    // Add latest news section if available
+    if (enhancedSections.news) {
+      combinedReport += enhancedSections.news + '\n\n';
+    }
+
+    // Add background information if available
+    if (enhancedSections.background) {
+      combinedReport += enhancedSections.background + '\n\n';
+    }
+
+    // Add AI-powered analysis from DeerFlow
+    combinedReport += `## AI-Powered Analysis\n\n`;
+    const deerflowContent = deerflowReport.replace(/^#.*$/gm, '').trim();
+    combinedReport += deerflowContent + '\n\n';
+
+    // Add academic research if available
+    if (enhancedSections.academic) {
+      combinedReport += enhancedSections.academic + '\n\n';
+    }
+
+    return combinedReport;
+  }
+
+  /**
+   * Extract sections from enhanced research report
+   */
+  private extractReportSections(report: string): {
+    news?: string;
+    background?: string;
+    academic?: string;
+  } {
+    const sections: any = {};
+
+    // Extract news section
+    const newsMatch = report.match(/## Latest News & Developments\n\n(.*?)(?=\n## |$)/s);
+    if (newsMatch) {
+      sections.news = `## Latest News & Developments\n\n${newsMatch[1].trim()}`;
+    }
+
+    // Extract background section
+    const backgroundMatch = report.match(/## Background Information\n\n(.*?)(?=\n## |$)/s);
+    if (backgroundMatch) {
+      sections.background = `## Background Information\n\n${backgroundMatch[1].trim()}`;
+    }
+
+    // Extract academic section
+    const academicMatch = report.match(/## Academic Research\n\n(.*?)(?=\n## |$)/s);
+    if (academicMatch) {
+      sections.academic = `## Academic Research\n\n${academicMatch[1].trim()}`;
+    }
+
+    return sections;
+  }
 
   /**
    * Create a fallback report when DeerFlow doesn't provide structured content
