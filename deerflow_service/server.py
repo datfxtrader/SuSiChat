@@ -6,6 +6,7 @@ Enhanced with intelligent agent capabilities for advanced planning and reasoning
 """
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import uvicorn
 from typing import Optional, List, Dict, Any
@@ -43,8 +44,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("deerflow_service")
 
-# Initialize FastAPI app
-app = FastAPI(title="DeerFlow Research Service")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown events"""
+    # Startup
+    logger.info("DeerFlow research service starting up...")
+    yield
+    # Shutdown
+    logger.info("Shutting down DeerFlow research service...")
+
+# Initialize FastAPI with lifespan
+app = FastAPI(lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -526,37 +536,13 @@ Format your report in Markdown, but make it readable and professional."""
         
         asyncio.create_task(cleanup_research_state())
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup/shutdown events"""
-    # Startup
-    logger.info("DeerFlow research service starting up...")
-    
-    # Check search capabilities
-    search_engines = []
-    if BRAVE_API_KEY:
-        search_engines.append("Brave (Primary)")
-    search_engines.append("DuckDuckGo (Backup)")
-    if TAVILY_API_KEY:
-        search_engines.append("Tavily (Backup)")
-    
-    logger.info(f"Available search engines: {', '.join(search_engines)}")
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down DeerFlow research service...")
-
-# Initialize FastAPI with lifespan
-app = FastAPI(lifespan=lifespan)
-
-if not DEEPSEEK_API_KEY:
-    logger.warning("DeepSeek API key not found. LLM functionality will be unavailable.")
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint to verify API is working."""
     return {"status": "ok", "timestamp": datetime.datetime.now().isoformat()}
+
+if not DEEPSEEK_API_KEY:
+    logger.warning("DeepSeek API key not found. LLM functionality will be unavailable.")
 
 @app.post("/research", response_model=ResearchResponse)
 async def perform_research_endpoint(request: ResearchRequest, background_tasks: BackgroundTasks):
@@ -832,7 +818,6 @@ async def full_deerflow_research(request: FullAgentResearchRequest):
     """Execute research using the complete DeerFlow agent system"""
     if not FULL_DEERFLOW_AVAILABLE:
         return {"error": "Full DeerFlow agent system not available"}
-    
     try:
         logger.info(f"Full DeerFlow research request: {request.research_question}")
         
