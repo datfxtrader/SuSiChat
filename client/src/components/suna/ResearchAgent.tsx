@@ -340,20 +340,23 @@ export const ResearchAgent = () => {
       console.log('📡 Sending research request to backend...');
       setIsSending(false);
 
-      // Start progress simulation
-      let currentProgress = 5;
+      // Start progress simulation - slower to allow backend time
       progressIntervalRef.current = setInterval(() => {
           setResearchProgress(prev => {
-            const newProgress = Math.min(prev + Math.random() * 2, 90);
-            // Update stages
-            if (newProgress >= 80) setResearchStage(6);
-            else if (newProgress >= 65) setResearchStage(5);
-            else if (newProgress >= 50) setResearchStage(4);
-            else if (newProgress >= 35) setResearchStage(3);
-            else if (newProgress >= 20) setResearchStage(2);
+            // Slower progress that caps at 85% to wait for reports
+            const increment = prev < 70 ? Math.random() * 1.5 : Math.random() * 0.5;
+            const newProgress = Math.min(prev + increment, 85);
+            
+            // Update stages based on progress
+            if (newProgress >= 75) setResearchStage(6);
+            else if (newProgress >= 60) setResearchStage(5);
+            else if (newProgress >= 45) setResearchStage(4);
+            else if (newProgress >= 30) setResearchStage(3);
+            else if (newProgress >= 15) setResearchStage(2);
+            
             return newProgress;
           });
-        }, 1000);
+        }, 1500);
 
       const response = await fetch('/api/suna-research', {
         method: 'POST',
@@ -511,26 +514,27 @@ The research service logs show it's working, so this might be a temporary connec
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const hasNewAssistantMessage = lastMessage?.role === 'assistant';
+    const hasResearchContent = lastMessage?.content && lastMessage.content.length > 100;
 
-    // Only complete research when we have both:
-    // 1. An assistant message AND 
-    // 2. Progress is at least 80% (indicating substantial progress was made)
-    if (isResearchInProgress && hasNewAssistantMessage && !isSending && researchProgress >= 80) {
-      console.log(`✅ Research completed - triggering completion (progress: ${Math.round(researchProgress)}%, hasMessage: true, isSending: false)`);
+    // Complete research when we have:
+    // 1. An assistant message with substantial content (>100 chars)
+    // 2. AND we're currently researching
+    if (isResearchInProgress && hasNewAssistantMessage && hasResearchContent && !isSending) {
+      console.log(`✅ Research completed - found substantial report (${lastMessage.content.length} chars)`);
 
-      // Set progress to 100% first
+      // Set progress to 100% immediately
       setResearchProgress(100);
       setResearchStage(6);
 
-      // Then complete after a brief delay to show completion animation
+      // Then complete after showing completion animation
       setTimeout(() => {
         setIsResearchInProgress(false);
         setCurrentResearchQuery('');
         setResearchProgress(0);
         setResearchStage(1);
-      }, 1500);
-    } else if (isResearchInProgress && hasNewAssistantMessage && researchProgress < 80) {
-      console.log(`⚠️ Got assistant message but progress only ${Math.round(researchProgress)}% - waiting for more progress...`);
+      }, 2000);
+    } else if (isResearchInProgress && hasNewAssistantMessage && !hasResearchContent) {
+      console.log(`⚠️ Got assistant message but content too short (${lastMessage?.content?.length || 0} chars) - waiting for full report...`);
     } else if (isResearchInProgress && researchProgress < 95) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
