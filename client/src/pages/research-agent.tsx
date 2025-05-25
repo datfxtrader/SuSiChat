@@ -62,6 +62,7 @@ const ResearchAgent = () => {
     stageLabel,
     startResearch,
     completeResearch,
+    resetResearch,
     forceSave,
     forceRestore
   } = useDirectTabPersistence();

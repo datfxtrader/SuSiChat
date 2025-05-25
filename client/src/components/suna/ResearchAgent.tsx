@@ -178,33 +178,38 @@ const ResearchResponse = ({ content, timestamp, sources }: {
               Verified
             </span>
           </div>
-          <div className="grid gap-3">
+          <div className="space-y-3">
             {sources.map((source, idx) => (
-              <div key={idx} className="group/source flex items-start space-x-3 p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
-                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <a 
-                    href={source.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-zinc-200 hover:text-blue-400 cursor-pointer transition-colors font-medium text-sm block"
-                  >
-                    {source.title}
-                  </a>
-                  <div className="flex items-center space-x-3 mt-2">
-                    <span className="text-xs text-zinc-500">{source.domain}</span>
-                    <span className="text-xs text-zinc-500 flex items-center">
-                      <span className="text-zinc-600">•</span>
-                      <span className="ml-2">{formatRelativeTime(timestamp)}</span>
-                    </span>
+              <div key={idx} className="group/source p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <h5 className="text-sm font-medium text-zinc-100 mb-1">
+                      [{idx + 1}] {source.title}
+                    </h5>
+                    <a 
+                      href={source.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors break-all"
+                    >
+                      {source.url}
+                    </a>
+                    <div className="flex items-center space-x-3 mt-2">
+                      <span className="text-xs text-zinc-500">{source.domain}</span>
+                      <span className="text-xs text-zinc-500 flex items-center">
+                        <span className="text-zinc-600">•</span>
+                        <span className="ml-2">{formatRelativeTime(timestamp)}</span>
+                      </span>
+                    </div>
                   </div>
+                  <Button 
+                    onClick={() => navigator.clipboard.writeText(source.url)}
+                    className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity bg-transparent border-none text-zinc-400 hover:text-zinc-200"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
                 </div>
-                <Button 
-                  onClick={() => navigator.clipboard.writeText(source.url)}
-                  className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity bg-transparent border-none text-zinc-400 hover:text-zinc-200"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
               </div>
             ))}
           </div>
@@ -256,6 +261,14 @@ export const ResearchAgent = () => {
       if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
       if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
     };
+  }, []);
+
+  // Ensure progress is reset on mount
+  useEffect(() => {
+    setIsResearchInProgress(false);
+    setResearchProgress(0);
+    setResearchStage(1);
+    setIsSending(false);
   }, []);
 
   // Handle research completion
@@ -361,17 +374,20 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
       clearTimeout(progressTimeoutRef.current);
     }
     
-    // Simulate research progress with better control
+    // Simulate research progress with smooth progression
     let currentProgress = 0;
     const targetProgress = 100;
-    const duration = 5000; // 5 seconds total
-    const updateInterval = 100; // Update every 100ms
-    const increment = (targetProgress / duration) * updateInterval;
+    const duration = 4000; // 4 seconds total
+    const updateInterval = 50; // Update every 50ms for smoother animation
     
     progressIntervalRef.current = setInterval(() => {
-      currentProgress += increment + (Math.random() * 2 - 1); // Add some randomness
+      // Smooth exponential progression
+      const remainingProgress = targetProgress - currentProgress;
+      const increment = remainingProgress * 0.05; // 5% of remaining each time
       
-      if (currentProgress >= targetProgress) {
+      currentProgress += Math.max(increment, 0.5); // Minimum 0.5% increment
+      
+      if (currentProgress >= targetProgress - 0.1) {
         currentProgress = targetProgress;
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
@@ -381,18 +397,18 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
         // Complete research after reaching 100%
         setTimeout(() => {
           completeResearch();
-        }, 300);
+        }, 200);
       }
       
       setResearchProgress(Math.min(currentProgress, targetProgress));
       
       // Update stages based on progress
       const progress = Math.min(currentProgress, targetProgress);
-      if (progress >= 85) setResearchStage(6);
-      else if (progress >= 70) setResearchStage(5);
-      else if (progress >= 55) setResearchStage(4);
-      else if (progress >= 40) setResearchStage(3);
-      else if (progress >= 20) setResearchStage(2);
+      if (progress >= 83) setResearchStage(6);
+      else if (progress >= 67) setResearchStage(5);
+      else if (progress >= 50) setResearchStage(4);
+      else if (progress >= 33) setResearchStage(3);
+      else if (progress >= 17) setResearchStage(2);
       else setResearchStage(1);
     }, updateInterval);
     
@@ -405,9 +421,11 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
           progressIntervalRef.current = null;
         }
         setResearchProgress(100);
-        completeResearch();
+        setTimeout(() => {
+          completeResearch();
+        }, 200);
       }
-    }, duration + 1000); // Add 1 second buffer
+    }, 5000); // 5 seconds total timeout
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
