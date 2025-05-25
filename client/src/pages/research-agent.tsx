@@ -26,6 +26,18 @@ const formatRelativeTime = (timestamp: string | number) => {
 };
 
 const ResearchAgent = () => {
+  useEffect(() => {
+    // Prevent unnecessary refreshes
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSending || isResearchInProgress) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isSending, isResearchInProgress]);
   const { isAuthenticated, user } = useAuth();
   const {
     conversation,
