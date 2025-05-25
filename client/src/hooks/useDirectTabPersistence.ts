@@ -102,7 +102,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
     if (restoredState) {
       console.log('🎯 RESTORING UI with state:', restoredState);
 
-      // CRITICAL FIX: Clean the state to prevent completion triggers
+      // Clean the state and validate it's actually a research session
       const cleanedState = {
         ...restoredState,
         isCompleting: false,
@@ -110,18 +110,25 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
         wasSaved: undefined
       };
 
-      // Force immediate state updates with cleaned state
-      setIsResearchInProgress(cleanedState.isInProgress);
-      setOngoingResearchQuery(cleanedState.query);
-      setResearchProgress(cleanedState.progress);
-      setResearchStage(cleanedState.stage);
-      setStageLabel(cleanedState.stageLabel);
-
-      // Double-check with a second update to ensure reliability
-      setTimeout(() => {
+      // Only restore if it's a legitimate research session (progress > 0 and query exists)
+      if (cleanedState.isInProgress && cleanedState.query && cleanedState.progress >= 0) {
+        console.log('🎯 RESTORING validated research state:', cleanedState);
+        
+        // Apply state updates
         setIsResearchInProgress(cleanedState.isInProgress);
+        setOngoingResearchQuery(cleanedState.query);
         setResearchProgress(cleanedState.progress);
-        console.log('🔥 SECOND UPDATE applied for reliability');
+        setResearchStage(cleanedState.stage);
+        setStageLabel(cleanedState.stageLabel);
+
+        // Ensure state sticks with a delayed verification
+        setTimeout(() => {
+          if (cleanedState.isInProgress) {
+            setIsResearchInProgress(true);
+            setResearchProgress(cleanedState.progress);
+            console.log('🔥 State persistence verified and reinforced');
+          }
+        }, 100);;
       }, 100);
 
       return true;

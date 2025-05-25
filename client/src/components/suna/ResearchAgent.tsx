@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import { ProgressDebugger } from '../debug/ProgressDebugger';
 
 const formatRelativeTime = (timestamp: string) => {
   const now = new Date();
@@ -340,23 +341,23 @@ export const ResearchAgent = () => {
       console.log('📡 Sending research request to backend...');
       setIsSending(false);
 
-      // Start progress simulation - slower to allow backend time
+      // Start progress simulation - much slower and more realistic
       progressIntervalRef.current = setInterval(() => {
           setResearchProgress(prev => {
-            // Slower progress that caps at 85% to wait for reports
-            const increment = prev < 70 ? Math.random() * 1.5 : Math.random() * 0.5;
-            const newProgress = Math.min(prev + increment, 85);
+            // Very slow progress that caps at 80% to wait for actual reports
+            const increment = prev < 50 ? Math.random() * 0.8 : Math.random() * 0.3;
+            const newProgress = Math.min(prev + increment, 80);
             
-            // Update stages based on progress
-            if (newProgress >= 75) setResearchStage(6);
-            else if (newProgress >= 60) setResearchStage(5);
-            else if (newProgress >= 45) setResearchStage(4);
+            // Update stages based on progress - more conservative
+            if (newProgress >= 70) setResearchStage(5);
+            else if (newProgress >= 50) setResearchStage(4);
             else if (newProgress >= 30) setResearchStage(3);
             else if (newProgress >= 15) setResearchStage(2);
+            else setResearchStage(1);
             
             return newProgress;
           });
-        }, 1500);
+        }, 2500); // Slower interval
 
       const response = await fetch('/api/suna-research', {
         method: 'POST',
@@ -376,15 +377,11 @@ export const ResearchAgent = () => {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
-      console.log('✅ Research completed! Report length:', data.report?.length || 0);
+      console.log('✅ Research API call completed! Report length:', data.report?.length || 0);
 
-      // Clear progress interval
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
+      // Don't complete yet - let the useEffect handle completion when message is added
+      // Just add the message and let the completion logic trigger naturally
 
-      // Add the research results immediately
       if (data.report && data.report.trim()) {
         console.log('✅ Adding research report to messages');
         const completedMessage: Message = {
@@ -396,21 +393,38 @@ export const ResearchAgent = () => {
         };
 
         setMessages(prev => [...prev, completedMessage]);
-        console.log('📝 Research message added to chat');
+        console.log('📝 Research message added to chat - completion will be handled by useEffect');
       } else {
         console.log('⚠️ Empty or missing report, adding fallback message');
+        
+        // Clear progress for failed research
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        
+        setIsResearchInProgress(false);
+        setResearchProgress(0);
+        setResearchStage(1);
+        setIsSending(false);
+        setCurrentResearchQuery('');
+
         const fallbackMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant' as const,
-          content: `# Research Complete
+          content: `# Research Service Unavailable
 
-I've completed research on "${queryText}" but the backend returned an empty report. This might be due to:
+I wasn't able to complete research on "${queryText}" at this time. This might be due to:
 
-- The research service being overloaded
-- Network connectivity issues  
-- The query being too broad or specific
+- **Backend service issues** - The research service may be starting up
+- **Network connectivity problems** - Connection to research APIs failed  
+- **Query processing errors** - Try rephrasing your question
 
-Please try rephrasing your question or try again in a moment.`,
+**Troubleshooting:**
+1. Wait a moment and try again
+2. Check that the backend service is running
+3. Try a simpler, more specific query
+4. Refresh the page if issues persist`,
           timestamp: new Date().toISOString(),
           sources: []
         };
@@ -510,35 +524,39 @@ The research service logs show it's working, so this might be a temporary connec
     }
   ];
 
-  // Handle research completion properly
+  // Handle research completion properly - only complete when we have a real research response
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const hasNewAssistantMessage = lastMessage?.role === 'assistant';
-    const hasResearchContent = lastMessage?.content && lastMessage.content.length > 100;
+    const hasResearchContent = lastMessage?.content && lastMessage.content.length > 500; // Increased threshold
+    const isActualResearchReport = hasResearchContent && 
+      (lastMessage?.content.includes('# ') || lastMessage?.content.includes('## ') || lastMessage?.sources);
 
-    // Complete research when we have:
-    // 1. An assistant message with substantial content (>100 chars)
-    // 2. AND we're currently researching
-    if (isResearchInProgress && hasNewAssistantMessage && hasResearchContent && !isSending) {
-      console.log(`✅ Research completed - found substantial report (${lastMessage.content.length} chars)`);
+    // Only complete research when we have a REAL research report
+    if (isResearchInProgress && hasNewAssistantMessage && isActualResearchReport && !isSending) {
+      console.log(`✅ Research completed - found research report (${lastMessage.content.length} chars)`);
 
-      // Set progress to 100% immediately
+      // Clear progress interval first
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+
+      // Set progress to 100% and complete
       setResearchProgress(100);
       setResearchStage(6);
 
-      // Then complete after showing completion animation
+      // Complete after brief animation
       setTimeout(() => {
         setIsResearchInProgress(false);
         setCurrentResearchQuery('');
         setResearchProgress(0);
         setResearchStage(1);
-      }, 2000);
-    } else if (isResearchInProgress && hasNewAssistantMessage && !hasResearchContent) {
-      console.log(`⚠️ Got assistant message but content too short (${lastMessage?.content?.length || 0} chars) - waiting for full report...`);
-    } else if (isResearchInProgress && researchProgress < 95) {
-      console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
+      }, 1500);
+    } else if (isResearchInProgress && hasNewAssistantMessage && !isActualResearchReport) {
+      console.log(`⚠️ Got assistant message but not a research report (${lastMessage?.content?.length || 0} chars) - continuing...`);
     }
-  }, [messages, isResearchInProgress, isSending, researchProgress]);
+  }, [messages, isResearchInProgress, isSending]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
@@ -672,6 +690,16 @@ The research service logs show it's working, so this might be a temporary connec
           </div>
         </div>
       </div>
+
+      {/* Progress Debugger - only shows in development */}
+      <ProgressDebugger
+        isResearchInProgress={isResearchInProgress}
+        researchProgress={researchProgress}
+        researchStage={researchStage}
+        currentQuery={currentResearchQuery}
+        isSending={isSending}
+        messagesCount={messages.length}
+      />
     </div>
   );
 };
