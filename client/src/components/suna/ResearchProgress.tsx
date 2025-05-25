@@ -9,7 +9,7 @@ interface ResearchProgressProps {
   isActive: boolean;
 }
 
-const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress, query, isActive }) => (
+export const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress, query, isActive }) => (
   <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-6 backdrop-blur-sm">
     <div className="flex items-center space-x-3 mb-4">
       <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
