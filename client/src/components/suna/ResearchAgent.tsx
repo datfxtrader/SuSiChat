@@ -145,6 +145,44 @@ export const ResearchAgent = () => {
 
       <div className="flex-1 flex flex-col">
         <div className="flex-1 overflow-y-auto p-6">
+          {messages.length === 0 && !isResearchInProgress && (
+            <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+              <div className="text-center max-w-4xl mx-auto px-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                  <Bot className="w-8 h-8 text-white" />
+                </div>
+                
+                <h1 className="text-3xl font-bold text-zinc-100 mb-3">
+                  Welcome to Research Agent
+                </h1>
+                <p className="text-lg text-zinc-400 mb-12">
+                  Get comprehensive, AI-powered research on any topic with real-time data
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                  {predefinedPrompts.map((card, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setMessage(card.prompt)}
+                      className="group p-6 bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 rounded-2xl hover:bg-zinc-800/70 hover:border-zinc-700/70 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] hover:shadow-2xl"
+                    >
+                      <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg`}>
+                        <card.icon className="w-6 h-6 text-white" />
+                      </div>
+                      
+                      <h3 className="text-lg font-semibold text-zinc-100 mb-2 group-hover:text-white transition-colors">
+                        {card.title}
+                      </h3>
+                      <p className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                        {card.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {messages.map((msg) => (
             <div key={msg.id} className="mb-4">
               <div className="flex items-start space-x-3">
