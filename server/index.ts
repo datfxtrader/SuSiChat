@@ -241,13 +241,4 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
-
-  tryPort(5000)
-    .then(port => {
-      log(`serving on port ${port}`);
-    })
-    .catch(err => {
-      console.error('Failed to start server:', err);
-      process.exit(1);
-    });
 })();
