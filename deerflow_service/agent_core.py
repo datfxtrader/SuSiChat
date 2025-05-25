@@ -16,6 +16,9 @@ from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# Import shared types
+from shared_types import TaskStatus, AgentState, ExecutionPlan, SubTask
+
 # Import optimization components
 from task_manager import TaskManager
 from state_manager import StateStore, StateTransitionValidator
@@ -40,14 +43,6 @@ except ImportError:
 
 logger = logging.getLogger("agent_core")
 
-class TaskStatus(Enum):
-    PENDING = "pending"
-    PLANNING = "planning"
-    EXECUTING = "executing"
-    REASONING = "reasoning"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
 class QueryType(Enum):
     SIMPLE = "simple"
     COMPARATIVE = "comparative"
@@ -56,41 +51,6 @@ class QueryType(Enum):
     SCIENTIFIC = "scientific"
     CURRENT_EVENTS = "current_events"
     MULTI_DOMAIN = "multi_domain"
-
-@dataclass
-class SubTask:
-    """Represents a decomposed sub-task within a research plan"""
-    id: str
-    description: str
-    type: str
-    priority: int
-    dependencies: List[str]
-    estimated_time: int
-    status: str = "pending"
-    result: Optional[Dict[str, Any]] = None
-
-@dataclass
-class ExecutionPlan:
-    """Represents the complete execution plan for a research task"""
-    strategy: str
-    steps: List[SubTask]
-    total_estimated_time: int
-    adaptation_points: List[str]
-    success_criteria: List[str]
-
-@dataclass
-class AgentState:
-    """Maintains the current state of the agent"""
-    agent_id: str
-    task_id: str
-    status: TaskStatus
-    current_step: int
-    working_memory: Dict[str, Any]
-    execution_plan: Optional[ExecutionPlan]
-    reasoning_chain: List[Dict[str, Any]]
-    confidence_scores: Dict[str, float]
-    start_time: float
-    metadata: Dict[str, Any]
 
 class TaskPlanner:
     """Intelligent task planning with query analysis and strategy selection"""

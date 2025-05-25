@@ -1,6 +1,20 @@
 
-# Domain Agent Configuration
-# This file contains configuration for all domain agents including keywords, thresholds, and analysis parameters
+# Optimized Domain Agent Configuration with Environment Variable Support
+# This file supports environment variables using ${VAR_NAME:default_value} syntax
+
+global:
+  cache_size: ${DOMAIN_CACHE_SIZE:256}
+  max_concurrent_analyses: ${DOMAIN_MAX_CONCURRENT:10}
+  error_threshold: ${DOMAIN_ERROR_THRESHOLD:20}
+  config_reload_interval: 300
+  enable_hot_reload: true
+  performance_monitoring: true
+  detailed_logging: ${DOMAIN_DETAILED_LOGGING:false}
+  
+  timeouts:
+    analysis_timeout: ${DOMAIN_ANALYSIS_TIMEOUT:30}
+    evidence_processing_timeout: ${DOMAIN_EVIDENCE_TIMEOUT:60}
+    orchestration_timeout: ${DOMAIN_ORCHESTRATION_TIMEOUT:120}
 
 financial:
   keywords:
@@ -54,9 +68,13 @@ financial:
       - aggressive
   
   thresholds:
-    relevance_score: 0.3
-    confidence_threshold: 0.6
-    risk_score_threshold: 0.7
+    relevance_score: ${FINANCIAL_RELEVANCE_SCORE:0.3}
+    confidence_threshold: ${FINANCIAL_CONFIDENCE:0.6}
+    risk_score_threshold: ${FINANCIAL_RISK_THRESHOLD:0.7}
+    min_evidence_count: 3
+  
+  enabled: true
+  priority: 8
 
 technical:
   keywords:
@@ -94,8 +112,12 @@ technical:
       - head and shoulders
   
   thresholds:
-    relevance_score: 0.4
-    confidence_threshold: 0.7
+    relevance_score: ${TECHNICAL_RELEVANCE_SCORE:0.4}
+    confidence_threshold: ${TECHNICAL_CONFIDENCE:0.7}
+    min_evidence_count: 2
+  
+  enabled: true
+  priority: 7
 
 market:
   keywords:
@@ -126,8 +148,12 @@ market:
       - seasonal
   
   thresholds:
-    relevance_score: 0.25
-    confidence_threshold: 0.65
+    relevance_score: ${MARKET_RELEVANCE_SCORE:0.25}
+    confidence_threshold: ${MARKET_CONFIDENCE:0.65}
+    min_evidence_count: 3
+  
+  enabled: true
+  priority: 6
 
 risk:
   keywords:
@@ -159,18 +185,9 @@ risk:
       - operational risk
   
   thresholds:
-    relevance_score: 0.35
-    confidence_threshold: 0.8
-
-# Global settings
-global:
-  cache_size: 256
-  max_concurrent_analyses: 10
-  error_threshold: 20
-  performance_monitoring: true
-  detailed_logging: false
+    relevance_score: ${RISK_RELEVANCE_SCORE:0.35}
+    confidence_threshold: ${RISK_CONFIDENCE:0.8}
+    min_evidence_count: 2
   
-  timeouts:
-    analysis_timeout: 30
-    evidence_processing_timeout: 60
-    orchestration_timeout: 120
+  enabled: true
+  priority: 9

@@ -6,7 +6,7 @@ import pickle
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from dataclasses import asdict
-from agent_core import AgentState, TaskStatus
+from shared_types import AgentState, TaskStatus
 
 logger = logging.getLogger("state_manager")
 
