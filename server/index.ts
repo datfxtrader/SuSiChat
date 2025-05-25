@@ -210,8 +210,13 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
-  // Direct Research Agent interface
+  // Redirect to existing research agent
   app.get('/research', (req, res) => {
+    res.redirect('/research-agent');
+  });
+
+  // Direct Research Agent interface (fallback)
+  app.get('/research-direct', (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="en">
