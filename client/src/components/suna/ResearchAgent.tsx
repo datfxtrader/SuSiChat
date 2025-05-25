@@ -225,46 +225,14 @@ export const ResearchAgent = () => {
             </div>
           ))}
 
-          {(isSending || isResearchInProgress) && (
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <ResearchProgress 
-                  stage={researchStage} 
-                  progress={researchProgress}
-                  query={message || ongoingResearchQuery}
-                  isActive={isSending || isResearchInProgress}
-                />
-                {isResearchInProgress && !isSending && (
-                  <div className="mt-3 space-y-3">
-                    <div className="text-xs text-blue-400 flex items-center space-x-2">
-                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                      <span>Stage {researchStage}/6: {
-                        researchStage === 1 ? "Initializing research..." :
-                        researchStage === 2 ? "Gathering data..." :
-                        researchStage === 3 ? "Analyzing information..." :
-                        researchStage === 4 ? "Processing results..." :
-                        researchStage === 5 ? "Generating insights..." :
-                        "Finalizing report..."
-                      }</span>
-                    </div>
-
-                    <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out animate-pulse"
-                        style={{ width: `${Math.max(researchProgress, 5)}%` }}
-                      />
-                    </div>
-
-                    <div className="text-xs text-gray-400 flex justify-between items-center">
-                      <span>Progress: {Math.round(researchProgress)}%</span>
-                      <span>Stage {researchStage}/6</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {isResearchInProgress && (
+            <div className="mb-4">
+              <ResearchProgress 
+                stage={researchStage}
+                progress={researchProgress}
+                query={message || "Analyzing..."}
+                isActive={isSending || isResearchInProgress}
+              />
             </div>
           )}
         </div>
