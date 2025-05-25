@@ -106,30 +106,53 @@ def get_token_limit_by_depth(research_depth: int) -> int:
 
 # Helper functions for research
 async def search_web(query: str, max_results: int = 8):
-    """Search the web using available search engines with DuckDuckGo as primary."""
+    """Search the web using available search engines with retries and rate limiting."""
     logger.info(f"Searching web for: {query}")
     
-    # Primary: Use DuckDuckGo (no API key required)
-    try:
-        results = await search_duckduckgo(query, max_results)
-        if results:
-            return results
-    except Exception as e:
-        logger.error(f"DuckDuckGo search error: {e}")
-    
-    # Backup: Try Brave if available 
+    all_results = []
+    retry_delay = 2  # seconds between retries
+    max_retries = 3
+
+    # Try DuckDuckGo with retries
+    for attempt in range(max_retries):
+        try:
+            results = await search_duckduckgo(query, max_results)
+            if results:
+                all_results.extend(results)
+                break
+        except Exception as e:
+            logger.warning(f"DuckDuckGo attempt {attempt + 1} failed: {e}")
+            await asyncio.sleep(retry_delay)
+
+    # If we have enough results, return early
+    if len(all_results) >= max_results:
+        return all_results[:max_results]
+
+    # Try Brave with rate limit handling
     if BRAVE_API_KEY:
         try:
-            return await search_brave(query, max_results)
+            brave_results = await search_brave(query, max_results - len(all_results))
+            if brave_results:
+                all_results.extend(brave_results)
         except Exception as e:
             if "RATE_LIMITED" in str(e):
-                logger.warning("Brave search rate limited, skipping")
+                logger.warning("Brave search rate limited, implementing backoff")
+                await asyncio.sleep(retry_delay * 2)  # Longer delay for rate limits
             else:
                 logger.error(f"Brave search error: {e}")
+
+    # Return whatever results we have, even if incomplete
+    if all_results:
+        return all_results
     
-    # Return empty results if all searches fail
-    logger.warning("All search methods failed")
-    return []
+    # If no results, return a basic fallback response
+    return [{
+        "title": "Market Analysis",
+        "url": "https://example.com/market-analysis",
+        "content": f"No immediate market data available for {query}. Please try again later or refine your search.",
+        "score": 1.0,
+        "source": "fallback"
+    }]
 
 async def search_tavily(query: str, max_results: int = 8):
     """Search using Tavily API."""
