@@ -1025,7 +1025,7 @@ if __name__ == "__main__":
     import os
     
     # Ensure we bind to the correct port
-    port = int(os.environ.get("DEERFLOW_PORT", 8000))
+    port = int(os.environ.get("DEERFLOW_PORT", 9000))
     print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
     
     uvicorn.run(

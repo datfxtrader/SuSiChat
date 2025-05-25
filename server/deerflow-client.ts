@@ -3,7 +3,7 @@
  */
 
 import axios from 'axios';
-import { checkDeerFlowService, startDeerFlowService, getDeerFlowServiceUrl } from './deerflow-manager';
+import { checkDeerFlowService, startDeerFlowService } from './deerflow-manager';
 
 // Create axios instance with extended timeout for comprehensive research
 const deerflowAxios = axios.create({
@@ -112,10 +112,10 @@ export class DeerFlowClient {
     try {
       // Check if DeerFlow service is running, with retry logic
       let serviceRunning = await checkDeerFlowService();
-      
+
       if (!serviceRunning) {
         console.log('DeerFlow service not running, starting it now...');
-        
+
         // Start the service
         const started = await startDeerFlowService();
         if (!started) {
@@ -129,19 +129,19 @@ export class DeerFlowClient {
           }
         }
       }
-      
+
       // Make the actual API call to DeerFlow
       console.log('Making request to DeerFlow service:', params);
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await deerflowAxios.post(`${serviceUrl}/research`, params);
-      
+
       return response.data;
     } catch (error) {
       console.error('Error performing DeerFlow research:', error);
-      
+
       // Handle timeout errors specifically
       const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
-      
+
       // Return error response
       return {
         status: { status: 'error', message: error instanceof Error ? error.message : 'Unknown error' },
@@ -150,18 +150,18 @@ export class DeerFlowClient {
       };
     }
   }
-  
+
   /**
    * Check the status of a research request
    */
   async checkResearchStatus(researchId: string): Promise<any> {
     try {
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       // Updated endpoint path to match our Python service implementation
       const response = await axios.get(`${serviceUrl}/research/${researchId}`, {
         timeout: 5000,
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Error checking research status:', error);
@@ -184,7 +184,7 @@ export class DeerFlowClient {
       }
 
       console.log('Creating agent research task:', params);
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.post(`${serviceUrl}/agent/research`, params, {
         timeout: 30000,
       });
@@ -205,7 +205,7 @@ export class DeerFlowClient {
    */
   async getAgentTaskStatus(taskId: string): Promise<AgentTaskStatus | null> {
     try {
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.get(`${serviceUrl}/agent/task/${taskId}`, {
         timeout: 10000,
       });
@@ -227,7 +227,7 @@ export class DeerFlowClient {
    */
   async listAgentTasks(): Promise<{ tasks: any[]; total: number }> {
     try {
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.get(`${serviceUrl}/agent/tasks`, {
         timeout: 10000,
       });
@@ -244,7 +244,7 @@ export class DeerFlowClient {
    */
   async cleanupAgentTasks(maxAgeHours: number = 24): Promise<{ message: string; remaining_tasks: number }> {
     try {
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.post(`${serviceUrl}/agent/cleanup`, 
         { max_age_hours: maxAgeHours },
         { timeout: 10000 }
@@ -279,7 +279,7 @@ export class DeerFlowClient {
       }
 
       console.log('Executing full DeerFlow agent research:', params);
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.post(`${serviceUrl}/deerflow/full-research`, params, {
         timeout: 600000, // 10 minutes for complex multi-agent research
       });
@@ -305,7 +305,7 @@ export class DeerFlowClient {
     error?: string;
   }> {
     try {
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.get(`${serviceUrl}/deerflow/capabilities`, {
         timeout: 10000,
       });
@@ -327,7 +327,7 @@ export class DeerFlowClient {
    */
   async getAvailableTools(): Promise<any> {
     try {
-      const serviceUrl = getDeerFlowServiceUrl();
+      const serviceUrl = this.getDeerFlowServiceUrl();
       const response = await axios.get(`${serviceUrl}/deerflow/tools`, {
         timeout: 10000,
       });
@@ -342,6 +342,13 @@ export class DeerFlowClient {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
+  }
+
+    /**
+   * Returns the DeerFlow service URL.  This is hardcoded to port 9000.
+   */
+  getDeerFlowServiceUrl(): string {
+    return `http://localhost:9000`;
   }
 }
 
