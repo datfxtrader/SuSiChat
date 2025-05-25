@@ -1,6 +1,8 @@
+
 import React from 'react';
-import { Search, Clock, Copy, Badge } from 'lucide-react';
+import { Search, Clock, Copy, Share2, Bookmark, Bot, TrendingUp, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 
 interface Source {
   title: string;
@@ -18,7 +20,7 @@ const formatRelativeTime = (timestamp: string) => {
   const now = new Date();
   const messageTime = new Date(timestamp);
   const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-
+  
   if (diffInMinutes < 1) return 'Just now';
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
@@ -28,21 +30,77 @@ const formatRelativeTime = (timestamp: string) => {
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp, sources }) => {
   return (
     <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg">
+      <div className="flex items-center justify-between mb-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div className="flex items-center space-x-3 text-xs text-zinc-400">
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-green-400 rounded-full" />
+            <span>AI Research Assistant</span>
+          </div>
+          <span>•</span>
+          <span>{formatRelativeTime(timestamp)}</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+            <Copy className="w-3 h-3" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+            <Share2 className="w-3 h-3" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+            <Bookmark className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+
       <div className="prose prose-invert max-w-none">
         <div className="space-y-6 text-zinc-200">
           {content.split('\n\n').map((paragraph, idx) => {
             if (paragraph.startsWith('# ')) {
               return (
-                <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50">
+                <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
+                  <TrendingUp className="w-6 h-6 mr-3 text-blue-400" />
                   {paragraph.replace('# ', '')}
                 </h1>
               );
+            } else if (paragraph.startsWith('## ')) {
+              return (
+                <h2 key={idx} className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center">
+                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3" />
+                  {paragraph.replace('## ', '')}
+                </h2>
+              );
+            } else if (paragraph.startsWith('### ')) {
+              return (
+                <h3 key={idx} className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
+                  {paragraph.replace('### ', '')}
+                </h3>
+              );
+            } else if (paragraph.startsWith('- **')) {
+              return (
+                <div key={idx} className="ml-4 mb-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
+                  <div className="font-medium text-zinc-100 mb-1">
+                    {paragraph.match(/\*\*(.*?)\*\*/)?.[1] || ''}
+                  </div>
+                  <div className="text-zinc-300 text-sm leading-relaxed">
+                    {paragraph.replace(/- \*\*(.*?)\*\*:\s*/, '')}
+                  </div>
+                </div>
+              );
             }
-            return <p key={idx} className="text-zinc-200 leading-relaxed">{paragraph}</p>;
+            return (
+              <p key={idx} className="text-zinc-200 leading-relaxed">
+                {paragraph.split('**').map((part, i) => 
+                  i % 2 === 1 ? 
+                    <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
+                    part
+                )}
+              </p>
+            );
           })}
         </div>
       </div>
-
+      
       {sources && sources.length > 0 && (
         <div className="mt-8 pt-6 border-t border-zinc-800/50">
           <div className="flex items-center justify-between mb-4">
@@ -50,12 +108,11 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
               <Search className="w-4 h-4 mr-2 text-blue-400" />
               Research Sources ({sources.length})
             </h4>
-            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+            <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
               <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1" />
               Verified
-            </div>
+            </Badge>
           </div>
-
           <div className="grid gap-3">
             {sources.map((source, idx) => (
               <div key={idx} className="group/source flex items-start space-x-3 p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
