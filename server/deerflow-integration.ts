@@ -264,9 +264,13 @@ export class ResearchService {
         }
       }
       
-      // Fall back to general DeerFlow research for financial topics
-      console.log('🔄 Falling back to general DeerFlow research for financial query');
-      return await this.performDeepResearch(params);
+      // Return basic error response instead of recursing
+      return {
+        report: "Financial research failed to provide detailed analysis. Please try a more specific query.",
+        sources: [],
+        depth: ResearchDepth.Basic,
+        processingTime: Date.now() - startTime
+      };
       
     } catch (error) {
       console.error('Financial research error:', error);
