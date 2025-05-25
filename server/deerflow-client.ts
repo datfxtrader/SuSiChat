@@ -112,10 +112,10 @@ export class DeerFlowClient {
     try {
       // Check if DeerFlow service is running, with retry logic
       let serviceRunning = await checkDeerFlowService();
-      
+
       if (!serviceRunning) {
         console.log('DeerFlow service not running, starting it now...');
-        
+
         // Start the service
         const started = await startDeerFlowService();
         if (!started) {
@@ -129,19 +129,19 @@ export class DeerFlowClient {
           }
         }
       }
-      
+
       // Make the actual API call to DeerFlow
       console.log('Making request to DeerFlow service:', params);
       const serviceUrl = getDeerFlowServiceUrl();
       const response = await deerflowAxios.post(`${serviceUrl}/research`, params);
-      
+
       return response.data;
     } catch (error) {
       console.error('Error performing DeerFlow research:', error);
-      
+
       // Handle timeout errors specifically
       const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
-      
+
       // Return error response
       return {
         status: { status: 'error', message: error instanceof Error ? error.message : 'Unknown error' },
@@ -150,7 +150,7 @@ export class DeerFlowClient {
       };
     }
   }
-  
+
   /**
    * Check the status of a research request
    */
@@ -161,7 +161,7 @@ export class DeerFlowClient {
       const response = await axios.get(`${serviceUrl}/research/${researchId}`, {
         timeout: 5000,
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Error checking research status:', error);
