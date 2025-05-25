@@ -373,7 +373,7 @@ export const ResearchAgent = () => {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
-      console.log('📊 Research completed! Report length:', data.report?.length || 0);
+      console.log('✅ Research completed! Report length:', data.report?.length || 0);
 
       // Clear progress interval
       if (progressIntervalRef.current) {
@@ -381,30 +381,19 @@ export const ResearchAgent = () => {
         progressIntervalRef.current = null;
       }
 
-      // Complete progress with animation
-        setResearchProgress(100);
-        setResearchStage(6);
+      // Add the research results immediately
+      if (data.report && data.report.trim()) {
+        console.log('✅ Adding research report to messages');
+        const completedMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant' as const,
+          content: data.report,
+          timestamp: new Date().toISOString(),
+          sources: data.sources || []
+        };
 
-        // Add the research results immediately
-        if (data.report && data.report.trim()) {
-          console.log('✅ Adding research report to messages');
-          const completedMessage: Message = {
-            id: Date.now().toString(),
-            role: 'assistant' as const,
-            content: data.report,
-            timestamp: new Date().toISOString(),
-            sources: data.sources || []
-          };
-
-          setMessages(prev => [...prev, completedMessage]);
-
-          // Show completion animation for 2 seconds before cleaning up
-          setTimeout(() => {
-            setIsResearchInProgress(false);
-            setCurrentResearchQuery('');
-            setResearchProgress(0);
-            setResearchStage(1);
-          }, 2000);
+        setMessages(prev => [...prev, completedMessage]);
+        console.log('📝 Research message added to chat');
       } else {
         console.log('⚠️ Empty or missing report, adding fallback message');
         const fallbackMessage: Message = {
@@ -424,16 +413,6 @@ Please try rephrasing your question or try again in a moment.`,
         };
 
         setMessages(prev => [...prev, fallbackMessage]);
-
-        // Clean up state
-        setIsResearchInProgress(false);
-        setCurrentResearchQuery('');
-
-        // Reset progress after showing completion
-        setTimeout(() => {
-          setResearchProgress(0);
-          setResearchStage(1);
-        }, 1000);
       }
 
     } catch (error) {
@@ -527,6 +506,31 @@ The research service logs show it's working, so this might be a temporary connec
       gradient: "from-blue-500 to-indigo-600"
     }
   ];
+
+  // Handle research completion properly
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    const hasNewAssistantMessage = lastMessage?.role === 'assistant';
+
+    // Complete research when we receive an assistant message while research is in progress
+    if (isResearchInProgress && hasNewAssistantMessage && !isSending) {
+      console.log(`✅ Research completed - found assistant message, completing research`);
+
+      // Set progress to 100% first
+      setResearchProgress(100);
+      setResearchStage(6);
+
+      // Then complete after a brief delay to show completion animation
+      setTimeout(() => {
+        setIsResearchInProgress(false);
+        setCurrentResearchQuery('');
+        setResearchProgress(0);
+        setResearchStage(1);
+      }, 1500);
+    } else if (isResearchInProgress && researchProgress < 95) {
+      console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
+    }
+  }, [messages, isResearchInProgress, isSending, researchProgress]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
