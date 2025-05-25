@@ -3,7 +3,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "./useAuth";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from './use-toast';
-import { enhancedSearchClient, type EnhancedSearchResponse } from '../lib/enhancedSearch';
+import { enhancedSearchClient, enhancedSearch, type EnhancedSearchResponse } from '../lib/enhancedSearch';
 
 type SunaMessage = {
   id: string;
