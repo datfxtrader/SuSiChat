@@ -479,31 +479,53 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
     }
   ];
 
-  // Handle completion detection
+  // Handle completion detection with safeguards
   useEffect(() => {
-    // Prevent completion handling during active sending
-    if (!isResearchInProgress || isSending) return;
+    let completionTimeout: NodeJS.Timeout | null = null;
 
-    // Complete when progress hits certain thresholds
-    if (researchProgress >= 100 || (!isSending && researchProgress >= 90)) {
-      console.log('✅ Research completed at', Math.round(researchProgress), '% - showing results');
-      completeResearch();
+    const safeComplete = () => {
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+      }
+      if (isResearchInProgress) {
+        console.log('✅ Research completed at', Math.round(researchProgress), '% - showing results');
+        completeResearch();
+      }
+    };
+
+    // Only attempt completion when research is active but not sending
+    if (isResearchInProgress && !isSending) {
+      if (researchProgress >= 100) {
+        safeComplete();
+      } else if (researchProgress >= 90) {
+        // Add slight delay to prevent race conditions
+        completionTimeout = setTimeout(safeComplete, 500);
+      }
     }
+
+    return () => {
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+      }
+    };
   }, [isResearchInProgress, isSending, researchProgress]);
 
-  // Add progress recovery for stuck states
+  // Simplified recovery for stuck states
   useEffect(() => {
-    if (isResearchInProgress && !isSending) {
-      // If progress seems stuck, complete it
-      const stuckTimer = setTimeout(() => {
-        if (isResearchInProgress && !isSending && researchProgress < 100) {
-          console.log('⚡ Progress recovery - completing research');
-          setResearchProgress(100);
-        }
-      }, 3000); // Wait 3 seconds after sending stops
+    let stuckTimer: NodeJS.Timeout | null = null;
 
-      return () => clearTimeout(stuckTimer);
+    if (isResearchInProgress && !isSending && researchProgress < 100) {
+      stuckTimer = setTimeout(() => {
+        console.log('⚡ Progress recovery - completing research');
+        setResearchProgress(100);
+      }, 3000);
     }
+
+    return () => {
+      if (stuckTimer) {
+        clearTimeout(stuckTimer);
+      }
+    };
   }, [isResearchInProgress, isSending, researchProgress]);
 
   // Add cleanup effect for stale research state
