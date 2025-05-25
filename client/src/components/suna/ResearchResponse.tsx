@@ -55,6 +55,95 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
       <div className="prose prose-invert max-w-none">
         <div className="space-y-6 text-zinc-200">
           {content.split('\n\n').map((paragraph, idx) => {
+            // Handle tables (lines containing multiple pipes)
+            if (paragraph.includes('|') && paragraph.split('|').length > 2) {
+              const lines = paragraph.split('\n').filter(line => line.trim());
+              const isTable = lines.length > 1 && lines.every(line => line.includes('|'));
+              
+              if (isTable) {
+                const [headerLine, separatorLine, ...dataLines] = lines;
+                const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+                const rows = dataLines.map(line => 
+                  line.split('|').map(cell => cell.trim()).filter(cell => cell)
+                );
+                
+                return (
+                  <div key={idx} className="my-6 overflow-x-auto">
+                    <table className="w-full border-collapse bg-zinc-800/30 rounded-lg overflow-hidden">
+                      <thead>
+                        <tr className="bg-zinc-700/50">
+                          {headers.map((header, i) => (
+                            <th key={i} className="px-4 py-3 text-left text-zinc-100 font-semibold border-b border-zinc-600">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, i) => (
+                          <tr key={i} className="border-b border-zinc-700/30 hover:bg-zinc-700/20">
+                            {row.map((cell, j) => (
+                              <td key={j} className="px-4 py-3 text-zinc-300">
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+            }
+            
+            // Handle numbered lists (prevent duplication)
+            if (/^\d+\.\s/.test(paragraph.trim())) {
+              const lines = paragraph.split('\n').filter(line => line.trim());
+              const listItems = [];
+              let currentItem = '';
+              
+              for (const line of lines) {
+                if (/^\d+\.\s/.test(line.trim())) {
+                  if (currentItem) listItems.push(currentItem);
+                  currentItem = line.trim();
+                } else {
+                  currentItem += ' ' + line.trim();
+                }
+              }
+              if (currentItem) listItems.push(currentItem);
+              
+              return (
+                <ol key={idx} className="list-none space-y-3 ml-2">
+                  {listItems.map((item, i) => {
+                    const match = item.match(/^(\d+)\.\s*(.+)/);
+                    if (match) {
+                      const [, number, text] = match;
+                      const boldMatch = text.match(/^(.+?):\s*(.+)/);
+                      
+                      return (
+                        <li key={i} className="flex items-start space-x-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
+                          <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white text-sm font-bold rounded-full flex items-center justify-center">
+                            {number}
+                          </span>
+                          <div className="flex-1">
+                            {boldMatch ? (
+                              <>
+                                <div className="font-semibold text-zinc-100 mb-1">{boldMatch[1]}</div>
+                                <div className="text-zinc-300 text-sm leading-relaxed">{boldMatch[2]}</div>
+                              </>
+                            ) : (
+                              <div className="text-zinc-300 leading-relaxed">{text}</div>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    }
+                    return null;
+                  })}
+                </ol>
+              );
+            }
+            
             if (paragraph.startsWith('# ')) {
               return (
                 <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
