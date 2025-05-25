@@ -889,22 +889,18 @@ class SunaIntegrationService {
       console.log(`Research depth detected: ${researchDepth}`);
       console.log('=== END DEBUG ===');
 
-      // Use DeerFlow for ALL research depths to ensure consistent search engine access
-      if (researchDepth >= 1) {
-        console.log(`🔍 Using DeerFlow research system for depth ${researchDepth} with Brave/Tavily/Yahoo search engines`);
+      // Force DeerFlow for depth level 3 from ANY UI component - PRIORITY CHECK
+      if (researchDepth === 3) {
 
         try {
-          // Use appropriate model based on research depth
-          const modelId = researchDepth === 3 ? 'gemini-1.5-flash' : 'deepseek-chat';
+          // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
+          const modelId = 'gemini-1.5-flash';
           const startTime = Date.now();
 
-          // Use Deep research for ALL modes to ensure access to external search engines
-          const deerflowDepth = ResearchDepth.Deep;
-
-          // Optimized DeerFlow research call for ALL depths
+          // Optimized DeerFlow research call
           const deerflowResult = await researchService.performResearch({
             query: data.query,
-            depth: deerflowDepth,
+            depth: ResearchDepth.Deep,
             modelId: modelId,
             researchDepth: researchDepth,
             researchLength: 'comprehensive',

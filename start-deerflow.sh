@@ -1,32 +1,17 @@
-
 #!/bin/bash
+# Start the DeerFlow research service
 
-echo "🚀 Starting DeerFlow service..."
+echo "Starting DeerFlow research service..."
 cd "$(dirname "$0")"
 
-# Check if there's an existing process and kill it
-if [ -f deerflow.pid ]; then
-  OLD_PID=$(cat deerflow.pid)
-  if ps -p $OLD_PID > /dev/null; then
-    echo "Stopping existing DeerFlow process (PID: $OLD_PID)"
-    kill $OLD_PID
-    sleep 2
-  fi
-fi
+# Make sure API keys are available to the service
+export TAVILY_API_KEY=${TAVILY_API_KEY}
+export BRAVE_API_KEY=${BRAVE_API_KEY}
+export DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
 
-# Start the service
+# Start the service in the background
 python deerflow_service/server.py &
 
-# Save the PID
+# Save the PID to kill it later if needed
 echo $! > deerflow.pid
 echo "DeerFlow service started with PID: $!"
-
-# Wait a moment for startup
-sleep 3
-
-# Check if the service is responding
-if curl -s http://0.0.0.0:9000/health > /dev/null; then
-  echo "✅ DeerFlow service is running and healthy!"
-else
-  echo "Warning: DeerFlow service started but health check failed"
-fi

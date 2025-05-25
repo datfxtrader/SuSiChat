@@ -24,8 +24,6 @@ echo "DEEPSEEK_API_KEY availability: ${DEEPSEEK_API_KEY:+available}"
 export TAVILY_API_KEY="${TAVILY_API_KEY}"
 export BRAVE_API_KEY="${BRAVE_API_KEY}"
 export DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY}"
-export NEWS_API_KEY="${NEWS_API_KEY}"
-export FINNHUB_API_KEY="${FINNHUB_API_KEY}"
 
 # Start the service in the background with output redirection
 nohup python run-deerflow-minimal.py > deerflow-minimal.log 2>&1 &

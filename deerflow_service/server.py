@@ -4,16 +4,13 @@ DeerFlow Research Service
 This service provides a FastAPI server to handle deep research requests using DeerFlow.
 Enhanced with intelligent agent capabilities for advanced planning and reasoning.
 """
-import os
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
-
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
-
 import uvicorn
 from typing import Optional, List, Dict, Any
+import os
 import asyncio
 import requests
 import json
@@ -92,7 +89,6 @@ research_state = {}
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def get_token_limit_by_depth(research_depth: int) -> int:
     """
@@ -109,51 +105,8 @@ def get_token_limit_by_depth(research_depth: int) -> int:
     return token_mapping.get(research_depth, 8000)  # Default to 8000 if invalid depth
 
 # Helper functions for research
-async def search_news(query: str, max_results: int = 8):
-    """Search news using NewsAPI."""
-    if not NEWS_API_KEY:
-        logger.warning("NEWS_API_KEY not configured, skipping news search")
-        return []
-        
-    try:
-        url = "https://newsapi.org/v2/everything"
-        params = {
-            "q": query,
-            "pageSize": max_results,
-            "language": "en",
-            "sortBy": "relevancy",
-            "from": (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d"),
-            "apiKey": NEWS_API_KEY
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            articles = data.get("articles", [])
-            return [{
-                "title": article.get("title", ""),
-                "url": article.get("url", ""),
-                "content": article.get("description", ""),
-                "source": "newsapi",
-                "score": 1.0 - (idx / len(articles)) if articles else 0,
-                "timestamp": article.get("publishedAt")
-            } for idx, article in enumerate(articles)]
-    except Exception as e:
-        logger.error(f"NewsAPI search error: {e}")
-        return []
-
 async def search_web(query: str, max_results: int = 8):
     """Search the web using available search engines with DuckDuckGo as primary."""
-    
-    # Add news results
-    results = await search_news(query, max_results=3)
-    
-    # Add Finnhub results if it's a financial query
-    if any(term in query.lower() for term in ['stock', 'price', 'market', 'trading', 'forex', 'crypto']):
-        finnhub_results = await search_finnhub(query, max_results=3)
-        results.extend(finnhub_results)
-    
     logger.info(f"Searching web for: {query}")
     
     # Primary: Use DuckDuckGo (no API key required)
@@ -256,42 +209,6 @@ async def search_duckduckgo(query: str, max_results: int = 8):
                     return []
     except Exception as e:
         logger.error(f"DuckDuckGo search failed: {e}")
-        return []
-
-async def search_finnhub(query: str, max_results: int = 8):
-    """Search using Finnhub API for financial data."""
-    if not FINNHUB_API_KEY:
-        logger.warning("FINNHUB_API_KEY not configured, skipping Finnhub search")
-        return []
-        
-    try:
-        # Parse for stock/crypto symbols
-        symbols = [word.upper() for word in query.split() if word.isalnum()]
-        results = []
-        
-        for symbol in symbols[:max_results]:
-            url = f"https://finnhub.io/api/v1/quote"
-            params = {
-                "symbol": symbol,
-                "token": FINNHUB_API_KEY
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data:
-                    results.append({
-                        "title": f"{symbol} Market Data",
-                        "url": f"https://finnhub.io/quote/{symbol}",
-                        "content": f"Current: {data.get('c')}, High: {data.get('h')}, Low: {data.get('l')}, Open: {data.get('o')}",
-                        "source": "finnhub",
-                        "score": 1.0
-                    })
-                    
-        return results
-    except Exception as e:
-        logger.error(f"Finnhub search error: {e}")
         return []
 
 async def search_brave(query: str, max_results: int = 8):
@@ -619,16 +536,6 @@ Format your report in Markdown, but make it readable and professional."""
         
         asyncio.create_task(cleanup_research_state())
 
-@app.get("/")
-async def root():
-    """Root endpoint with API info."""
-    return {
-        "name": "DeerFlow Research Service",
-        "version": "1.0",
-        "status": "running",
-        "endpoints": ["/health", "/research", "/docs"]
-    }
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint to verify API is working."""
@@ -813,7 +720,7 @@ async def submit_feedback(request: FeedbackRequest):
         )
         
         # Process feedback through learning system
-        learning_results =learning_system.feedback_processor.process_feedback(feedback)
+        learning_results = learning_system.feedback_processor.process_feedback(feedback)
         
         return {
             "message": "Feedback processed successfully",
@@ -995,5 +902,4 @@ async def list_available_tools():
         return {"error": str(e)}
 
 if __name__ == "__main__":
-    print("Starting DeerFlow service on port 9000...")
     uvicorn.run(app, host="0.0.0.0", port=9000)
