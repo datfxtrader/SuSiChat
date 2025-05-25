@@ -295,74 +295,7 @@ export const ResearchAgent = () => {
     checkStuckState();
   }, []);
 
-  // Store completed research result globally to avoid duplicate API calls
-  const completedResearchRef = useRef<any>(null);
-
-  // Handle research completion - use already completed backend results
-  const completeResearch = async (researchData?: any) => {
-    console.log('✅ Completing research with data:', researchData ? 'provided' : 'from ref');
-    
-    // Use provided data or stored data
-    const data = researchData || completedResearchRef.current;
-    
-    if (data && data.report) {
-      // Create message with real research content
-      const completedMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant' as const,
-        content: data.report || data.content || 'Research completed successfully.',
-        timestamp: new Date().toISOString(),
-        sources: data.sources || []
-      };
-      
-      setMessages(prev => [...prev, completedMessage]);
-      console.log('✅ Research message added to UI from completed data');
-      
-    } else {
-      console.log('⚠️ No research data available, showing fallback message');
-      
-      // Fallback message when no data is available
-      const fallbackMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant' as const,
-        content: `# Research Analysis for "${currentResearchQuery}"
-
-## Status: Research Completed Successfully
-
-The research analysis has been completed for your query. The backend service processed your request and gathered comprehensive information from multiple sources.
-
-**Query**: ${currentResearchQuery}
-**Timestamp**: ${new Date().toISOString()}
-**Status**: Completed successfully
-
-If you don't see the detailed results above, please try submitting your query again.`,
-        timestamp: new Date().toISOString(),
-        sources: []
-      };
-      
-      setMessages(prev => [...prev, fallbackMessage]);
-    }
-    
-    // Clear all research-related state
-    setIsResearchInProgress(false);
-    setResearchProgress(0);
-    setResearchStage(1);
-    setIsSending(false);
-    setCurrentResearchQuery('');
-    
-    // Clear any running intervals/timeouts
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-    if (progressTimeoutRef.current) {
-      clearTimeout(progressTimeoutRef.current);
-      progressTimeoutRef.current = null;
-    }
-    
-    // Clear the stored research data
-    completedResearchRef.current = null;
-  };
+  
 
   const handleSendMessage = async () => {
     if (!message.trim() || isSending || isResearchInProgress) return;
@@ -448,27 +381,61 @@ If you don't see the detailed results above, please try submitting your query ag
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
-      console.log('📊 Research completed successfully:', data);
-      console.log('📄 Report content:', data.report?.substring(0, 200) + '...');
-      console.log('📚 Sources received:', data.sources?.length || 0);
+      console.log('📊 Research API response received:', {
+        status: data.status,
+        hasReport: !!data.report,
+        reportLength: data.report?.length || 0,
+        sourcesCount: data.sources?.length || 0
+      });
 
-      // Store the research data for completion
-      completedResearchRef.current = data;
-      
-      // Clear progress interval immediately
+      // Clear progress interval immediately when we get real data
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
       
-      // Set progress to 100% and show completion
+      // Set progress to 100% immediately
       setResearchProgress(100);
       setResearchStage(6);
       
-      // Complete the research immediately with the received data
+      // Process and display results immediately - no delays
+      if (data.report) {
+        const completedMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant' as const,
+          content: data.report,
+          timestamp: new Date().toISOString(),
+          sources: data.sources || []
+        };
+        
+        setMessages(prev => [...prev, completedMessage]);
+        console.log('✅ Research results added to messages');
+      } else {
+        console.log('⚠️ No report content in response');
+        const fallbackMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant' as const,
+          content: `# Research Complete
+
+Research for "${queryText}" has been completed, but no content was returned from the backend service.
+
+Please try your query again or check if the backend service is running properly.`,
+          timestamp: new Date().toISOString(),
+          sources: []
+        };
+        
+        setMessages(prev => [...prev, fallbackMessage]);
+      }
+      
+      // Clean up state immediately
+      setIsResearchInProgress(false);
+      setCurrentResearchQuery('');
+      
+      // Reset progress after a short delay for visual feedback
       setTimeout(() => {
-        completeResearch(data);
-      }, 500);
+        setResearchProgress(0);
+        setResearchStage(1);
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Research request failed:', error);
@@ -510,14 +477,6 @@ Please try again or rephrase your research question.`,
       setIsSending(false);
       setCurrentResearchQuery('');
     }
-    
-    // Failsafe timeout for very long requests
-    progressTimeoutRef.current = setTimeout(() => {
-      if (isResearchInProgress) {
-        console.log('⚠️ Research timeout - completing anyway');
-        completeResearch();
-      }
-    }, 30000); // 30 seconds timeout
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
