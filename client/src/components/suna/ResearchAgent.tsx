@@ -52,20 +52,20 @@ const ResearchProgress = ({ stage, progress, query, isActive }: {
         <p className="text-xs text-zinc-400">{query}</p>
       </div>
     </div>
-    
+
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <span className="text-xs text-blue-400">Stage {stage}/6</span>
         <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
       </div>
-      
+
       <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden">
         <div 
           className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
           style={{ width: `${Math.max(progress, 5)}%` }}
         />
       </div>
-      
+
       {isActive && (
         <div className="flex items-center space-x-2 text-xs text-blue-400">
           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
@@ -165,7 +165,7 @@ const ResearchResponse = ({ content, timestamp, sources }: {
           })}
         </div>
       </div>
-      
+
       {sources && sources.length > 0 && (
         <div className="mt-8 pt-6 border-t border-zinc-800/50">
           <div className="flex items-center justify-between mb-4">
@@ -270,12 +270,12 @@ export const ResearchAgent = () => {
     setResearchProgress(0);
     setResearchStage(1);
     setIsSending(false);
-    
+
     // Check for any stuck research state and clean it up
     const checkStuckState = () => {
       const now = Date.now();
       const savedTimestamp = localStorage.getItem('research_timestamp');
-      
+
       if (savedTimestamp) {
         const timeDiff = now - parseInt(savedTimestamp);
         // If research has been "running" for more than 2 minutes, clear it
@@ -291,17 +291,17 @@ export const ResearchAgent = () => {
         }
       }
     };
-    
+
     checkStuckState();
   }, []);
 
-  
+
 
   const handleSendMessage = async () => {
     if (!message.trim() || isSending || isResearchInProgress) return;
-    
+
     console.log('🚀 Starting research:', message);
-    
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -310,23 +310,23 @@ export const ResearchAgent = () => {
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     // Store the query before clearing message
     const queryText = message;
-    
+
     // Clear message input immediately
     setMessage('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    
+
     // Set research state
     setIsSending(true);
     setIsResearchInProgress(true);
     setResearchProgress(5); // Start with some progress
     setResearchStage(1);
     setCurrentResearchQuery(queryText);
-    
+
     // Clear any existing intervals/timeouts
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -334,12 +334,12 @@ export const ResearchAgent = () => {
     if (progressTimeoutRef.current) {
       clearTimeout(progressTimeoutRef.current);
     }
-    
+
     // Start the actual research request immediately
     try {
       console.log('📡 Sending research request to backend...');
       setIsSending(false);
-      
+
       // Start progress simulation
       let currentProgress = 5;
       progressIntervalRef.current = setInterval(() => {
@@ -354,7 +354,7 @@ export const ResearchAgent = () => {
           return newProgress;
         });
       }, 800);
-      
+
       const response = await fetch('/api/suna-research', {
         method: 'POST',
         headers: {
@@ -368,7 +368,7 @@ export const ResearchAgent = () => {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
@@ -380,33 +380,31 @@ export const ResearchAgent = () => {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
-      
-      // Complete progress
-      setResearchProgress(100);
-      setResearchStage(6);
-      
-      // Add the research results immediately
-      if (data.report && data.report.trim()) {
-        console.log('✅ Adding research report to messages');
-        const completedMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant' as const,
-          content: data.report,
-          timestamp: new Date().toISOString(),
-          sources: data.sources || []
-        };
-        
-        setMessages(prev => [...prev, completedMessage]);
-        
-        // Clean up state immediately after adding message
-        setIsResearchInProgress(false);
-        setCurrentResearchQuery('');
-        
-        // Reset progress after a brief delay
-        setTimeout(() => {
-          setResearchProgress(0);
-          setResearchStage(1);
-        }, 1000);
+
+      // Complete progress with animation
+        setResearchProgress(100);
+        setResearchStage(6);
+
+        // Add the research results immediately
+        if (data.report && data.report.trim()) {
+          console.log('✅ Adding research report to messages');
+          const completedMessage: Message = {
+            id: Date.now().toString(),
+            role: 'assistant' as const,
+            content: data.report,
+            timestamp: new Date().toISOString(),
+            sources: data.sources || []
+          };
+
+          setMessages(prev => [...prev, completedMessage]);
+
+          // Show completion animation for 2 seconds before cleaning up
+          setTimeout(() => {
+            setIsResearchInProgress(false);
+            setCurrentResearchQuery('');
+            setResearchProgress(0);
+            setResearchStage(1);
+          }, 2000);
       } else {
         console.log('⚠️ Empty or missing report, adding fallback message');
         const fallbackMessage: Message = {
@@ -424,29 +422,29 @@ Please try rephrasing your question or try again in a moment.`,
           timestamp: new Date().toISOString(),
           sources: []
         };
-        
+
         setMessages(prev => [...prev, fallbackMessage]);
-        
+
         // Clean up state
         setIsResearchInProgress(false);
         setCurrentResearchQuery('');
-        
+
         // Reset progress after showing completion
         setTimeout(() => {
           setResearchProgress(0);
           setResearchStage(1);
         }, 1000);
       }
-      
+
     } catch (error) {
       console.error('❌ Research failed:', error);
-      
+
       // Clear progress
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
-      
+
       // Add error message
       const errorMessage: Message = {
         id: Date.now().toString(),
@@ -467,9 +465,9 @@ The research service logs show it's working, so this might be a temporary connec
         timestamp: new Date().toISOString(),
         sources: []
       };
-      
+
       setMessages(prev => [...prev, errorMessage]);
-      
+
       // Reset state
       setIsResearchInProgress(false);
       setResearchProgress(0);
@@ -488,7 +486,7 @@ The research service logs show it's working, so this might be a temporary connec
 
   const handleNewResearch = () => {
     console.log('🔄 Starting new research session');
-    
+
     // Clear all intervals and timeouts first
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -502,7 +500,7 @@ The research service logs show it's working, so this might be a temporary connec
       clearTimeout(progressTimeoutRef.current);
       progressTimeoutRef.current = null;
     }
-    
+
     // Then reset all state
     setMessages([]);
     setIsResearchInProgress(false);
