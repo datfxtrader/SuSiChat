@@ -323,7 +323,7 @@ export const ResearchAgent = () => {
     // Set research state
     setIsSending(true);
     setIsResearchInProgress(true);
-    setResearchProgress(0);
+    setResearchProgress(5); // Start with some progress
     setResearchStage(1);
     setCurrentResearchQuery(queryText);
     
@@ -335,33 +335,25 @@ export const ResearchAgent = () => {
       clearTimeout(progressTimeoutRef.current);
     }
     
-    // Start progress simulation while research is happening
-    let currentProgress = 0;
-    const updateInterval = 800; // Update every 800ms
-    
-    progressIntervalRef.current = setInterval(() => {
-      // Smooth exponential progression but cap at 95% until real completion
-      const remainingProgress = 95 - currentProgress;
-      const increment = remainingProgress * 0.08; // 8% of remaining each time
-      
-      currentProgress += Math.max(increment, 0.5); // Minimum 0.5% increment
-      currentProgress = Math.min(currentProgress, 95); // Cap at 95%
-      
-      setResearchProgress(currentProgress);
-      
-      // Update stages based on progress
-      if (currentProgress >= 80) setResearchStage(6);
-      else if (currentProgress >= 65) setResearchStage(5);
-      else if (currentProgress >= 50) setResearchStage(4);
-      else if (currentProgress >= 33) setResearchStage(3);
-      else if (currentProgress >= 17) setResearchStage(2);
-      else setResearchStage(1);
-    }, updateInterval);
-    
-    // Start the actual research request in parallel
+    // Start the actual research request immediately
     try {
       console.log('📡 Sending research request to backend...');
-      setIsSending(false); // Allow progress to continue but research is no longer "sending"
+      setIsSending(false);
+      
+      // Start progress simulation
+      let currentProgress = 5;
+      progressIntervalRef.current = setInterval(() => {
+        setResearchProgress(prev => {
+          const newProgress = Math.min(prev + Math.random() * 3, 95);
+          // Update stages
+          if (newProgress >= 80) setResearchStage(6);
+          else if (newProgress >= 65) setResearchStage(5);
+          else if (newProgress >= 50) setResearchStage(4);
+          else if (newProgress >= 35) setResearchStage(3);
+          else if (newProgress >= 20) setResearchStage(2);
+          return newProgress;
+        });
+      }, 800);
       
       const response = await fetch('/api/suna-research', {
         method: 'POST',
@@ -381,25 +373,21 @@ export const ResearchAgent = () => {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
-      console.log('📊 Research API response received:', {
-        status: data.status,
-        hasReport: !!data.report,
-        reportLength: data.report?.length || 0,
-        sourcesCount: data.sources?.length || 0
-      });
+      console.log('📊 Research completed! Report length:', data.report?.length || 0);
 
-      // Clear progress interval immediately when we get real data
+      // Clear progress interval
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
       
-      // Set progress to 100% immediately
+      // Complete progress
       setResearchProgress(100);
       setResearchStage(6);
       
-      // Process and display results immediately - no delays
-      if (data.report) {
+      // Add the research results immediately
+      if (data.report && data.report.trim()) {
+        console.log('✅ Adding research report to messages');
         const completedMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant' as const,
@@ -409,17 +397,20 @@ export const ResearchAgent = () => {
         };
         
         setMessages(prev => [...prev, completedMessage]);
-        console.log('✅ Research results added to messages');
       } else {
-        console.log('⚠️ No report content in response');
+        console.log('⚠️ Empty or missing report, adding fallback message');
         const fallbackMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant' as const,
           content: `# Research Complete
 
-Research for "${queryText}" has been completed, but no content was returned from the backend service.
+I've completed research on "${queryText}" but the backend returned an empty report. This might be due to:
 
-Please try your query again or check if the backend service is running properly.`,
+- The research service being overloaded
+- Network connectivity issues  
+- The query being too broad or specific
+
+Please try rephrasing your question or try again in a moment.`,
           timestamp: new Date().toISOString(),
           sources: []
         };
@@ -427,50 +418,49 @@ Please try your query again or check if the backend service is running properly.
         setMessages(prev => [...prev, fallbackMessage]);
       }
       
-      // Clean up state immediately
+      // Clean up state
       setIsResearchInProgress(false);
       setCurrentResearchQuery('');
       
-      // Reset progress after a short delay for visual feedback
+      // Reset progress after showing completion
       setTimeout(() => {
         setResearchProgress(0);
         setResearchStage(1);
-      }, 1000);
+      }, 2000);
       
     } catch (error) {
-      console.error('❌ Research request failed:', error);
+      console.error('❌ Research failed:', error);
       
-      // Clear progress interval
+      // Clear progress
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
       
-      // Show error message
+      // Add error message
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant' as const,
-        content: `# Research Request Failed
+        content: `# Research Error
 
-I encountered an error while processing your research query: "${queryText}"
+I encountered an issue while researching "${queryText}":
 
-**Error Details:**
-${error.message}
+**Error:** ${error.message}
 
-**Troubleshooting Steps:**
-1. Check your internet connection
-2. Verify the backend service is running
-3. Try submitting a simpler query
-4. Contact support if the issue persists
+**What you can try:**
+1. Check that the backend service is running
+2. Verify your internet connection
+3. Try a simpler or more specific query
+4. Wait a moment and try again
 
-Please try again or rephrase your research question.`,
+The research service logs show it's working, so this might be a temporary connection issue.`,
         timestamp: new Date().toISOString(),
         sources: []
       };
       
       setMessages(prev => [...prev, errorMessage]);
       
-      // Clear research state
+      // Reset state
       setIsResearchInProgress(false);
       setResearchProgress(0);
       setResearchStage(1);

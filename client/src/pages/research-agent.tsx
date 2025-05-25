@@ -462,69 +462,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
               </div>
             ))}
 
-            {/* Research Progress - Show when researching or when research state is persisted */}
-            {(isSending || isResearchInProgress) && (
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <ResearchProgress 
-                    stage={researchStage} 
-                    progress={researchProgress}
-                    query={ongoingResearchQuery || message}
-                    isActive={isSending || isResearchInProgress}
-                  />
-                  {rateLimitStatus.isLimited && (
-                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        ⏳ Request queued due to rate limits
-                        {rateLimitStatus.queuePosition && ` (Position: ${rateLimitStatus.queuePosition})`}
-                      </p>
-                    </div>
-                  )}
-                  {isResearchInProgress && !isSending && (
-                    <div className="mt-3 space-y-3">
-                      {/* Enhanced Stage Indicator */}
-                      <div className="text-xs text-blue-400 flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                        <span>{stageLabel}</span>
-                      </div>
-
-                      {/* Enhanced Progress Bar */}
-                      <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out animate-pulse"
-                          style={{ width: `${Math.max(researchProgress, 5)}%` }}
-                        />
-                      </div>
-
-                      {/* Progress Info */}
-                      <div className="text-xs text-gray-400 flex justify-between items-center">
-                        <span>Progress: {Math.round(researchProgress)}%</span>
-                        <span>Stage {researchStage}/6</span>
-                      </div>
-
-                      {/* Debug Controls */}
-                      <div className="flex gap-2 mt-2">
-                        <button 
-                          onClick={forceSave}
-                          className="text-xs px-2 py-1 bg-blue-600 rounded hover:bg-blue-700"
-                        >
-                          Force Save
-                        </button>
-                        <button 
-                          onClick={forceRestore}
-                          className="text-xs px-2 py-1 bg-green-600 rounded hover:bg-green-700"
-                        >
-                          Force Restore
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Research Progress disabled to prevent conflicts with ResearchAgent component */}
           </div>
 
           {/* Input Area */}
