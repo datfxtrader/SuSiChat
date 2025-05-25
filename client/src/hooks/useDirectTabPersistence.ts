@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface DirectTabState {
@@ -217,7 +216,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
   // Enhanced progress management with proper isSending detection
   useEffect(() => {
     if (!isResearchInProgress) return;
-    
+
     let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
         // Auto-complete when research is actually done
@@ -228,16 +227,16 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
           }, 1000);
           return 100;
         }
-        
+
         if (prev >= 100) {
           clearInterval(progressInterval);
           return 100;
         }
-        
+
         // Dynamic increment based on actual sending status
         const baseIncrement = isSending ? Math.random() * 4 + 2 : Math.random() * 8 + 4;
         const newProgress = prev + baseIncrement;
-        
+
         // Stage-based caps with proper research completion detection
         if (isSending === false && newProgress >= 85) {
           return Math.min(newProgress, 100);
@@ -254,7 +253,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
         }
       });
     }, 1500);
-    
+
     return () => {
       if (progressInterval) {
         clearInterval(progressInterval);
@@ -267,6 +266,23 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
     forceRestoreState();
   }, [forceRestoreState]);
 
+  const resetResearch = useCallback(() => {
+    console.log('🔄 Resetting research state for new session');
+    setIsResearchInProgress(false);
+    setOngoingResearchQuery('');
+    setResearchProgress(0);
+    setResearchStage(1);
+
+    // Clean up storage
+    try {
+      localStorage.removeItem('direct_tab_state_1');
+      localStorage.removeItem('direct_tab_state_2');
+      localStorage.removeItem('direct_tab_state_backup');
+    } catch (error) {
+      console.warn('Failed to clean storage:', error);
+    }
+  }, []);
+
   return {
     isResearchInProgress,
     ongoingResearchQuery,
@@ -275,6 +291,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
     stageLabel,
     startResearch: startDirectResearch,
     completeResearch: completeDirectResearch,
+    resetResearch: resetResearch,
     forceSave: forceSaveState,
     forceRestore: forceRestoreState
   };

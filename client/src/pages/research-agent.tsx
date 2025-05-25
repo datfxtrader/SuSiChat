@@ -130,6 +130,8 @@ const ResearchAgent = () => {
 
   const handleNewConversation = () => {
     createNewChat();
+    resetResearch();
+    setMessage('');
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
