@@ -9,44 +9,39 @@ interface ResearchProgressProps {
   isActive: boolean;
 }
 
-export const ResearchProgress: React.FC<ResearchProgressProps> = ({ 
-  stage, 
-  progress, 
-  query, 
-  isActive 
-}) => {
-  return (
-    <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-6 backdrop-blur-sm">
-      <div className="flex items-center space-x-3 mb-4">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-          <Search className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-100">Researching...</h3>
-          <p className="text-xs text-zinc-400">{query}</p>
-        </div>
+const ResearchProgress: React.FC<ResearchProgressProps> = ({ stage, progress, query, isActive }) => (
+  <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-6 backdrop-blur-sm">
+    <div className="flex items-center space-x-3 mb-4">
+      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+        <Search className="w-4 h-4 text-white" />
       </div>
-
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-blue-400">Stage {stage}/6</span>
-          <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
-        </div>
-
-        <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden">
-          <div 
-            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
-            style={{ width: `${Math.max(progress, 5)}%` }}
-          />
-        </div>
-
-        {isActive && (
-          <div className="flex items-center space-x-2 text-xs text-blue-400">
-            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-            <span>Analyzing sources and generating insights...</span>
-          </div>
-        )}
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-100">Researching...</h3>
+        <p className="text-xs text-zinc-400">{query}</p>
       </div>
     </div>
-  );
-};
+    
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-blue-400">Stage {stage}/6</span>
+        <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
+      </div>
+      
+      <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
+          style={{ width: `${Math.max(progress, 5)}%` }}
+        />
+      </div>
+      
+      {isActive && (
+        <div className="flex items-center space-x-2 text-xs text-blue-400">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+          <span>Analyzing sources and generating insights...</span>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+export default ResearchProgress;
