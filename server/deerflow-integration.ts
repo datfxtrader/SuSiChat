@@ -52,7 +52,7 @@ export interface ResearchParams {
 }
 
 /**
- * Service for performing research at different depth levels
+ * Main research service class
  */
 export class ResearchService {
   private activeRequests = new Map<string, AbortController>();
@@ -64,6 +64,7 @@ export class ResearchService {
       this.activeRequests.delete(researchId);
     }
   }
+
   /**
    * Perform research at the specified depth level
    */
@@ -74,23 +75,10 @@ export class ResearchService {
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
     try {
-      // Basic search (depth 1) - use existing performWebSearch
-      if (depth === ResearchDepth.Basic) {
-        return await this.performBasicResearch(params);
-      }
+      // For ALL research depths, use DeerFlow to ensure consistent access to external search engines
+      console.log(`🔍 Using DeerFlow system with Brave/Tavily/Yahoo search engines for depth ${depth}`);
+      return await this.performDeepResearch(params);
 
-      // Enhanced search (depth 2) - more comprehensive web search
-      if (depth === ResearchDepth.Enhanced) {
-        return await this.performEnhancedResearch(params);
-      }
-
-      // Deep research (depth 3) - use DeerFlow
-      if (depth === ResearchDepth.Deep) {
-        return await this.performDeepResearch(params);
-      }
-
-      // Default to basic research if invalid depth
-      return await this.performBasicResearch(params);
     } catch (error) {
       console.error(`Research error at depth ${depth}:`, error);
 
@@ -129,674 +117,231 @@ export class ResearchService {
   }
 
   /**
-   * Perform basic research using existing web search
-   * This integrates with the existing performWebSearch in suna-integration.ts
+   * Perform deep research using DeerFlow service
    */
-  private async performBasicResearch(params: ResearchParams): Promise<ResearchResult> {
-    const startTime = Date.now();
-
-    try {
-      // Direct import to avoid global object issues
-      const { performWebSearch } = require('./performWebSearch');
-
-      // Perform web search using the function
-      const searchResults = await performWebSearch(params.query);
-
-      if (searchResults.error) {
-        throw new Error(`Web search error: ${searchResults.error}`);
-      }
-
-      // Extract search results
-      const results = searchResults.results || [];
-
-      // Format sources
-      const sources: ResearchSource[] = results.map((result: any) => {
-        try {
-          if (!result || !result.url) return null;
-          const domain = new URL(result.url).hostname;
-          const source: ResearchSource = {
-            title: result.title || domain,
-            url: result.url,
-            domain: domain,
-            content: result.content || result.snippet || ''
-          };
-          return source;
-        } catch (e) {
-          return null;
-        }
-      }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
-
-      // Generate a comprehensive report using LLM to match 25K formatting style
-      let report = '';
-
-      if (results.length > 0) {
-        // Extract content from sources for LLM processing
-        const sourceContent = sources.slice(0, 5).map((source, index) => {
-          return `Source ${index + 1} (${source.title} - ${source.domain}):\n${source.content}`;
-        }).join('\n\n---\n\n');
-
-        try {
-          // Use the same comprehensive formatting as Enhanced/Deep research
-          const systemPrompt = 'You are an expert research analyst providing detailed, well-structured reports with comprehensive analysis and professional formatting.';
-          
-          const userPrompt = `Create a comprehensive research report about "${params.query}" using the following sources.
-
-The report should include:
-1. **Executive Summary** (2-3 paragraphs with key insights)
-2. **Key Findings** (3-5 detailed bullet points with specific data)
-3. **Detailed Analysis** (comprehensive examination with facts and figures)
-4. **Supporting Evidence** (relevant quotes and data from sources)
-5. **Conclusions** (summary of implications and significance)
-
-SOURCES:
-${sourceContent}
-
-Format the report with:
-- Clear markdown headings (##, ###)
-- Bullet points with **bold** emphasis for key terms
-- Specific data and numbers from sources
-- Professional structure and flow
-- Source citations using [Source X] notation
-
-Your report should be detailed, data-driven, and professionally formatted to match comprehensive research standards.`;
-
-          // Generate formatted report using LLM
-          const llmResponse = await llmService.generateResearchReport(
-            [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            0.7,
-            2000 // Sufficient tokens for comprehensive formatting
-          );
-
-          report = llmResponse.message || '';
-
-          // Add sources section
-          report += '\n\n## Sources\n';
-          sources.forEach((source, index) => {
-            report += `[${index + 1}] **${source.title}**\n${source.url}\n\n`;
-          });
-
-        } catch (error) {
-          console.error('Error generating formatted report:', error);
-          
-          // Fallback to enhanced formatting if LLM fails
-          report = `# Research Report: ${params.query}\n\n`;
-          report += `## Executive Summary\n\nBased on my research, here are the key findings about "${params.query}".\n\n`;
-          report += `## Key Findings\n\n`;
-          
-          results.slice(0, 3).forEach((result: any, index: number) => {
-            report += `### ${index + 1}. ${result.title || 'Key Finding'}\n`;
-            report += `${result.snippet || result.content || 'Information not available'}\n\n`;
-          });
-
-          report += `## Sources\n`;
-          sources.forEach((source, index) => {
-            report += `[${index + 1}] **${source.title}**\n${source.url}\n\n`;
-          });
-        }
-      } else {
-        report = `# Research Report: ${params.query}\n\n## Executive Summary\n\nI couldn't find any relevant information for "${params.query}" in my research. This may be due to the topic being very new, specialized, or the search terms needing refinement.\n\n## Recommendations\n\n- Try rephrasing the query with different keywords\n- Consider searching for related or broader topics\n- Check if there are alternative terms for the same concept`;
-      }
-
-      return {
-        report,
-        sources,
-        depth: ResearchDepth.Basic,
-        processingTime: Date.now() - startTime
-      };
-    } catch (error) {
-      console.error('Basic research error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        report: `I encountered an error while performing basic research: ${errorMessage}`,
-        sources: [],
-        depth: ResearchDepth.Basic,
-        processingTime: Date.now() - startTime
-      };
-    }
-  }
-
-  /**
-   * Perform enhanced research with more sources and better processing
-   */
-  private async performEnhancedResearch(params: ResearchParams): Promise<ResearchResult> {
-    const startTime = Date.now();
-
-    try {
-      // Perform multiple searches with different query variations to get more diverse results
-      const mainQuery = params.query;
-
-      // Create more specific queries by adding qualifiers
-      const queries = [
-        mainQuery,                                      // Original query
-        `latest information about ${mainQuery}`,        // For recency
-        `detailed analysis of ${mainQuery}`,            // For depth
-        `${mainQuery} research findings`,               // For academic/research focus
-        `${mainQuery} statistics data`                  // For data-oriented results
-      ];
-
-      // Direct import to avoid circular dependency issues
-      const { performWebSearch } = await import('./performWebSearch');
-
-      // Run all searches in parallel
-      const searchResultPromises = queries.map(query => performWebSearch(query, 10)); // Get more results
-      const searchResultsArray = await Promise.all(searchResultPromises);
-
-      // Remove any failed searches
-      const validSearchResults = searchResultsArray.filter(result => !result.error);
-
-      if (validSearchResults.length === 0) {
-        throw new Error('All enhanced searches failed');
-      }
-
-      // Combine and deduplicate results
-      const allResults = [];
-      const urlsSeen = new Set();
-
-      for (const searchResult of validSearchResults) {
-        const results = searchResult.results || [];
-        for (const result of results) {
-          if (result.url && !urlsSeen.has(result.url)) {
-            urlsSeen.add(result.url);
-            allResults.push(result);
-          }
-        }
-      }
-
-      // Sort results by relevance heuristic (prioritize title matches over content matches)
-      allResults.sort((a, b) => {
-        const aTitle = (a.title || '').toLowerCase();
-        const bTitle = (b.title || '').toLowerCase();
-        const queryWords = mainQuery.toLowerCase().split(' ');
-
-        // Count query word matches in titles
-        const aTitleMatches = queryWords.filter(word => aTitle.includes(word)).length;
-        const bTitleMatches = queryWords.filter(word => bTitle.includes(word)).length;
-
-        if (aTitleMatches !== bTitleMatches) {
-          return bTitleMatches - aTitleMatches; // Higher title matches first
-        }
-
-        // If tie, use content match as secondary sort
-        const aContent = (a.snippet || a.content || '').toLowerCase();
-        const bContent = (b.snippet || b.content || '').toLowerCase();
-        const aContentMatches = queryWords.filter(word => aContent.includes(word)).length;
-        const bContentMatches = queryWords.filter(word => bContent.includes(word)).length;
-
-        return bContentMatches - aContentMatches;
-      });
-
-      // Format sources
-      const sources: ResearchSource[] = allResults.map((result: any) => {
-        try {
-          if (!result || !result.url) return null;
-          const domain = new URL(result.url).hostname;
-          const source: ResearchSource = {
-            title: result.title || domain,
-            url: result.url,
-            domain: domain,
-            content: result.content || result.snippet || ''
-          };
-          return source;
-        } catch (e) {
-          return null;
-        }
-      }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
-
-      // Generate a comprehensive report using LLM to synthesize findings
-      let report = '';
-
-      if (sources.length > 0) {
-        // Use only the top sources to avoid overwhelming the LLM
-        const topSources = sources.slice(0, 7);
-
-        // Extract key content from sources - include full content for better analysis
-        const sourceContent = topSources.map((source, index) => {
-          // Get the most substantial content possible from each source
-          const content = source.content || '';
-          // Format with clear separation between sources for better LLM comprehension
-          return `Source ${index + 1} (${source.title} - ${source.domain}):\n${content}`;
-        }).join('\n\n---\n\n');
-
-        // Use LLM to synthesize findings
-        try {
-          const prompt = `You are an advanced research assistant tasked with creating a well-organized, comprehensive report.
-
-Based on the following sources, create a detailed research report about "${mainQuery}".
-Structure your report with these sections:
-1. Executive Summary (1-2 paragraphs)
-2. Key Findings (3-5 bullet points)
-3. Detailed Analysis (2-3 paragraphs)
-4. Conclusions (1 paragraph)
-
-SOURCES:
-${sourceContent}
-
-Your report should synthesize information from multiple sources, highlight consensus and disagreements, and provide a balanced view. Cite sources in your analysis where appropriate using [Source X] notation.`;
-
-          // Create a detailed prompt with source content
-          const systemPrompt = 'You are an expert financial and market analyst providing detailed, comprehensive reports with accurate information. Your reports should include specific data, trends, technical analysis, and market insights.';
-
-          // Check if this is a financial/forex query
-          const isFinancialQuery = /EUR\/USD|USD\/JPY|GBP\/USD|currency|forex|exchange rate|financial market|stock market|trading|investment/i.test(mainQuery);
-
-          let userPrompt = '';
-
-          if (isFinancialQuery) {
-            userPrompt = `Create a comprehensive, expert-level financial analysis report about "${mainQuery}" using the following sources.
-
-The report MUST include:
-1. Executive Summary (2-3 paragraphs with specific numerical insights)
-2. Current Market Status (detailed price analysis with EXACT current rates, ranges, and percentage movements)
-3. Technical Analysis (identify support/resistance levels with precise numbers, chart patterns, key indicators like RSI, MACD, moving averages)
-4. Fundamental Analysis (economic indicators, central bank policies, geopolitical factors with dates and data)
-5. Expert Forecasts (include specific price targets, timeframes, and divergent opinions)
-6. Risk Assessment (volatility measures, potential scenarios with probability estimates)
-7. Trading Recommendations (entry/exit points with specific price levels)
-
-SOURCES:
-${sourceContent}
-
-Your report MUST:
-- Include ALL available numerical data (EXACT prices, percentages, dates, ranges) from the sources
-- Cite sources using [Source X] notation for EVERY significant data point or claim
-- Use proper financial terminology (pips, spreads, liquidity, etc.)
-- Format with clear Markdown headings, bullet points, and tables where appropriate
-- Be extremely detailed and data-driven with NO generic statements
-- Include any conflicting viewpoints or predictions from different sources`;
-          } else {
-            userPrompt = `Create a comprehensive, well-organized research report about "${mainQuery}" using the following sources.
-
-The report should include:
-1. Executive Summary (2-3 paragraphs with key insights)
-2. Current Situation Analysis (detailed examination with facts, figures, and specific data points)
-3. Key Factors and Trends (identify 3-5 important influences with supporting evidence)
-4. Detailed Analysis (explore critical aspects in depth)
-5. Expert Perspectives (include varied viewpoints and quotes when available)
-6. Future Outlook (likely scenarios based on current evidence)
-
-SOURCES:
-${sourceContent}
-
-Your report should:
-- Include exact numerical data and specific facts from the sources
-- Cite sources using [Source X] notation throughout the analysis
-- Use proper terminology relevant to the topic
-- Format with clear Markdown headings, bullet points, and emphasis
-- Be highly detailed and data-driven rather than general
-- Acknowledge any limitations in the available information`;
-          }
-
-          // Use LLM service to generate detailed report
-          const llmResponse = await llmService.generateResearchReport(
-            [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            0.7,  // temperature for balanced creativity and accuracy
-            4000  // token limit for comprehensive research
-          );
-
-          report = llmResponse.message || '';
-
-          // Add sources reference at the end
-          report += '\n\n## Sources Used\n';
-          topSources.forEach((source, index) => {
-            report += `[Source ${index + 1}] ${source.title}\n${source.url}\n`;
-          });
-        } catch (error) {
-          console.error('Error generating enhanced report with LLM:', error);
-
-          // Fallback to simpler report format if LLM fails
-          report = `# Research Report on "${mainQuery}"\n\n`;
-          report += `## Key Findings\n\n`;
-
-          sources.slice(0, 5).forEach((source, index) => {
-            report += `### ${source.title}\n`;
-            report += `${source.content}\n\n`;
-          });
-
-          report += `\n## Sources\n`;
-          sources.forEach((source, index) => {
-            report += `[${index + 1}] ${source.title}\n${source.url}\n`;
-          });
-        }
-      } else {
-        report = `I couldn't find any relevant information for "${mainQuery}" in my enhanced research.`;
-      }
-
-      return {
-        report,
-        sources,
-        depth: ResearchDepth.Enhanced,
-        processingTime: Date.now() - startTime
-      };
-    } catch (error) {
-      console.error('Enhanced research error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        report: `I encountered an error while performing enhanced research: ${errorMessage}`,
-        sources: [],
-        depth: ResearchDepth.Enhanced,
-        processingTime: Date.now() - startTime
-      };
-    }
-  }
-
-  /**
-   * Perform specialized financial research for forex/market queries
-   */
-  private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
-    const startTime = Date.now();
-    console.log('Performing specialized financial research for query:', params.query);
-
-    try {
-      // Extract currency pair if present (e.g., EUR/USD, GBP/USD)
-      const currencyPairMatch = params.query.match(/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)\/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)/i);
-      const currencyPair = currencyPairMatch ? currencyPairMatch[0].toUpperCase() : null;
-
-      if (currencyPair) {
-        // For currency pairs, use the forex API
-        try {
-          // Use axios for server-side requests instead of fetch
-          const axios = require('axios');
-          const response = await axios.post('http://localhost:5000/api/forex/analyze', {
-            currencyPair,
-            timeframe: 'daily'
-          });
-
-          if (response.status === 200) {
-            const data = response.data;
-
-            // Format sources
-            const sources: ResearchSource[] = (data.sources || []).map((source: any) => ({
-              title: source.title,
-              url: source.url,
-              domain: source.domain
-            }));
-
-            return {
-              report: data.analysis || `Analysis for ${currencyPair} not available.`,
-              sources,
-              depth: ResearchDepth.Deep,
-              processingTime: data.processingTime || (Date.now() - startTime)
-            };
-          }
-        } catch (forexError) {
-          console.error('Error using forex API:', forexError);
-          // Continue to general financial research on error
-        }
-      }
-
-      // Use the specialized financial research module
-      const financialResearch = require('./financial-research');
-
-      // Generate financial analysis
-      const result = await financialResearch.generateFinancialAnalysis(params.query);
-
-      // Format sources to match ResearchSource interface
-      const sources: ResearchSource[] = result.sources.map((source: {title: string; url: string; domain: string}) => ({
-        title: source.title,
-        url: source.url,
-        domain: source.domain
-      }));
-
-      return {
-        report: result.report,
-        sources,
-        depth: ResearchDepth.Deep,
-        processingTime: result.processingTime || (Date.now() - startTime)
-      };
-    } catch (error) {
-      console.error('Error in financial research:', error);
-      // Fall back to enhanced research on error
-      return this.performEnhancedResearch(params);
-    }
-  }
-
   private async performDeepResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
 
     try {
-      console.log('Performing deep research with DeerFlow service for query:', params.query);
-
-      // Check if this is a financial/forex query that needs specialized handling
-      const isFinancialQuery = /EUR\/USD|USD\/JPY|GBP\/USD|currency|forex|exchange rate|financial market|stock market|trading|investment/i.test(params.query);
-
+      console.log('🚀 Starting DeerFlow deep research with external search engines...');
+      
+      // Check if this is a financial query
+      const isFinancialQuery = /(?:forex|currency|exchange rate|trading|market|price|financial|investment|stock|crypto|bitcoin|ethereum|USD|EUR|GBP|JPY|analysis)/i.test(params.query);
+      
       if (isFinancialQuery) {
-        console.log('Detected financial query, using specialized financial research');
-        return this.performFinancialResearch(params);
+        console.log('🏦 Financial query detected - using specialized financial research');
+        return await this.performFinancialResearch(params);
       }
 
-      // Use the deerflowClient that's already imported at the top of the file
-      // This fixes the "require is not defined" error
-
-      // Advanced DeerFlow agent system with full multi-domain capabilities
-      const deerflowParams = {
-        research_question: params.query,
-        model_id: params.modelId || 'deepseek-v3',
-        include_market_data: params.includeMarketData !== false,
-        include_news: params.includeNews !== false,
+      // Prepare DeerFlow parameters
+      const deerflowParams: DeerFlowResearchParams = {
+        query: params.query,
+        model_id: params.modelId || 'deepseek-chat',
+        research_depth: params.researchDepth || 3,
         research_length: params.researchLength || 'comprehensive',
         research_tone: params.researchTone || 'analytical',
-        min_word_count: params.minWordCount || 1500,
-        // Advanced agent orchestration features activated
-        use_advanced_agents: true,
-        enable_domain_expertise: true,
-        enable_reasoning_chains: true,
-        enable_adaptive_planning: true,
-        enable_working_memory: true,
-        enable_multi_agent_orchestration: true,
-        domain_focus: 'auto',
-        reasoning_depth: params.researchDepth || 3,
-        include_intermediate_results: true,
-        enable_cross_domain_analysis: (params.researchDepth || 3) >= 2,
-        use_financial_agent: true,
-        use_scientific_agent: (params.researchDepth || 3) >= 2,
-        use_news_intelligence: true,
-        enable_learning_system: true,
-        // Enhanced reasoning and analysis capabilities
-        enable_hypothesis_generation: true,
-        enable_evidence_synthesis: true,
-        enable_logical_inference: true,
-        enable_confidence_scoring: true,
-        enable_contradiction_analysis: true,
-        enable_cross_source_validation: true,
-        // Advanced professional features
-        use_formatting_agent: true,
-        use_styling_agent: true,
-        use_data_visualization_agent: true,
-        use_programming_format_agent: true,
-        enable_markdown_enhancement: true,
-        enable_table_formatting: true,
-        enable_chart_generation: true,
-        enable_academic_integration: true,
-        enable_memory_persistence: true,
-        // Financial fact validation
-        enable_fact_checking: true,
-        validate_financial_data: true,
-        enable_code_highlighting: true,
-        enable_visual_structuring: true,
-        format_for_web_display: true,
-        complexity: (params.researchDepth || 3) === 3 ? 'high' : (params.researchDepth || 3) === 2 ? 'medium' : 'low'
+        include_market_data: params.includeMarketData || false,
+        include_news: params.includeNews || true,
+        min_word_count: params.minWordCount || 2500
       };
 
-      // Call the DeerFlow service with advanced agent capabilities
-      console.log('Sending request to DeerFlow service with advanced agent system enabled:', deerflowParams);
-      console.log('Advanced features: Multi-agent orchestration, domain expertise, reasoning chains, adaptive planning');
-      console.log('Formatting agents: Data visualization, styling, programming format, markdown enhancement enabled');
+      console.log('📊 DeerFlow parameters:', deerflowParams);
+
+      // Perform DeerFlow research with retry mechanism
       const maxRetries = 3;
       let retryCount = 0;
-      let deerflowResponse;
+      let deerflowResponse: DeerFlowResearchResponse | undefined;
 
       while (retryCount < maxRetries) {
         try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-          deerflowResponse = await deerflowClient.performResearch(deerflowParams, controller.signal);
-          clearTimeout(timeout);
+          console.log(`🔄 DeerFlow attempt ${retryCount + 1}/${maxRetries}`);
+          deerflowResponse = await deerflowClient.performResearch(deerflowParams);
           break;
         } catch (error) {
           retryCount++;
-          if (error.name === 'AbortError') {
-            console.log('Request timed out, retrying...');
-          } else {
-            console.error('Request failed, retrying...', error);
+          console.error(`❌ DeerFlow attempt ${retryCount} failed:`, error);
+          if (retryCount >= maxRetries) {
+            throw new Error(`DeerFlow failed after ${maxRetries} attempts: ${error}`);
           }
-          if (retryCount === maxRetries) throw error;
-          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
         }
       }
 
-      // Check if there was an error with the DeerFlow service
-      if (deerflowResponse.status?.status === 'error') {
-        console.error('DeerFlow service error:', deerflowResponse.status.message);
-        throw new Error(`DeerFlow service error: ${deerflowResponse.status.message}`);
+      if (!deerflowResponse) {
+        throw new Error('No response from DeerFlow service');
       }
 
-      // Handle processing state - if the response is still processing, wait for completion
-      if (deerflowResponse.status?.status === 'processing') {
-        console.log('Research is processing, waiting for completion...');
+      console.log('✅ DeerFlow research completed successfully');
+      console.log('📈 DeerFlow response keys:', Object.keys(deerflowResponse));
 
-        // Wait a bit for research to complete
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      // Process DeerFlow response
+      const processingTime = Date.now() - startTime;
 
-        // Try to get the completed result
-        try {
-          const completedResponse = await deerflowClient.performResearch(deerflowParams);
-          if (completedResponse.report) {
-            deerflowResponse = completedResponse;
-          }
-        } catch (error) {
-          console.log('Failed to get completed result, using current response');
-        }
-      }
-
-      // If still processing after retry, wait longer
-      if (deerflowResponse.status?.status === 'processing' && deerflowResponse.status?.id) {
-        console.log('Research still processing, waiting longer...');
-
-        // Wait for research to be completed (with timeout)
-        const maxAttempts = 10;
-        const delayBetweenAttempts = 3000; // 3 seconds
-        let attempt = 0;
-
-        while (attempt < maxAttempts) {
-          // Wait before checking again
-          await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
-
-          // Check status
-          try {
-            const statusResponse = await deerflowClient.checkResearchStatus(deerflowResponse.status.id);
-
-            // If completed, use this response instead
-            if (statusResponse.status?.status === 'completed') {
-              console.log('Research completed successfully');
-              return {
-                report: statusResponse.report || 'No research report was generated.',
-                sources: (statusResponse.sources || []).map((source: any) => ({
-                  title: source.title || 'Untitled',
-                  url: source.url,
-                  domain: source.domain || 'unknown',
-                  content: source.content
-                })),
-                depth: ResearchDepth.Deep,
-                processingTime: Date.now() - startTime
-              };
-            }
-
-            // If error, throw
-            if (statusResponse.status?.status === 'error') {
-              throw new Error(`Research failed: ${statusResponse.status.message}`);
-            }
-
-            console.log(`Research still in progress (attempt ${attempt + 1}/${maxAttempts})...`);
-          } catch (statusError) {
-            console.error('Error checking research status:', statusError);
-          }
-
-          attempt++;
-        }
-
-        // If we've waited too long, fall back to enhanced research
-        console.log('Research taking too long, falling back to enhanced research');
-        return this.performEnhancedResearch(params);
-      }
-
-      // Extract authentic research data directly
-      console.log('Processing comprehensive research response...');
-      console.log('Raw DeerFlow response keys:', Object.keys(deerflowResponse));
-
-      // The DeerFlow service completed successfully but may return data in different formats
-      let report = '';
+      // Extract sources from DeerFlow response
       let sources: ResearchSource[] = [];
 
-      // Check multiple possible response formats from DeerFlow
+      if (deerflowResponse.sources && Array.isArray(deerflowResponse.sources)) {
+        sources = deerflowResponse.sources.map((source: any) => {
+          try {
+            const domain = new URL(source.url || source.link || '').hostname;
+            return {
+              title: source.title || source.name || domain,
+              url: source.url || source.link || '',
+              domain: domain,
+              content: source.content || source.description || ''
+            };
+          } catch (e) {
+            return {
+              title: source.title || source.name || 'Unknown Source',
+              url: source.url || source.link || '',
+              domain: 'unknown',
+              content: source.content || source.description || ''
+            };
+          }
+        }).filter((source: ResearchSource) => source.url);
+      }
+
+      // Extract report from DeerFlow response
+      let report = '';
       if (deerflowResponse.report) {
         report = deerflowResponse.report;
-        console.log('Found report in direct property, length:', report.length);
-      } else if (deerflowResponse.response?.report) {
-        report = deerflowResponse.response.report;
-        console.log('Found report in response.report, length:', report.length);
-      } else if (typeof deerflowResponse.response === 'string') {
-        report = deerflowResponse.response;
-        console.log('Found report as string in response, length:', report.length);
+      } else if (deerflowResponse.content) {
+        report = deerflowResponse.content;
+      } else if (deerflowResponse.analysis) {
+        report = deerflowResponse.analysis;
+      } else {
+        // Fallback: create a comprehensive report from available data
+        report = this.createFallbackReport(params.query, sources, deerflowResponse);
       }
 
-      // Extract sources from multiple possible locations
-      let sourceData = deerflowResponse.sources || deerflowResponse.response?.sources || [];
+      console.log(`📄 Final report length: ${report.length} characters`);
+      console.log(`🔗 Sources found: ${sources.length}`);
 
-      if (Array.isArray(sourceData) && sourceData.length > 0) {
-        console.log('Found sources array with', sourceData.length, 'items');
-        sourceData.forEach((source: any, index: number) => {
-          if (source) {
-            sources.push({
-              title: source.title || `Source ${index + 1}`,
-              url: source.url || '',
-              domain: source.domain || 'research-data',
-              content: source.content || ''
-            });
-          }
-        });
-      }
-
-      // If we still don't have a report but the service indicated success,
-      // there might be an async response we need to retrieve
-      if (!report && deerflowResponse.status?.status === 'processing') {
-        console.log('Report not immediately available, DeerFlow may be processing asynchronously');
-        // We'll return what we have and let the fallback handle the rest
-        report = 'Research is being processed. Please check back in a moment.';
-      }
-
-      console.log(`Final result: ${sources.length} sources, ${report.length} characters`);
-
-      console.log('Formatted sources count:', sources.length);
-
-      // Log service process info
-      if (deerflowResponse.service_process_log && deerflowResponse.service_process_log.length > 0) {
-        console.log('DeerFlow service process log:', deerflowResponse.service_process_log.join('\n'));
-      }
-
-      // Return the research result, always labeling as Deep research even if we used fallback
-      // This ensures consistent user experience
       return {
-        report,
-        sources,
+        report: report,
+        sources: sources,
+        depth: ResearchDepth.Deep,
+        processingTime: processingTime
+      };
+
+    } catch (error) {
+      console.error('DeerFlow research error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        report: `I encountered an error while performing deep research: ${errorMessage}`,
+        sources: [],
         depth: ResearchDepth.Deep,
         processingTime: Date.now() - startTime
       };
-    } catch (error) {
-      console.error('Error performing deep research with DeerFlow:', error);
+    }
+  }
 
-      // Fall back to enhanced research if DeerFlow fails
-      console.log('DeerFlow service unavailable or error occurred. Falling back to enhanced research...');
-      return this.performEnhancedResearch(params);
+  /**
+   * Perform specialized financial research
+   */
+  private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
+    const startTime = Date.now();
+    console.log('🏦 Starting specialized financial research...');
+    
+    try {
+      // Check for currency pair patterns
+      const currencyPairMatch = params.query.match(/([A-Z]{3})[\s\/]?([A-Z]{3})/);
+      const currencyPair = currencyPairMatch ? `${currencyPairMatch[1]}/${currencyPairMatch[2]}` : null;
+      
+      if (currencyPair) {
+        console.log(`💱 Currency pair detected: ${currencyPair}`);
+        
+        // Enhanced financial research with multiple data sources
+        const financialResearch = await this.performComprehensiveFinancialAnalysis(params.query, currencyPair);
+        
+        if (financialResearch.success) {
+          return {
+            report: financialResearch.content,
+            sources: financialResearch.sources,
+            depth: ResearchDepth.Deep,
+            processingTime: Date.now() - startTime
+          };
+        }
+      }
+      
+      // Fall back to general DeerFlow research for financial topics
+      console.log('🔄 Falling back to general DeerFlow research for financial query');
+      return await this.performDeepResearch(params);
+      
+    } catch (error) {
+      console.error('Financial research error:', error);
+      // Fallback to enhanced research
+      return await this.performDeepResearch(params);
+    }
+  }
+
+  /**
+   * Create a fallback report when DeerFlow doesn't provide structured content
+   */
+  private createFallbackReport(query: string, sources: ResearchSource[], deerflowResponse: any): string {
+    let report = `# Research Report: ${query}\n\n`;
+    
+    if (sources.length > 0) {
+      report += `## Executive Summary\n\n`;
+      report += `Based on comprehensive research using multiple search engines and sources, here are the key findings for "${query}":\n\n`;
+      
+      report += `## Key Findings\n\n`;
+      sources.slice(0, 5).forEach((source, index) => {
+        if (source.content) {
+          report += `**${index + 1}. ${source.title}**\n`;
+          report += `${source.content.substring(0, 200)}...\n`;
+          report += `*Source: ${source.domain}*\n\n`;
+        }
+      });
+      
+      report += `## Sources\n\n`;
+      sources.forEach((source, index) => {
+        report += `${index + 1}. [${source.title}](${source.url}) - ${source.domain}\n`;
+      });
+    } else {
+      report += `I apologize, but I was unable to find sufficient information about "${query}" at this time. This could be due to the specificity of the query or temporary search limitations.`;
+    }
+    
+    return report;
+  }
+
+  /**
+   * Perform comprehensive financial analysis
+   */
+  private async performComprehensiveFinancialAnalysis(query: string, currencyPair: string): Promise<any> {
+    console.log(`💰 Performing comprehensive financial analysis for ${currencyPair}`);
+    
+    try {
+      // Use DeerFlow with financial-specific parameters
+      const deerflowParams: DeerFlowResearchParams = {
+        query: `${query} ${currencyPair} financial analysis market trends trading`,
+        model_id: 'deepseek-chat',
+        research_depth: 3,
+        research_length: 'comprehensive',
+        research_tone: 'analytical',
+        include_market_data: true,
+        include_news: true,
+        min_word_count: 3000
+      };
+      
+      const result = await deerflowClient.performResearch(deerflowParams);
+      
+      return {
+        success: true,
+        content: result.report || result.content || result.analysis || 'Financial analysis completed',
+        sources: result.sources || []
+      };
+      
+    } catch (error) {
+      console.error('Comprehensive financial analysis error:', error);
+      return {
+        success: false,
+        content: '',
+        sources: []
+      };
     }
   }
 }
 
-// Export singleton instance
+// Export a singleton instance
 export const researchService = new ResearchService();
