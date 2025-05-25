@@ -41,8 +41,9 @@ export async function performWebSearch(
   let braveResults = null;
   let duckduckgoResults = null;
 
-  // Run DuckDuckGo, Brave, and Tavily searches in parallel for maximum efficiency
+  // Run DuckDuckGo, Brave, Tavily, and Yahoo searches in parallel for maximum efficiency
   const searchPromises = [];
+  let yahooResults = null;
 
   // DuckDuckGo search (free, no rate limits)
   searchPromises.push(
@@ -214,9 +215,51 @@ export async function performWebSearch(
     );
   }
 
+  // Add Yahoo search to parallel execution
+  searchPromises.push(
+    (async () => {
+      try {
+        console.log('Starting Yahoo search...');
+        const yahooResponse = await axios.get('https://search.yahoo.com/search', {
+          params: {
+            p: query,
+            n: Math.ceil(maxResults / 3)
+          },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          timeout: 10000
+        });
+
+        if (yahooResponse.data) {
+          yahooResults = yahooResponse.data;
+          // Parse Yahoo search results
+          const matches = yahooResponse.data.match(/<h3 class="title"><a href="([^"]+)"[^>]*>([^<]+)<\/a>/g);
+          if (matches) {
+            for (const match of matches.slice(0, Math.ceil(maxResults / 3))) {
+              const urlMatch = match.match(/href="([^"]+)"/);
+              const titleMatch = match.match(/>([^<]+)</);
+              if (urlMatch && titleMatch) {
+                results.push({
+                  title: titleMatch[1],
+                  url: urlMatch[1],
+                  score: 0.9,
+                  source: 'Yahoo'
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Yahoo search error:', error);
+        yahooResults = { error: 'Yahoo search failed' };
+      }
+    })()
+  );
+
   // Wait for all searches to complete in parallel
   await Promise.allSettled(searchPromises);
-  console.log(`Parallel search completed. Found ${results.length} total results.`);
+  console.log(`Parallel search completed. Found ${results.length} total results from multiple engines`);
 
   // Enhanced fallback system when primary sources fail
   if (results.length < 3) {
@@ -276,6 +319,7 @@ export async function performWebSearch(
     sourceBreakdown: Object.fromEntries(sourceCount),
     braveSuccess: !braveResults?.error,
     tavilySuccess: !tavilyResults?.error,
+    yahooSuccess: !yahooResults?.error,
     fallbackUsed: results.some(r => r.source?.includes('Fallback'))
   };
 
