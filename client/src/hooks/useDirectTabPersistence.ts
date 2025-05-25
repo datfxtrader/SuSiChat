@@ -7,6 +7,7 @@ interface DirectTabState {
   stage: number;
   stageLabel: string;
   timestamp: number;
+  isSending?: boolean;
 }
 
 // Use multiple storage keys for maximum reliability
@@ -22,6 +23,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
   const [researchProgress, setResearchProgress] = useState(0);
   const [researchStage, setResearchStage] = useState(1);
   const [stageLabel, setStageLabel] = useState('Ready');
+  const [state, setState] = useState<DirectTabState | null>(null);
 
   const stateRef = useRef<DirectTabState | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -34,7 +36,8 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
       progress: researchProgress,
       stage: researchStage,
       stageLabel,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isSending: isSending
     };
 
     if (currentState.isInProgress) {
@@ -58,7 +61,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
       stateRef.current = currentState;
     }
-  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel]);
+  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel, isSending]);
 
   // Force restore state from any available location
   const forceRestoreState = useCallback(() => {
@@ -123,6 +126,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
         setResearchProgress(cleanedState.progress);
         console.log('🔥 SECOND UPDATE applied for reliability');
       }, 100);
+      setState(cleanedState);
 
       return true;
     } else {
@@ -220,7 +224,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
     let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
         // Auto-complete when research is actually done
-        if (isSending === false && prev >= 95) {
+        if (!state || state.isSending === false && prev >= 95) {
           clearInterval(progressInterval);
           setTimeout(() => {
             completeDirectResearch();
@@ -264,7 +268,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
         clearInterval(progressInterval);
       }
     };
-  }, [isResearchInProgress, researchStage, isSending, completeDirectResearch]);
+  }, [isResearchInProgress, researchStage, state, completeDirectResearch]);
 
   // Initial restore on mount
   useEffect(() => {

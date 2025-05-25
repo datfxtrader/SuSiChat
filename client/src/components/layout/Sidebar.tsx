@@ -137,10 +137,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
               <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-2" />
               Family Rooms
             </h2>
-            <Link href="/family-room/new" onClick={handleItemClick}>
-              <a className="p-1 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/50 rounded-md transition-all duration-200">
-                <span className="text-sm">{icons.add}</span>
-              </a>
+            <Link href="/family-room/new" onClick={handleItemClick} className="p-1 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/50 rounded-md transition-all duration-200">
+              <span className="text-sm">{icons.add}</span>
             </Link>
           </div>
 
