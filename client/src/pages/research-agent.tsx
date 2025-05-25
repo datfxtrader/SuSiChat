@@ -74,26 +74,18 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle research completion with restoration guards (progress-based completion)
+  // Complete when we reach 100% OR when isSending stops and we're above 90%
   useEffect(() => {
-    // Complete when we have assistant messages AND sufficient progress (indicating research is done)
-    const hasCompletedMessage = messages.length > 0 && 
-                               messages[messages.length - 1]?.role === 'assistant';
-
-    // Complete if we have a new assistant message while research is in progress
-    const shouldComplete = isResearchInProgress && (
-      researchProgress >= 100 || 
-      (hasCompletedMessage && !isSending && researchProgress >= 90) ||
-      (hasCompletedMessage && !isSending) // Complete if we have a message and not sending
-    );
-
-    if (shouldComplete) {
-      console.log(`✅ Research completed - triggering completion (progress: ${Math.round(researchProgress)}%, hasMessage: ${hasCompletedMessage}, isSending: ${isSending})`);
+    if (isResearchInProgress && researchProgress >= 100) {
+      console.log('✅ Research completed - triggering completion (progress: 100%)');
       completeResearch();
-    } else if (isResearchInProgress && researchProgress < 95) {
+    } else if (isResearchInProgress && !isSending && researchProgress >= 90 && messages.length > 0) {
+      console.log(`✅ Research completed - triggering completion (progress: ${Math.round(researchProgress)}%, hasMessage: ${messages.length > 0}, isSending: ${isSending})`);
+      completeResearch();
+    } else if (isResearchInProgress && researchProgress < 100) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
-  }, [isSending, isResearchInProgress, researchProgress, messages, completeResearch]);
+  }, [isResearchInProgress, researchProgress, isSending, messages.length, completeResearch]);
 
   // Auto-resize textarea
   useEffect(() => {

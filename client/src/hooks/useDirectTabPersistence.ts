@@ -129,6 +129,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
             console.log('🔥 State persistence verified and reinforced');
           }
         }, 100);
+      }
 
       return true;
     } else {
