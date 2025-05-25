@@ -244,15 +244,15 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                 <div
                   key={conv.id}
                   onClick={() => selectConversation(conv.id)}
-                  className="group p-3 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 hover:bg-slate-900/80 hover:border-primary/20 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer"
+                  className="group p-4 rounded-xl bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/50 hover:bg-zinc-800/60 hover:border-zinc-700/70 transition-all duration-200 cursor-pointer transform hover:scale-[1.02]"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="text-sm font-medium text-gray-200 group-hover:text-primary transition-colors truncate">{conv.title || 'Untitled Research'}</h4>
-                    <span className="text-xs text-gray-500">{formatRelativeTime(conv.createdAt || conv.updatedAt || new Date().toISOString())}</span>
+                    <h4 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors line-clamp-2">{conv.title || 'Untitled Research'}</h4>
+                    <span className="text-xs text-zinc-500 flex-shrink-0 ml-2">{formatRelativeTime(conv.createdAt || conv.updatedAt || new Date().toISOString())}</span>
                   </div>
-                  <p className="text-xs text-gray-400 truncate">
+                  <p className="text-xs text-zinc-400 line-clamp-2 group-hover:text-zinc-300 transition-colors">
                     {conv.messages && conv.messages.length > 0 
-                      ? String(conv.messages[conv.messages.length - 1]?.content || '').substring(0, 60) + '...'
+                      ? String(conv.messages[conv.messages.length - 1]?.content || '').substring(0, 80) + '...'
                       : 'No messages yet'
                     }
                   </p>
@@ -276,7 +276,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
             {messages.length === 0 && (
               <div className="flex-1 flex items-center justify-center min-h-[60vh]">
                 <div className="text-center max-w-4xl mx-auto px-8">
-                  <h1 className="text-3xl font-semibold text-gray-100 mb-8">
+                  <h1 className="text-3xl font-semibold text-zinc-100 mb-8">
                     Hello Dat, where should we begin?
                   </h1>
                   
@@ -307,12 +307,12 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                       <div
                         key={idx}
                         onClick={() => setMessage(card.prompt)}
-                        className="group p-6 bg-slate-900/70 backdrop-blur-sm border border-slate-800/40 rounded-xl hover:bg-slate-900/90 hover:border-primary/30 hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1"
+                        className="group p-6 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/50 rounded-xl hover:bg-zinc-800/60 hover:border-zinc-700/70 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-[1.02]"
                       >
-                        <h3 className="text-lg font-semibold text-gray-100 mb-2 group-hover:text-primary transition-colors">
+                        <h3 className="text-lg font-semibold text-zinc-100 mb-2 group-hover:text-white transition-colors">
                           {card.title}
                         </h3>
-                        <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">
+                        <p className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
                           {card.description}
                         </p>
                       </div>
