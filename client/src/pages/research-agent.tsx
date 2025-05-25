@@ -46,11 +46,7 @@ const ResearchAgent = () => {
     toggleDisableSearch
   } = useSuna();
 
-  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
-  const [isSending, setIsSending] = useState(false);
   const isSendingRef = useRef(false);
-  const { isConnected } = useWebsocket();
-  const { updateProgress } = useResearchState();
 
   useEffect(() => {
     isSendingRef.current = isSending;
@@ -78,7 +74,7 @@ const ResearchAgent = () => {
 
   // Use the direct tab persistence hook
   const {
-    isResearchInProgress,
+    isResearchInProgress: persistedIsResearchInProgress,
     ongoingResearchQuery,
     researchProgress,
     researchStage,
