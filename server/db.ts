@@ -3,6 +3,15 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
+// Add crash prevention handler
+process.on('unhandledRejection', (reason: any, promise) => {
+  if (reason?.code === '57P01' || reason?.message?.includes('administrator command')) {
+    console.log('🔄 Database connection reset (normal) - continuing...');
+    return; // Don't crash
+  }
+  console.error('Actual error that needs attention:', reason);
+});
+
 neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
@@ -14,19 +23,30 @@ if (!process.env.DATABASE_URL) {
 // Enhanced PostgreSQL pool configuration for long-running research operations
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  
-  // CONNECTION TIMEOUT FIXES
   connectionTimeoutMillis: 30000,     // 30 seconds to establish connection
   idleTimeoutMillis: 600000,         // 10 minutes idle timeout
   max: 20,                           // Maximum connections in pool
   min: 5,                            // Minimum connections to maintain
-  
-  // KEEP-ALIVE SETTINGS - Prevents administrator disconnect
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000, // 10 seconds before first keep-alive
 });
 
 export const db = drizzle({ client: pool, schema });
+
+// Safe query wrapper to handle connection resets
+export async function safeQuery<T>(queryFn: () => Promise<T>): Promise<T> {
+  try {
+    return await queryFn();
+  } catch (error: any) {
+    if (error.code === '57P01' || error.message?.includes('administrator command')) {
+      console.log('🔄 Retrying database connection...');
+      // Wait and retry once
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return await queryFn();
+    }
+    throw error;
+  }
+}
 
 // Research results cache for fallback storage
 const researchResultsCache = new Map();
@@ -35,10 +55,10 @@ const researchResultsCache = new Map();
 export async function storeResearchResults(conversationId: string, results: any) {
   try {
     // Try database first
-    await executeResearchQuery(
+    await safeQuery(() => executeResearchQuery(
       'INSERT INTO research_results (conversation_id, results, created_at) VALUES ($1, $2, NOW())',
       [conversationId, JSON.stringify(results)]
-    );
+    ));
     console.log('✅ Results stored in database');
     
   } catch (error) {
@@ -57,10 +77,10 @@ export async function storeResearchResults(conversationId: string, results: any)
 export async function getResearchResults(conversationId: string) {
   try {
     // Try database first
-    const result = await executeResearchQuery(
+    const result = await safeQuery(() => executeResearchQuery(
       'SELECT results FROM research_results WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1',
       [conversationId]
-    );
+    ));
     
     if (result.rows.length > 0) {
       return JSON.parse(result.rows[0].results);
