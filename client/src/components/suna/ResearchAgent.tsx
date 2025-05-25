@@ -512,9 +512,11 @@ The research service logs show it's working, so this might be a temporary connec
     const lastMessage = messages[messages.length - 1];
     const hasNewAssistantMessage = lastMessage?.role === 'assistant';
 
-    // Complete research when we receive an assistant message while research is in progress
-    if (isResearchInProgress && hasNewAssistantMessage && !isSending) {
-      console.log(`✅ Research completed - found assistant message, completing research`);
+    // Only complete research when we have both:
+    // 1. An assistant message AND 
+    // 2. Progress is at least 80% (indicating substantial progress was made)
+    if (isResearchInProgress && hasNewAssistantMessage && !isSending && researchProgress >= 80) {
+      console.log(`✅ Research completed - triggering completion (progress: ${Math.round(researchProgress)}%, hasMessage: true, isSending: false)`);
 
       // Set progress to 100% first
       setResearchProgress(100);
@@ -527,6 +529,8 @@ The research service logs show it's working, so this might be a temporary connec
         setResearchProgress(0);
         setResearchStage(1);
       }, 1500);
+    } else if (isResearchInProgress && hasNewAssistantMessage && researchProgress < 80) {
+      console.log(`⚠️ Got assistant message but progress only ${Math.round(researchProgress)}% - waiting for more progress...`);
     } else if (isResearchInProgress && researchProgress < 95) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
