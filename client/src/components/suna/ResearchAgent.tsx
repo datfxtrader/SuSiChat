@@ -124,7 +124,7 @@ export const ResearchAgent = () => {
     
     const completedMessage: Message = {
       id: Date.now().toString(),
-      role: 'assistant',
+      role: 'assistant' as const,
       content: `# Research Analysis Complete
 
 ## Executive Summary
@@ -187,7 +187,7 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
-      role: 'user',
+      role: 'user' as const,
       content: message,
       timestamp: new Date().toISOString()
     };
