@@ -61,6 +61,17 @@ export const ResearchAgent = () => {
     }
   }, [isResearchInProgress, isSending, researchProgress]);
 
+  // Add cleanup effect for stale research state
+  useEffect(() => {
+    // Clear stale research state if no messages
+    if (messages.length === 0 && isResearchInProgress) {
+      console.log('🔄 Clearing stale research state - no messages found');
+      setIsResearchInProgress(false);
+      setResearchProgress(0);
+      setResearchStage(1);
+    }
+  }, [messages.length, isResearchInProgress]);
+
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
 
