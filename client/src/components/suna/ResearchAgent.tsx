@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -10,7 +9,7 @@ const formatRelativeTime = (timestamp: string) => {
   const now = new Date();
   const messageTime = new Date(timestamp);
   const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-  
+
   if (diffInMinutes < 1) return 'Just now';
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
@@ -42,7 +41,7 @@ export const ResearchAgent = () => {
         setIsResearchInProgress(false);
         setResearchProgress(0);
         setResearchStage(1);
-        
+
         const completedMessage = {
           id: Date.now().toString(),
           role: 'assistant',
@@ -52,7 +51,7 @@ export const ResearchAgent = () => {
             { title: 'Market Analysis', url: '#', domain: 'example.com' }
           ]
         };
-        
+
         setMessages(prev => [...prev, completedMessage]);
       }, 1000);
     }
@@ -60,9 +59,9 @@ export const ResearchAgent = () => {
 
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
-    
+
     console.log('🚀 Starting research:', message);
-    
+
     const userMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -70,12 +69,12 @@ export const ResearchAgent = () => {
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     setIsSending(true);
     setIsResearchInProgress(true);
     setResearchProgress(0);
     setResearchStage(1);
-    
+
     const interval = setInterval(() => {
       setResearchProgress(prev => {
         if (prev >= 100) {
@@ -92,9 +91,9 @@ export const ResearchAgent = () => {
         return Math.min(newProgress, 100);
       });
     }, 800);
-    
+
     setMessage('');
-    
+
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -181,9 +180,9 @@ export const ResearchAgent = () => {
                   <SelectValue placeholder="Research Depth" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Quick Analysis</SelectItem>
-                  <SelectItem value="2">Standard Research</SelectItem>
-                  <SelectItem value="3">Deep Research</SelectItem>
+                  <SelectItem value="1">Quick (25K)</SelectItem>
+                  <SelectItem value="2">Standard (25K)</SelectItem>
+                  <SelectItem value="3">Deep (25K)</SelectItem>
                 </SelectContent>
               </Select>
 
