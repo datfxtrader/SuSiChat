@@ -74,18 +74,12 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Complete when we reach 100% OR when isSending stops and we're above 90%
+  // Let useDirectTabPersistence handle completion logic
   useEffect(() => {
-    if (isResearchInProgress && researchProgress >= 100) {
-      console.log('✅ Research completed - triggering completion (progress: 100%)');
-      completeResearch();
-    } else if (isResearchInProgress && !isSending && researchProgress >= 90 && messages.length > 0) {
-      console.log(`✅ Research completed - triggering completion (progress: ${Math.round(researchProgress)}%, hasMessage: ${messages.length > 0}, isSending: ${isSending})`);
-      completeResearch();
-    } else if (isResearchInProgress && researchProgress < 100) {
-      console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
+    if (isResearchInProgress) {
+      console.log(`🔄 Research progress: ${Math.round(researchProgress)}%`);
     }
-  }, [isResearchInProgress, researchProgress, isSending, messages.length, completeResearch]);
+  }, [isResearchInProgress, researchProgress]);
 
   // Auto-resize textarea
   useEffect(() => {

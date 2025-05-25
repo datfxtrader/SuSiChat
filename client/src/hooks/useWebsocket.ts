@@ -53,7 +53,7 @@ export function useWebsocket(): WebSocketReturn {
 
     console.log('Attempting to connect to WebSocket...');
 
-    const wsUrl = `ws://localhost:5000/ws?userId=${user.id}`;
+    const wsUrl = `ws://${window.location.hostname}:5000/ws?userId=${user.id}`;
     const ws = new WebSocket(wsUrl);
     setSocket(ws);
 
@@ -75,8 +75,17 @@ export function useWebsocket(): WebSocketReturn {
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      setError('WebSocket error occurred');
+      setError('WebSocket connection failed');
       setIsConnected(false);
+      
+      // Don't attempt reconnection immediately on error
+      if (shouldReconnect.current) {
+        setTimeout(() => {
+          if (shouldReconnect.current && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnect();
+          }
+        }, 2000);
+      }
     };
 
     ws.onclose = (event) => {

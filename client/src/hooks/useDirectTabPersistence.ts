@@ -113,7 +113,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
       // Only restore if it's a legitimate research session (progress > 0 and query exists)
       if (cleanedState.isInProgress && cleanedState.query && cleanedState.progress >= 0) {
         console.log('🎯 RESTORING validated research state:', cleanedState);
-        
+
         // Apply state updates
         setIsResearchInProgress(cleanedState.isInProgress);
         setOngoingResearchQuery(cleanedState.query);
@@ -254,7 +254,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
           setResearchStage(2);
           setStageLabel('Gathering information...');
         }
-        
+
         return newProgress;
       });
     }, 800);
@@ -265,6 +265,21 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
       }
     };
   }, [isResearchInProgress, researchStage]);
+
+  // Complete only when we reach 100% AND have a response message
+  useEffect(() => {
+    if (isResearchInProgress && researchProgress >= 100 && messages.length > 0) {
+      // Add a small delay to ensure all processing is complete
+      const timer = setTimeout(() => {
+        console.log('✅ Research completed - triggering completion (progress: 100%, has response)');
+        completeResearch();
+      }, 500);
+
+      return () => clearTimeout(timer);
+    } else if (isResearchInProgress && researchProgress < 100) {
+      console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - waiting for completion`);
+    }
+  }, [isResearchInProgress, researchProgress, messages.length, completeResearch]);
 
   // Initial restore on mount
   useEffect(() => {
