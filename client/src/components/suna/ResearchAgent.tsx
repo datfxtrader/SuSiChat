@@ -37,7 +37,7 @@ export const ResearchAgent = () => {
   useEffect(() => {
     if (isResearchInProgress && !isSending && researchProgress >= 95) {
       console.log('✅ Research completed - clearing progress');
-      
+
       // Add completed message first
       const completedMessage = {
         id: Date.now().toString(),
@@ -48,9 +48,9 @@ export const ResearchAgent = () => {
           { title: 'Market Analysis', url: '#', domain: 'example.com' }
         ]
       };
-      
+
       setMessages(prev => [...prev, completedMessage]);
-      
+
       // CRITICAL FIX: Clear research state after a delay
       setTimeout(() => {
         setIsResearchInProgress(false);
@@ -147,6 +147,16 @@ export const ResearchAgent = () => {
     }
   ];
 
+  const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
+
+  useEffect(() => {
+    if (isResearchInProgress) {
+      setOngoingResearchQuery(message);
+    } else {
+      setOngoingResearchQuery('');
+    }
+  }, [isResearchInProgress, message]);
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
       <div className="w-64 border-r border-zinc-800/60 bg-zinc-950/80 backdrop-blur-xl">
@@ -166,14 +176,14 @@ export const ResearchAgent = () => {
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
                   <Bot className="w-8 h-8 text-white" />
                 </div>
-                
+
                 <h1 className="text-3xl font-bold text-zinc-100 mb-3">
                   Welcome to Research Agent
                 </h1>
                 <p className="text-lg text-zinc-400 mb-12">
                   Get comprehensive, AI-powered research on any topic with real-time data
                 </p>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                   {predefinedPrompts.map((card, idx) => (
                     <div
@@ -184,7 +194,7 @@ export const ResearchAgent = () => {
                       <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg`}>
                         <card.icon className="w-6 h-6 text-white" />
                       </div>
-                      
+
                       <h3 className="text-lg font-semibold text-zinc-100 mb-2 group-hover:text-white transition-colors">
                         {card.title}
                       </h3>
@@ -215,13 +225,47 @@ export const ResearchAgent = () => {
             </div>
           ))}
 
-          {isResearchInProgress && (
-            <ResearchProgress 
-              stage={researchStage}
-              progress={researchProgress}
-              query={message}
-              isActive={true}
-            />
+          {(isSending || isResearchInProgress) && (
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <ResearchProgress 
+                  stage={researchStage} 
+                  progress={researchProgress}
+                  query={message || ongoingResearchQuery}
+                  isActive={isSending || isResearchInProgress}
+                />
+                {isResearchInProgress && !isSending && (
+                  <div className="mt-3 space-y-3">
+                    <div className="text-xs text-blue-400 flex items-center space-x-2">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                      <span>Stage {researchStage}/6: {
+                        researchStage === 1 ? "Initializing research..." :
+                        researchStage === 2 ? "Gathering data..." :
+                        researchStage === 3 ? "Analyzing information..." :
+                        researchStage === 4 ? "Processing results..." :
+                        researchStage === 5 ? "Generating insights..." :
+                        "Finalizing report..."
+                      }</span>
+                    </div>
+
+                    <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out animate-pulse"
+                        style={{ width: `${Math.max(researchProgress, 5)}%` }}
+                      />
+                    </div>
+
+                    <div className="text-xs text-gray-400 flex justify-between items-center">
+                      <span>Progress: {Math.round(researchProgress)}%</span>
+                      <span>Stage {researchStage}/6</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
