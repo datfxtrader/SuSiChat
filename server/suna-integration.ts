@@ -1278,8 +1278,8 @@ ${numberContradictions.join('\n')}
             
             if (credibleResults.length < sortedResults.length) {
               dataFreshnessWarning = `\n🏆 PREMIUM SOURCE FILTERING: Selected ${credibleResults.length} high-credibility sources from ${sortedResults.length} total results.\n🔍 Filtered out: Outdated macro data, non-credible sources, stale content\n⏰ Date Range: ${threeDaysAgo.toLocaleDateString()} to ${currentDate.toLocaleDateString()}\n📊 Quality Focus: Trusted financial institutions + Current May 2025 data only\n`;
-              let freshResults = credibleResults; // Use only premium credible sources
-        sortedResults = freshResults;
+              const results = credibleResults; // Use only premium credible sources
+              return results; // Return filtered results instead of reassignment
             }
             
             // Check if this is a financial forecast query

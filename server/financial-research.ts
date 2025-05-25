@@ -55,13 +55,11 @@ export function isFinancialQuery(query: string): boolean {
 async function generateFinancialAnalysis(query: string): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   const API_TIMEOUT = 30000;
+  const MAX_RETRIES = 3;
 
   if (!apiKey) {
     throw new Error('DeepSeek API key not available');
   }
-
-  const API_TIMEOUT = 30000;
-  const MAX_RETRIES = 3;
 
   try {
     // Default sources for financial data - cached for efficiency
@@ -133,5 +131,9 @@ export async function performFinancialResearch(query: string): Promise<ResearchR
       success: false,
       error: error.message
     };
+  } finally {
+    // Cleanup code here if needed
+    console.log('Financial research completed in', Date.now() - startTime, 'ms');
   }
+}
 }
