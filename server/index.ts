@@ -421,39 +421,16 @@ async function generateFallbackAnalysis(query: string, depth: number = 3) {
     serveStatic(app);
   }
 
-  // Use port 5000 for Replit compatibility, with smart fallback
-  const preferredPort = 5000;
-  const fallbackPort = 3000;
-  const port = parseInt(process.env.PORT || preferredPort.toString());
+  // Use port 3000 since 5000 is busy
+  const port = parseInt(process.env.PORT || "3000");
 
-  // Enhanced server startup with smart port detection
-  function startServer(portToTry: number, isRetry = false) {
-    const serverInstance = server.listen({
-      port: portToTry,
-      host: "0.0.0.0",
-    }, () => {
-      log(`🚀 Research Agent server running on port ${portToTry}`);
-      if (portToTry === preferredPort) {
-        log(`🌐 Optimal Replit configuration active`);
-      }
-      if (process.env.REPLIT_DB_URL) {
-        log(`🔗 Available at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
-      }
-    });
-
-    serverInstance.on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE' && !isRetry) {
-        log(`Port ${portToTry} busy, trying fallback port ${fallbackPort}`);
-        setTimeout(() => startServer(fallbackPort, true), 1000);
-      } else if (err.code === 'EADDRINUSE' && isRetry) {
-        const randomPort = fallbackPort + Math.floor(Math.random() * 100);
-        log(`Using alternative port ${randomPort}`);
-        setTimeout(() => startServer(randomPort, true), 1000);
-      } else {
-        throw err;
-      }
-    });
-  }
-
-  startServer(Number(port));
+  server.listen({
+    port: port,
+    host: "0.0.0.0",
+  }, () => {
+    log(`🚀 Research Agent server running on port ${port}`);
+    if (process.env.REPLIT_DB_URL) {
+      log(`🔗 Available at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+    }
+  });
 })();
