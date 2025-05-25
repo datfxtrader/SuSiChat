@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { log } from './utils/logger';
-import { apiRateManager } from './apiRateManager';
+// Remove circular imports and use direct logging
+const log = console.log;
 
 // Environment variables for API keys
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -38,6 +38,7 @@ export async function performWebSearch(
 
   try {
     // Use the intelligent search manager for better rate limiting
+    const { intelligentSearchManager } = await import('./intelligentSearchManager');
     const searchResult = await intelligentSearchManager.performIntelligentSearch(
       query,
       maxResults,

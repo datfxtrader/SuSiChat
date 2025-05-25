@@ -41,10 +41,19 @@ class IntelligentSearchManager {
   private readonly MAX_CONCURRENT_REQUESTS = 3;
   private readonly FALLBACK_SOURCES = ['duckduckgo', 'serp'];
   
-  // API Keys
+  // API Keys with validation
   private readonly TAVILY_API_KEY = process.env.TAVILY_API_KEY;
   private readonly BRAVE_API_KEY = process.env.BRAVE_API_KEY;
   private readonly NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
+
+  constructor() {
+    // Log available API keys for debugging (without exposing actual keys)
+    console.log('Search API Status:', {
+      tavily: !!this.TAVILY_API_KEY,
+      brave: !!this.BRAVE_API_KEY,
+      newsdata: !!this.NEWSDATA_API_KEY
+    });
+  }
 
   /**
    * Normalize query for consistent caching

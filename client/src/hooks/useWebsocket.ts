@@ -7,7 +7,7 @@ export function useWebsocket() {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Connect to WebSocket when user is authenticated
   useEffect(() => {
     if (user) {
@@ -20,20 +20,31 @@ export function useWebsocket() {
           setIsConnected(false);
           setError(err.message || "Failed to connect to WebSocket");
         });
-      
+
       return () => {
         closeWebSocket();
         setIsConnected(false);
       };
     }
   }, [user]);
-  
+
   // Register a message handler
   const registerMessageHandler = useCallback((handler: (message: WebSocketMessage) => void) => {
     addMessageHandler(handler);
     return () => removeMessageHandler(handler);
   }, []);
-  
+
+const reconnect = useCallback(() => {
+    if (reconnectAttempts.current < maxReconnectAttempts) {
+      reconnectAttempts.current += 1;
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000); // Exponential backoff, max 30s
+      console.log(`Attempting to reconnect in ${delay}ms (${reconnectAttempts.current}/${maxReconnectAttempts})`);
+      setTimeout(() => {
+        connect();
+      }, delay);
+    }
+  }, [connect, maxReconnectAttempts]);
+
   return {
     isConnected,
     error,

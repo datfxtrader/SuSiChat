@@ -215,9 +215,9 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
 
   app.use('/api/financial-research', financialResearchRoutes);
-  app.use('/api/web-search', webSearchRoutes);
-  // Enhanced web search route
-  app.use('/api/enhanced-search', enhancedWebSearchRoutes);
+  // Use enhanced web search as the primary search system
+  app.use('/api/web-search', enhancedWebSearchRoutes);
+  app.use('/api/enhanced-web-search', enhancedWebSearchRoutes);
 
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {

@@ -40,7 +40,20 @@ export const enhancedSearch = {
       });
     } catch (error) {
       console.error('Enhanced search error:', error);
-      throw error;
+      // Return empty results instead of throwing to prevent app crashes
+      return {
+        results: [],
+        totalResults: 0,
+        searchEnginesUsed: [],
+        query,
+        searchType,
+        timestamp: new Date().toISOString(),
+        performance: {
+          searchTime: 0,
+          cacheHits: 0,
+          apiCalls: 0
+        }
+      };
     }
   },
 
