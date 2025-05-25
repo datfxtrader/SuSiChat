@@ -92,6 +92,21 @@ Your research query "${message || 'analysis'}" has been completed successfully w
     }
   }, [isResearchInProgress, isSending, researchProgress, message]);
 
+  // Add progress recovery logic to prevent stuck states
+  useEffect(() => {
+    if (isResearchInProgress && !isSending) {
+      // If progress seems stuck (hasn't changed in a while), complete it
+      const stuckTimer = setTimeout(() => {
+        if (isResearchInProgress && !isSending && researchProgress < 100) {
+          console.log('⚡ Progress recovery - completing research');
+          setResearchProgress(100);
+        }
+      }, 3000); // Wait 3 seconds after sending stops
+      
+      return () => clearTimeout(stuckTimer);
+    }
+  }, [isResearchInProgress, isSending, researchProgress]);
+
   // Add cleanup effect for stale research state
   useEffect(() => {
     // Clear stale research state if no messages
