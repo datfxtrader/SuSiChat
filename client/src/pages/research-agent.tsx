@@ -55,7 +55,7 @@ const ResearchAgent = () => {
   useEffect(() => {
     // Prevent unnecessary refreshes
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isSending || isResearchInProgress) {
+      if (isSending || researchProgress > 0) {
         e.preventDefault();
         e.returnValue = '';
       }

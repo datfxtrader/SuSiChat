@@ -237,6 +237,24 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = process.env.PORT || 5000;
+  
+  // Force close any existing listeners on this port
+  process.on('uncaughtException', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log('Port conflict detected, retrying with different port...');
+      const altPort = parseInt(port.toString()) + Math.floor(Math.random() * 100);
+      server.listen({
+        port: altPort,
+        host: "0.0.0.0",
+        reusePort: true,
+      }, () => {
+        log(`serving on alternative port ${altPort}`);
+      });
+      return;
+    }
+    throw err;
+  });
+  
   server.listen({
     port,
     host: "0.0.0.0",
