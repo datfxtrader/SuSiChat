@@ -55,44 +55,49 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
       <div className="prose prose-invert max-w-none">
         <div className="space-y-6 text-zinc-200">
           {content.split('\n\n').map((paragraph, idx) => {
-            // Handle tables (lines containing multiple pipes)
+            // Handle tables (improved detection and formatting)
             if (paragraph.includes('|') && paragraph.split('|').length > 2) {
               const lines = paragraph.split('\n').filter(line => line.trim());
-              const isTable = lines.length > 1 && lines.every(line => line.includes('|'));
+              const tableLines = lines.filter(line => line.includes('|') && line.split('|').length > 2);
               
-              if (isTable) {
-                const [headerLine, separatorLine, ...dataLines] = lines;
-                const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
-                const rows = dataLines.map(line => 
-                  line.split('|').map(cell => cell.trim()).filter(cell => cell)
-                );
+              if (tableLines.length >= 2) {
+                // Remove lines that are just separators (dashes)
+                const contentLines = tableLines.filter(line => !line.match(/^\s*\|[\s\-|]+\|\s*$/));
                 
-                return (
-                  <div key={idx} className="my-6 overflow-x-auto">
-                    <table className="w-full border-collapse bg-zinc-800/30 rounded-lg overflow-hidden">
-                      <thead>
-                        <tr className="bg-zinc-700/50">
-                          {headers.map((header, i) => (
-                            <th key={i} className="px-4 py-3 text-left text-zinc-100 font-semibold border-b border-zinc-600">
-                              {header}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((row, i) => (
-                          <tr key={i} className="border-b border-zinc-700/30 hover:bg-zinc-700/20">
-                            {row.map((cell, j) => (
-                              <td key={j} className="px-4 py-3 text-zinc-300">
-                                {cell}
-                              </td>
+                if (contentLines.length >= 2) {
+                  const [headerLine, ...dataLines] = contentLines;
+                  const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+                  const rows = dataLines.map(line => 
+                    line.split('|').map(cell => cell.trim()).filter(cell => cell)
+                  );
+                  
+                  return (
+                    <div key={idx} className="my-6 overflow-x-auto">
+                      <table className="w-full border-collapse bg-zinc-800/40 rounded-xl overflow-hidden shadow-lg">
+                        <thead>
+                          <tr className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b-2 border-blue-500/30">
+                            {headers.map((header, i) => (
+                              <th key={i} className="px-6 py-4 text-left text-zinc-100 font-semibold text-sm uppercase tracking-wide">
+                                {header}
+                              </th>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
+                        </thead>
+                        <tbody>
+                          {rows.map((row, i) => (
+                            <tr key={i} className="border-b border-zinc-700/30 hover:bg-zinc-700/30 transition-colors">
+                              {row.map((cell, j) => (
+                                <td key={j} className="px-6 py-4 text-zinc-300 font-mono text-sm">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
               }
             }
             
@@ -113,7 +118,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
               if (currentItem) listItems.push(currentItem);
               
               return (
-                <ol key={idx} className="list-none space-y-3 ml-2">
+                <ol key={idx} className="list-none space-y-4 ml-0">
                   {listItems.map((item, i) => {
                     const match = item.match(/^(\d+)\.\s*(.+)/);
                     if (match) {
@@ -121,18 +126,46 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                       const boldMatch = text.match(/^(.+?):\s*(.+)/);
                       
                       return (
-                        <li key={i} className="flex items-start space-x-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
-                          <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white text-sm font-bold rounded-full flex items-center justify-center">
+                        <li key={i} className="flex items-start space-x-4 p-4 bg-zinc-800/30 rounded-lg border-l-4 border-blue-500/60">
+                          <span className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white text-sm font-bold rounded-full flex items-center justify-center">
                             {number}
                           </span>
-                          <div className="flex-1">
+                          <div className="flex-1 space-y-2">
                             {boldMatch ? (
                               <>
-                                <div className="font-semibold text-zinc-100 mb-1">{boldMatch[1]}</div>
-                                <div className="text-zinc-300 text-sm leading-relaxed">{boldMatch[2]}</div>
+                                <div className="font-semibold text-zinc-100 text-base">{boldMatch[1]}</div>
+                                <div className="text-zinc-300 leading-relaxed">
+                                  {boldMatch[2].split('\n').map((line, lineIdx) => {
+                                    // Handle bullet points within numbered items
+                                    if (line.trim().startsWith('•') || line.trim().startsWith('*')) {
+                                      const bulletText = line.replace(/^[\s•*]+/, '').trim();
+                                      return (
+                                        <div key={lineIdx} className="flex items-start space-x-2 ml-4 my-2">
+                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                                          <span>{bulletText}</span>
+                                        </div>
+                                      );
+                                    }
+                                    return line && <div key={lineIdx} className="mb-1">{line}</div>;
+                                  })}
+                                </div>
                               </>
                             ) : (
-                              <div className="text-zinc-300 leading-relaxed">{text}</div>
+                              <div className="text-zinc-300 leading-relaxed">
+                                {text.split('\n').map((line, lineIdx) => {
+                                  // Handle bullet points within numbered items
+                                  if (line.trim().startsWith('•') || line.trim().startsWith('*')) {
+                                    const bulletText = line.replace(/^[\s•*]+/, '').trim();
+                                    return (
+                                      <div key={lineIdx} className="flex items-start space-x-2 ml-4 my-2">
+                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                                        <span>{bulletText}</span>
+                                      </div>
+                                    );
+                                  }
+                                  return line && <div key={lineIdx} className="mb-1">{line}</div>;
+                                })}
+                              </div>
                             )}
                           </div>
                         </li>
@@ -165,14 +198,29 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                   {paragraph.replace('### ', '')}
                 </h3>
               );
-            } else if (paragraph.startsWith('- **')) {
+            } else if (paragraph.startsWith('- **') || paragraph.match(/^\s*[-*•]\s*\*\*/)) {
               return (
-                <div key={idx} className="ml-4 mb-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
-                  <div className="font-medium text-zinc-100 mb-1">
+                <div key={idx} className="mb-3 p-4 bg-zinc-800/30 rounded-lg border-l-3 border-blue-500/50">
+                  <div className="font-medium text-zinc-100 mb-2">
                     {paragraph.match(/\*\*(.*?)\*\*/)?.[1] || ''}
                   </div>
-                  <div className="text-zinc-300 text-sm leading-relaxed">
-                    {paragraph.replace(/- \*\*(.*?)\*\*:\s*/, '')}
+                  <div className="text-zinc-300 leading-relaxed">
+                    {paragraph.replace(/^[\s\-*•]*\*\*(.*?)\*\*:\s*/, '')}
+                  </div>
+                </div>
+              );
+            } else if (paragraph.match(/^[\s]*[-*•]\s+/)) {
+              // Handle regular bullet points
+              const bulletText = paragraph.replace(/^[\s\-*•]+/, '').trim();
+              return (
+                <div key={idx} className="flex items-start space-x-3 mb-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                  <div className="text-zinc-300 leading-relaxed flex-1">
+                    {bulletText.split('**').map((part, i) => 
+                      i % 2 === 1 ? 
+                        <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
+                        part
+                    )}
                   </div>
                 </div>
               );
