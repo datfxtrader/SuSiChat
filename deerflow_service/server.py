@@ -8,6 +8,9 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
+
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
+
 import uvicorn
 from typing import Optional, List, Dict, Any
 import os
@@ -145,6 +148,12 @@ async def search_web(query: str, max_results: int = 8):
     
     # Add news results
     results = await search_news(query, max_results=3)
+    
+    # Add Finnhub results if it's a financial query
+    if any(term in query.lower() for term in ['stock', 'price', 'market', 'trading', 'forex', 'crypto']):
+        finnhub_results = await search_finnhub(query, max_results=3)
+        results.extend(finnhub_results)
+    
     logger.info(f"Searching web for: {query}")
     
     # Primary: Use DuckDuckGo (no API key required)
@@ -247,6 +256,42 @@ async def search_duckduckgo(query: str, max_results: int = 8):
                     return []
     except Exception as e:
         logger.error(f"DuckDuckGo search failed: {e}")
+        return []
+
+async def search_finnhub(query: str, max_results: int = 8):
+    """Search using Finnhub API for financial data."""
+    if not FINNHUB_API_KEY:
+        logger.warning("FINNHUB_API_KEY not configured, skipping Finnhub search")
+        return []
+        
+    try:
+        # Parse for stock/crypto symbols
+        symbols = [word.upper() for word in query.split() if word.isalnum()]
+        results = []
+        
+        for symbol in symbols[:max_results]:
+            url = f"https://finnhub.io/api/v1/quote"
+            params = {
+                "symbol": symbol,
+                "token": FINNHUB_API_KEY
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    results.append({
+                        "title": f"{symbol} Market Data",
+                        "url": f"https://finnhub.io/quote/{symbol}",
+                        "content": f"Current: {data.get('c')}, High: {data.get('h')}, Low: {data.get('l')}, Open: {data.get('o')}",
+                        "source": "finnhub",
+                        "score": 1.0
+                    })
+                    
+        return results
+    except Exception as e:
+        logger.error(f"Finnhub search error: {e}")
         return []
 
 async def search_brave(query: str, max_results: int = 8):
