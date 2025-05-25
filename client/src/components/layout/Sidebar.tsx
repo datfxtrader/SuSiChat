@@ -92,11 +92,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
               Personal Account
             </div>
           </div>
-          <Link href="/profile" onClick={handleItemClick}>
-            <a className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 rounded-lg transition-all duration-200">
-              <span className="text-lg">{icons.settings}</span>
-            </a>
-          </Link>
+          <button 
+            onClick={() => {
+              handleItemClick();
+              window.location.href = '/profile';
+            }}
+            className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 rounded-lg transition-all duration-200"
+          >
+            <span className="text-lg">{icons.settings}</span>
+          </button>
         </div>
       </div>
 
@@ -105,20 +109,24 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.path}>
-              <Link href={item.path} onClick={handleItemClick}>
-                <a className={cn(
+              <button
+                onClick={() => {
+                  handleItemClick();
+                  window.location.href = item.path;
+                }}
+                className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 w-full",
                   isActive(item.path)
                     ? "bg-gradient-to-r from-blue-600/25 to-purple-600/25 text-zinc-50 border border-blue-500/40 shadow-lg backdrop-blur-sm"
                     : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60"
-                )}>
-                  <span className="text-lg flex-shrink-0">{icons[item.icon]}</span>
-                  <span className="truncate">{item.label}</span>
-                  {isActive(item.path) && (
-                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full ml-auto animate-pulse" />
-                  )}
-                </a>
-              </Link>
+                )}
+              >
+                <span className="text-lg flex-shrink-0">{icons[item.icon]}</span>
+                <span className="truncate">{item.label}</span>
+                {isActive(item.path) && (
+                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full ml-auto animate-pulse" />
+                )}
+              </button>
             </li>
           ))}
         </ul>
