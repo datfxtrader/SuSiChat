@@ -397,6 +397,16 @@ export const ResearchAgent = () => {
         };
         
         setMessages(prev => [...prev, completedMessage]);
+        
+        // Clean up state immediately after adding message
+        setIsResearchInProgress(false);
+        setCurrentResearchQuery('');
+        
+        // Reset progress after a brief delay
+        setTimeout(() => {
+          setResearchProgress(0);
+          setResearchStage(1);
+        }, 1000);
       } else {
         console.log('⚠️ Empty or missing report, adding fallback message');
         const fallbackMessage: Message = {
@@ -416,17 +426,17 @@ Please try rephrasing your question or try again in a moment.`,
         };
         
         setMessages(prev => [...prev, fallbackMessage]);
+        
+        // Clean up state
+        setIsResearchInProgress(false);
+        setCurrentResearchQuery('');
+        
+        // Reset progress after showing completion
+        setTimeout(() => {
+          setResearchProgress(0);
+          setResearchStage(1);
+        }, 1000);
       }
-      
-      // Clean up state
-      setIsResearchInProgress(false);
-      setCurrentResearchQuery('');
-      
-      // Reset progress after showing completion
-      setTimeout(() => {
-        setResearchProgress(0);
-        setResearchStage(1);
-      }, 2000);
       
     } catch (error) {
       console.error('❌ Research failed:', error);

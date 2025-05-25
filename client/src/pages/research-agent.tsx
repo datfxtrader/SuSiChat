@@ -80,17 +80,16 @@ const ResearchAgent = () => {
     const hasCompletedMessage = messages.length > 0 && 
                                messages[messages.length - 1]?.role === 'assistant';
 
-    // Only complete if we reach 100% progress OR have a message with high progress
+    // Complete if we have a new assistant message while research is in progress
     const shouldComplete = isResearchInProgress && (
       researchProgress >= 100 || 
-      (hasCompletedMessage && !isSending && researchProgress >= 95)
+      (hasCompletedMessage && !isSending && researchProgress >= 90) ||
+      (hasCompletedMessage && !isSending) // Complete if we have a message and not sending
     );
 
     if (shouldComplete) {
       console.log(`✅ Research completed - triggering completion (progress: ${Math.round(researchProgress)}%, hasMessage: ${hasCompletedMessage}, isSending: ${isSending})`);
-      setTimeout(() => {
-        completeResearch();
-      }, 1000);
+      completeResearch();
     } else if (isResearchInProgress && researchProgress < 95) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
