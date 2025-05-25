@@ -1,0 +1,105 @@
+Looking at your code, I can see the issue! The New Research button calls handleNewConversation() which only calls createNewChat(), but it doesn't reset the research progress state. The welcome screen is only shown when messages.length === 0, but the research progress bars are still visible because isResearchInProgress remains true.
+🐛 The Problem:
+When you click "New Research":
+
+✅ createNewChat() clears messages
+❌ Research progress state (isResearchInProgress, researchProgress) is NOT reset
+❌ Progress bars continue showing over the welcome screen
+
+🔧 The Fix:
+Update your handleNewConversation function to also reset the research state:
+javascriptconst handleNewConversation = () => {
+  // Reset chat
+  createNewChat();
+  
+  // Reset research progress state
+  completeResearch(); // This will clear the research state
+  
+  // Reset local state
+  setMessage('');
+  
+  // Close sidebar on mobile
+  if (window.innerWidth < 768) {
+    setIsSidebarOpen(false);
+  }
+};
+🎯 Alternative Fix (More Explicit):
+If you want more control, you can manually reset the states:
+javascriptconst handleNewConversation = () => {
+  // Reset chat
+  createNewChat();
+  
+  // Manually reset all research states
+  setIsResearchInProgress(false);
+  setOngoingResearchQuery('');
+  setResearchProgress(0);
+  setResearchStage(1);
+  setStageLabel('Ready');
+  
+  // Clear any persistent storage
+  completeResearch(); // This cleans up localStorage
+  
+  // Reset input
+  setMessage('');
+  
+  if (window.innerWidth < 768) {
+    setIsSidebarOpen(false);
+  }
+};
+💡 Better Solution (Recommended):
+Add a reset function to your useDirectTabPersistence hook:
+javascript// In your useDirectTabPersistence hook, add this function:
+const resetResearch = useCallback(() => {
+  console.log('🔄 Resetting research state for new session');
+  setIsResearchInProgress(false);
+  setOngoingResearchQuery('');
+  setResearchProgress(0);
+  setResearchStage(1);
+  setStageLabel('Ready');
+  
+  // Clean up all storage
+  STORAGE_KEYS.forEach(key => {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn(`Failed to clean ${key}:`, error);
+    }
+  });
+}, []);
+
+// Return it from the hook
+return {
+  // ... existing returns
+  resetResearch
+};
+Then use it in your component:
+javascriptconst {
+  isResearchInProgress,
+  ongoingResearchQuery,
+  researchProgress,
+  researchStage,
+  stageLabel,
+  startResearch,
+  completeResearch,
+  resetResearch, // Add this
+  forceSave,
+  forceRestore
+} = useDirectTabPersistence();
+
+const handleNewConversation = () => {
+  createNewChat();
+  resetResearch(); // Clean reset
+  setMessage('');
+  
+  if (window.innerWidth < 768) {
+    setIsSidebarOpen(false);
+  }
+};
+🚀 Expected Result:
+After implementing this fix:
+✅ New Research button will clear messages
+✅ Progress bars disappear completely
+✅ Welcome screen shows cleanly without overlays
+✅ Research state resets to fresh start
+✅ No persistent progress from previous sessions
+The simplest immediate fix is to add completeResearch(); to your handleNewConversation function!
