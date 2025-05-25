@@ -1,0 +1,576 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, PlusIcon, MenuIcon, XIcon, Ban, Clock, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
+
+// Mock components for demonstration
+const Button = ({ children, className = '', variant = 'default', size = 'default', onClick, disabled, ...props }) => {
+  const baseClasses = 'inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed';
+  
+  const variants = {
+    default: 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md',
+    ghost: 'hover:bg-zinc-800/80 text-zinc-300 hover:text-white',
+    outline: 'border border-zinc-700/60 bg-zinc-800/40 hover:bg-zinc-700/50 text-zinc-300 hover:text-white hover:border-zinc-600',
+    secondary: 'bg-zinc-700/60 hover:bg-zinc-600/70 text-zinc-200 border border-zinc-600/40'
+  };
+  
+  const sizes = {
+    default: 'px-4 py-2 rounded-lg text-sm',
+    sm: 'px-2 py-1 rounded-md text-xs',
+    lg: 'px-6 py-3 rounded-lg text-base'
+  };
+  
+  return (
+    <button 
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Textarea = ({ className = '', ...props }) => (
+  <textarea 
+    className={`w-full bg-zinc-900/60 border border-zinc-700/60 rounded-lg px-3 py-2 text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all ${className}`}
+    {...props}
+  />
+);
+
+const Select = ({ children, value, onValueChange }) => (
+  <div className="relative">
+    <select 
+      className="bg-zinc-800/60 border border-zinc-700/60 rounded-md px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+      value={value}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {React.Children.map(children, child => 
+        React.isValidElement(child) ? child : null
+      )}
+    </select>
+  </div>
+);
+
+const SelectTrigger = ({ children, className }) => <div className={className}>{children}</div>;
+const SelectContent = ({ children }) => children;
+const SelectItem = ({ value, children }) => <option value={value}>{children}</option>;
+const SelectValue = () => null;
+
+const Badge = ({ children, className = '' }) => (
+  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 ${className}`}>
+    {children}
+  </span>
+);
+
+// Utility function to format relative time
+const formatRelativeTime = (timestamp) => {
+  const now = new Date();
+  const messageTime = new Date(timestamp);
+  const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
+  
+  if (diffInMinutes < 1) return 'Just now';
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+  return `${Math.floor(diffInMinutes / 1440)}d ago`;
+};
+
+const ResearchProgress = ({ stage, progress, query, isActive }) => (
+  <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-6 backdrop-blur-sm">
+    <div className="flex items-center space-x-3 mb-4">
+      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+        <Search className="w-4 h-4 text-white" />
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-100">Researching...</h3>
+        <p className="text-xs text-zinc-400">{query}</p>
+      </div>
+    </div>
+    
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-blue-400">Stage {stage}/6</span>
+        <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
+      </div>
+      
+      <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
+          style={{ width: `${Math.max(progress, 5)}%` }}
+        />
+      </div>
+      
+      {isActive && (
+        <div className="flex items-center space-x-2 text-xs text-blue-400">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+          <span>Analyzing sources and generating insights...</span>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+const ResearchAgent = () => {
+  const [message, setMessage] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [researchDepth, setResearchDepth] = useState('3');
+  const [selectedModel, setSelectedModel] = useState('auto');
+  const [isSending, setIsSending] = useState(false);
+  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
+  const [researchProgress, setResearchProgress] = useState(0);
+  const [researchStage, setResearchStage] = useState(1);
+  const textareaRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  // Mock data
+  const allConversations = [
+    {
+      id: '1',
+      title: 'Bitcoin Market Analysis 2025',
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+      messages: [{ content: 'What are the key factors driving Bitcoin price movements in 2025?' }]
+    },
+    {
+      id: '2', 
+      title: 'AI Stock Performance Review',
+      createdAt: new Date(Date.now() - 7200000).toISOString(),
+      messages: [{ content: 'Analyze the performance of major AI companies in Q1 2025' }]
+    },
+    {
+      id: '3',
+      title: 'Renewable Energy Investment Trends',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      messages: [{ content: 'Research renewable energy investment opportunities' }]
+    }
+  ];
+
+  const messages = [
+    {
+      id: '1',
+      role: 'user',
+      content: 'What are the key factors driving Bitcoin price movements in 2025?',
+      timestamp: new Date(Date.now() - 300000).toISOString()
+    },
+    {
+      id: '2',
+      role: 'assistant',
+      content: `# Bitcoin Price Analysis: Key Driving Factors in 2025
+
+## Executive Summary
+Current market conditions show several critical factors influencing Bitcoin's trajectory through 2025, with institutional adoption and regulatory clarity emerging as primary catalysts.
+
+## Key Market Drivers
+
+### 1. Institutional Adoption
+- **Corporate Treasury Allocation**: Major corporations continuing to add BTC to balance sheets, with MicroStrategy, Tesla, and Square leading the trend
+- **ETF Performance**: Bitcoin ETFs experiencing record inflows, with over $50B in assets under management
+- **Banking Integration**: Traditional banks like JPMorgan and Goldman Sachs expanding crypto services
+
+### 2. Regulatory Environment
+- **Global Framework Development**: Clearer regulatory frameworks emerging across major economies
+- **Compliance Infrastructure**: Maturing institutional-grade custody and compliance solutions
+- **Policy Certainty**: Reduced regulatory uncertainty driving institutional confidence
+
+### 3. Macroeconomic Factors
+- **Monetary Policy**: Federal Reserve decisions impacting risk asset appetite
+- **Inflation Dynamics**: Bitcoin's role as digital store of value during inflationary periods
+- **Dollar Strength**: Inverse correlation with USD performance continuing
+
+### 4. Technical Developments
+- **Lightning Network Growth**: Improved scalability and transaction throughput
+- **Mining Efficiency**: Sustainable mining practices and renewable energy adoption
+- **Layer 2 Solutions**: Enhanced functionality and reduced transaction costs
+
+## Market Outlook
+The convergence of these factors suggests continued institutional interest, though volatility remains elevated due to regulatory uncertainty and macroeconomic conditions.`,
+      timestamp: new Date(Date.now() - 240000).toISOString(),
+      sources: [
+        { title: 'Bloomberg Crypto Market Analysis', url: '#', domain: 'bloomberg.com' },
+        { title: 'Federal Reserve Economic Data', url: '#', domain: 'federalreserve.gov' },
+        { title: 'CoinDesk Institutional Reports', url: '#', domain: 'coindesk.com' },
+        { title: 'JPMorgan Crypto Research', url: '#', domain: 'jpmorgan.com' }
+      ]
+    }
+  ];
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [message]);
+
+  const handleSendMessage = () => {
+    if (!message.trim() || isSending) return;
+    
+    setIsSending(true);
+    setIsResearchInProgress(true);
+    setResearchProgress(0);
+    setResearchStage(1);
+    
+    // Simulate research progress
+    const interval = setInterval(() => {
+      setResearchProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsSending(false);
+          setIsResearchInProgress(false);
+          return 100;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 500);
+    
+    setMessage('');
+    
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleNewConversation = () => {
+    setIsSidebarOpen(false);
+  };
+
+  // Extract sources from research responses
+  const extractSources = (content) => {
+    const sources = [];
+    
+    if (content.includes('Sources:') || content.includes('**Sources:**')) {
+      const lines = content.split('\n');
+      lines.forEach(line => {
+        const urlMatch = line.match(/https?:\/\/[^\s)]+/);
+        if (urlMatch) {
+          try {
+            const url = new URL(urlMatch[0]);
+            sources.push({
+              title: line.replace(/^\d+\.\s*/, '').replace(/\*\*/g, '').replace(urlMatch[0], '').trim(),
+              url: urlMatch[0],
+              domain: url.hostname
+            });
+          } catch (e) {
+            // Invalid URL, skip
+          }
+        }
+      });
+    }
+    
+    return sources;
+  };
+
+  return (
+    <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
+      {/* Sidebar - Conversations */}
+      <div className="w-64 border-r border-zinc-800/60 bg-zinc-950/80 backdrop-blur-xl">
+        <div className="p-4 border-b border-zinc-800/60">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-100">Research Agent</h2>
+              <p className="text-xs text-zinc-400">AI-Powered Research</p>
+            </div>
+          </div>
+          
+          <Button 
+            onClick={handleNewConversation}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            New Research
+          </Button>
+        </div>
+
+        {/* Conversations List */}
+        <div className="p-4 space-y-3">
+          <h3 className="text-sm font-medium text-zinc-400 mb-4 flex items-center">
+            <Clock className="w-4 h-4 mr-2" />
+            Recent Conversations
+          </h3>
+          
+          {allConversations.map((conv) => (
+            <div
+              key={conv.id}
+              className="group p-4 rounded-xl bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/50 hover:bg-zinc-800/60 hover:border-zinc-700/70 transition-all duration-200 cursor-pointer transform hover:scale-[1.02]"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <h4 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors line-clamp-2">
+                  {conv.title || 'Untitled Research'}
+                </h4>
+                <span className="text-xs text-zinc-500 flex-shrink-0 ml-2">
+                  {formatRelativeTime(conv.createdAt)}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors line-clamp-2">
+                {conv.messages && conv.messages.length > 0 
+                  ? String(conv.messages[conv.messages.length - 1]?.content || '').substring(0, 80) + '...'
+                  : 'No messages yet'
+                }
+              </p>
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                  <span className="text-xs text-zinc-500">Completed</span>
+                </div>
+                <MessageSquare className="w-3 h-3 text-zinc-500 group-hover:text-zinc-400" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* Welcome Screen - Show when no messages */}
+          {messages.length === 0 && (
+            <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+              <div className="text-center max-w-4xl mx-auto px-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                  <Bot className="w-8 h-8 text-white" />
+                </div>
+                
+                <h1 className="text-3xl font-bold text-zinc-100 mb-3">
+                  Welcome to Research Agent
+                </h1>
+                <p className="text-lg text-zinc-400 mb-12">
+                  Get comprehensive, AI-powered research on any topic with real-time data and expert analysis
+                </p>
+                
+                {/* Predefined Prompt Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                  {[
+                    {
+                      title: "Market Analysis Research",
+                      description: "Deep dive into current market trends, opportunities, and risk assessment",
+                      prompt: "Analyze current market trends and identify emerging investment opportunities with detailed financial data and forecasts",
+                      icon: TrendingUp,
+                      gradient: "from-emerald-500 to-teal-600"
+                    },
+                    {
+                      title: "Financial Data Analysis", 
+                      description: "Comprehensive financial metrics, ratios, and performance evaluation",
+                      prompt: "Generate a comprehensive financial analysis including key metrics, ratios, and performance indicators with latest quarterly data",
+                      icon: Database,
+                      gradient: "from-blue-500 to-indigo-600"
+                    },
+                    {
+                      title: "Competitive Intelligence",
+                      description: "Research competitors, market positioning, and strategic advantages",
+                      prompt: "Research competitive landscape, market positioning, and strategic advantages with detailed competitor analysis",
+                      icon: Search,
+                      gradient: "from-purple-500 to-pink-600"
+                    },
+                    {
+                      title: "Risk Assessment Report",
+                      description: "Evaluate investment risks, opportunities, and risk-adjusted returns",
+                      prompt: "Assess investment risks, market volatility, and potential opportunities with risk-adjusted return analysis",
+                      icon: AlertCircle,
+                      gradient: "from-orange-500 to-red-600"
+                    }
+                  ].map((card, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setMessage(card.prompt)}
+                      className="group p6 bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 rounded-2xl hover:bg-zinc-800/70 hover:border-zinc-700/70 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] hover:shadow-2xl"
+                    >
+                      <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-shadow`}>
+                        <card.icon className="w-6 h-6 text-white" />
+                      </div>
+                      
+                      <h3 className="text-lg font-semibold text-zinc-100 mb-2 group-hover:text-white transition-colors">
+                        {card.title}
+                      </h3>
+                      <p className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors leading-relaxed">
+                        {card.description}
+                      </p>
+                      
+                      <div className="flex items-center mt-4 text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        <span>AI-Powered Research</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <p className="text-sm text-zinc-500 mt-8 flex items-center justify-center">
+                  <Zap className="w-4 h-4 mr-2" />
+                  Click any card above or type your own research question below
+                </p>
+              </div>
+            </div>
+          )}
+
+          {messages.map((msg) => (
+            <div key={msg.id} className="flex items-start space-x-4">
+              {msg.role === 'user' ? (
+                <>
+                  <div className="flex-1" />
+                  <div className="max-w-2xl">
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-2xl rounded-tr-md shadow-lg">
+                      <p className="leading-relaxed">{msg.content}</p>
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-2 text-right flex items-center justify-end">
+                      <User className="w-3 h-3 mr-1" />
+                      {formatRelativeTime(msg.timestamp)}
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 bg-gradient-to-br from-zinc-600 to-zinc-700 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-700 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                    <Bot className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl rounded-tl-md hover:border-zinc-700/60 transition-all duration-200 shadow-lg">
+                      {/* Message Header with Enhanced Actions */}
+                      <div className="flex items-center justify-between mb-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="flex items-center space-x-3 text-xs text-zinc-400">
+                          <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 bg-green-400 rounded-full" />
+                            <span>AI Research Assistant</span>
+                          </div>
+                          <span>•</span>
+                          <span>{formatRelativeTime(msg.timestamp)}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+                            <Share2 className="w-3 h-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+                            <Bookmark className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Enhanced Message Content with Better Typography */}
+                      <div className="prose prose-invert max-w-none">
+                        <div className="space-y-6 text-zinc-200">
+                          {msg.content.split('\n\n').map((paragraph, idx) => {
+                            if (paragraph.startsWith('# ')) {
+                              return (
+                                <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
+                                  <TrendingUp className="w-6 h-6 mr-3 text-blue-400" />
+                                  {paragraph.replace('# ', '')}
+                                </h1>
+                              );
+                            } else if (paragraph.startsWith('## ')) {
+                              return (
+                                <h2 key={idx} className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center">
+                                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3" />
+                                  {paragraph.replace('## ', '')}
+                                </h2>
+                              );
+                            } else if (paragraph.startsWith('### ')) {
+                              return (
+                                <h3 key={idx} className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center">
+                                  <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
+                                  {paragraph.replace('### ', '')}
+                                </h3>
+                              );
+                            } else if (paragraph.startsWith('- **')) {
+                              return (
+                                <div key={idx} className="ml-4 mb-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
+                                  <div className="font-medium text-zinc-100 mb-1">
+                                    {paragraph.match(/\*\*(.*?)\*\*/)?.[1] || ''}
+                                  </div>
+                                  <div className="text-zinc-300 text-sm leading-relaxed">
+                                    {paragraph.replace(/- \*\*(.*?)\*\*:\s*/, '')}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <p key={idx} className="text-zinc-200 leading-relaxed">
+                                  {paragraph.split('**').map((part, i) => 
+                                    i % 2 === 1 ? 
+                                      <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
+                                      part
+                                  )}
+                                </p>
+                              );
+                            }
+                          })}
+                        </div>
+                      </div>
+                      
+                      {/* Enhanced Sources Section */}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-8 pt-6 border-t border-zinc-800/50">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-sm font-semibold text-zinc-300 flex items-center">
+                              <Search className="w-4 h-4 mr-2 text-blue-400" />
+                              Research Sources ({msg.sources.length})
+                            </h4>
+                            <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                              <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1" />
+                              Verified
+                            </Badge>
+                          </div>
+                          <div className="grid gap-3">
+                            {msg.sources.map((source, idx) => (
+                              <div key={idx} className="group/source flex items-start space-x-3 p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
+                                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <a 
+                                    href={source.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-zinc-200 hover:text-blue-400 cursor-pointer transition-colors font-medium text-sm block group-hover/source:text-blue-400 leading-snug"
+                                  >
+                                    {source.title}
+                                  </a>
+                                  <div className="flex items-center space-x-3 mt-2">
+                                    <span className="text-xs text-zinc-500 flex items-center">
+                                      <div className="w-3 h-3 bg-zinc-600 rounded-full mr-1.5 flex items-center justify-center">
+                                        <div className="w-1 h-1 bg-zinc-400 rounded-full" />
+                                      </div>
+                                      {source.domain}
+                                    </span>
+                                    <span className="text-xs text-zinc-600">•</span>
+                                    <span className="text-xs text-zinc-500 flex items-center">
+                                      <Clock className="w-3 h-3 mr-1" />
+                                      Real-time data
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity">
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Research Quality Indicator */}
+                      <div className="mt-6 pt-4 border-t border-zinc-800/40">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-4 text-zinc-500">
+                            <div className="flex items-center space-x-1.5">
+                              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                              <span>High-confidence analysis</span>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                              <Database className="w-3 h-3 text-blue-400" />
+                              <span>Multi-source verified</span>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                              <Zap className="w-3 h-3 text-purple-400" />
+                              <span>AI-enhanced insights</span>
+                            </div>

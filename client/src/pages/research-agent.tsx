@@ -205,31 +205,35 @@ Current market conditions show several critical factors influencing Bitcoin's tr
     <MainLayout
       showHeader={false}
     >
-      <div className="flex h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950">
-        {/* Compact Sidebar - Conversations */}
-        <div className="w-60 border-r border-slate-800/50 bg-slate-950/70 backdrop-blur-md">
-          <div className="p-3 border-b border-slate-800/50">
-            <div className="flex items-center space-x-2 mb-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-slate-800 rounded-lg flex items-center justify-center">
-                <Bot className="w-4 h-4 text-white" />
+      <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
+        {/* Enhanced Sidebar - Conversations */}
+        <div className="w-64 border-r border-zinc-800/60 bg-zinc-950/80 backdrop-blur-xl">
+          <div className="p-4 border-b border-zinc-800/60">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg">
+                <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-gray-100">Research Agent</h2>
+                <h2 className="text-sm font-semibold text-zinc-100">Research Agent</h2>
+                <p className="text-xs text-zinc-400">AI-Powered Research</p>
               </div>
             </div>
             
             <Button 
               onClick={handleNewConversation}
-              className="w-full h-8 bg-slate-700 hover:bg-slate-600 hover:text-primary transition-all duration-200 text-white text-sm"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
             >
-              <Sparkles className="w-3 h-3 mr-2" />
-              New Chat
+              <Sparkles className="w-4 h-4 mr-2" />
+              New Research
             </Button>
           </div>
 
           {/* Conversations List */}
-          <div className="p-4 space-y-2">
-            <h3 className="text-sm font-medium text-gray-400 mb-3">Recent Conversations</h3>
+          <div className="p-4 space-y-3">
+            <h3 className="text-sm font-medium text-zinc-400 mb-4 flex items-center">
+              <Clock className="w-4 h-4 mr-2" />
+              Recent Conversations
+            </h3>
 {Array.isArray(allConversations) ? allConversations.map((conv: any) => {
               if (!conv || typeof conv.id !== 'string') {
                 console.warn('⚠️ Invalid conversation object:', conv);
