@@ -128,8 +128,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
             setResearchProgress(cleanedState.progress);
             console.log('🔥 State persistence verified and reinforced');
           }
-        }, 100);;
-      }, 100);
+        }, 100);
 
       return true;
     } else {
