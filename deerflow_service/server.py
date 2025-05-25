@@ -183,7 +183,7 @@ async def search_duckduckgo(query: str, max_results: int = 8):
                     results = []
 
                     # Process DuckDuckGo results
-                    if data.get('RelatedTopics')):
+                    if data.get('RelatedTopics'):
                         for topic in data.get('RelatedTopics', [])[:max_results]:
                             if isinstance(topic, dict) and 'Text' in topic and 'FirstURL' in topic:
                                 results.append({
