@@ -74,9 +74,9 @@ export const ResearchAgent = () => {
 
   const handleSendMessage = () => {
     if (!message.trim() || isSending) return;
-
+    
     console.log('🚀 Starting research:', message);
-
+    
     const userMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -84,12 +84,13 @@ export const ResearchAgent = () => {
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMessage]);
-
+    
     setIsSending(true);
     setIsResearchInProgress(true);
     setResearchProgress(0);
     setResearchStage(1);
-
+    
+    // FIXED: Better progress simulation
     const interval = setInterval(() => {
       setResearchProgress(prev => {
         if (prev >= 100) {
@@ -97,18 +98,25 @@ export const ResearchAgent = () => {
           setIsSending(false);
           return 100;
         }
-        const newProgress = prev + Math.random() * 12 + 3;
-        if (newProgress >= 80) setResearchStage(6);
-        else if (newProgress >= 65) setResearchStage(5);
-        else if (newProgress >= 50) setResearchStage(4);
-        else if (newProgress >= 30) setResearchStage(3);
-        else if (newProgress >= 15) setResearchStage(2);
+        
+        // More consistent progress increments
+        const baseIncrement = Math.random() * 8 + 4; // 4-12% increments
+        const newProgress = prev + baseIncrement;
+        
+        // Update stages more smoothly
+        if (newProgress >= 85) setResearchStage(6);
+        else if (newProgress >= 70) setResearchStage(5);
+        else if (newProgress >= 55) setResearchStage(4);
+        else if (newProgress >= 40) setResearchStage(3);
+        else if (newProgress >= 20) setResearchStage(2);
+        else setResearchStage(1);
+        
         return Math.min(newProgress, 100);
       });
-    }, 800);
-
+    }, 600); // Faster updates - every 600ms instead of 800ms
+    
     setMessage('');
-
+    
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
