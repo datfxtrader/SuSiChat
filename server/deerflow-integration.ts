@@ -80,7 +80,7 @@ export class ResearchService {
         console.log('🔍 Using enhanced free research service');
         const { enhancedResearchService } = await import('./enhanced-research-service');
         const results = await enhancedResearchService.performResearch(params.query);
-        
+
         return {
           ...results,
           depth: depth,

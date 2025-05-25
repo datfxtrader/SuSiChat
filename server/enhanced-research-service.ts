@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 interface SearchResult {
@@ -14,20 +13,23 @@ interface ResearchResults {
   news: SearchResult[];
   wiki: SearchResult[];
   academic: SearchResult[];
+  financial: SearchResult[];
 }
 
 export class EnhancedFreeResearchService {
   private BRAVE_API_KEY = process.env.BRAVE_API_KEY;
   private NEWS_API_KEY = process.env.NEWS_API_KEY;
+  private FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
   async performResearch(query: string) {
     const results = {
       web: await this.braveSearch(query),
       news: await this.newsSearch(query),
+      financial: await this.finnhubSearch(query),
       wiki: await this.wikipediaSearch(query),
       academic: await this.academicSearch(query)
     };
-    
+
     return this.synthesizeResults(results, query);
   }
 
@@ -83,6 +85,30 @@ export class EnhancedFreeResearchService {
     }
   }
 
+  private async finnhubSearch(query: string): Promise<SearchResult[]> {
+    try {
+      const response = await axios.get('https://finnhub.io/api/v1/company-news', {
+        params: {
+          symbol: query,
+          from: '2023-01-01', // You might want to adjust the date range
+          to: new Date().toISOString().slice(0, 10),
+          token: this.FINNHUB_API_KEY,
+        },
+      });
+
+      return response.data.map((article: any) => ({
+        title: article.headline,
+        url: article.url,
+        description: article.summary,
+        source: 'finnhub',
+        timestamp: article.datetime ? new Date(article.datetime * 1000).toISOString() : undefined, // Convert Unix timestamp to ISO string
+      }));
+    } catch (error) {
+      console.error('Finnhub API error:', error);
+      return [];
+    }
+  }
+
   private async wikipediaSearch(query: string): Promise<SearchResult[]> {
     try {
       const response = await axios.get('https://en.wikipedia.org/w/api.php', {
@@ -125,7 +151,7 @@ export class EnhancedFreeResearchService {
         const title = entry.match(/<title>(.*?)<\/title>/s)?.[1] || '';
         const url = entry.match(/<id>(.*?)<\/id>/s)?.[1] || '';
         const summary = entry.match(/<summary>(.*?)<\/summary>/s)?.[1] || '';
-        
+
         return {
           title: title.trim(),
           url: url.trim(),
@@ -143,6 +169,7 @@ export class EnhancedFreeResearchService {
     const sources = [
       ...results.web.slice(0, 5),
       ...results.news.slice(0, 3),
+      ...results.financial.slice(0,3),
       ...results.wiki.slice(0, 2),
       ...results.academic.slice(0, 2)
     ];
@@ -166,7 +193,7 @@ export class EnhancedFreeResearchService {
 
     // Generate report sections
     let report = `# Research Report: ${query}\n\n`;
-    
+
     if (sourcesByType.news?.length) {
       report += '## Latest News\n\n';
       sourcesByType.news.forEach((source: SearchResult) => {
@@ -187,6 +214,13 @@ export class EnhancedFreeResearchService {
         report += `- ${source.title}\n  ${source.description}\n\n`;
       });
     }
+
+      if (sourcesByType.financial?.length) {
+          report += '## Financial News\n\n';
+          sourcesByType.financial.forEach((source: SearchResult) => {
+              report += `- ${source.title}\n  ${source.description}\n\n`;
+          });
+      }
 
     if (sourcesByType.brave?.length) {
       report += '## Additional Resources\n\n';
