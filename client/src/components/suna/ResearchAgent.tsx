@@ -608,16 +608,26 @@ Please try again or rephrase your research question.`,
             </div>
           ))}
 
+          {/* Show research progress in main chat area instead of duplicating */}
           {isResearchInProgress && (
             <div className="mb-4">
-              <ResearchProgress 
-                stage={researchStage}
-                progress={researchProgress}
-                query={currentResearchQuery || "Analyzing..."}
-                isActive={true}
-              />
+              <div className="flex items-start space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <ResearchProgress 
+                    stage={researchStage}
+                    progress={researchProgress}
+                    query={currentResearchQuery || "Analyzing..."}
+                    isActive={true}
+                  />
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Research progress is now only shown in the main chat area */}
         </div>
 
         <div className="border-t border-zinc-800/60 bg-zinc-900/80 backdrop-blur-xl p-4">
