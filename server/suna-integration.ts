@@ -995,9 +995,31 @@ class SunaIntegrationService {
             .replace(/^(what|how|when|where|who|why|can you|could you|would you|tell me|do you know|i need to know|i want to know|please find|search for|look up)/i, '')
             .trim();
 
-          // Continue with regular web search for depth 1 & 2
-          console.log(`Web search using refined query: ${finalQuery}`);
-          webSearchResults = await performWebSearch(finalQuery);
+          // Use ULTIMATE search engine with all sources
+          console.log(`ULTIMATE web search using refined query: ${finalQuery}`);
+          try {
+            const { ultimateWebSearch } = await import('./ultimateWebSearch');
+            const ultimateResults = await ultimateWebSearch(finalQuery, 15);
+            
+            // Convert to expected format
+            webSearchResults = {
+              results: ultimateResults.results,
+              tavilyResults: { results: ultimateResults.results.filter(r => r.source === 'Tavily') },
+              braveResults: { web: { results: ultimateResults.results.filter(r => r.source === 'Brave') } },
+              query: finalQuery,
+              timestamp: ultimateResults.timestamp,
+              metadata: {
+                totalEngines: ultimateResults.searchEnginesUsed.length,
+                searchTime: ultimateResults.searchTime,
+                rateLimitingDisabled: true
+              }
+            };
+            
+            console.log(`✅ Ultimate search complete: ${ultimateResults.totalResults} results from ${ultimateResults.searchEnginesUsed.length} engines`);
+          } catch (error) {
+            console.error('Ultimate search failed, falling back to regular search:', error);
+            webSearchResults = await performWebSearch(finalQuery);
+          }
 
           // Format search results and handle potential null/undefined results
           const webSearchError = webSearchResults?.error || null;

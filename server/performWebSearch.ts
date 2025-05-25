@@ -5,6 +5,8 @@ const log = console.log;
 // Environment variables for API keys
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
+const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
+const SERP_API_KEY = process.env.SERP_API_KEY;
 
 export interface SearchResult {
   title: string;
@@ -25,26 +27,123 @@ export interface WebSearchResponse {
 
 /**
  * Perform a web search with robust error handling and retries
+ * RATE LIMITS DISABLED FOR 15 DAYS
  */
-const SEARCH_TIMEOUT = 15000;
-const MAX_SEARCH_RETRIES = 3;
+const SEARCH_TIMEOUT = 30000;
+const MAX_SEARCH_RETRIES = 5;
 
 export async function performWebSearch(
   query: string, 
   maxResults: number = 5,
   retries: number = MAX_SEARCH_RETRIES
 ): Promise<WebSearchResponse> {
-  console.log(`Performing optimized web search for: "${query}"`);
+  console.log(`Performing UNLIMITED web search for: "${query}" (rate limits disabled)`);
 
   try {
-    // Use the intelligent search manager for better rate limiting
-    const { intelligentSearchManager } = await import('./intelligentSearchManager');
-    const searchResult = await intelligentSearchManager.performIntelligentSearch(
-      query,
-      maxResults,
-      'all',
-      'week'
+    // BYPASS rate limiting - try all search engines in parallel
+    const results: SearchResult[] = [];
+    let tavilyResults = null;
+    let braveResults = null;
+    let newsResults = null;
+    let serpResults = null;
+    let duckResults = null;
+
+    const searchPromises = [];
+
+    // 1. Tavily Search (no rate limit)
+    if (TAVILY_API_KEY) {
+      searchPromises.push(
+        searchTavily(query, Math.ceil(maxResults / 2))
+          .then(res => ({ type: 'tavily', results: res }))
+          .catch(err => ({ type: 'tavily', error: err.message }))
+      );
+    }
+
+    // 2. Brave Search (no rate limit)
+    if (BRAVE_API_KEY) {
+      searchPromises.push(
+        searchBrave(query, Math.ceil(maxResults / 2))
+          .then(res => ({ type: 'brave', results: res }))
+          .catch(err => ({ type: 'brave', error: err.message }))
+      );
+    }
+
+    // 3. NewsData Search (no rate limit)
+    if (NEWSDATA_API_KEY) {
+      searchPromises.push(
+        searchNewsData(query, Math.ceil(maxResults / 3))
+          .then(res => ({ type: 'news', results: res }))
+          .catch(err => ({ type: 'news', error: err.message }))
+      );
+    }
+
+    // 4. SERP API (no rate limit)
+    if (SERP_API_KEY) {
+      searchPromises.push(
+        searchSerpApi(query, Math.ceil(maxResults / 3))
+          .then(res => ({ type: 'serp', results: res }))
+          .catch(err => ({ type: 'serp', error: err.message }))
+      );
+    }
+
+    // 5. DuckDuckGo (always available, no rate limit)
+    searchPromises.push(
+      searchDuckDuckGo(query, Math.ceil(maxResults / 3))
+        .then(res => ({ type: 'duck', results: res }))
+        .catch(err => ({ type: 'duck', error: err.message }))
     );
+
+    // Execute all searches in parallel
+    const searchResults = await Promise.allSettled(searchPromises);
+
+    // Process results
+    searchResults.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value.results) {
+        const searchData = result.value;
+        
+        if (searchData.type === 'tavily' && searchData.results) {
+          tavilyResults = { results: searchData.results };
+          results.push(...searchData.results);
+        } else if (searchData.type === 'brave' && searchData.results) {
+          braveResults = { web: { results: searchData.results } };
+          results.push(...searchData.results);
+        } else if (searchData.type === 'news' && searchData.results) {
+          newsResults = { results: searchData.results };
+          results.push(...searchData.results);
+        } else if (searchData.type === 'serp' && searchData.results) {
+          serpResults = { results: searchData.results };
+          results.push(...searchData.results);
+        } else if (searchData.type === 'duck' && searchData.results) {
+          duckResults = { results: searchData.results };
+          results.push(...searchData.results);
+        }
+      }
+    });
+
+    // Remove duplicates and sort by relevance
+    const uniqueResults = removeDuplicatesAndSort(results, maxResults);
+
+    console.log(`Search completed: ${uniqueResults.length} results from ${searchPromises.length} engines`);
+
+    return {
+      results: uniqueResults,
+      tavilyResults,
+      braveResults,
+      query,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        totalSources: searchPromises.length,
+        sourceBreakdown: {
+          tavily: results.filter(r => r.source === 'Tavily').length,
+          brave: results.filter(r => r.source === 'Brave').length,
+          news: results.filter(r => r.source === 'NewsData').length,
+          serp: results.filter(r => r.source === 'SERP').length,
+          duck: results.filter(r => r.source === 'DuckDuckGo').length
+        },
+        searchEnginesUsed: searchPromises.length,
+        rateLimitingDisabled: true
+      }
+    };
 
     // Convert to expected format
     const results: SearchResult[] = searchResult.results.map(result => ({
@@ -329,14 +428,250 @@ export async function performWebSearch(
     metadata: searchMetadata
   };
   } catch (error) {
-    console.error('Search fallback failed:', error);
-    return {
-      results: [],
-      tavilyResults: null,
-      braveResults: null,
-      query,
-      timestamp: new Date().toISOString(),
-      metadata: { totalSources: 0, sourceBreakdown: {}, braveSuccess: false, tavilySuccess: false, fallbackUsed: true }
-    };
+    console.error('All search engines failed, using emergency fallback:', error);
+    
+    // Emergency fallback - just use DuckDuckGo
+    try {
+      const emergencyResults = await searchDuckDuckGo(query, maxResults);
+      return {
+        results: emergencyResults,
+        tavilyResults: null,
+        braveResults: null,
+        query,
+        timestamp: new Date().toISOString(),
+        metadata: { 
+          totalSources: 1, 
+          sourceBreakdown: { emergency: emergencyResults.length }, 
+          emergencyMode: true,
+          rateLimitingDisabled: true
+        }
+      };
+    } catch (emergencyError) {
+      console.error('Emergency search failed:', emergencyError);
+      return {
+        results: [],
+        tavilyResults: null,
+        braveResults: null,
+        query,
+        timestamp: new Date().toISOString(),
+        metadata: { totalSources: 0, sourceBreakdown: {}, allSearchesFailed: true }
+      };
+    }
   }
+}
+
+/**
+ * Search using NewsData API
+ */
+async function searchNewsData(query: string, maxResults: number = 5): Promise<SearchResult[]> {
+  if (!NEWSDATA_API_KEY) return [];
+  
+  try {
+    const response = await axios.get('https://newsdata.io/api/1/news', {
+      params: {
+        apikey: NEWSDATA_API_KEY,
+        q: query,
+        language: 'en',
+        size: maxResults
+      },
+      timeout: SEARCH_TIMEOUT
+    });
+
+    if (response.data?.results) {
+      return response.data.results.map((item: any) => ({
+        title: item.title || 'News Article',
+        content: item.description || item.content || '',
+        url: item.link || '',
+        score: 1.0,
+        source: 'NewsData',
+        publishedDate: item.pubDate
+      })).filter((result: SearchResult) => result.url);
+    }
+  } catch (error) {
+    console.error('NewsData search error:', error);
+  }
+  
+  return [];
+}
+
+/**
+ * Search using SERP API
+ */
+async function searchSerpApi(query: string, maxResults: number = 5): Promise<SearchResult[]> {
+  if (!SERP_API_KEY) return [];
+  
+  try {
+    const response = await axios.get('https://serpapi.com/search', {
+      params: {
+        api_key: SERP_API_KEY,
+        q: query,
+        engine: 'google',
+        num: maxResults
+      },
+      timeout: SEARCH_TIMEOUT
+    });
+
+    if (response.data?.organic_results) {
+      return response.data.organic_results.map((item: any) => ({
+        title: item.title || 'Search Result',
+        content: item.snippet || '',
+        url: item.link || '',
+        score: 1.0,
+        source: 'SERP'
+      })).filter((result: SearchResult) => result.url);
+    }
+  } catch (error) {
+    console.error('SERP API search error:', error);
+  }
+  
+  return [];
+}
+
+/**
+ * Enhanced DuckDuckGo search
+ */
+async function searchDuckDuckGo(query: string, maxResults: number = 5): Promise<SearchResult[]> {
+  try {
+    const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
+      timeout: SEARCH_TIMEOUT
+    });
+
+    const results: SearchResult[] = [];
+    
+    // Process RelatedTopics
+    if (response.data.RelatedTopics) {
+      response.data.RelatedTopics.slice(0, maxResults).forEach((topic: any) => {
+        if (topic.FirstURL && topic.Text) {
+          results.push({
+            title: topic.Text.split(' - ')[0] || 'DuckDuckGo Result',
+            content: topic.Text || '',
+            url: topic.FirstURL || '',
+            score: 0.8,
+            source: 'DuckDuckGo'
+          });
+        }
+      });
+    }
+
+    // Also try instant answer
+    if (response.data.Answer && response.data.AbstractURL) {
+      results.unshift({
+        title: 'Direct Answer',
+        content: response.data.Answer,
+        url: response.data.AbstractURL,
+        score: 1.0,
+        source: 'DuckDuckGo'
+      });
+    }
+
+    return results;
+  } catch (error) {
+    console.error('DuckDuckGo search error:', error);
+    return [];
+  }
+}
+
+/**
+ * Enhanced Tavily search (no rate limiting)
+ */
+async function searchTavily(query: string, maxResults: number = 5): Promise<SearchResult[]> {
+  if (!TAVILY_API_KEY) return [];
+  
+  try {
+    const response = await axios.post('https://api.tavily.com/search', {
+      query,
+      search_depth: 'advanced',
+      include_answer: true,
+      max_results: maxResults,
+      include_raw_content: false
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': TAVILY_API_KEY
+      },
+      timeout: SEARCH_TIMEOUT
+    });
+
+    if (response.data?.results) {
+      return response.data.results.map((item: any) => ({
+        title: item.title || 'Tavily Result',
+        content: item.content || '',
+        url: item.url || '',
+        score: item.relevance_score || 1.0,
+        source: 'Tavily',
+        publishedDate: item.published_date
+      }));
+    }
+  } catch (error) {
+    console.error('Tavily search error (continuing with other engines):', error);
+  }
+  
+  return [];
+}
+
+/**
+ * Enhanced Brave search (no rate limiting)
+ */
+async function searchBrave(query: string, maxResults: number = 5): Promise<SearchResult[]> {
+  if (!BRAVE_API_KEY) return [];
+  
+  try {
+    const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+      params: {
+        q: query,
+        count: maxResults,
+        search_lang: 'en',
+        freshness: 'week',
+        safesearch: 'moderate'
+      },
+      headers: {
+        'Accept': 'application/json',
+        'X-Subscription-Token': BRAVE_API_KEY
+      },
+      timeout: SEARCH_TIMEOUT
+    });
+
+    if (response.data?.web?.results) {
+      return response.data.web.results.map((item: any) => ({
+        title: item.title || 'Brave Result',
+        content: item.description || '',
+        url: item.url || '',
+        score: 1.0,
+        source: 'Brave'
+      }));
+    }
+  } catch (error) {
+    console.error('Brave search error (continuing with other engines):', error);
+  }
+  
+  return [];
+}
+
+/**
+ * Remove duplicates and sort results
+ */
+function removeDuplicatesAndSort(results: SearchResult[], maxResults: number): SearchResult[] {
+  const seen = new Set<string>();
+  const unique = results.filter(result => {
+    if (!result.url || seen.has(result.url)) return false;
+    seen.add(result.url);
+    return true;
+  });
+
+  // Sort by score and source priority
+  const sourcePriority: { [key: string]: number } = {
+    'Tavily': 5,
+    'Brave': 4,
+    'NewsData': 3,
+    'SERP': 3,
+    'DuckDuckGo': 2
+  };
+
+  unique.sort((a, b) => {
+    const priorityDiff = (sourcePriority[b.source] || 1) - (sourcePriority[a.source] || 1);
+    if (priorityDiff !== 0) return priorityDiff;
+    return (b.score || 0) - (a.score || 0);
+  });
+
+  return unique.slice(0, maxResults);
 }

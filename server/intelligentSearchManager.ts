@@ -33,13 +33,13 @@ class IntelligentSearchManager {
   private rateLimits = new Map<string, RateLimitInfo>();
   private requestQueue = new Map<string, Promise<any>>();
   
-  // Configuration
-  private readonly BASE_DELAY = 1000;
-  private readonly MAX_DELAY = 60000;
-  private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-  private readonly BLOCK_DURATION = 2 * 60 * 1000; // 2 minutes
-  private readonly MAX_CONCURRENT_REQUESTS = 3;
-  private readonly FALLBACK_SOURCES = ['duckduckgo', 'serp'];
+  // Configuration - RATE LIMITING DISABLED FOR 15 DAYS
+  private readonly BASE_DELAY = 0; // DISABLED
+  private readonly MAX_DELAY = 0; // DISABLED
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes (reduced for fresher results)
+  private readonly BLOCK_DURATION = 0; // DISABLED
+  private readonly MAX_CONCURRENT_REQUESTS = 10; // INCREASED
+  private readonly FALLBACK_SOURCES = ['duckduckgo', 'serp', 'newsdata'];
   
   // API Keys with validation
   private readonly TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -74,43 +74,11 @@ class IntelligentSearchManager {
   }
 
   /**
-   * Check if should delay API call
+   * Check if should delay API call - DISABLED FOR 15 DAYS
    */
   private shouldDelay(apiName: string): number {
-    const rateInfo = this.rateLimits.get(apiName) || {
-      lastCall: 0,
-      callCount: 0,
-      backoffDelay: this.BASE_DELAY,
-      isBlocked: false,
-      blockUntil: 0,
-      consecutiveErrors: 0
-    };
-
-    const now = Date.now();
-
-    // Check if still blocked
-    if (rateInfo.isBlocked && now < rateInfo.blockUntil) {
-      return rateInfo.blockUntil - now;
-    }
-
-    // Reset block if time has passed
-    if (rateInfo.isBlocked && now >= rateInfo.blockUntil) {
-      rateInfo.isBlocked = false;
-      rateInfo.backoffDelay = this.BASE_DELAY;
-      rateInfo.consecutiveErrors = 0;
-    }
-
-    // Calculate dynamic delay based on recent activity
-    const timeSinceLastCall = now - rateInfo.lastCall;
-    const requiredDelay = Math.min(
-      rateInfo.backoffDelay + (rateInfo.consecutiveErrors * 1000),
-      this.MAX_DELAY
-    );
-
-    if (timeSinceLastCall < requiredDelay) {
-      return requiredDelay - timeSinceLastCall;
-    }
-
+    // RATE LIMITING COMPLETELY DISABLED
+    console.log(`Rate limiting DISABLED for ${apiName} - no delays applied`);
     return 0;
   }
 

@@ -21,46 +21,18 @@ class ApiRateManager {
   private rateLimits: Map<string, RateLimitInfo> = new Map();
   private cache: Map<string, CacheEntry> = new Map();
   
-  // Rate limiting configuration
-  private readonly BASE_DELAY = 2000; // 2 seconds base delay
-  private readonly MAX_DELAY = 30000; // 30 seconds max delay
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
-  private readonly BLOCK_DURATION = 60000; // 1 minute block after 429
+  // Rate limiting configuration - DISABLED FOR 15 DAYS
+  private readonly BASE_DELAY = 0; // DISABLED
+  private readonly MAX_DELAY = 0; // DISABLED  
+  private readonly CACHE_TTL = 3 * 60 * 1000; // 3 minutes cache (reduced)
+  private readonly BLOCK_DURATION = 0; // DISABLED
 
   /**
-   * Check if we should delay API call and return delay in ms
+   * Check if we should delay API call - ALWAYS RETURNS 0 (DISABLED)
    */
   shouldDelay(apiName: string): number {
-    const rateInfo = this.rateLimits.get(apiName) || {
-      lastCall: 0,
-      callCount: 0,
-      backoffDelay: this.BASE_DELAY,
-      isBlocked: false,
-      blockUntil: 0
-    };
-
-    const now = Date.now();
-
-    // Check if still blocked from previous 429
-    if (rateInfo.isBlocked && now < rateInfo.blockUntil) {
-      return rateInfo.blockUntil - now;
-    }
-
-    // Reset block if time has passed
-    if (rateInfo.isBlocked && now >= rateInfo.blockUntil) {
-      rateInfo.isBlocked = false;
-      rateInfo.backoffDelay = this.BASE_DELAY;
-    }
-
-    // Calculate delay based on recent calls
-    const timeSinceLastCall = now - rateInfo.lastCall;
-    const requiredDelay = rateInfo.backoffDelay;
-
-    if (timeSinceLastCall < requiredDelay) {
-      return requiredDelay - timeSinceLastCall;
-    }
-
-    return 0;
+    console.log(`⚡ Rate limiting DISABLED for ${apiName} - proceeding immediately`);
+    return 0; // NO DELAYS FOR 15 DAYS
   }
 
   /**
