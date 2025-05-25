@@ -22,7 +22,7 @@ export const useDirectTabPersistence = () => {
   const [researchProgress, setResearchProgress] = useState(0);
   const [researchStage, setResearchStage] = useState(1);
   const [stageLabel, setStageLabel] = useState('Ready');
-  
+
   const stateRef = useRef<DirectTabState | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -39,7 +39,7 @@ export const useDirectTabPersistence = () => {
 
     if (currentState.isInProgress) {
       console.log('🔒 FORCE SAVING state to multiple locations:', currentState);
-      
+
       // Save to multiple storage keys for redundancy
       STORAGE_KEYS.forEach(key => {
         try {
@@ -48,14 +48,14 @@ export const useDirectTabPersistence = () => {
           console.warn(`Failed to save to ${key}:`, error);
         }
       });
-      
+
       // Also save to sessionStorage as backup
       try {
         sessionStorage.setItem('tab_state_session', JSON.stringify(currentState));
       } catch (error) {
         console.warn('SessionStorage save failed:', error);
       }
-      
+
       stateRef.current = currentState;
     }
   }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel]);
@@ -63,9 +63,9 @@ export const useDirectTabPersistence = () => {
   // Force restore state from any available location
   const forceRestoreState = useCallback(() => {
     console.log('🔓 FORCE RESTORING state from storage...');
-    
+
     let restoredState: DirectTabState | null = null;
-    
+
     // Try all storage locations
     for (const key of STORAGE_KEYS) {
       try {
@@ -82,7 +82,7 @@ export const useDirectTabPersistence = () => {
         console.warn(`Failed to load from ${key}:`, error);
       }
     }
-    
+
     // Try sessionStorage if localStorage failed
     if (!restoredState) {
       try {
@@ -98,10 +98,10 @@ export const useDirectTabPersistence = () => {
         console.warn('SessionStorage restore failed:', error);
       }
     }
-    
+
     if (restoredState) {
       console.log('🎯 RESTORING UI with state:', restoredState);
-      
+
       // CRITICAL FIX: Clean the state to prevent completion triggers
       const cleanedState = {
         ...restoredState,
@@ -109,21 +109,21 @@ export const useDirectTabPersistence = () => {
         shouldComplete: false,
         wasSaved: undefined
       };
-      
+
       // Force immediate state updates with cleaned state
       setIsResearchInProgress(cleanedState.isInProgress);
       setOngoingResearchQuery(cleanedState.query);
       setResearchProgress(cleanedState.progress);
       setResearchStage(cleanedState.stage);
       setStageLabel(cleanedState.stageLabel);
-      
+
       // Double-check with a second update to ensure reliability
       setTimeout(() => {
         setIsResearchInProgress(cleanedState.isInProgress);
         setResearchProgress(cleanedState.progress);
         console.log('🔥 SECOND UPDATE applied for reliability');
       }, 100);
-      
+
       return true;
     } else {
       console.log('❌ No valid state found to restore');
@@ -139,7 +139,7 @@ export const useDirectTabPersistence = () => {
     setResearchProgress(0);
     setResearchStage(1);
     setStageLabel('Initializing research...');
-    
+
     // Force save immediately
     setTimeout(forceSaveState, 100);
   }, [forceSaveState]);
@@ -151,7 +151,7 @@ export const useDirectTabPersistence = () => {
     setOngoingResearchQuery('');
     setResearchProgress(0);
     setStageLabel('Complete');
-    
+
     // Clean up all storage
     STORAGE_KEYS.forEach(key => {
       try {
@@ -160,7 +160,7 @@ export const useDirectTabPersistence = () => {
         console.warn(`Failed to clean ${key}:`, error);
       }
     });
-    
+
     try {
       sessionStorage.removeItem('tab_state_session');
     } catch (error) {
@@ -173,11 +173,11 @@ export const useDirectTabPersistence = () => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     saveTimeoutRef.current = setTimeout(() => {
       forceSaveState();
     }, 500);
-    
+
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -205,7 +205,7 @@ export const useDirectTabPersistence = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('focus', forceRestoreState);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pageshow', handlePageShow);
@@ -213,45 +213,43 @@ export const useDirectTabPersistence = () => {
     };
   }, [forceSaveState, forceRestoreState]);
 
-  // Progress simulation that can reach 100%
+  // Progress simulation with completion check
   useEffect(() => {
     if (!isResearchInProgress) return;
-    
-    const interval = setInterval(() => {
+
+    let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
-        // Allow progress to reach 100% for completion
-        if (prev >= 100) return 100;
-        
+        // Stop at 100%
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+
         // Calculate next progress increment
         const increment = Math.random() * 3 + 1;
         const newProgress = prev + increment;
-        
-        // Stage-based progress logic - allow reaching 100% in final stage
-        const newStage = Math.min(Math.floor(newProgress / 20) + 1, 5);
-        setResearchStage(newStage);
-        setStageLabel(`Research stage ${newStage}/5`);
-        
-        if (newStage >= 5) {
-          // In final stage, allow reaching 100%
+
+        // Stage-based progress caps
+        if (researchStage >= 5) {
           return Math.min(newProgress, 100);
-        } else if (newStage >= 4) {
-          // Stage 4: allow up to 95%
+        } else if (researchStage >= 4) {
           return Math.min(newProgress, 95);
-        } else if (newStage >= 3) {
-          // Stage 3: allow up to 80%
+        } else if (researchStage >= 3) {
           return Math.min(newProgress, 80);
-        } else if (newStage >= 2) {
-          // Stage 2: allow up to 60%
+        } else if (researchStage >= 2) {
           return Math.min(newProgress, 60);
         } else {
-          // Stage 1: allow up to 40%
           return Math.min(newProgress, 40);
         }
       });
     }, 2000);
 
-    return () => clearInterval(interval);
-  }, [isResearchInProgress]);
+    return () => {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    };
+  }, [isResearchInProgress, researchStage]);
 
   // Initial restore on mount
   useEffect(() => {
