@@ -233,31 +233,14 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Always try port 5000 first, then increment if needed
-  const tryPort = async (startPort: number): Promise<number> => {
-    let port = startPort;
-    const maxAttempts = 10;
-    
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        await new Promise((resolve, reject) => {
-          server.listen({
-            port,
-            host: "0.0.0.0",
-            reusePort: true
-          }, () => resolve(port))
-          .on('error', () => {
-            port++;
-            reject();
-          });
-        });
-        return port;
-      } catch {
-        continue;
-      }
-    }
-    throw new Error('Could not find available port');
-  };
+  // Use port 5010 for Express since DeerFlow uses 5000
+  const port = 5010;
+  server.listen({
+    port,
+    host: "0.0.0.0"
+  }, () => {
+    log(`serving on port ${port}`);
+  });
 
   tryPort(5000)
     .then(port => {

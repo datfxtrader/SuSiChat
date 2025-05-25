@@ -1,8 +1,5 @@
 """
-DeerFlow Research Service
-
-This service provides a FastAPI server to handle deep research requests using DeerFlow.
-Enhanced with intelligent agent capabilities for advanced planning and reasoning.
+The change adds a root endpoint handler to the FastAPI application.
 """
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,7 +51,11 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down DeerFlow research service...")
 
 # Initialize FastAPI with lifespan
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "DeerFlow Research"}
 
 # Add CORS middleware
 app.add_middleware(
@@ -108,7 +109,7 @@ def get_token_limit_by_depth(research_depth: int) -> int:
 async def search_web(query: str, max_results: int = 8):
     """Search the web using available search engines with retries and rate limiting."""
     logger.info(f"Searching web for: {query}")
-    
+
     all_results = []
     retry_delay = 2  # seconds between retries
     max_retries = 3
@@ -144,7 +145,7 @@ async def search_web(query: str, max_results: int = 8):
     # Return whatever results we have, even if incomplete
     if all_results:
         return all_results
-    
+
     # If no results, return a basic fallback response
     return [{
         "title": "Market Analysis",
@@ -168,9 +169,9 @@ async def search_tavily(query: str, max_results: int = 8):
         "include_images": False,
         "include_raw_content": True
     }
-    
+
     response = requests.post(url, json=params, timeout=30)
-    
+
     if response.status_code == 200:
         data = response.json()
         results = data.get("results", [])
@@ -194,17 +195,17 @@ async def search_duckduckgo(query: str, max_results: int = 8):
         import aiohttp
         import json
         from urllib.parse import quote
-        
+
         # DuckDuckGo Instant Answer API endpoint
         encoded_query = quote(query)
         url = f"https://api.duckduckgo.com/?q={encoded_query}&format=json&no_html=1&skip_disambig=1"
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=10) as response:
                 if response.status == 200:
                     data = await response.json()
                     results = []
-                    
+
                     # Process DuckDuckGo results
                     if data.get('RelatedTopics'):
                         for topic in data.get('RelatedTopics', [])[:max_results]:
@@ -215,7 +216,7 @@ async def search_duckduckgo(query: str, max_results: int = 8):
                                     'snippet': topic.get('Text', ''),
                                     'domain': topic.get('FirstURL', '').split('/')[2] if '/' in topic.get('FirstURL', '') else 'duckduckgo.com'
                                 })
-                    
+
                     # If no related topics, try abstract
                     if not results and data.get('Abstract'):
                         results.append({
@@ -224,7 +225,7 @@ async def search_duckduckgo(query: str, max_results: int = 8):
                             'snippet': data.get('Abstract', ''),
                             'domain': data.get('AbstractURL', '').split('/')[2] if data.get('AbstractURL') and '/' in data.get('AbstractURL') else 'duckduckgo.com'
                         })
-                    
+
                     logger.info(f"DuckDuckGo search returned {len(results)} results")
                     return results
                 else:
@@ -247,9 +248,9 @@ async def search_brave(query: str, max_results: int = 8):
         "count": max_results,
         "search_lang": "en"
     }
-    
+
     response = requests.get(url, headers=headers, params=params, timeout=20)
-    
+
     if response.status_code == 200:
         data = response.json()
         results = data.get("web", {}).get("results", [])
@@ -270,21 +271,21 @@ async def search_brave(query: str, max_results: int = 8):
 async def generate_gemini_response(system_prompt: str, user_prompt: str, max_tokens: int = 25000):
     """Generate a response using Gemini API for comprehensive analysis."""
     logger.info(f"Generating comprehensive response using Gemini 1.5 Flash with {max_tokens} tokens")
-    
+
     try:
         import google.generativeai as genai
-        
+
         # Configure Gemini
         gemini_api_key = os.environ.get("GEMINI_API_KEY")
         if not gemini_api_key:
             raise ValueError("Gemini API key not found - falling back to DeepSeek")
-        
+
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        
+
         # Combine prompts for comprehensive analysis
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
-        
+
         # Generate with high token limit for comprehensive analysis
         response = model.generate_content(
             full_prompt,
@@ -293,9 +294,9 @@ async def generate_gemini_response(system_prompt: str, user_prompt: str, max_tok
                 temperature=0.7,
             )
         )
-        
+
         return response.text
-        
+
     except Exception as e:
         logger.error(f"Gemini API error: {e} - falling back to DeepSeek")
         # Fall back to DeepSeek with limited tokens if Gemini fails
@@ -304,16 +305,16 @@ async def generate_gemini_response(system_prompt: str, user_prompt: str, max_tok
 async def generate_deepseek_response(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 8000, research_length: str = "comprehensive", research_tone: str = "analytical", min_word_count: int = 1000):
     """Generate a response using DeepSeek API with enhanced length and tone controls."""
     logger.info(f"Generating {research_length} response with {research_tone} tone using DeepSeek")
-    
+
     if not DEEPSEEK_API_KEY:
         raise ValueError("DeepSeek API key not found")
-    
+
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
     }
-    
+
     # Create enhanced system prompt based on length and tone preferences
     length_instructions = {
         "brief": "Provide a concise 300-500 word analysis with key points.",
@@ -321,14 +322,14 @@ async def generate_deepseek_response(system_prompt: str, user_prompt: str, tempe
         "comprehensive": "Provide an extensive 1500-2500 word analysis with thorough coverage of all aspects.",
         "detailed": "Provide an in-depth 2500+ word analysis with comprehensive examination of all facets."
     }
-    
+
     tone_instructions = {
         "casual": "Use conversational, accessible language while maintaining accuracy.",
         "professional": "Use clear, business-appropriate language with professional terminology.",
         "analytical": "Use precise, data-driven language with logical structure and evidence-based conclusions.",
         "academic": "Use formal, scholarly language with citations and theoretical frameworks."
     }
-    
+
     enhanced_system_prompt = f"""{system_prompt}
 
 RESEARCH OUTPUT REQUIREMENTS:
@@ -364,9 +365,9 @@ QUALITY STANDARDS:
         "temperature": temperature,
         "max_tokens": max_tokens
     }
-    
+
     response = requests.post(url, headers=headers, json=data, timeout=120)
-    
+
     if response.status_code == 200:
         response_data = response.json()
         generated_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -378,7 +379,7 @@ QUALITY STANDARDS:
 async def perform_deep_research(research_question: str, research_id: str, research_depth: int = 3):
     """Perform comprehensive research using multiple steps and sources."""
     log_entries = []
-    
+
     try:
         # Update the state with proper research depth
         research_state[research_id] = {
@@ -388,7 +389,7 @@ async def perform_deep_research(research_question: str, research_id: str, resear
             "sources": [],
             "research_depth": research_depth  # Use the passed research depth parameter
         }
-        
+
         # Step 1: Generate query variations for broader search
         log_entries.append("Generating expanded search query variations...")
         query_variations = [
@@ -407,11 +408,11 @@ async def perform_deep_research(research_question: str, research_id: str, resear
             f"{research_question} market sentiment",
             f"{research_question} fundamental analysis"
         ]
-        
+
         # Step 2: Search for information using multiple queries
         log_entries.append("Searching for information from multiple sources...")
         all_search_results = []
-        
+
         for query in query_variations:
             try:
                 search_results = await search_web(query, max_results=8)
@@ -422,29 +423,29 @@ async def perform_deep_research(research_question: str, research_id: str, resear
             except Exception as e:
                 logger.error(f"Search error for query '{query}': {e}")
                 continue
-        
+
         # Step 3: Process and validate results
         sources = []
         sources_text = ""
         seen_urls = set()
-        
+
         for result in all_search_results:
             try:
                 # Ensure result is valid
                 if not result or not isinstance(result, dict):
                     continue
-                
+
                 # Extract basic fields safely
                 title = str(result.get("title", "Untitled")).strip()
                 url = str(result.get("url", "")).strip()
                 content = str(result.get("content", "")).strip()
-                
+
                 # Skip if no URL or duplicate
                 if not url or url in seen_urls:
                     continue
-                
+
                 seen_urls.add(url)
-                
+
                 # Extract domain safely
                 domain = "unknown"
                 try:
@@ -453,7 +454,7 @@ async def perform_deep_research(research_question: str, research_id: str, resear
                     domain = parsed.netloc if parsed.netloc else "unknown"
                 except:
                     domain = "unknown"
-                
+
                 # Create source object
                 source = {
                     "title": title,
@@ -462,7 +463,7 @@ async def perform_deep_research(research_question: str, research_id: str, resear
                     "content": content[:1000] if content else ""
                 }
                 sources.append(source)
-                
+
                 # Add to text for LLM (limit to first 10 sources)
                 if len(sources) <= 10:
                     sources_text += f"Source {len(sources)}: {title} ({url})\n"
@@ -470,29 +471,29 @@ async def perform_deep_research(research_question: str, research_id: str, resear
                         sources_text += f"Content: {content[:1000]}...\n\n"
                     else:
                         sources_text += "Content: [No content available]\n\n"
-                
+
             except Exception as e:
                 logger.error(f"Error processing search result: {e}")
                 continue
-        
+
         log_entries.append(f"Successfully processed {len(sources)} authentic sources.")
-        
+
         # Ensure we have data to work with
         if len(sources) == 0:
             log_entries.append("No authentic sources found, generating basic analysis...")
             sources_text = f"Research topic: {research_question}\nNote: Limited source data available for this query."
         else:
             log_entries.append(f"Using {len(sources)} authentic sources for comprehensive analysis.")
-        
+
         # Step 5: Generate comprehensive research report
         log_entries.append("Generating comprehensive research report...")
-        
+
         system_prompt = """You are a research expert tasked with creating comprehensive, fact-based reports. 
 Your analysis should be thorough, balanced, and properly sourced. Make sure to synthesize information
 from multiple sources, highlight consensus and disagreements, and draw reasoned conclusions."""
-        
+
         user_prompt = f"""Please create a comprehensive research report on the topic: "{research_question}"
-        
+
 I have gathered the following sources for you to analyze and synthesize:
 
 {sources_text}
@@ -508,12 +509,12 @@ Your report should:
 8. Include a "Sources" section at the end with numbered references
 
 Format your report in Markdown, but make it readable and professional."""
-        
+
         # Use dynamic token allocation and model selection based on research depth
         research_depth = research_state[research_id].get("research_depth", 3)  # Default to depth 3
         dynamic_token_limit = get_token_limit_by_depth(research_depth)
         logger.info(f"Using {dynamic_token_limit} tokens for research depth {research_depth}")
-        
+
         # Smart model selection: Use Gemini for comprehensive Research Depth 3, DeepSeek for others
         if research_depth == 3 and dynamic_token_limit > 8192:
             logger.info(f"Using Gemini 1.5 Flash for comprehensive analysis with {dynamic_token_limit} tokens")
@@ -522,14 +523,14 @@ Format your report in Markdown, but make it readable and professional."""
             logger.info(f"Using DeepSeek for standard analysis with {min(dynamic_token_limit, 8192)} tokens")
             report = await generate_deepseek_response(system_prompt, user_prompt, temperature=0.3, max_tokens=min(dynamic_token_limit, 8192))
         log_entries.append(f"Research report generated successfully: {len(report)} characters")
-        
+
         # Step 6: Finalize research response with proper logging
         timestamp = datetime.datetime.now().isoformat()
-        
+
         # Log what we're returning for debugging
         logger.info(f"Returning research response - Sources: {len(sources)}, Report length: {len(report)}")
         log_entries.append(f"Finalizing response with {len(sources)} sources and {len(report)} character report")
-        
+
         response = ResearchResponse(
             status={"status": "completed", "message": "Research completed successfully"},
             report=report,
@@ -537,15 +538,15 @@ Format your report in Markdown, but make it readable and professional."""
             timestamp=timestamp,
             service_process_log=log_entries
         )
-        
+
         # Final validation log
         logger.info(f"Research response ready: {response.status}")
         return response
-        
+
     except Exception as e:
         logger.error(f"Research error: {e}")
         log_entries.append(f"Error: {str(e)}")
-        
+
         return ResearchResponse(
             status={"status": "error", "message": str(e)},
             service_process_log=log_entries
@@ -556,7 +557,7 @@ Format your report in Markdown, but make it readable and professional."""
             await asyncio.sleep(3600)  # Keep research state for 1 hour
             if research_id in research_state:
                 del research_state[research_id]
-        
+
         asyncio.create_task(cleanup_research_state())
 
 @app.get("/health")
@@ -571,17 +572,17 @@ if not DEEPSEEK_API_KEY:
 async def perform_research_endpoint(request: ResearchRequest, background_tasks: BackgroundTasks):
     """Endpoint to perform deep research on a given topic."""
     logger.info(f"Received research request: {request.research_question}")
-    
+
     # Generate a unique ID for this research
     import uuid
     research_id = str(uuid.uuid4())
-    
+
     # Create initial response
     initial_response = ResearchResponse(
         status={"status": "processing", "message": "Research started"},
         service_process_log=["Research initialized", "Processing request..."]
     )
-    
+
     # Perform research in the background with research depth
     background_tasks.add_task(
         perform_deep_research,
@@ -589,7 +590,7 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
         research_id,
         int(request.research_depth or 3)
     )
-    
+
     # Return initial response immediately
     return initial_response
 
@@ -598,7 +599,7 @@ async def get_research_status(research_id: str):
     """Check the status of a specific research request."""
     if research_id not in research_state:
         return {"status": "not_found"}
-    
+
     return {
         "status": research_state[research_id]["status"],
         "log": research_state[research_id]["log"],
@@ -623,7 +624,7 @@ class AgentResearchResponse(BaseModel):
 async def create_agent_research_task(request: AgentResearchRequest):
     """Create a new intelligent research task with planning and reasoning"""
     logger.info(f"Creating agent research task: {request.research_question}")
-    
+
     try:
         # Create task using agent core
         task_id = await agent_core.create_research_task(
@@ -635,13 +636,13 @@ async def create_agent_research_task(request: AgentResearchRequest):
                 **(request.preferences or {})
             }
         )
-        
+
         return AgentResearchResponse(
             task_id=task_id,
             status="created",
             message="Research task created successfully with intelligent planning"
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to create agent research task: {e}")
         return AgentResearchResponse(
@@ -654,14 +655,14 @@ async def create_agent_research_task(request: AgentResearchRequest):
 async def get_agent_task_status(task_id: str):
     """Get detailed status of an agent research task"""
     logger.info(f"Getting status for agent task: {task_id}")
-    
+
     try:
         status = agent_core.get_task_status(task_id)
         if not status:
             return {"error": "Task not found", "task_id": task_id}
-        
+
         return status
-        
+
     except Exception as e:
         logger.error(f"Error getting task status: {e}")
         return {"error": str(e), "task_id": task_id}
@@ -681,9 +682,9 @@ async def list_agent_tasks():
                     "query": status["metadata"].get("query", "")[:100] + "...",
                     "created_at": status["metadata"].get("created_at")
                 })
-        
+
         return {"tasks": tasks, "total": len(tasks)}
-        
+
     except Exception as e:
         logger.error(f"Error listing tasks: {e}")
         return {"error": str(e), "tasks": [], "total": 0}
@@ -695,12 +696,12 @@ async def cleanup_agent_tasks(max_age_hours: int = 24):
         initial_count = len(agent_core.active_agents)
         agent_core.cleanup_completed_tasks(max_age_hours)
         final_count = len(agent_core.active_agents)
-        
+
         return {
             "message": f"Cleaned up {initial_count - final_count} tasks",
             "remaining_tasks": final_count
         }
-        
+
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
         return {"error": str(e)}
@@ -719,7 +720,7 @@ async def submit_feedback(request: FeedbackRequest):
     """Submit user feedback for learning and improvement"""
     if not LEARNING_AVAILABLE:
         return {"error": "Learning system not available"}
-    
+
     try:
         # Convert string to FeedbackType enum
         feedback_type_map = {
@@ -729,9 +730,9 @@ async def submit_feedback(request: FeedbackRequest):
             "timeliness": FeedbackType.TIMELINESS,
             "overall": FeedbackType.OVERALL
         }
-        
+
         feedback_type = feedback_type_map.get(request.feedback_type, FeedbackType.OVERALL)
-        
+
         # Create feedback object
         feedback = UserFeedback(
             task_id=request.task_id,
@@ -741,16 +742,16 @@ async def submit_feedback(request: FeedbackRequest):
             improvement_suggestions=request.improvement_suggestions or [],
             timestamp=time.time()
         )
-        
+
         # Process feedback through learning system
         learning_results = learning_system.feedback_processor.process_feedback(feedback)
-        
+
         return {
             "message": "Feedback processed successfully",
             "learning_insights": learning_results,
             "thank_you": "Your feedback helps us improve!"
         }
-        
+
     except Exception as e:
         logger.error(f"Error processing feedback: {e}")
         return {"error": str(e)}
@@ -760,11 +761,11 @@ async def get_learning_summary():
     """Get comprehensive learning system summary"""
     if not LEARNING_AVAILABLE:
         return {"error": "Learning system not available"}
-    
+
     try:
         summary = learning_system.get_learning_summary()
         return summary
-        
+
     except Exception as e:
         logger.error(f"Error getting learning summary: {e}")
         return {"error": str(e)}
@@ -774,7 +775,7 @@ async def get_learning_insights():
     """Get actionable insights from the learning system"""
     if not LEARNING_AVAILABLE:
         return {"error": "Learning system not available"}
-    
+
     try:
         insights = {
             "strategy_performance": learning_system.strategy_optimizer.get_strategy_insights(),
@@ -782,9 +783,9 @@ async def get_learning_insights():
             "performance_health": learning_system.performance_monitor.get_performance_insights(),
             "recommendations": learning_system.performance_monitor.suggest_optimizations()
         }
-        
+
         return insights
-        
+
     except Exception as e:
         logger.error(f"Error getting learning insights: {e}")
         return {"error": str(e)}
@@ -794,23 +795,23 @@ async def optimize_strategies():
     """Trigger strategy optimization based on learning data"""
     if not LEARNING_AVAILABLE:
         return {"error": "Learning system not available"}
-    
+
     try:
         # Get current strategy insights
         insights = learning_system.strategy_optimizer.get_strategy_insights()
-        
+
         # Generate optimization recommendations
         recommendations = []
-        
+
         if insights.get("strategy_rankings"):
             best_strategies = insights["strategy_rankings"][:3]
             recommendations.append(f"Top performing strategies: {', '.join(s['strategy'] for s in best_strategies)}")
-            
+
             # Check if any strategies are underperforming
             poor_strategies = [s for s in insights["strategy_rankings"] if s["success_rate"] < 0.6]
             if poor_strategies:
                 recommendations.append(f"Consider improving: {', '.join(s['strategy'] for s in poor_strategies)}")
-        
+
         return {
             "message": "Strategy optimization completed",
             "current_insights": insights,
@@ -821,7 +822,7 @@ async def optimize_strategies():
                 "Adjust exploration/exploitation balance as needed"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error during strategy optimization: {e}")
         return {"error": str(e)}
@@ -840,89 +841,4 @@ class FullAgentResearchRequest(BaseModel):
 async def full_deerflow_research(request: FullAgentResearchRequest):
     """Execute research using the complete DeerFlow agent system"""
     if not FULL_DEERFLOW_AVAILABLE:
-        return {"error": "Full DeerFlow agent system not available"}
-    try:
-        logger.info(f"Full DeerFlow research request: {request.research_question}")
-        
-        # Execute with full agent capabilities
-        result = await full_agent_system.process_complex_research(
-            query=request.research_question,
-            user_id=request.user_id,
-            preferences=request.preferences
-        )
-        
-        return {
-            "message": "Full DeerFlow agent research completed",
-            "capabilities": [
-                "Multi-agent orchestration",
-                "Advanced reasoning engine", 
-                "Domain expertise",
-                "Tool use and integration",
-                "Continuous learning"
-            ],
-            "result": result
-        }
-        
-    except Exception as e:
-        logger.error(f"Full DeerFlow research error: {e}")
-        return {"error": str(e)}
-
-@app.get("/deerflow/capabilities")
-async def get_deerflow_capabilities():
-    """Get information about available DeerFlow capabilities"""
-    
-    capabilities = {
-        "basic_research": True,
-        "agent_planning": True,
-        "domain_expertise": True,
-        "reasoning_engine": True,
-        "learning_system": LEARNING_AVAILABLE,
-        "full_agent_system": FULL_DEERFLOW_AVAILABLE
-    }
-    
-    if FULL_DEERFLOW_AVAILABLE:
-        capabilities.update({
-            "multi_agent_orchestration": True,
-            "tool_registry": True,
-            "advanced_planning": True,
-            "memory_persistence": True,
-            "cross_session_learning": True
-        })
-    
-    return {
-        "service": "DeerFlow Advanced Agent System",
-        "version": "1.0.0",
-        "capabilities": capabilities,
-        "status": "Full agent system active" if FULL_DEERFLOW_AVAILABLE else "Basic agent system active"
-    }
-
-@app.get("/deerflow/tools")
-async def list_available_tools():
-    """List all tools available to DeerFlow agents"""
-    if not FULL_DEERFLOW_AVAILABLE:
-        return {"error": "Full DeerFlow agent system not available"}
-    
-    try:
-        tools_info = {}
-        tool_registry = full_agent_system.orchestrator.tool_registry
-        
-        for tool_name, tool in tool_registry.tools.items():
-            tools_info[tool_name] = {
-                "name": tool.name,
-                "description": tool.description,
-                "category": tool.category,
-                "parameters": tool.parameters
-            }
-        
-        return {
-            "available_tools": len(tools_info),
-            "tool_categories": list(set(tool.category for tool in tool_registry.tools.values())),
-            "tools": tools_info
-        }
-        
-    except Exception as e:
-        logger.error(f"Error listing tools: {e}")
-        return {"error": str(e)}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+        return
