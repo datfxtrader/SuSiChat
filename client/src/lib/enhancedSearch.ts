@@ -74,3 +74,36 @@ export const enhancedSearch = {
     return optimizedSearchClient.getCacheStats();
   }
 };
+
+interface SearchOptions {
+    maxResults?: number;
+    category?: string;
+}
+
+export const enhancedWebSearch = async (query: string, options: SearchOptions = {}): Promise<SearchResult[]> => {
+  try {
+    const response = await fetch('/api/enhanced-web-search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        maxResults: options.maxResults || 10,
+        category: options.category || 'general'
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Search failed: ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error('Enhanced web search error:', error);
+    // Return empty results instead of throwing to prevent unhandled rejections
+    return [];
+  }
+};

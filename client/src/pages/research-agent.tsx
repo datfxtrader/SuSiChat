@@ -67,6 +67,8 @@ const ResearchAgent = () => {
     forceRestore
   } = useDirectTabPersistence();
 
+  const [rateLimitStatus, setRateLimitStatus] = useState<{isLimited: boolean, queuePosition?: number}>({isLimited: false});
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -471,6 +473,14 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     query={ongoingResearchQuery || message}
                     isActive={isSending || isResearchInProgress}
                   />
+                  {rateLimitStatus.isLimited && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⏳ Request queued due to rate limits
+                        {rateLimitStatus.queuePosition && ` (Position: ${rateLimitStatus.queuePosition})`}
+                      </p>
+                    </div>
+                  )}
                   {isResearchInProgress && !isSending && (
                     <div className="mt-3 space-y-3">
                       {/* Enhanced Stage Indicator */}
@@ -527,7 +537,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                     <Select value={researchDepth} onValueChange={setResearchDepth}>
                       <SelectTrigger className="w-36 h-7 bg-slate-800/50 border-slate-700/50 text-xs">
                         <SelectValue />
-                      </SelectTrigger
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="1">Quick (8K)</SelectItem>
                         <SelectItem value="2">Standard (15K)</SelectItem>

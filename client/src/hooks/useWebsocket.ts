@@ -45,6 +45,59 @@ const reconnect = useCallback(() => {
     }
   }, [connect, maxReconnectAttempts]);
 
+  const connectWebSocket = useCallback(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        return;
+      }
+
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname;
+        const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
+        const wsUrl = `${protocol}//${host}:${port}/ws`;
+
+        console.log('Connecting to WebSocket:', wsUrl);
+        wsRef.current = new WebSocket(wsUrl);
+        wsRef.current.onopen = () => {
+          console.log('WebSocket connected');
+          setIsConnected(true);
+          setError(null);
+          reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
+        };
+
+        wsRef.current.onmessage = (event) => {
+          try {
+            const message: WebSocketMessage = JSON.parse(event.data);
+            messageHandlers.forEach(handler => handler(message));
+          } catch (e) {
+            console.error('Failed to parse WebSocket message', event.data, e);
+          }
+        };
+
+        wsRef.current.onclose = (event) => {
+          if (event.wasClean) {
+            console.log(`WebSocket closed cleanly, code=${event.code}, reason=${event.reason}`);
+          } else {
+            console.warn('WebSocket connection died');
+            setIsConnected(false);
+            setError('WebSocket connection lost. Reconnecting...');
+            reconnect();
+          }
+        };
+
+        wsRef.current.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setIsConnected(false);
+          setError('WebSocket error. Reconnecting...');
+        };
+
+      } catch (err: any) {
+        console.error("WebSocket connection error:", err);
+        setIsConnected(false);
+        setError(err.message || "Failed to connect to WebSocket");
+      }
+    }, [reconnect]);
+
   return {
     isConnected,
     error,
