@@ -1,6 +1,16 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { THEME } from '@/lib/theme';
+
+export interface TextareaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+
+const textareaStyles = cn(
+  `w-full ${THEME.bg.tertiary} ${THEME.border.secondary} border rounded-lg px-3 py-2`,
+  `${THEME.text.secondary} placeholder:${THEME.text.muted}`,
+  `focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:${THEME.border.hover} transition-all`
+);
 
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,

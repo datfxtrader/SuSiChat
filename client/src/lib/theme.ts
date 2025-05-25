@@ -1,30 +1,37 @@
-// Load Material Icons font
-const linkElement = document.createElement('link');
-linkElement.rel = 'stylesheet';
-linkElement.href = 'https://fonts.googleapis.com/icon?family=Material+Icons';
-document.head.appendChild(linkElement);
 
-// Check for user's preferred theme
-export function setInitialTheme() {
-  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  if (isDarkMode) {
-    document.documentElement.classList.add('dark');
+// Theme constants for consistent styling
+export const THEME = {
+  // Backgrounds
+  bg: {
+    primary: 'bg-zinc-950',           // Main app background
+    secondary: 'bg-zinc-950/95',      // Secondary areas
+    tertiary: 'bg-zinc-900/80',       // Cards, panels
+    interactive: 'bg-zinc-800/60',    // Buttons, inputs
+    hover: 'bg-zinc-700/70',          // Hover states
+  },
+  // Text Colors
+  text: {
+    primary: 'text-zinc-50',          // Main headings
+    secondary: 'text-zinc-200',       // Body text
+    tertiary: 'text-zinc-400',        // Secondary text
+    muted: 'text-zinc-500',           // Placeholder, labels
+    disabled: 'text-zinc-600',        // Disabled states
+  },
+  // Borders
+  border: {
+    primary: 'border-zinc-800/60',    // Main borders
+    secondary: 'border-zinc-700/50',  // Secondary borders
+    hover: 'border-zinc-600/60',      // Hover borders
+  },
+  // Accents (use sparingly)
+  accent: {
+    primary: 'from-blue-600 to-purple-600',
+    secondary: 'from-emerald-500 to-teal-600',
   }
+};
+
+export function setInitialTheme() {
+  document.documentElement.classList.add('dark');
 }
 
-// Set theme on load
 setInitialTheme();
-
-// Listen for changes to color scheme
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-  if (event.matches) {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
-});
-
-// Export toggle function for use in components
-export const toggleTheme = () => {
-  document.documentElement.classList.toggle('dark');
-};

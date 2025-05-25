@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
+import { THEME } from '@/lib/theme';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -41,7 +42,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       </div>
     );
   }
-  
+
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-neutral-50 dark:bg-neutral-950">
@@ -62,7 +63,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   }
 
   return (
-    <div className="flex h-screen w-full bg-transparent">
+    <div className={`flex h-screen ${THEME.bg.primary}`}>
       {/* Sidebar - Fixed position on desktop, absolute on mobile */}
       <div className={`
         fixed lg:relative z-40
@@ -116,3 +117,4 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 };
 
 export default MainLayout;
+```
