@@ -346,4 +346,3 @@ export function useSuna(initialThreadId?: string) {
     clearError
   };
 }
-```
