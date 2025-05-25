@@ -17,7 +17,7 @@ const STORAGE_KEYS = [
   'direct_tab_state_backup'
 ];
 
-export const useDirectTabPersistence = (isSending?: boolean) => {
+export const useDirectTabPersistence = () => {
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
   const [researchProgress, setResearchProgress] = useState(0);
@@ -27,12 +27,11 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
   const stateRef = useRef<DirectTabState | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isSending, setIsSending] = useState<boolean>(false);
-  const [savedTabs, setSavedTabs] = useState<SavedTab[]>([]);
+  const [savedTabs, setSavedTabs] = useState<any[]>([]);
 
   // Initialize state before using
   useEffect(() => {
-    setIsSending(false);
+    // State initialization
   }, []);
 
   // Force save state to multiple locations
@@ -44,7 +43,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
       stage: researchStage,
       stageLabel,
       timestamp: Date.now(),
-      isSending: isSending
+      isSending: false
     };
 
     if (currentState.isInProgress) {
@@ -68,7 +67,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
       stateRef.current = currentState;
     }
-  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel, isSending]);
+  }, [isResearchInProgress, ongoingResearchQuery, researchProgress, researchStage, stageLabel]);
 
   // Force restore state from any available location
   const forceRestoreState = useCallback(() => {
