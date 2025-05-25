@@ -1,0 +1,93 @@
+I see the issue! The problem is that your useDirectTabPersistence hook is referencing isSending in the progress management, but isSending is not defined within this hook. It's coming from your main component, so the hook doesn't know when the research actually completes.
+🐛 The Root Problem:
+javascript// This line in your hook references `isSending` which doesn't exist here
+if (!isSending && prev >= 85) {
+isSending is undefined in this context, so the condition !isSending is always true, causing premature completion.
+🔧 The Fix:
+You need to pass isSending status to your hook. Here's the corrected version:
+javascript// Update your hook interface
+export const useDirectTabPersistence = (isSending?: boolean) => {
+  // ... existing code ...
+
+  // Enhanced progress management with proper isSending detection
+  useEffect(() => {
+    if (!isResearchInProgress) return;
+    
+    let progressInterval = setInterval(() => {
+      setResearchProgress(prev => {
+        // Auto-complete when research is actually done
+        if (isSending === false && prev >= 85) {
+          clearInterval(progressInterval);
+          setTimeout(() => {
+            completeDirectResearch();
+          }, 1000);
+          return 100;
+        }
+        
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        
+        // Dynamic increment based on actual sending status
+        const baseIncrement = isSending ? Math.random() * 4 + 2 : Math.random() * 8 + 4;
+        const newProgress = prev + baseIncrement;
+        
+        // Stage-based caps with proper research completion detection
+        if (isSending === false && newProgress >= 85) {
+          return Math.min(newProgress, 100);
+        } else if (researchStage >= 5) {
+          return Math.min(newProgress, isSending ? 90 : 100);
+        } else if (researchStage >= 4) {
+          return Math.min(newProgress, isSending ? 80 : 95);
+        } else if (researchStage >= 3) {
+          return Math.min(newProgress, 70);
+        } else if (researchStage >= 2) {
+          return Math.min(newProgress, 50);
+        } else {
+          return Math.min(newProgress, 35);
+        }
+      });
+    }, 1500);
+    
+    return () => {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    };
+  }, [isResearchInProgress, researchStage, isSending, completeDirectResearch]);
+
+  // ... rest of existing code
+};
+🎯 Update Your Component Usage:
+In your Research Agent component, pass isSending to the hook:
+javascript// In your ResearchAgent component
+const {
+  isResearchInProgress,
+  ongoingResearchQuery,
+  researchProgress,
+  researchStage,
+  stageLabel,
+  startResearch,
+  completeResearch,
+  forceSave,
+  forceRestore
+} = useDirectTabPersistence(isSending); // Pass isSending here
+🚀 Alternative Quick Fix (if you can't modify the hook signature):
+Add this useEffect in your main component to handle completion:
+javascript// In your ResearchAgent component
+useEffect(() => {
+  if (isResearchInProgress && !isSending && researchProgress >= 95) {
+    console.log('✅ Research completed - triggering completion from component');
+    setTimeout(() => {
+      completeResearch();
+    }, 1000);
+  }
+}, [isResearchInProgress, isSending, researchProgress, completeResearch]);
+💡 Why This Happens:
+
+Hook isolation: useDirectTabPersistence doesn't have access to isSending
+Undefined reference: !isSending evaluates to true when isSending is undefined
+Premature completion: Progress bar completes before research is actually done
+
+The fix ensures the hook knows the actual research status and only completes when the research is truly finished!
