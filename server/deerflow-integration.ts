@@ -74,6 +74,21 @@ export class ResearchService {
 
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
+    // Check if DeerFlow service is available
+    const isServiceAvailable = await checkDeerFlowService();
+    if (!isServiceAvailable) {
+      console.log('DeerFlow service unavailable, using enhanced fallback research');
+      const { EnhancedFallbackResearch } = await import('./enhanced-research-fallback');
+      const fallbackResult = await EnhancedFallbackResearch.performComprehensiveResearch(params.query);
+      
+      return {
+        report: fallbackResult.report,
+        sources: [],
+        depth: ResearchDepth.Basic,
+        processingTime: Date.now() - startTime
+      };
+    }
+
     try {
       if (depth === ResearchDepth.Basic) {
         // Use enhanced free research service for basic depth
