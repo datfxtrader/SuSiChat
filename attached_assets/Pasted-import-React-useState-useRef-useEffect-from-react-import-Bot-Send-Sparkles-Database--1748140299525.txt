@@ -1,0 +1,470 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, Ban, Clock, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
+
+// Unified Theme Colors - Use these consistently across ALL components
+const THEME = {
+  // Backgrounds
+  bg: {
+    primary: 'bg-zinc-950',           // Main app background
+    secondary: 'bg-zinc-950/95',     // Secondary areas
+    tertiary: 'bg-zinc-900/80',      // Cards, panels
+    interactive: 'bg-zinc-800/60',   // Buttons, inputs
+    hover: 'bg-zinc-700/70',         // Hover states
+  },
+  // Text Colors
+  text: {
+    primary: 'text-zinc-50',         // Main headings
+    secondary: 'text-zinc-200',      // Body text
+    tertiary: 'text-zinc-400',       // Secondary text
+    muted: 'text-zinc-500',          // Placeholder, labels
+    disabled: 'text-zinc-600',       // Disabled states
+  },
+  // Borders
+  border: {
+    primary: 'border-zinc-800/60',   // Main borders
+    secondary: 'border-zinc-700/50', // Secondary borders
+    hover: 'border-zinc-600/60',     // Hover borders
+  },
+  // Accents (only use sparingly)
+  accent: {
+    primary: 'from-blue-600 to-purple-600',
+    secondary: 'from-emerald-500 to-teal-600',
+  }
+};
+
+// Mock components with unified theme
+const Button = ({ children, className = '', variant = 'default', size = 'default', onClick, disabled, ...props }) => {
+  const baseClasses = `inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${THEME.text.secondary}`;
+  
+  const variants = {
+    default: `bg-gradient-to-r ${THEME.accent.primary} hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl`,
+    ghost: `hover:${THEME.bg.hover} ${THEME.text.tertiary} hover:${THEME.text.secondary}`,
+    outline: `${THEME.border.secondary} ${THEME.bg.interactive} hover:${THEME.bg.hover} ${THEME.text.tertiary} hover:${THEME.text.secondary} hover:${THEME.border.hover} border`,
+    secondary: `${THEME.bg.interactive} hover:${THEME.bg.hover} ${THEME.text.secondary} ${THEME.border.secondary} border`
+  };
+  
+  const sizes = {
+    default: 'px-4 py-2 rounded-lg text-sm',
+    sm: 'px-2 py-1 rounded-md text-xs',
+    lg: 'px-6 py-3 rounded-lg text-base'
+  };
+  
+  return (
+    <button 
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Textarea = ({ className = '', ...props }) => (
+  <textarea 
+    className={`w-full ${THEME.bg.tertiary} ${THEME.border.secondary} border rounded-lg px-3 py-2 ${THEME.text.secondary} placeholder:${THEME.text.muted} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:${THEME.border.hover} transition-all ${className}`}
+    {...props}
+  />
+);
+
+const Select = ({ children, value, onValueChange, className = '' }) => (
+  <div className={`relative ${className}`}>
+    <select 
+      className={`${THEME.bg.interactive} ${THEME.border.secondary} border rounded-md px-2 py-1 text-xs ${THEME.text.muted} hover:${THEME.bg.hover} hover:${THEME.border.hover} hover:${THEME.text.tertiary} focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all`}
+      value={value}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {React.Children.map(children, child => 
+        React.isValidElement(child) ? child : null
+      )}
+    </select>
+  </div>
+);
+
+const SelectTrigger = ({ children, className }) => <div className={className}>{children}</div>;
+const SelectContent = ({ children }) => children;
+const SelectItem = ({ value, children }) => <option value={value}>{children}</option>;
+const SelectValue = () => null;
+
+// Unified Avatar Component
+const Avatar = ({ children, className = '' }) => (
+  <div className={`w-10 h-10 rounded-full overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
+const AvatarImage = ({ src, alt }) => (
+  <img src={src} alt={alt} className="w-full h-full object-cover" />
+);
+
+const AvatarFallback = ({ children }) => (
+  <div className={`w-full h-full bg-gradient-to-br ${THEME.accent.primary} flex items-center justify-center text-white font-semibold`}>
+    {children}
+  </div>
+);
+
+// Mock icons
+const icons = {
+  chat: "💬", event: "📅", groups: "👥", auto_awesome: "✨", article: "📄",
+  school: "🎓", flight_takeoff: "✈️", assistant: "🤖", settings: "⚙️",
+  add: "➕", home: "🏠", notifications_active: "🔔"
+};
+
+const UnifiedApp = () => {
+  const [location, setLocation] = useState("/research-agent");
+  const [message, setMessage] = useState('');
+  const [researchDepth, setResearchDepth] = useState('3');
+  const [selectedModel, setSelectedModel] = useState('auto');
+  const [isSending, setIsSending] = useState(false);
+  const textareaRef = useRef(null);
+
+  // Mock data
+  const user = { firstName: "Dat", lastName: "Tong", profileImageUrl: null };
+  const familyRooms = [{ id: 1, name: "Family Chat" }];
+  
+  const navItems = [
+    { path: "/", icon: "chat", label: "Chat" },
+    { path: "/schedule", icon: "event", label: "Schedule" },
+    { path: "/family-room", icon: "groups", label: "Family Room" },
+    { path: "/research-agent", icon: "auto_awesome", label: "Research Agent" },
+    { path: "/research-blog", icon: "article", label: "Research Blog" },
+    { path: "/profile", icon: "school", label: "Homework Help" },
+    { path: "/trip", icon: "flight_takeoff", label: "Trip Planning" },
+  ];
+
+  const handleItemClick = (path) => setLocation(path);
+  const isActive = (path) => location === path;
+
+  const handleSendMessage = () => {
+    if (!message.trim() || isSending) return;
+    setIsSending(true);
+    setTimeout(() => setIsSending(false), 2000);
+    setMessage('');
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  return (
+    <div className={`flex h-screen ${THEME.bg.primary}`}>
+      {/* UNIFIED SIDEBAR */}
+      <div className={`w-64 ${THEME.border.primary} border-r ${THEME.bg.secondary} backdrop-blur-xl`}>
+        {/* App Logo - Consistent Theme */}
+        <div className={`p-4 ${THEME.border.primary} border-b`}>
+          <div className="flex items-center space-x-3">
+            <div className={`w-10 h-10 bg-gradient-to-br ${THEME.accent.primary} rounded-xl flex items-center justify-center shadow-lg`}>
+              <span className="text-white text-xl">{icons.assistant}</span>
+            </div>
+            <div>
+              <h1 className={`text-lg font-bold ${THEME.text.primary}`}>Tongkeeper</h1>
+              <p className={`text-xs ${THEME.text.muted}`}>AI Assistant Platform</p>
+            </div>
+          </div>
+        </div>
+
+        {/* User Profile - Consistent Theme */}
+        <div className={`p-4 ${THEME.border.primary} border-b`}>
+          <div className="flex items-center space-x-3">
+            <Avatar>
+              {user?.profileImageUrl ? (
+                <AvatarImage src={user.profileImageUrl} alt={user.firstName || "User"} />
+              ) : (
+                <AvatarFallback>{user?.firstName?.[0] || "U"}</AvatarFallback>
+              )}
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className={`font-semibold ${THEME.text.primary} truncate`}>
+                {user?.firstName} {user?.lastName}
+              </div>
+              <div className={`text-xs ${THEME.text.muted} flex items-center`}>
+                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-1.5 animate-pulse" />
+                Personal Account
+              </div>
+            </div>
+            <button 
+              onClick={() => handleItemClick('/profile')}
+              className={`p-1.5 ${THEME.text.muted} hover:${THEME.text.tertiary} hover:${THEME.bg.interactive} rounded-lg transition-all duration-200`}
+            >
+              <span className="text-lg">{icons.settings}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation - Unified Theme */}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          <ul className="space-y-1">
+            {navItems.map((item) => (
+              <li key={item.path}>
+                <button
+                  onClick={() => handleItemClick(item.path)}
+                  className={`
+                    flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 w-full text-left
+                    ${isActive(item.path) 
+                      ? `bg-gradient-to-r from-blue-600/20 to-purple-600/20 ${THEME.text.primary} ${THEME.border.hover} border shadow-lg` 
+                      : `${THEME.text.muted} hover:${THEME.text.tertiary} hover:${THEME.bg.interactive}`
+                    }
+                  `}
+                >
+                  <span className="text-lg flex-shrink-0">{icons[item.icon]}</span>
+                  <span className="truncate">{item.label}</span>
+                  {isActive(item.path) && (
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full ml-auto animate-pulse" />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {/* Family Rooms - Unified Theme */}
+          {familyRooms && familyRooms.length > 0 && (
+            <div className="mt-8">
+              <div className="px-3 mb-3 flex items-center justify-between">
+                <h2 className={`text-xs uppercase tracking-wider ${THEME.text.muted} font-semibold flex items-center`}>
+                  <div className={`w-1 h-4 bg-gradient-to-b ${THEME.accent.primary} rounded-full mr-2`} />
+                  Family Rooms
+                </h2>
+                <button 
+                  onClick={() => handleItemClick('/family-room/new')}
+                  className={`p-1 ${THEME.text.muted} hover:text-blue-400 hover:${THEME.bg.interactive} rounded-md transition-all duration-200`}
+                >
+                  <span className="text-sm">{icons.add}</span>
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                {familyRooms.map((room) => (
+                  <button
+                    key={room.id}
+                    onClick={() => handleItemClick(`/family-room/${room.id}`)}
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg hover:${THEME.bg.interactive} hover:${THEME.text.tertiary} transition-all duration-200 ${THEME.text.muted} w-full text-left group`}
+                  >
+                    <div className={`w-6 h-6 ${THEME.bg.interactive} group-hover:${THEME.bg.hover} rounded-lg flex items-center justify-center transition-colors`}>
+                      <span className="text-sm">{icons.home}</span>
+                    </div>
+                    <span className="text-sm truncate">{room.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </nav>
+      </div>
+
+      {/* MAIN AREA - Research Agent */}
+      <div className="flex-1 flex flex-col">
+        {/* Research Agent Header */}
+        <div className={`p-4 ${THEME.border.primary} border-b ${THEME.bg.secondary}`}>
+          <div className="flex items-center space-x-3">
+            <div className={`w-10 h-10 bg-gradient-to-br ${THEME.accent.primary} rounded-xl flex items-center justify-center shadow-lg`}>
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className={`text-lg font-bold ${THEME.text.primary}`}>Research Agent</h2>
+              <p className={`text-sm ${THEME.text.muted}`}>AI-Powered Research</p>
+            </div>
+            <div className="flex-1" />
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <Sparkles className="w-4 h-4 mr-2" />
+              New Research
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+            <div className="text-center max-w-4xl mx-auto px-8">
+              <div className={`w-16 h-16 bg-gradient-to-br ${THEME.accent.primary} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl`}>
+                <Bot className="w-8 h-8 text-white" />
+              </div>
+              
+              <h1 className={`text-3xl font-bold ${THEME.text.primary} mb-3`}>
+                Hello Dat, where should we begin?
+              </h1>
+              <p className={`text-lg ${THEME.text.muted} mb-12`}>
+                Get comprehensive, AI-powered research on any topic with real-time data and expert analysis
+              </p>
+              
+              {/* Research Cards - Unified Theme */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                {[
+                  {
+                    title: "Market Analysis Research",
+                    description: "Deep dive into current market trends, opportunities, and risk assessment",
+                    icon: TrendingUp,
+                    gradient: THEME.accent.primary
+                  },
+                  {
+                    title: "Financial Data Analysis", 
+                    description: "Comprehensive financial metrics, ratios, and performance evaluation",
+                    icon: Database,
+                    gradient: "from-blue-500 to-indigo-600"
+                  },
+                  {
+                    title: "Competitive Intelligence",
+                    description: "Research competitors, market positioning, and strategic advantages",
+                    icon: Search,
+                    gradient: "from-purple-500 to-pink-600"
+                  },
+                  {
+                    title: "Risk Assessment Report",
+                    description: "Evaluate investment risks, opportunities, and risk-adjusted returns",
+                    icon: AlertCircle,
+                    gradient: "from-orange-500 to-red-600"
+                  }
+                ].map((card, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setMessage(`Research ${card.title.toLowerCase()}`)}
+                    className={`group p-6 ${THEME.bg.tertiary} backdrop-blur-sm ${THEME.border.secondary} border rounded-2xl hover:${THEME.bg.hover} hover:${THEME.border.hover} transition-all duration-300 cursor-pointer transform hover:scale-[1.02] hover:shadow-2xl`}
+                  >
+                    <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-shadow`}>
+                      <card.icon className="w-6 h-6 text-white" />
+                    </div>
+                    
+                    <h3 className={`text-lg font-semibold ${THEME.text.primary} mb-2 group-hover:text-white transition-colors`}>
+                      {card.title}
+                    </h3>
+                    <p className={`text-sm ${THEME.text.muted} group-hover:${THEME.text.tertiary} transition-colors leading-relaxed`}>
+                      {card.description}
+                    </p>
+                    
+                    <div className={`flex items-center mt-4 text-xs ${THEME.text.disabled} group-hover:${THEME.text.muted} transition-colors`}>
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      <span>AI-Powered Research</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* UNIFIED INPUT AREA */}
+        <div className={`p-6 ${THEME.border.primary} border-t ${THEME.bg.secondary} backdrop-blur-xl`}>
+          <div className="space-y-4">
+            {/* Controls - Unified Theme */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                {/* Research Depth */}
+                <div className="flex items-center space-x-2">
+                  <span className={`text-xs ${THEME.text.muted} font-medium`}>Depth</span>
+                  <Select value={researchDepth} onValueChange={setResearchDepth} className="w-32">
+                    <SelectItem value="1">Quick (8K)</SelectItem>
+                    <SelectItem value="2">Standard (15K)</SelectItem>
+                    <SelectItem value="3">Deep (25K)</SelectItem>
+                  </Select>
+                </div>
+
+                {/* Model Selection */}
+                <div className="flex items-center space-x-2">
+                  <span className={`text-xs ${THEME.text.muted} font-medium`}>Model</span>
+                  <Select value={selectedModel} onValueChange={setSelectedModel} className="w-24">
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="deepseek">DeepSeek</SelectItem>
+                    <SelectItem value="gemini">Gemini</SelectItem>
+                  </Select>
+                </div>
+
+                {/* Template Buttons */}
+                <div className="flex items-center space-x-1">
+                  <span className={`text-xs ${THEME.text.muted} font-medium mr-2`}>Templates</span>
+                  {[
+                    { icon: TrendingUp, text: "Market" },
+                    { icon: Database, text: "Financial" },
+                    { icon: Search, text: "Competitive" },
+                    { icon: AlertCircle, text: "Risk" }
+                  ].map((template, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMessage(`Research ${template.text.toLowerCase()}`)}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <template.icon className="w-3 h-3 mr-1" />
+                      {template.text}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className={`flex items-center space-x-2 text-xs ${THEME.text.muted}`}>
+                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                <span>Ready</span>
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="relative">
+              <Textarea
+                ref={textareaRef}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask me anything about markets, technology, economics..."
+                className="min-h-[80px] pr-24 text-sm leading-relaxed rounded-xl"
+                rows={3}
+              />
+              
+              {/* Send Button */}
+              <div className="absolute bottom-3 right-3 flex items-center space-x-3">
+                <span className={`text-xs ${THEME.text.disabled} ${THEME.bg.interactive} px-2 py-1 rounded-md ${THEME.border.secondary} border`}>
+                  {message.length}/2000
+                </span>
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!message.trim() || isSending}
+                  size="sm"
+                  className="h-9 px-4 transform hover:scale-105 transition-all duration-200"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Researching...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Research
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Footer Info */}
+            <div className={`flex items-center justify-between text-xs ${THEME.text.disabled}`}>
+              <div className="flex items-center space-x-4">
+                <span className="flex items-center">
+                  <Search className="w-3 h-3 mr-1.5" />
+                  Real-time data
+                </span>
+                <span className="flex items-center">
+                  <Database className="w-3 h-3 mr-1.5" />
+                  Multi-source
+                </span>
+                <span className="flex items-center">
+                  <Zap className="w-3 h-3 mr-1.5" />
+                  AI-powered
+                </span>
+              </div>
+              <div className={`flex items-center space-x-2 ${THEME.text.muted}`}>
+                <kbd className={`px-1.5 py-0.5 ${THEME.bg.interactive} ${THEME.border.secondary} border rounded text-xs`}>⏎</kbd>
+                <span>to send</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UnifiedApp;
