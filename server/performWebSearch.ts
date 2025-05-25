@@ -328,4 +328,15 @@ export async function performWebSearch(
     timestamp: new Date().toISOString(),
     metadata: searchMetadata
   };
+  } catch (error) {
+    console.error('Search fallback failed:', error);
+    return {
+      results: [],
+      tavilyResults: null,
+      braveResults: null,
+      query,
+      timestamp: new Date().toISOString(),
+      metadata: { totalSources: 0, sourceBreakdown: {}, braveSuccess: false, tavilySuccess: false, fallbackUsed: true }
+    };
+  }
 }
