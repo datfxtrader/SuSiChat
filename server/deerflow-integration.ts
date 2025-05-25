@@ -166,25 +166,78 @@ export class ResearchService {
         }
       }).filter((source: ResearchSource | null): source is ResearchSource => source !== null);
 
-      // Generate a report from results
+      // Generate a comprehensive report using LLM to match 25K formatting style
       let report = '';
 
       if (results.length > 0) {
-        // Simple results summary for basic research
-        report = `Here are the key findings from my basic research:\n\n`;
+        // Extract content from sources for LLM processing
+        const sourceContent = sources.slice(0, 5).map((source, index) => {
+          return `Source ${index + 1} (${source.title} - ${source.domain}):\n${source.content}`;
+        }).join('\n\n---\n\n');
 
-        // Add main findings from top results
-        results.slice(0, 3).forEach((result: any, index: number) => {
-          report += `${index + 1}. ${result.title || 'Source'}: ${result.snippet || result.content || 'Information not available'}\n\n`;
-        });
+        try {
+          // Use the same comprehensive formatting as Enhanced/Deep research
+          const systemPrompt = 'You are an expert research analyst providing detailed, well-structured reports with comprehensive analysis and professional formatting.';
+          
+          const userPrompt = `Create a comprehensive research report about "${params.query}" using the following sources.
 
-        // Add sources reference
-        report += `\nSources:\n`;
-        sources.forEach((source: any, index: number) => {
-          report += `[${index + 1}] ${source.title}\n${source.url}\n`;
-        });
+The report should include:
+1. **Executive Summary** (2-3 paragraphs with key insights)
+2. **Key Findings** (3-5 detailed bullet points with specific data)
+3. **Detailed Analysis** (comprehensive examination with facts and figures)
+4. **Supporting Evidence** (relevant quotes and data from sources)
+5. **Conclusions** (summary of implications and significance)
+
+SOURCES:
+${sourceContent}
+
+Format the report with:
+- Clear markdown headings (##, ###)
+- Bullet points with **bold** emphasis for key terms
+- Specific data and numbers from sources
+- Professional structure and flow
+- Source citations using [Source X] notation
+
+Your report should be detailed, data-driven, and professionally formatted to match comprehensive research standards.`;
+
+          // Generate formatted report using LLM
+          const llmResponse = await llmService.generateResearchReport(
+            [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            0.7,
+            2000 // Sufficient tokens for comprehensive formatting
+          );
+
+          report = llmResponse.message || '';
+
+          // Add sources section
+          report += '\n\n## Sources\n';
+          sources.forEach((source, index) => {
+            report += `[${index + 1}] **${source.title}**\n${source.url}\n\n`;
+          });
+
+        } catch (error) {
+          console.error('Error generating formatted report:', error);
+          
+          // Fallback to enhanced formatting if LLM fails
+          report = `# Research Report: ${params.query}\n\n`;
+          report += `## Executive Summary\n\nBased on my research, here are the key findings about "${params.query}".\n\n`;
+          report += `## Key Findings\n\n`;
+          
+          results.slice(0, 3).forEach((result: any, index: number) => {
+            report += `### ${index + 1}. ${result.title || 'Key Finding'}\n`;
+            report += `${result.snippet || result.content || 'Information not available'}\n\n`;
+          });
+
+          report += `## Sources\n`;
+          sources.forEach((source, index) => {
+            report += `[${index + 1}] **${source.title}**\n${source.url}\n\n`;
+          });
+        }
       } else {
-        report = `I couldn't find any relevant information for "${params.query}" in my basic research.`;
+        report = `# Research Report: ${params.query}\n\n## Executive Summary\n\nI couldn't find any relevant information for "${params.query}" in my research. This may be due to the topic being very new, specialized, or the search terms needing refinement.\n\n## Recommendations\n\n- Try rephrasing the query with different keywords\n- Consider searching for related or broader topics\n- Check if there are alternative terms for the same concept`;
       }
 
       return {
