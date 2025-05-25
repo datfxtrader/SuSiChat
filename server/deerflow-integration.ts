@@ -124,10 +124,10 @@ export class ResearchService {
 
     try {
       console.log('🚀 Starting DeerFlow deep research with external search engines...');
-      
+
       // Check if this is a financial query
       const isFinancialQuery = /(?:forex|currency|exchange rate|trading|market|price|financial|investment|stock|crypto|bitcoin|ethereum|USD|EUR|GBP|JPY|analysis)/i.test(params.query);
-      
+
       if (isFinancialQuery) {
         console.log('🏦 Financial query detected - using specialized financial research');
         return await this.performFinancialResearch(params);
@@ -241,37 +241,34 @@ export class ResearchService {
    */
   private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
-    console.log('🏦 Starting specialized financial research...');
-    
+
     try {
       // Check for currency pair patterns
       const currencyPairMatch = params.query.match(/([A-Z]{3})[\s\/]?([A-Z]{3})/);
       const currencyPair = currencyPairMatch ? `${currencyPairMatch[1]}/${currencyPairMatch[2]}` : null;
-      
+
       if (currencyPair) {
         console.log(`💱 Currency pair detected: ${currencyPair}`);
-        
+
         // Enhanced financial research with multiple data sources
         const financialResearch = await this.performComprehensiveFinancialAnalysis(params.query, currencyPair);
-        
-        if (financialResearch.success) {
-          return {
-            report: financialResearch.content,
-            sources: financialResearch.sources,
-            depth: ResearchDepth.Deep,
-            processingTime: Date.now() - startTime
-          };
-        }
+
+        return {
+          report: financialResearch.content || `# Market Analysis\n\nAnalysis for ${currencyPair} is currently unavailable. Please try:\n\n1. Being more specific with your query\n2. Including a timeframe\n3. Specifying particular metrics you're interested in`,
+          sources: financialResearch.sources || [],
+          depth: ResearchDepth.Deep,
+          processingTime: Date.now() - startTime
+        };
       }
-      
-      // Return basic error response instead of recursing
+
+      // Basic research without currency pair
       return {
-        report: "Financial research failed to provide detailed analysis. Please try a more specific query.",
+        report: `# Financial Analysis\n\nUnable to analyze the market without a valid currency pair. Please specify a currency pair like "EUR/USD" or "GBP/JPY" for detailed analysis.`,
         sources: [],
         depth: ResearchDepth.Basic,
         processingTime: Date.now() - startTime
       };
-      
+
     } catch (error) {
       console.error('Financial research error:', error);
       return {
@@ -288,11 +285,11 @@ export class ResearchService {
    */
   private createFallbackReport(query: string, sources: ResearchSource[], deerflowResponse: any): string {
     let report = `# Research Report: ${query}\n\n`;
-    
+
     if (sources.length > 0) {
       report += `## Executive Summary\n\n`;
       report += `Based on comprehensive research using multiple search engines and sources, here are the key findings for "${query}":\n\n`;
-      
+
       report += `## Key Findings\n\n`;
       sources.slice(0, 5).forEach((source, index) => {
         if (source.content) {
@@ -301,7 +298,7 @@ export class ResearchService {
           report += `*Source: ${source.domain}*\n\n`;
         }
       });
-      
+
       report += `## Sources\n\n`;
       sources.forEach((source, index) => {
         report += `${index + 1}. [${source.title}](${source.url}) - ${source.domain}\n`;
@@ -309,7 +306,7 @@ export class ResearchService {
     } else {
       report += `I apologize, but I was unable to find sufficient information about "${query}" at this time. This could be due to the specificity of the query or temporary search limitations.`;
     }
-    
+
     return report;
   }
 
@@ -318,7 +315,7 @@ export class ResearchService {
    */
   private async performComprehensiveFinancialAnalysis(query: string, currencyPair: string): Promise<any> {
     console.log(`💰 Performing comprehensive financial analysis for ${currencyPair}`);
-    
+
     try {
       // Use DeerFlow with financial-specific parameters
       const deerflowParams: DeerFlowResearchParams = {
@@ -331,15 +328,15 @@ export class ResearchService {
         include_news: true,
         min_word_count: 3000
       };
-      
+
       const result = await deerflowClient.performResearch(deerflowParams);
-      
+
       return {
         success: true,
         content: result.report || result.content || result.analysis || 'Financial analysis completed',
         sources: result.sources || []
       };
-      
+
     } catch (error) {
       console.error('Comprehensive financial analysis error:', error);
       return {
