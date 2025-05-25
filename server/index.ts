@@ -324,8 +324,39 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = process.env.PORT || 5000;
-  server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
+  const port = parseInt(process.env.PORT || "5000");
+  
+  server.listen(port, "0.0.0.0", (err?: Error) => {
+    if (err) {
+      console.error(`Failed to start server on port ${port}:`, err);
+      process.exit(1);
+    }
+    log(`🚀 Server successfully running on port ${port}`);
+    log(`🌐 Access your app at: http://0.0.0.0:${port}`);
+  });
+
+  // Handle server errors
+  server.on('error', (err: Error) => {
+    console.error('Server error:', err);
+    if (err.message.includes('EADDRINUSE')) {
+      console.error(`Port ${port} is already in use. Please check for other processes.`);
+    }
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('Received SIGTERM, shutting down gracefully');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('Received SIGINT, shutting down gracefully');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
   });
 })();

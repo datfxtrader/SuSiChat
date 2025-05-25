@@ -9,7 +9,7 @@ import axios from 'axios';
 
 // Configuration
 const DEERFLOW_PORT = 8000;
-const DEERFLOW_URL = `http://localhost:${DEERFLOW_PORT}`;
+const DEERFLOW_URL = `http://0.0.0.0:${DEERFLOW_PORT}`;
 const MAX_STARTUP_RETRIES = 5;
 const RETRY_INTERVAL_MS = 2000;
 
