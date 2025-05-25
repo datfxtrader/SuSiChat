@@ -37,23 +37,27 @@ export const ResearchAgent = () => {
   useEffect(() => {
     if (isResearchInProgress && !isSending && researchProgress >= 95) {
       console.log('✅ Research completed - clearing progress');
+      
+      // Add completed message first
+      const completedMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `# Research Analysis Complete\n\n## Executive Summary\nYour research has been completed with comprehensive analysis.\n\n## Key Findings\n\n### Market Overview\n- Current trends analyzed\n- Key patterns identified\n- Risk factors assessed`,
+        timestamp: new Date().toISOString(),
+        sources: [
+          { title: 'Market Analysis', url: '#', domain: 'example.com' }
+        ]
+      };
+      
+      setMessages(prev => [...prev, completedMessage]);
+      
+      // CRITICAL FIX: Clear research state after a delay
       setTimeout(() => {
         setIsResearchInProgress(false);
         setResearchProgress(0);
         setResearchStage(1);
-
-        const completedMessage = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: `# Research Analysis Complete\n\n## Executive Summary\nYour research has been completed with comprehensive analysis.\n\n## Key Findings\n\n### Market Overview\n- Current trends analyzed\n- Key patterns identified\n- Risk factors assessed`,
-          timestamp: new Date().toISOString(),
-          sources: [
-            { title: 'Market Analysis', url: '#', domain: 'example.com' }
-          ]
-        };
-
-        setMessages(prev => [...prev, completedMessage]);
-      }, 1000);
+        console.log('🧹 Research state cleared completely');
+      }, 1500);
     }
   }, [isResearchInProgress, isSending, researchProgress]);
 
