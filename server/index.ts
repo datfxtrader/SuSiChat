@@ -233,8 +233,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Use port 5010 for Express since DeerFlow uses 5000
-  const port = 5010;
+  const port = process.env.PORT || 5000;
   server.listen({
     port,
     host: "0.0.0.0"
