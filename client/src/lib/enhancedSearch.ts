@@ -10,6 +10,20 @@ interface SearchResult {
   domain?: string;
 }
 
+export interface EnhancedSearchResponse {
+  results: SearchResult[];
+  totalResults: number;
+  searchEnginesUsed: string[];
+  query: string;
+  searchType: string;
+  timestamp: string;
+  performance: {
+    searchTime: number;
+    cacheHits: number;
+    apiCalls: number;
+  };
+}
+
 interface SearchResponse {
   results: SearchResult[];
   totalResults: number;
@@ -105,5 +119,22 @@ export const enhancedWebSearch = async (query: string, options: SearchOptions = 
     console.error('Enhanced web search error:', error);
     // Return empty results instead of throwing to prevent unhandled rejections
     return [];
+  }
+};
+
+// Export enhancedSearchClient for compatibility with useSuna hook
+export const enhancedSearchClient = {
+  search: async (options: {
+    query: string;
+    searchType?: 'web' | 'news' | 'all';
+    maxResults?: number;
+    freshness?: 'day' | 'week' | 'month' | 'year';
+  }) => {
+    return enhancedSearch.search(
+      options.query,
+      options.maxResults || 10,
+      options.searchType || 'all',
+      options.freshness || 'week'
+    );
   }
 };
