@@ -76,15 +76,14 @@ const ResearchAgent = () => {
 
   // Handle research completion with restoration guards (progress-based completion)
   useEffect(() => {
-    // Complete when we have assistant messages (indicating research is done)
+    // Complete when we have assistant messages AND sufficient progress (indicating research is done)
     const hasCompletedMessage = messages.length > 0 && 
                                messages[messages.length - 1]?.role === 'assistant';
 
-    // Also complete if we reach 100% progress OR if sending stops at high progress
+    // Only complete if we reach 100% progress OR have a message with high progress
     const shouldComplete = isResearchInProgress && (
-      hasCompletedMessage || 
       researchProgress >= 100 || 
-      (!isSending && researchProgress >= 90)
+      (hasCompletedMessage && !isSending && researchProgress >= 95)
     );
 
     if (shouldComplete) {
@@ -92,7 +91,7 @@ const ResearchAgent = () => {
       setTimeout(() => {
         completeResearch();
       }, 1000);
-    } else if (isResearchInProgress && researchProgress < 90) {
+    } else if (isResearchInProgress && researchProgress < 95) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - not completing yet`);
     }
   }, [isSending, isResearchInProgress, researchProgress, messages, completeResearch]);

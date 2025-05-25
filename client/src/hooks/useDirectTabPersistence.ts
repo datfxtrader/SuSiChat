@@ -226,9 +226,9 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
         // Dynamic increment for smooth progression
         const baseIncrement = Math.random() * 3 + 1;
-        // Allow progress to reach 100% but slow down near the end
-        const maxProgress = prev >= 90 ? 98 : 100;
-        const newProgress = Math.min(prev + baseIncrement, maxProgress);
+        // Slow down near the end but allow reaching 100%
+        const slowDownFactor = prev >= 90 ? 0.5 : 1;
+        const newProgress = Math.min(prev + (baseIncrement * slowDownFactor), 100);
 
         // Update stage based on progress
         if (newProgress >= 80 && researchStage < 6) {
