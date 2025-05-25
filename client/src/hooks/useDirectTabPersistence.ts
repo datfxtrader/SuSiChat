@@ -219,15 +219,6 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
     let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
-        // Auto-complete when research is actually done
-        if (isSending === false && prev >= 95) {
-          clearInterval(progressInterval);
-          setTimeout(() => {
-            completeDirectResearch();
-          }, 1000);
-          return 100;
-        }
-
         if (prev >= 100) {
           clearInterval(progressInterval);
           return 100;
@@ -235,7 +226,9 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
         // Dynamic increment for smooth progression
         const baseIncrement = Math.random() * 3 + 1;
-        const newProgress = Math.min(prev + baseIncrement, 100);
+        // Allow progress to reach 100% but slow down near the end
+        const maxProgress = prev >= 90 ? 98 : 100;
+        const newProgress = Math.min(prev + baseIncrement, maxProgress);
 
         // Update stage based on progress
         if (newProgress >= 80 && researchStage < 6) {
@@ -264,7 +257,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
         clearInterval(progressInterval);
       }
     };
-  }, [isResearchInProgress, researchStage, isSending, completeDirectResearch]);
+  }, [isResearchInProgress, researchStage]);
 
   // Initial restore on mount
   useEffect(() => {
