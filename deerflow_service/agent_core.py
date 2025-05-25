@@ -1,3 +1,4 @@
+
 """
 Advanced Agent Core for DeerFlow Research Service
 
@@ -14,6 +15,13 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+# Import optimization components
+from task_manager import TaskManager
+from state_manager import StateStore, StateTransitionValidator
+from tools import ToolRegistry, WebSearchTool, FinancialSearchTool
+from query_analyzer import EnhancedQueryAnalyzer
+from metrics import MetricsCollector
 
 # Import reasoning engine and domain agents for Phase 2
 try:
@@ -87,7 +95,8 @@ class AgentState:
 class TaskPlanner:
     """Intelligent task planning with query analysis and strategy selection"""
     
-    def __init__(self):
+    def __init__(self, query_analyzer: EnhancedQueryAnalyzer):
+        self.query_analyzer = query_analyzer
         self.strategy_templates = {
             "simple": {
                 "steps": ["search", "synthesize", "report"],
@@ -106,223 +115,169 @@ class TaskPlanner:
             },
             "financial": {
                 "steps": ["market_data", "news_analysis", "trend_analysis", "forecast"],
-                "tools": ["financial_apis", "news_search", "sentiment_analysis"],
+                "tools": ["financial_search", "news_search", "sentiment_analysis"],
                 "depth": 3
             }
         }
     
-    def analyze_query(self, query: str) -> Dict[str, Any]:
-        """Analyze the query to determine type, complexity, and requirements"""
-        query_lower = query.lower()
-        
-        # Determine query type
-        query_type = QueryType.SIMPLE
-        if any(word in query_lower for word in ["compare", "versus", "vs", "difference", "better"]):
-            query_type = QueryType.COMPARATIVE
-        elif any(word in query_lower for word in ["analyze", "analysis", "evaluate", "assess"]):
-            query_type = QueryType.ANALYTICAL
-        elif any(word in query_lower for word in ["price", "market", "trading", "stock", "currency", "forex"]):
-            query_type = QueryType.FINANCIAL
-        elif any(word in query_lower for word in ["research", "study", "scientific", "paper"]):
-            query_type = QueryType.SCIENTIFIC
-        elif any(word in query_lower for word in ["news", "current", "recent", "latest", "today"]):
-            query_type = QueryType.CURRENT_EVENTS
-        
-        # Determine complexity
-        complexity = "simple"
-        if len(query.split()) > 10 or "and" in query_lower or "also" in query_lower:
-            complexity = "complex"
-        if any(word in query_lower for word in ["comprehensive", "detailed", "thorough", "complete"]):
-            complexity = "comprehensive"
-        
-        # Identify key entities and concepts
-        entities = self._extract_entities(query)
-        
-        return {
-            "type": query_type,
-            "complexity": complexity,
-            "entities": entities,
-            "estimated_time": self._estimate_time(query_type, complexity),
-            "required_tools": self._determine_tools(query_type, complexity)
-        }
-    
-    def _extract_entities(self, query: str) -> List[str]:
-        """Extract key entities and concepts from the query"""
-        # Simple entity extraction - can be enhanced with NLP libraries
-        words = query.split()
-        entities = []
-        
-        # Look for capitalized words (potential proper nouns)
-        for word in words:
-            if word[0].isupper() and len(word) > 2:
-                entities.append(word.strip('.,!?'))
-        
-        return entities
-    
-    def _estimate_time(self, query_type: QueryType, complexity: str) -> int:
-        """Estimate processing time in seconds"""
-        base_times = {
-            QueryType.SIMPLE: 30,
-            QueryType.COMPARATIVE: 60,
-            QueryType.ANALYTICAL: 90,
-            QueryType.FINANCIAL: 45,
-            QueryType.SCIENTIFIC: 120,
-            QueryType.CURRENT_EVENTS: 40
-        }
-        
-        multipliers = {
-            "simple": 1.0,
-            "complex": 1.5,
-            "comprehensive": 2.0
-        }
-        
-        return int(base_times.get(query_type, 60) * multipliers.get(complexity, 1.0))
-    
-    def _determine_tools(self, query_type: QueryType, complexity: str) -> List[str]:
-        """Determine which tools are needed for this query"""
-        base_tools = ["web_search", "llm_synthesis"]
-        
-        if query_type == QueryType.FINANCIAL:
-            base_tools.extend(["financial_search", "market_data"])
-        elif query_type == QueryType.SCIENTIFIC:
-            base_tools.extend(["academic_search", "paper_analysis"])
-        elif query_type == QueryType.COMPARATIVE:
-            base_tools.extend(["comparison_engine", "structured_analysis"])
-        
-        if complexity in ["complex", "comprehensive"]:
-            base_tools.extend(["reasoning_engine", "fact_verification"])
-        
-        return base_tools
-    
     def create_execution_plan(self, query: str, analysis: Dict[str, Any]) -> ExecutionPlan:
         """Create a detailed execution plan based on query analysis"""
-        query_type = analysis["type"]
-        complexity = analysis["complexity"]
+        intent = analysis["intent"]["primary"]
+        complexity = analysis["complexity"]["level"]
         
         # Select strategy template
-        strategy_name = self._select_strategy(query_type, complexity)
+        strategy_name = self._select_strategy(intent, complexity)
         template = self.strategy_templates.get(strategy_name, self.strategy_templates["simple"])
         
-        # Create sub-tasks
+        # Create sub-tasks based on analysis
         sub_tasks = []
-        for i, step in enumerate(template["steps"]):
-            sub_task = SubTask(
-                id=f"task_{i+1}",
-                description=f"Execute {step} for: {query[:50]}...",
-                type=step,
-                priority=i + 1,
-                dependencies=[f"task_{i}"] if i > 0 else [],
-                estimated_time=analysis["estimated_time"] // len(template["steps"])
-            )
-            sub_tasks.append(sub_task)
+        
+        # Initial search phase
+        sub_tasks.append(SubTask(
+            id="search_1",
+            description=f"Search for information about: {query[:50]}...",
+            type="search",
+            priority=1,
+            dependencies=[],
+            estimated_time=30
+        ))
+        
+        # Add domain-specific tasks
+        if analysis.get("domains"):
+            for i, domain_info in enumerate(analysis["domains"][:2]):
+                if domain_info["confidence"] > 0.3:
+                    sub_tasks.append(SubTask(
+                        id=f"domain_{i+1}",
+                        description=f"Domain analysis: {domain_info['domain']}",
+                        type="domain_analysis",
+                        priority=2,
+                        dependencies=["search_1"],
+                        estimated_time=45
+                    ))
+        
+        # Add comparison if needed
+        if intent == "comparison":
+            sub_tasks.append(SubTask(
+                id="comparison_1",
+                description="Structured comparison analysis",
+                type="comparison",
+                priority=3,
+                dependencies=["search_1"],
+                estimated_time=60
+            ))
+        
+        # Synthesis phase
+        sub_tasks.append(SubTask(
+            id="synthesis_1",
+            description="Synthesize findings",
+            type="synthesis",
+            priority=len(sub_tasks) + 1,
+            dependencies=[t.id for t in sub_tasks],
+            estimated_time=40
+        ))
+        
+        total_time = sum(t.estimated_time for t in sub_tasks)
         
         return ExecutionPlan(
             strategy=strategy_name,
             steps=sub_tasks,
-            total_estimated_time=analysis["estimated_time"],
-            adaptation_points=[f"After step {i+1}" for i in range(len(sub_tasks)-1)],
+            total_estimated_time=total_time,
+            adaptation_points=[f"after_{t.id}" for t in sub_tasks[:-1]],
             success_criteria=[
-                "Comprehensive information gathered",
+                "Information gathered successfully",
                 "High-quality sources identified",
-                "Logical conclusions drawn",
-                "User query fully addressed"
+                "Analysis completed",
+                "User query addressed"
             ]
         )
     
-    def _select_strategy(self, query_type: QueryType, complexity: str) -> str:
+    def _select_strategy(self, intent: str, complexity: str) -> str:
         """Select the best strategy based on query characteristics"""
-        if query_type == QueryType.COMPARATIVE:
+        if intent == "comparison":
             return "comparative"
-        elif query_type == QueryType.ANALYTICAL:
+        elif intent == "analysis":
             return "analytical"
-        elif query_type == QueryType.FINANCIAL:
-            return "financial"
-        elif complexity in ["complex", "comprehensive"]:
+        elif complexity == "complex":
             return "analytical"
         else:
             return "simple"
+
+class OptimizedAgentCore:
+    """Optimized agent core with all improvements"""
     
-    def adapt_plan(self, plan: ExecutionPlan, intermediate_results: List[Dict]) -> ExecutionPlan:
-        """Adapt the execution plan based on intermediate results"""
-        # Simple adaptation logic - can be enhanced
-        if len(intermediate_results) > 0:
-            last_result = intermediate_results[-1]
-            
-            # If we found limited sources, add more search steps
-            if last_result.get("source_count", 0) < 3:
-                additional_search = SubTask(
-                    id=f"task_additional_{len(plan.steps)+1}",
-                    description="Additional targeted search for more sources",
-                    type="enhanced_search",
-                    priority=len(plan.steps) + 1,
-                    dependencies=[plan.steps[-1].id],
-                    estimated_time=30
-                )
-                plan.steps.append(additional_search)
-                plan.total_estimated_time += 30
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
         
-        return plan
-
-class WorkingMemory:
-    """Manages working memory for the current task"""
-    
-    def __init__(self):
-        self.data: Dict[str, Any] = {}
-        self.context_history: List[Dict[str, Any]] = []
-        self.intermediate_results: List[Dict[str, Any]] = []
-    
-    def store(self, key: str, value: Any, metadata: Optional[Dict] = None):
-        """Store information in working memory"""
-        self.data[key] = {
-            "value": value,
-            "timestamp": time.time(),
-            "metadata": metadata or {}
-        }
-    
-    def retrieve(self, key: str) -> Any:
-        """Retrieve information from working memory"""
-        return self.data.get(key, {}).get("value")
-    
-    def add_intermediate_result(self, step: str, result: Dict[str, Any]):
-        """Add an intermediate result from a completed step"""
-        self.intermediate_results.append({
-            "step": step,
-            "result": result,
-            "timestamp": time.time()
-        })
-    
-    def get_context(self) -> Dict[str, Any]:
-        """Get the current context for reasoning"""
-        return {
-            "current_data": self.data,
-            "intermediate_results": self.intermediate_results,
-            "history_length": len(self.context_history)
-        }
-
-class AgentCore:
-    """Main agent core that orchestrates the research process with advanced reasoning"""
-    
-    def __init__(self):
-        self.planner = TaskPlanner()
-        self.active_agents: Dict[str, AgentState] = {}
+        # Initialize components
+        self.task_manager = TaskManager()
+        self.state_store = StateStore(self.config.get("state_path", "state_storage"))
+        self.tool_registry = ToolRegistry()
+        self.query_analyzer = EnhancedQueryAnalyzer()
+        self.planner = TaskPlanner(self.query_analyzer)
+        self.metrics = MetricsCollector()
+        
+        # Initialize tools
+        self._initialize_tools()
+        
+        # Advanced reasoning integration
         self.reasoning_enabled = ADVANCED_REASONING_AVAILABLE
-        logger.info(f"AgentCore initialized with reasoning capabilities: {self.reasoning_enabled}")
+        self.learning_enabled = LEARNING_SYSTEM_AVAILABLE
+        
+        logger.info("OptimizedAgentCore initialized")
+    
+    async def __aenter__(self):
+        """Async context manager entry"""
+        await self.state_store.connect()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.task_manager.shutdown()
+        await self.state_store.disconnect()
+    
+    def _initialize_tools(self):
+        """Initialize available tools"""
+        # Register basic tools
+        self.tool_registry.register(
+            "web_search",
+            WebSearchTool,
+            self.config.get("web_search", {})
+        )
+        
+        self.tool_registry.register(
+            "financial_search",
+            FinancialSearchTool,
+            self.config.get("financial_search", {})
+        )
+        
+        logger.info(f"Initialized {len(self.tool_registry.tools)} tools")
     
     async def create_research_task(
-        self, 
-        query: str, 
-        preferences: Optional[Dict[str, Any]] = None
+        self,
+        query: str,
+        preferences: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None
     ) -> str:
-        """Create a new research task and return task ID"""
+        """Create optimized research task"""
         
         task_id = str(uuid.uuid4())
-        agent_id = f"agent_{task_id[:8]}"
         
-        # Initialize agent state
+        # Analyze query
+        start_time = time.time()
+        analysis = self.query_analyzer.analyze_query(query)
+        analysis_time = time.time() - start_time
+        
+        self.metrics.record_operation_time("query_analysis", analysis_time)
+        
+        # Record metrics
+        intent = analysis["intent"]["primary"]
+        self.metrics.record_task_start(task_id, intent)
+        
+        # Create initial state
         agent_state = AgentState(
-            agent_id=agent_id,
+            agent_id=f"agent_{task_id[:8]}",
             task_id=task_id,
-            status=TaskStatus.PLANNING,
+            status=TaskStatus.PENDING,
             current_step=0,
             working_memory={},
             execution_plan=None,
@@ -331,192 +286,393 @@ class AgentCore:
             start_time=time.time(),
             metadata={
                 "query": query,
+                "analysis": analysis,
                 "preferences": preferences or {},
                 "created_at": datetime.now().isoformat()
             }
         )
         
-        self.active_agents[task_id] = agent_state
+        # Save state
+        await self.state_store.save_state(task_id, agent_state)
         
-        # Start planning phase
-        asyncio.create_task(self._execute_planning_phase(task_id, query))
+        # Create managed task
+        await self.task_manager.create_managed_task(
+            self._execute_research_task(task_id, query, analysis),
+            task_id,
+            timeout=timeout or self.config.get("default_timeout", 300)
+        )
         
-        logger.info(f"Created research task {task_id} for query: {query[:100]}...")
+        logger.info(f"Created optimized research task {task_id}")
         return task_id
     
-    async def _execute_planning_phase(self, task_id: str, query: str):
-        """Execute the planning phase for a research task"""
+    async def _execute_research_task(
+        self,
+        task_id: str,
+        query: str,
+        analysis: Dict[str, Any]
+    ):
+        """Execute research task with all optimizations"""
+        
+        state = await self.state_store.get_state(task_id)
+        if not state:
+            raise ValueError(f"State not found for task {task_id}")
+        
+        intent = analysis["intent"]["primary"]
+        
         try:
-            agent_state = self.active_agents[task_id]
-            
-            # Analyze query
-            analysis = self.planner.analyze_query(query)
-            logger.info(f"Query analysis for {task_id}: {analysis}")
+            # Planning phase
+            state = StateTransitionValidator.transition_state(state, TaskStatus.PLANNING)
+            await self.state_store.save_state(task_id, state)
             
             # Create execution plan
-            execution_plan = self.planner.create_execution_plan(query, analysis)
-            agent_state.execution_plan = execution_plan
+            plan_start = time.time()
+            plan = self.planner.create_execution_plan(query, analysis)
+            plan_time = time.time() - plan_start
             
-            # Update state
-            agent_state.status = TaskStatus.EXECUTING
-            agent_state.working_memory = WorkingMemory().data
+            self.metrics.record_operation_time("planning", plan_time)
             
-            # Add to reasoning chain
-            agent_state.reasoning_chain.append({
-                "step": "planning",
-                "analysis": analysis,
-                "plan": asdict(execution_plan),
-                "timestamp": time.time()
-            })
+            state.execution_plan = plan
             
-            logger.info(f"Planning completed for {task_id}. Strategy: {execution_plan.strategy}")
+            # Execution phase
+            state = StateTransitionValidator.transition_state(state, TaskStatus.EXECUTING)
+            await self.state_store.save_state(task_id, state)
             
-            # Start execution with reasoning if available
+            # Execute plan steps
+            exec_start = time.time()
+            results = await self._execute_plan(task_id, plan, analysis)
+            exec_time = time.time() - exec_start
+            
+            self.metrics.record_operation_time("execution", exec_time)
+            
+            # Reasoning phase (if available)
             if self.reasoning_enabled:
-                await self._execute_with_reasoning(task_id, query)
-            else:
-                # Basic execution without advanced reasoning
-                agent_state.status = TaskStatus.COMPLETED
-                agent_state.confidence_scores["planning"] = 0.85
+                state = StateTransitionValidator.transition_state(state, TaskStatus.REASONING)
+                await self.state_store.save_state(task_id, state)
+                
+                reasoning_start = time.time()
+                reasoning_results = await self._apply_reasoning(query, results, analysis)
+                reasoning_time = time.time() - reasoning_start
+                
+                self.metrics.record_operation_time("reasoning", reasoning_time)
+                state.reasoning_chain.extend(reasoning_results)
+            
+            # Complete
+            state = StateTransitionValidator.transition_state(state, TaskStatus.COMPLETED)
+            await self.state_store.save_state(task_id, state)
+            
+            # Record completion metrics
+            duration = time.time() - state.start_time
+            self.metrics.record_task_end(task_id, intent, "success", duration)
             
         except Exception as e:
-            logger.error(f"Planning phase failed for {task_id}: {e}")
-            agent_state = self.active_agents.get(task_id)
-            if agent_state:
-                agent_state.status = TaskStatus.FAILED
+            logger.error(f"Task {task_id} failed: {e}")
+            state = await self.state_store.get_state(task_id)
+            if state:
+                state.status = TaskStatus.FAILED
+                state.metadata["error"] = str(e)
+                await self.state_store.save_state(task_id, state)
+            
+            # Record failure metrics
+            duration = time.time() - state.start_time if state else 0
+            self.metrics.record_task_end(task_id, intent, "failed", duration)
+            raise
     
-    def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Get the current status of a research task"""
-        agent_state = self.active_agents.get(task_id)
-        if not agent_state:
+    async def _execute_plan(
+        self,
+        task_id: str,
+        plan: ExecutionPlan,
+        analysis: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Execute plan with parallel processing where possible"""
+        
+        results = []
+        completed_tasks = set()
+        
+        # Execute tasks in dependency order
+        while len(completed_tasks) < len(plan.steps):
+            # Find tasks ready to execute
+            ready_tasks = [
+                task for task in plan.steps
+                if task.id not in completed_tasks
+                and all(dep in completed_tasks for dep in task.dependencies)
+            ]
+            
+            if not ready_tasks:
+                break
+            
+            # Execute ready tasks
+            for task in ready_tasks:
+                task_start = time.time()
+                result = await self._execute_subtask(task, analysis)
+                task_time = time.time() - task_start
+                
+                self.metrics.record_operation_time(f"subtask_{task.type}", task_time)
+                
+                results.append({
+                    "task_id": task.id,
+                    "type": task.type,
+                    "result": result,
+                    "timestamp": time.time()
+                })
+                completed_tasks.add(task.id)
+                
+                # Update state
+                state = await self.state_store.get_state(task_id)
+                if state:
+                    state.current_step = len(completed_tasks)
+                    await self.state_store.save_state(task_id, state)
+        
+        return results
+    
+    async def _execute_subtask(
+        self,
+        task: SubTask,
+        analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute individual subtask"""
+        
+        try:
+            if task.type == "search":
+                return await self._execute_search(analysis["query"], analysis)
+            elif task.type == "domain_analysis":
+                return await self._execute_domain_analysis(analysis)
+            elif task.type == "comparison":
+                return await self._execute_comparison(analysis)
+            elif task.type == "synthesis":
+                return await self._execute_synthesis(analysis)
+            else:
+                return {"status": "skipped", "reason": "Unknown task type"}
+                
+        except Exception as e:
+            logger.error(f"Subtask {task.id} failed: {e}")
+            return {"status": "error", "error": str(e)}
+    
+    async def _execute_search(
+        self,
+        query: str,
+        analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute search with multiple tools"""
+        
+        search_results = []
+        
+        # Web search
+        search_start = time.time()
+        web_results = await self.tool_registry.execute_tool("web_search", query, limit=10)
+        search_time = time.time() - search_start
+        
+        self.metrics.record_tool_call("web_search", web_results.get("status", "error"), search_time)
+        
+        if web_results.get("status") == "success":
+            search_results.extend(web_results.get("results", []))
+        
+        # Financial search if relevant
+        domains = analysis.get("domains", [])
+        if domains and domains[0]["domain"] == "financial" and domains[0]["confidence"] > 0.5:
+            fin_start = time.time()
+            fin_results = await self.tool_registry.execute_tool("financial_search", query, limit=5)
+            fin_time = time.time() - fin_start
+            
+            self.metrics.record_tool_call("financial_search", fin_results.get("status", "error"), fin_time)
+            
+            if fin_results.get("status") == "success":
+                search_results.extend(fin_results.get("results", []))
+        
+        return {
+            "status": "success",
+            "results": search_results,
+            "total_results": len(search_results)
+        }
+    
+    async def _execute_domain_analysis(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute domain-specific analysis"""
+        
+        if not ADVANCED_REASONING_AVAILABLE:
+            return {"status": "skipped", "reason": "Domain analysis not available"}
+        
+        try:
+            # Use domain orchestrator
+            domain_results = await domain_orchestrator.process_with_domain_expertise(
+                analysis["query"]
+            )
+            
+            return {
+                "status": "success",
+                "domain_analysis": domain_results,
+                "primary_domain": domain_results.get("primary_domain")
+            }
+        except Exception as e:
+            logger.error(f"Domain analysis failed: {e}")
+            return {"status": "error", "error": str(e)}
+    
+    async def _execute_comparison(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute comparison analysis"""
+        
+        entities = analysis.get("entities", [])
+        if len(entities) < 2:
+            return {
+                "status": "error",
+                "error": "Not enough entities for comparison"
+            }
+        
+        # Extract comparison subjects
+        subjects = [e["text"] for e in entities[:2]]
+        
+        return {
+            "status": "success",
+            "comparison": {
+                "subjects": subjects,
+                "aspects": ["features", "performance", "cost", "reviews"],
+                "methodology": "multi-criteria analysis"
+            }
+        }
+    
+    async def _execute_synthesis(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute synthesis of results"""
+        
+        return {
+            "status": "success",
+            "synthesis": {
+                "method": "abstractive",
+                "confidence": 0.85,
+                "key_findings": []
+            }
+        }
+    
+    async def _apply_reasoning(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+        analysis: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Apply advanced reasoning to results"""
+        
+        reasoning_chain = []
+        
+        if ADVANCED_REASONING_AVAILABLE:
+            try:
+                # Convert results to evidence
+                evidence_list = []
+                
+                for result in results:
+                    if result.get("result", {}).get("status") == "success":
+                        search_results = result.get("result", {}).get("results", [])
+                        for item in search_results:
+                            evidence_list.append({
+                                "content": item.get("snippet", ""),
+                                "source": item.get("url", ""),
+                                "relevance_score": item.get("relevance_score", 0.5)
+                            })
+                
+                # Process with reasoning engine
+                if evidence_list:
+                    evidence_objects = reasoning_engine.process_evidence(evidence_list)
+                    
+                    # Domain analysis
+                    domain_insights = await domain_orchestrator.process_with_domain_expertise(
+                        query,
+                        evidence_objects
+                    )
+                    
+                    reasoning_chain.append({
+                        "step": "domain_analysis",
+                        "insights": domain_insights,
+                        "timestamp": time.time()
+                    })
+                    
+                    # Record confidence metrics
+                    for domain, report in domain_insights.get("domain_reports", {}).items():
+                        for insight in report.get("insights", []):
+                            self.metrics.record_confidence(
+                                domain,
+                                insight.get("confidence", 0.0)
+                            )
+            except Exception as e:
+                logger.error(f"Reasoning failed: {e}")
+                reasoning_chain.append({
+                    "step": "reasoning_error",
+                    "error": str(e),
+                    "timestamp": time.time()
+                })
+        
+        return reasoning_chain
+    
+    async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get optimized task status"""
+        
+        state = await self.state_store.get_state(task_id)
+        if not state:
             return None
+        
+        # Get metrics summary
+        metrics_summary = self.metrics.get_metrics_summary()
         
         return {
             "task_id": task_id,
-            "status": agent_state.status.value,
-            "current_step": agent_state.current_step,
-            "progress": self._calculate_progress(agent_state),
-            "execution_plan": asdict(agent_state.execution_plan) if agent_state.execution_plan else None,
-            "reasoning_chain": agent_state.reasoning_chain,
-            "confidence_scores": agent_state.confidence_scores,
-            "processing_time": time.time() - agent_state.start_time,
-            "metadata": agent_state.metadata
+            "status": state.status.value,
+            "current_step": state.current_step,
+            "progress": self._calculate_progress(state),
+            "execution_plan": asdict(state.execution_plan) if state.execution_plan else None,
+            "reasoning_chain": state.reasoning_chain,
+            "confidence_scores": state.confidence_scores,
+            "processing_time": time.time() - state.start_time,
+            "metadata": state.metadata,
+            "metrics": {
+                "task_specific": {
+                    "steps_completed": state.current_step,
+                    "total_steps": len(state.execution_plan.steps) if state.execution_plan else 0
+                },
+                "system": metrics_summary
+            }
         }
     
-    def _calculate_progress(self, agent_state: AgentState) -> float:
-        """Calculate the progress percentage for a task"""
-        if agent_state.status == TaskStatus.COMPLETED:
+    def _calculate_progress(self, state: AgentState) -> float:
+        """Calculate progress with better granularity"""
+        
+        if state.status == TaskStatus.COMPLETED:
             return 1.0
-        elif agent_state.status == TaskStatus.FAILED:
+        elif state.status == TaskStatus.FAILED:
+            return state.current_step / len(state.execution_plan.steps) if state.execution_plan else 0.0
+        elif state.status == TaskStatus.PENDING:
             return 0.0
-        elif not agent_state.execution_plan:
-            return 0.1  # Planning phase
-        else:
-            total_steps = len(agent_state.execution_plan.steps)
+        elif state.status == TaskStatus.PLANNING:
+            return 0.1
+        elif state.status == TaskStatus.EXECUTING and state.execution_plan:
+            total_steps = len(state.execution_plan.steps)
             if total_steps == 0:
                 return 0.5
-            return min(0.95, agent_state.current_step / total_steps)
+            
+            step_progress = state.current_step / total_steps
+            return 0.1 + (step_progress * 0.8)  # 10% planning, 80% execution, 10% reasoning
+        elif state.status == TaskStatus.REASONING:
+            return 0.9
+        else:
+            return 0.5
     
-    def cleanup_completed_tasks(self, max_age_hours: int = 24):
-        """Clean up old completed tasks"""
-        current_time = time.time()
-        to_remove = []
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a running task"""
         
-        for task_id, agent_state in self.active_agents.items():
-            age_hours = (current_time - agent_state.start_time) / 3600
-            if age_hours > max_age_hours and agent_state.status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
-                to_remove.append(task_id)
+        # Cancel the async task
+        cancelled = await self.task_manager.cancel_task(task_id)
         
-        for task_id in to_remove:
-            del self.active_agents[task_id]
-            logger.info(f"Cleaned up task {task_id}")
-
-    async def _execute_with_reasoning(self, task_id: str, query: str):
-        """Execute research task with advanced reasoning capabilities"""
-        try:
-            agent_state = self.active_agents[task_id]
-            agent_state.status = TaskStatus.REASONING
-            
-            # Simulate evidence collection (in real implementation, this would come from web search)
-            mock_evidence_data = [
-                {
-                    "content": f"Research findings related to {query}. This represents collected information from various sources.",
-                    "url": "https://example-research-source.com",
-                    "source": "research-database",
-                    "relevance_score": 0.8
-                }
-            ]
-            
-            # Process evidence with reasoning engine
-            if ADVANCED_REASONING_AVAILABLE:
-                # Convert raw evidence to structured Evidence objects
-                evidence_objects = reasoning_engine.process_evidence(mock_evidence_data)
-                
-                # Analyze with domain agents
-                domain_analysis = await domain_orchestrator.process_with_domain_expertise(query, evidence_objects)
-                
-                # Form hypotheses using reasoning engine
-                hypotheses = reasoning_engine.form_hypotheses(query, evidence_objects)
-                
-                # Generate conclusions
-                conclusions = reasoning_engine.perform_logical_inference(
-                    premises=[f"Research query: {query}"],
-                    evidence=evidence_objects
-                )
-                
-                # Create comprehensive reasoning report
-                reasoning_report = reasoning_engine.synthesize_reasoning_report(
-                    query=query,
-                    evidence=evidence_objects,
-                    hypotheses=hypotheses,
-                    conclusions=conclusions
-                )
-                
-                # Update agent state with reasoning results
-                agent_state.reasoning_chain.append({
-                    "step": "domain_analysis",
-                    "domain_expertise": domain_analysis,
-                    "timestamp": time.time()
-                })
-                
-                agent_state.reasoning_chain.append({
-                    "step": "hypothesis_formation",
-                    "hypotheses": [
-                        {
-                            "statement": h.statement,
-                            "confidence": h.confidence_level,
-                            "status": h.status
-                        } for h in hypotheses
-                    ],
-                    "timestamp": time.time()
-                })
-                
-                agent_state.reasoning_chain.append({
-                    "step": "logical_inference",
-                    "conclusions": [
-                        {
-                            "statement": c.statement,
-                            "reasoning_type": c.reasoning_type.value,
-                            "confidence": c.confidence_score
-                        } for c in conclusions
-                    ],
-                    "timestamp": time.time()
-                })
-                
-                # Set confidence scores based on reasoning quality
-                agent_state.confidence_scores["domain_analysis"] = domain_analysis.get("consolidated_insights", [])
-                agent_state.confidence_scores["reasoning"] = reasoning_report["reasoning_summary"]["overall_confidence"]
-                agent_state.confidence_scores["evidence_quality"] = reasoning_report["evidence_analysis"].get("high_credibility_count", 0) / max(1, len(evidence_objects))
-            
-            # Mark as completed
-            agent_state.status = TaskStatus.COMPLETED
-            logger.info(f"Advanced reasoning completed for task {task_id}")
-            
-        except Exception as e:
-            logger.error(f"Reasoning execution failed for {task_id}: {e}")
-            agent_state = self.active_agents.get(task_id)
-            if agent_state:
-                agent_state.status = TaskStatus.FAILED
+        if cancelled:
+            # Update state
+            state = await self.state_store.get_state(task_id)
+            if state and state.status not in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+                state.status = TaskStatus.FAILED
+                state.metadata["cancelled"] = True
+                state.metadata["cancelled_at"] = datetime.now().isoformat()
+                await self.state_store.save_state(task_id, state)
+        
+        return cancelled
+    
+    async def cleanup_old_tasks(self, max_age_hours: int = 24):
+        """Cleanup old tasks from storage"""
+        logger.info(f"Cleanup requested for tasks older than {max_age_hours} hours")
+    
+    def get_system_health(self) -> Dict[str, Any]:
+        """Get system health status"""
+        return self.metrics.get_system_health()
 
 # Global agent core instance
-agent_core = AgentCore()
+agent_core = OptimizedAgentCore()

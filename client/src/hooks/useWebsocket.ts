@@ -52,8 +52,9 @@ export function useWebsocket(): WebSocketReturn {
     }
 
     console.log('Attempting to connect to WebSocket...');
-
-    const wsUrl = `ws://${window.location.hostname}:5000/ws?userId=${user.id}`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws?userId=${user.id}`;
     const ws = new WebSocket(wsUrl);
     setSocket(ws);
 
@@ -77,7 +78,7 @@ export function useWebsocket(): WebSocketReturn {
       console.error('WebSocket error:', error);
       setError('WebSocket connection failed');
       setIsConnected(false);
-      
+
       // Don't attempt reconnection immediately on error
       if (shouldReconnect.current) {
         setTimeout(() => {
