@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '../ui/select';
-import { ResearchProgress } from './ResearchProgress';
 
 const formatRelativeTime = (timestamp: string) => {
   const now = new Date();
@@ -16,6 +14,80 @@ const formatRelativeTime = (timestamp: string) => {
   return `${Math.floor(diffInMinutes / 1440)}d ago`;
 };
 
+// Simple UI components
+const Select = ({ value, onValueChange, children }: { value: string; onValueChange: (value: string) => void; children?: React.ReactNode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-4 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 flex items-center space-x-2"
+      >
+        <span>{value === '3' ? 'Deep (25K)' : value === '2' ? 'Standard (25K)' : value === '1' ? 'Quick (25K)' : value}</span>
+      </button>
+      {isOpen && (
+        <div className="absolute top-full mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10">
+          <div onClick={() => { onValueChange('1'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Quick (25K)</div>
+          <div onClick={() => { onValueChange('2'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Standard (25K)</div>
+          <div onClick={() => { onValueChange('3'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Deep (25K)</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ResearchProgress = ({ stage, progress, query, isActive }: {
+  stage: number;
+  progress: number;
+  query: string;
+  isActive: boolean;
+}) => (
+  <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-6 backdrop-blur-sm">
+    <div className="flex items-center space-x-3 mb-4">
+      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+        <Search className="w-4 h-4 text-white" />
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-100">Researching...</h3>
+        <p className="text-xs text-zinc-400">{query}</p>
+      </div>
+    </div>
+    
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-blue-400">Stage {stage}/6</span>
+        <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
+      </div>
+      
+      <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
+          style={{ width: `${Math.max(progress, 5)}%` }}
+        />
+      </div>
+      
+      {isActive && (
+        <div className="flex items-center space-x-2 text-xs text-blue-400">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+          <span>Analyzing sources and generating insights...</span>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  sources?: Array<{
+    title: string;
+    url: string;
+    domain: string;
+  }>;
+}
+
 export const ResearchAgent = () => {
   const [message, setMessage] = useState('');
   const [researchDepth, setResearchDepth] = useState('3');
@@ -24,9 +96,13 @@ export const ResearchAgent = () => {
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [researchProgress, setResearchProgress] = useState(0);
   const [researchStage, setResearchStage] = useState(1);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentResearchQuery, setCurrentResearchQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -34,18 +110,25 @@ export const ResearchAgent = () => {
     }
   }, [message]);
 
+  // Cleanup on unmount
   useEffect(() => {
-    // Complete when we reach 100% OR when isSending stops and we're above 90%
-    if (isResearchInProgress && !isSending && researchProgress >= 90) {
-      console.log('✅ Research completed at', Math.round(researchProgress), '% - showing results');
-      
-      const completedMessage = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `# Research Analysis Complete
+    return () => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
+    };
+  }, []);
+
+  // Handle research completion
+  const completeResearch = () => {
+    console.log('✅ Completing research');
+    
+    const completedMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `# Research Analysis Complete
 
 ## Executive Summary
-Your research query "${message || 'analysis'}" has been completed successfully with comprehensive analysis from multiple verified sources.
+Your research query "${currentResearchQuery}" has been completed successfully with comprehensive analysis from multiple verified sources.
 
 ## Key Findings
 
@@ -71,59 +154,38 @@ Your research query "${message || 'analysis'}" has been completed successfully w
 - ✅ Real-time data integration verified and current
 - ✅ Expert-level analysis applied throughout process
 - ✅ Comprehensive coverage across all relevant aspects`,
-        timestamp: new Date().toISOString(),
-        sources: [
-          { title: 'Bloomberg Market Analysis Report', url: '#', domain: 'bloomberg.com' },
-          { title: 'Reuters Financial Data Review', url: '#', domain: 'reuters.com' },
-          { title: 'Wall Street Journal Industry Research', url: '#', domain: 'wsj.com' },
-          { title: 'Financial Times Economic Analysis', url: '#', domain: 'ft.com' }
-        ]
-      };
-      
-      setMessages(prev => [...prev, completedMessage]);
-      
-      // Clear research state after adding the message
-      setTimeout(() => {
-        setIsResearchInProgress(false);
-        setResearchProgress(0);
-        setResearchStage(1);
-        console.log('🧹 Research state cleared - ready for new research');
-      }, 1200);
+      timestamp: new Date().toISOString(),
+      sources: [
+        { title: 'Bloomberg Market Analysis Report', url: '#', domain: 'bloomberg.com' },
+        { title: 'Reuters Financial Data Review', url: '#', domain: 'reuters.com' },
+        { title: 'Wall Street Journal Industry Research', url: '#', domain: 'wsj.com' },
+        { title: 'Financial Times Economic Analysis', url: '#', domain: 'ft.com' }
+      ]
+    };
+    
+    setMessages(prev => [...prev, completedMessage]);
+    
+    // Clear all research-related state
+    setIsResearchInProgress(false);
+    setResearchProgress(0);
+    setResearchStage(1);
+    setIsSending(false);
+    setCurrentResearchQuery('');
+    
+    // Clear any running intervals
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
     }
-  }, [isResearchInProgress, isSending, researchProgress, message]);
-
-  // Add progress recovery logic to prevent stuck states
-  useEffect(() => {
-    if (isResearchInProgress && !isSending) {
-      // If progress seems stuck (hasn't changed in a while), complete it
-      const stuckTimer = setTimeout(() => {
-        if (isResearchInProgress && !isSending && researchProgress < 100) {
-          console.log('⚡ Progress recovery - completing research');
-          setResearchProgress(100);
-        }
-      }, 3000); // Wait 3 seconds after sending stops
-      
-      return () => clearTimeout(stuckTimer);
-    }
-  }, [isResearchInProgress, isSending, researchProgress]);
-
-  // Add cleanup effect for stale research state
-  useEffect(() => {
-    // Clear stale research state if no messages
-    if (messages.length === 0 && isResearchInProgress) {
-      console.log('🔄 Clearing stale research state - no messages found');
-      setIsResearchInProgress(false);
-      setResearchProgress(0);
-      setResearchStage(1);
-    }
-  }, [messages.length, isResearchInProgress]);
+  };
 
   const handleSendMessage = () => {
-    if (!message.trim() || isSending) return;
+    if (!message.trim() || isSending || isResearchInProgress) return;
     
     console.log('🚀 Starting research:', message);
     
-    const userMessage = {
+    // Add user message
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
       content: message,
@@ -131,38 +193,49 @@ Your research query "${message || 'analysis'}" has been completed successfully w
     };
     setMessages(prev => [...prev, userMessage]);
     
+    // Set research state
     setIsSending(true);
     setIsResearchInProgress(true);
     setResearchProgress(0);
     setResearchStage(1);
+    setCurrentResearchQuery(message);
     
-    // FIXED: Better progress simulation
-    const interval = setInterval(() => {
-      setResearchProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsSending(false);
-          return 100;
+    // Clear any existing intervals
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    
+    // Simulate research progress
+    let currentProgress = 0;
+    progressIntervalRef.current = setInterval(() => {
+      currentProgress += Math.random() * 8 + 4; // 4-12% increments
+      
+      if (currentProgress >= 100) {
+        currentProgress = 100;
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
         }
         
-        // More consistent progress increments
-        const baseIncrement = Math.random() * 8 + 4; // 4-12% increments
-        const newProgress = prev + baseIncrement;
-        
-        // Update stages more smoothly
-        if (newProgress >= 85) setResearchStage(6);
-        else if (newProgress >= 70) setResearchStage(5);
-        else if (newProgress >= 55) setResearchStage(4);
-        else if (newProgress >= 40) setResearchStage(3);
-        else if (newProgress >= 20) setResearchStage(2);
-        else setResearchStage(1);
-        
-        return Math.min(newProgress, 100);
-      });
-    }, 600); // Faster updates - every 600ms instead of 800ms
+        // Complete research after a short delay
+        setTimeout(() => {
+          completeResearch();
+        }, 500);
+      }
+      
+      setResearchProgress(currentProgress);
+      
+      // Update stages
+      if (currentProgress >= 85) setResearchStage(6);
+      else if (currentProgress >= 70) setResearchStage(5);
+      else if (currentProgress >= 55) setResearchStage(4);
+      else if (currentProgress >= 40) setResearchStage(3);
+      else if (currentProgress >= 20) setResearchStage(2);
+      else setResearchStage(1);
+    }, 600);
     
+    // Clear message input
     setMessage('');
-    
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -176,12 +249,24 @@ Your research query "${message || 'analysis'}" has been completed successfully w
   };
 
   const handleNewResearch = () => {
+    // Clear all intervals and timeouts
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+    
+    // Reset all state
     setMessages([]);
     setIsResearchInProgress(false);
     setResearchProgress(0);
     setResearchStage(1);
     setIsSending(false);
     setMessage('');
+    setCurrentResearchQuery('');
   };
 
   const predefinedPrompts = [
@@ -200,16 +285,6 @@ Your research query "${message || 'analysis'}" has been completed successfully w
       gradient: "from-blue-500 to-indigo-600"
     }
   ];
-
-  const [ongoingResearchQuery, setOngoingResearchQuery] = useState('');
-
-  useEffect(() => {
-    if (isResearchInProgress) {
-      setOngoingResearchQuery(message);
-    } else {
-      setOngoingResearchQuery('');
-    }
-  }, [isResearchInProgress, message]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
@@ -272,7 +347,11 @@ Your research query "${message || 'analysis'}" has been completed successfully w
                 </div>
                 <div className="flex-1">
                   <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
-                    {msg.content}
+                    <div className="prose prose-invert max-w-none">
+                      {msg.content.split('\n').map((line, i) => (
+                        <div key={i}>{line || <br />}</div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -284,8 +363,8 @@ Your research query "${message || 'analysis'}" has been completed successfully w
               <ResearchProgress 
                 stage={researchStage}
                 progress={researchProgress}
-                query={message || "Analyzing..."}
-                isActive={isSending || isResearchInProgress}
+                query={currentResearchQuery || "Analyzing..."}
+                isActive={true}
               />
             </div>
           )}
@@ -294,27 +373,8 @@ Your research query "${message || 'analysis'}" has been completed successfully w
         <div className="border-t border-zinc-800/60 bg-zinc-900/80 backdrop-blur-xl p-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center space-x-4 mb-4">
-              <Select value={researchDepth} onValueChange={setResearchDepth}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Research Depth" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Quick (25K)</SelectItem>
-                  <SelectItem value="2">Standard (25K)</SelectItem>
-                  <SelectItem value="3">Deep (25K)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="AI Model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto-select</SelectItem>
-                  <SelectItem value="gpt4">GPT-4</SelectItem>
-                  <SelectItem value="claude">Claude</SelectItem>
-                </SelectContent>
-              </Select>
+              <Select value={researchDepth} onValueChange={setResearchDepth} />
+              <Select value={selectedModel} onValueChange={setSelectedModel} />
             </div>
 
             <div className="relative">
@@ -329,7 +389,7 @@ Your research query "${message || 'analysis'}" has been completed successfully w
               />
               <Button
                 onClick={handleSendMessage}
-                disabled={!message.trim() || isSending}
+                disabled={!message.trim() || isSending || isResearchInProgress}
                 className="absolute bottom-4 right-4"
               >
                 {isSending ? (
