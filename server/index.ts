@@ -233,10 +233,10 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Smart port strategy: Use 3000 for public access, fallback to 5000
-  const preferredPort = 3000;
-  const fallbackPort = 5000;
-  const port = process.env.PORT || preferredPort;
+  // Use port 5000 for Replit compatibility, with smart fallback
+  const preferredPort = 5000;
+  const fallbackPort = 3000;
+  const port = parseInt(process.env.PORT || preferredPort.toString());
   
   // Enhanced server startup with smart port detection
   function startServer(portToTry: number, isRetry = false) {
@@ -267,5 +267,5 @@ app.use((req, res, next) => {
     });
   }
 
-  startServer(port);
+  startServer(Number(port));
 })();
