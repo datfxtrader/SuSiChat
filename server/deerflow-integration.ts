@@ -320,6 +320,7 @@ export class ResearchService {
     try {
       // Use DeerFlow with financial-specific parameters
       const deerflowParams: DeerFlowResearchParams = {
+        research_question: `${query} ${currencyPair} financial analysis market trends trading`,
         query: `${query} ${currencyPair} financial analysis market trends trading`,
         model_id: 'deepseek-chat',
         research_depth: 3,
