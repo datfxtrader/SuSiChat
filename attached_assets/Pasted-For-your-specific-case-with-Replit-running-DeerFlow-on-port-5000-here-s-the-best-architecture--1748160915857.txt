@@ -1,0 +1,239 @@
+For your specific case with Replit running DeerFlow on port 5000, here's the best architecture:
+🏗️ Recommended Architecture for Replit + DeerFlow
+Port Strategy:
+
+Port 3000: Main Express server (public Replit port)
+Port 5000: DeerFlow service (internal only)
+Internal communication: 3000 ↔ 5000
+
+Solution: Unified Proxy Server on Port 3000
+javascript// server/main.js - Single entry point for Replit
+const express = require('express');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const path = require('path');
+
+const app = express();
+
+// Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Import your enhanced research service
+const { enhancedResearchService } = require('./deerflow-integration-enhanced');
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy',
+    services: {
+      main: 'running',
+      deerflow: 'internal:5000'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Research endpoint - acts as a smart proxy/orchestrator
+app.post('/api/research', async (req, res) => {
+  try {
+    console.log('🔍 Research request received:', req.body.query);
+    
+    // Use your enhanced research service which handles DeerFlow internally
+    const result = await enhancedResearchService.performResearch({
+      query: req.body.query,
+      depth: req.body.depth || 3,
+      modelId: req.body.modelId || 'deepseek-chat',
+      includeMarketData: req.body.includeMarketData || true,
+      includeNews: req.body.includeNews || true,
+      researchLength: 'comprehensive',
+      researchTone: 'analytical'
+    });
+    
+    console.log('✅ Research completed successfully');
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ Research failed:', error.message);
+    
+    // Return user-friendly error
+    res.status(500).json({
+      error: 'Research service temporarily unavailable',
+      message: error.message,
+      suggestion: 'Please try again in a few moments or simplify your query'
+    });
+  }
+});
+
+// Serve React app for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
+// Start main server on port 3000 (Replit's public port)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Main server running on port ${PORT}`);
+  console.log(`🌐 Public URL: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+  console.log(`🔗 DeerFlow service: localhost:5000 (internal)`);
+});
+Update Your DeerFlow Integration
+javascript// server/deerflow-integration-enhanced.js
+export class EnhancedResearchService {
+  constructor() {
+    // Configure for Replit environment
+    this.deerflowUrl = process.env.DEERFLOW_URL || 'http://localhost:5000';
+    this.isReplit = process.env.REPLIT_DB_URL !== undefined;
+  }
+
+  async performResearch(params) {
+    console.log(`🔍 Starting research in ${this.isReplit ? 'Replit' : 'local'} environment`);
+    
+    try {
+      // Try DeerFlow first
+      return await this.performDeerFlowResearch(params);
+    } catch (deerflowError) {
+      console.log('⚠️ DeerFlow unavailable, using enhanced fallback');
+      
+      // Use your enhanced fallback system
+      return await this.performEnhancedFallback(params);
+    }
+  }
+
+  async performDeerFlowResearch(params) {
+    const response = await fetch(`${this.deerflowUrl}/research`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+      timeout: 30000 // 30 second timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeerFlow error: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  async performEnhancedFallback(params) {
+    // Your existing fallback logic with free search APIs
+    const currencyAnalysis = CurrencyPairDetector.detectCurrencyPairs(params.query);
+    
+    if (currencyAnalysis.isFinancial) {
+      return await FallbackResearchService.generateFinancialAnalysis(
+        params.query,
+        currencyAnalysis.pairs,
+        params.depth
+      );
+    } else {
+      return await FallbackResearchService.generateGeneralAnalysis(
+        params.query,
+        params.depth
+      );
+    }
+  }
+}
+Process Management for Replit
+javascript// server/start.js - Process orchestrator
+const { spawn } = require('child_process');
+const path = require('path');
+
+console.log('🚀 Starting Replit services...');
+
+// Start DeerFlow service on port 5000 (internal)
+const deerflowProcess = spawn('node', ['server/deerflow-server.js'], {
+  env: { ...process.env, PORT: 5000, INTERNAL_SERVICE: 'true' },
+  stdio: 'inherit'
+});
+
+// Give DeerFlow time to start
+setTimeout(() => {
+  console.log('🔗 Starting main server on port 3000...');
+  
+  // Start main server on port 3000 (public)
+  const mainProcess = spawn('node', ['server/main.js'], {
+    env: { ...process.env, PORT: 3000 },
+    stdio: 'inherit'
+  });
+
+  // Handle process cleanup
+  process.on('SIGINT', () => {
+    console.log('🛑 Shutting down services...');
+    deerflowProcess.kill();
+    mainProcess.kill();
+    process.exit(0);
+  });
+}, 2000);
+Package.json Configuration
+json{
+  "scripts": {
+    "start": "node server/start.js",
+    "dev": "node server/start.js",
+    "build": "vite build",
+    "replit:setup": "npm install && npm run build && npm start"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "cors": "^2.8.5"
+  }
+}
+React Component Update
+javascript// Your React component - simplified API calls
+class ResearchAPI {
+  private baseUrl = '/api'; // Always relative in Replit
+
+  async performResearch(params) {
+    console.log('🌐 Sending research request...');
+    
+    const response = await fetch(`${this.baseUrl}/research`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  }
+}
+Replit Configuration Files
+.replit:
+tomlrun = "npm start"
+entrypoint = "server/start.js"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+replit.nix:
+nix{ pkgs }: {
+  deps = [
+    pkgs.nodejs-18_x
+    pkgs.npm
+  ];
+}
+🎯 Why This is Best for Your Case:
+
+Replit Compliance: Uses port 3000 as the public interface
+DeerFlow Integration: Keeps your existing DeerFlow service on port 5000
+Smart Fallbacks: Gracefully handles DeerFlow outages
+Single Entry Point: All traffic goes through port 3000
+Internal Communication: Secure localhost communication between services
+Production Ready: Works in both development and production
+
+🚀 Implementation Steps:
+
+Replace your current server setup with the unified approach above
+Keep DeerFlow running on port 5000 (internal only)
+Update your React component to use /api endpoints
+Test the health endpoint: GET /api/health
+Test research: POST /api/research
+
+This architecture gives you the best of both worlds: your existing DeerFlow service continues working on port 5000, while Replit serves everything through the standard port 3000. The main server acts as an intelligent proxy that handles failovers automatically.
+Would you like me to help you implement this step by step?
