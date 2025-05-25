@@ -26,21 +26,6 @@ const formatRelativeTime = (timestamp: string | number) => {
 };
 
 const ResearchAgent = () => {
-  const [isSending, setIsSending] = useState(false);
-  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
-
-  useEffect(() => {
-    // Prevent unnecessary refreshes
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isSending || isResearchInProgress) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isSending, isResearchInProgress]);
   const { isAuthenticated, user } = useAuth();
   const {
     conversation,
@@ -60,6 +45,21 @@ const ResearchAgent = () => {
     toggleForceSearch,
     toggleDisableSearch
   } = useSuna();
+
+  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
+
+  useEffect(() => {
+    // Prevent unnecessary refreshes
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSending || isResearchInProgress) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isSending, isResearchInProgress]);
 
   const [message, setMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
