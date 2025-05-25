@@ -27,6 +27,13 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
   const stateRef = useRef<DirectTabState | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isSending, setIsSending] = useState<boolean>(false);
+  const [savedTabs, setSavedTabs] = useState<SavedTab[]>([]);
+
+  // Initialize state before using
+  useEffect(() => {
+    setIsSending(false);
+  }, []);
 
   // Force save state to multiple locations
   const forceSaveState = useCallback(() => {
