@@ -26,6 +26,9 @@ const formatRelativeTime = (timestamp: string | number) => {
 };
 
 const ResearchAgent = () => {
+  const [isSending, setIsSending] = useState(false);
+  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
+
   useEffect(() => {
     // Prevent unnecessary refreshes
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {

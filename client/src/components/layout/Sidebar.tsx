@@ -146,7 +146,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
 
           {/* Family Room Links */}
           <div className="space-y-1">
-            <Link href={`/family-room/1`} onClick={handleItemClick} className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 hover:text-zinc-200 transition-all duration-200 text-zinc-400 w-full group">
+            <Link 
+              href={`/family-room/1`} 
+              onClick={handleItemClick}
+              className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 hover:text-zinc-200 transition-all duration-200 text-zinc-400 w-full group"
+            >
               <div className="w-6 h-6 bg-zinc-700/60 group-hover:bg-zinc-600/70 rounded-lg flex items-center justify-center transition-colors">
                 <span className="text-sm">{icons.home}</span>
               </div>
