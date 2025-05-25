@@ -1,0 +1,176 @@
+
+# Domain Agent Configuration
+# This file contains configuration for all domain agents including keywords, thresholds, and analysis parameters
+
+financial:
+  keywords:
+    primary:
+      - market
+      - trading
+      - investment
+      - portfolio
+      - stock
+      - bond
+      - forex
+      - currency
+      - financial
+      - economics
+    secondary:
+      - commodity
+      - derivative
+      - equity
+      - debt
+      - monetary
+      - fiscal
+      - inflation
+      - interest rate
+      - volatility
+      - risk
+    contextual:
+      - central bank
+      - fed
+      - ecb
+      - bank of japan
+      - earnings
+      - revenue
+      - profit
+      - loss
+      - dividend
+      - yield
+  
+  analysis_patterns:
+    trend_analysis:
+      - uptrend
+      - downtrend
+      - sideways
+      - bullish
+      - bearish
+    risk_analysis:
+      - high risk
+      - low risk
+      - volatile
+      - stable
+      - conservative
+      - aggressive
+  
+  thresholds:
+    relevance_score: 0.3
+    confidence_threshold: 0.6
+    risk_score_threshold: 0.7
+
+technical:
+  keywords:
+    primary:
+      - technical analysis
+      - chart
+      - pattern
+      - indicator
+      - signal
+      - support
+      - resistance
+      - trend
+      - momentum
+    secondary:
+      - oscillator
+      - moving average
+      - rsi
+      - macd
+      - bollinger bands
+      - fibonacci
+      - candlestick
+      - volume
+      - breakout
+      - reversal
+    contextual:
+      - bullish
+      - bearish
+      - overbought
+      - oversold
+      - divergence
+      - consolidation
+      - pennant
+      - flag
+      - triangle
+      - head and shoulders
+  
+  thresholds:
+    relevance_score: 0.4
+    confidence_threshold: 0.7
+
+market:
+  keywords:
+    primary:
+      - market
+      - sector
+      - industry
+      - economy
+      - economic
+      - gdp
+      - employment
+      - consumer
+    secondary:
+      - sentiment
+      - outlook
+      - forecast
+      - prediction
+      - analysis
+      - research
+      - report
+      - data
+    contextual:
+      - bull market
+      - bear market
+      - recession
+      - expansion
+      - cycle
+      - seasonal
+  
+  thresholds:
+    relevance_score: 0.25
+    confidence_threshold: 0.65
+
+risk:
+  keywords:
+    primary:
+      - risk
+      - volatility
+      - uncertainty
+      - hedge
+      - protection
+      - insurance
+      - safety
+      - security
+    secondary:
+      - diversification
+      - correlation
+      - exposure
+      - mitigation
+      - management
+      - assessment
+      - analysis
+      - measurement
+    contextual:
+      - black swan
+      - tail risk
+      - systematic
+      - idiosyncratic
+      - credit risk
+      - market risk
+      - operational risk
+  
+  thresholds:
+    relevance_score: 0.35
+    confidence_threshold: 0.8
+
+# Global settings
+global:
+  cache_size: 256
+  max_concurrent_analyses: 10
+  error_threshold: 20
+  performance_monitoring: true
+  detailed_logging: false
+  
+  timeouts:
+    analysis_timeout: 30
+    evidence_processing_timeout: 60
+    orchestration_timeout: 120
