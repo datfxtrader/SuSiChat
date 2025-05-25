@@ -76,6 +76,144 @@ const ResearchProgress = ({ stage, progress, query, isActive }: {
   </div>
 );
 
+// Enhanced Research Response Component
+const ResearchResponse = ({ content, timestamp, sources }: {
+  content: string;
+  timestamp: string;
+  sources?: Array<{ title: string; url: string; domain: string; }>;
+}) => {
+  const [copySuccess, setCopySuccess] = useState('');
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopySuccess('Copied!');
+    setTimeout(() => setCopySuccess(''), 2000);
+  };
+
+  return (
+    <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg">
+      <div className="flex items-center justify-between mb-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div className="flex items-center space-x-3 text-xs text-zinc-400">
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-green-400 rounded-full" />
+            <span>AI Research Assistant</span>
+          </div>
+          <span>•</span>
+          <span>{formatRelativeTime(timestamp)}</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <Button 
+            onClick={handleCopy} 
+            className="h-7 w-7 p-0 hover:bg-zinc-800/60 bg-transparent border-none text-zinc-400 hover:text-zinc-200"
+          >
+            <Copy className="w-3 h-3" />
+          </Button>
+          <Button className="h-7 w-7 p-0 hover:bg-zinc-800/60 bg-transparent border-none text-zinc-400 hover:text-zinc-200">
+            <Share2 className="w-3 h-3" />
+          </Button>
+          <Button className="h-7 w-7 p-0 hover:bg-zinc-800/60 bg-transparent border-none text-zinc-400 hover:text-zinc-200">
+            <Bookmark className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="prose prose-invert max-w-none">
+        <div className="space-y-6 text-zinc-200">
+          {content.split('\n\n').map((paragraph, idx) => {
+            if (paragraph.startsWith('# ')) {
+              return (
+                <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
+                  <TrendingUp className="w-6 h-6 mr-3 text-blue-400" />
+                  {paragraph.replace('# ', '')}
+                </h1>
+              );
+            } else if (paragraph.startsWith('## ')) {
+              return (
+                <h2 key={idx} className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center">
+                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3" />
+                  {paragraph.replace('## ', '')}
+                </h2>
+              );
+            } else if (paragraph.startsWith('### ')) {
+              return (
+                <h3 key={idx} className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
+                  {paragraph.replace('### ', '')}
+                </h3>
+              );
+            } else if (paragraph.startsWith('- **')) {
+              return (
+                <div key={idx} className="ml-4 mb-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
+                  <div className="font-medium text-zinc-100 mb-1">
+                    {paragraph.match(/\*\*(.*?)\*\*/)?.[1] || ''}
+                  </div>
+                  <div className="text-zinc-300 text-sm leading-relaxed">
+                    {paragraph.replace(/- \*\*(.*?)\*\*:\s*/, '')}
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <p key={idx} className="text-zinc-200 leading-relaxed">
+                {paragraph.split('**').map((part, i) => 
+                  i % 2 === 1 ? 
+                    <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
+                    part
+                )}
+              </p>
+            );
+          })}
+        </div>
+      </div>
+      
+      {sources && sources.length > 0 && (
+        <div className="mt-8 pt-6 border-t border-zinc-800/50">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-semibold text-zinc-300 flex items-center">
+              <Search className="w-4 h-4 mr-2 text-blue-400" />
+              Research Sources ({sources.length})
+            </h4>
+            <span className="bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-1 rounded-full text-xs flex items-center">
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1" />
+              Verified
+            </span>
+          </div>
+          <div className="grid gap-3">
+            {sources.map((source, idx) => (
+              <div key={idx} className="group/source flex items-start space-x-3 p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
+                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <a 
+                    href={source.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-zinc-200 hover:text-blue-400 cursor-pointer transition-colors font-medium text-sm block"
+                  >
+                    {source.title}
+                  </a>
+                  <div className="flex items-center space-x-3 mt-2">
+                    <span className="text-xs text-zinc-500">{source.domain}</span>
+                    <span className="text-xs text-zinc-500 flex items-center">
+                      <span className="text-zinc-600">•</span>
+                      <span className="ml-2">{formatRelativeTime(timestamp)}</span>
+                    </span>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => navigator.clipboard.writeText(source.url)}
+                  className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity bg-transparent border-none text-zinc-400 hover:text-zinc-200"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -101,6 +239,7 @@ export const ResearchAgent = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -115,6 +254,7 @@ export const ResearchAgent = () => {
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
+      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
     };
   }, []);
 
@@ -172,10 +312,14 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
     setIsSending(false);
     setCurrentResearchQuery('');
     
-    // Clear any running intervals
+    // Clear any running intervals/timeouts
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
+    }
+    if (progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
+      progressTimeoutRef.current = null;
     }
   };
 
@@ -193,52 +337,77 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
     };
     setMessages(prev => [...prev, userMessage]);
     
+    // Store the query before clearing message
+    const queryText = message;
+    
+    // Clear message input immediately
+    setMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+    
     // Set research state
     setIsSending(true);
     setIsResearchInProgress(true);
     setResearchProgress(0);
     setResearchStage(1);
-    setCurrentResearchQuery(message);
+    setCurrentResearchQuery(queryText);
     
-    // Clear any existing intervals
+    // Clear any existing intervals/timeouts
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
     }
+    if (progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
+    }
     
-    // Simulate research progress
+    // Simulate research progress with better control
     let currentProgress = 0;
+    const targetProgress = 100;
+    const duration = 5000; // 5 seconds total
+    const updateInterval = 100; // Update every 100ms
+    const increment = (targetProgress / duration) * updateInterval;
+    
     progressIntervalRef.current = setInterval(() => {
-      currentProgress += Math.random() * 8 + 4; // 4-12% increments
+      currentProgress += increment + (Math.random() * 2 - 1); // Add some randomness
       
-      if (currentProgress >= 100) {
-        currentProgress = 100;
+      if (currentProgress >= targetProgress) {
+        currentProgress = targetProgress;
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
           progressIntervalRef.current = null;
         }
         
-        // Complete research after a short delay
+        // Complete research after reaching 100%
         setTimeout(() => {
           completeResearch();
-        }, 500);
+        }, 300);
       }
       
-      setResearchProgress(currentProgress);
+      setResearchProgress(Math.min(currentProgress, targetProgress));
       
-      // Update stages
-      if (currentProgress >= 85) setResearchStage(6);
-      else if (currentProgress >= 70) setResearchStage(5);
-      else if (currentProgress >= 55) setResearchStage(4);
-      else if (currentProgress >= 40) setResearchStage(3);
-      else if (currentProgress >= 20) setResearchStage(2);
+      // Update stages based on progress
+      const progress = Math.min(currentProgress, targetProgress);
+      if (progress >= 85) setResearchStage(6);
+      else if (progress >= 70) setResearchStage(5);
+      else if (progress >= 55) setResearchStage(4);
+      else if (progress >= 40) setResearchStage(3);
+      else if (progress >= 20) setResearchStage(2);
       else setResearchStage(1);
-    }, 600);
+    }, updateInterval);
     
-    // Clear message input
-    setMessage('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    // Failsafe timeout to ensure completion
+    progressTimeoutRef.current = setTimeout(() => {
+      if (isResearchInProgress) {
+        console.log('⚠️ Failsafe triggered - forcing completion');
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        setResearchProgress(100);
+        completeResearch();
+      }
+    }, duration + 1000); // Add 1 second buffer
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -249,7 +418,9 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
   };
 
   const handleNewResearch = () => {
-    // Clear all intervals and timeouts
+    console.log('🔄 Starting new research session');
+    
+    // Clear all intervals and timeouts first
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
@@ -258,8 +429,12 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
       clearTimeout(completionTimeoutRef.current);
       completionTimeoutRef.current = null;
     }
+    if (progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
+      progressTimeoutRef.current = null;
+    }
     
-    // Reset all state
+    // Then reset all state
     setMessages([]);
     setIsResearchInProgress(false);
     setResearchProgress(0);
@@ -346,13 +521,19 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
                   {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
                 </div>
                 <div className="flex-1">
-                  <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
-                    <div className="prose prose-invert max-w-none">
-                      {msg.content.split('\n').map((line, i) => (
-                        <div key={i}>{line || <br />}</div>
-                      ))}
+                  {msg.role === 'user' ? (
+                    <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
+                      <div className="prose prose-invert max-w-none">
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <ResearchResponse 
+                      content={msg.content}
+                      timestamp={msg.timestamp}
+                      sources={msg.sources}
+                    />
+                  )}
                 </div>
               </div>
             </div>
