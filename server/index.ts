@@ -233,11 +233,39 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = process.env.PORT || 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0"
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  // Smart port strategy: Use 3000 for public access, fallback to 5000
+  const preferredPort = 3000;
+  const fallbackPort = 5000;
+  const port = process.env.PORT || preferredPort;
+  
+  // Enhanced server startup with smart port detection
+  function startServer(portToTry: number, isRetry = false) {
+    const serverInstance = server.listen({
+      port: portToTry,
+      host: "0.0.0.0",
+    }, () => {
+      log(`🚀 Research Agent server running on port ${portToTry}`);
+      if (portToTry === preferredPort) {
+        log(`🌐 Optimal Replit configuration active`);
+      }
+      if (process.env.REPLIT_DB_URL) {
+        log(`🔗 Available at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+      }
+    });
+
+    serverInstance.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE' && !isRetry) {
+        log(`Port ${portToTry} busy, trying fallback port ${fallbackPort}`);
+        setTimeout(() => startServer(fallbackPort, true), 1000);
+      } else if (err.code === 'EADDRINUSE' && isRetry) {
+        const randomPort = fallbackPort + Math.floor(Math.random() * 100);
+        log(`Using alternative port ${randomPort}`);
+        setTimeout(() => startServer(randomPort, true), 1000);
+      } else {
+        throw err;
+      }
+    });
+  }
+
+  startServer(port);
 })();
