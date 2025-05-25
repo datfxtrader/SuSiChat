@@ -213,14 +213,14 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
     };
   }, [forceSaveState, forceRestoreState]);
 
-  // Enhanced progress management with proper isSending detection
+  // Enhanced progress management with proper stage progression
   useEffect(() => {
     if (!isResearchInProgress) return;
 
     let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
         // Auto-complete when research is actually done
-        if (isSending === false && prev >= 85) {
+        if (isSending === false && prev >= 95) {
           clearInterval(progressInterval);
           setTimeout(() => {
             completeDirectResearch();
@@ -233,26 +233,31 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
           return 100;
         }
 
-        // Dynamic increment based on actual sending status
-        const baseIncrement = isSending ? Math.random() * 4 + 2 : Math.random() * 8 + 4;
-        const newProgress = prev + baseIncrement;
+        // Dynamic increment for smooth progression
+        const baseIncrement = Math.random() * 3 + 1;
+        const newProgress = Math.min(prev + baseIncrement, 100);
 
-        // Stage-based caps with proper research completion detection
-        if (isSending === false && newProgress >= 85) {
-          return Math.min(newProgress, 100);
-        } else if (researchStage >= 5) {
-          return Math.min(newProgress, isSending ? 90 : 100);
-        } else if (researchStage >= 4) {
-          return Math.min(newProgress, isSending ? 80 : 95);
-        } else if (researchStage >= 3) {
-          return Math.min(newProgress, 70);
-        } else if (researchStage >= 2) {
-          return Math.min(newProgress, 50);
-        } else {
-          return Math.min(newProgress, 35);
+        // Update stage based on progress
+        if (newProgress >= 80 && researchStage < 6) {
+          setResearchStage(6);
+          setStageLabel('Finalizing results...');
+        } else if (newProgress >= 65 && researchStage < 5) {
+          setResearchStage(5);
+          setStageLabel('Generating insights...');
+        } else if (newProgress >= 50 && researchStage < 4) {
+          setResearchStage(4);
+          setStageLabel('Analyzing data...');
+        } else if (newProgress >= 35 && researchStage < 3) {
+          setResearchStage(3);
+          setStageLabel('Processing sources...');
+        } else if (newProgress >= 20 && researchStage < 2) {
+          setResearchStage(2);
+          setStageLabel('Gathering information...');
         }
+        
+        return newProgress;
       });
-    }, 1500);
+    }, 800);
 
     return () => {
       if (progressInterval) {
