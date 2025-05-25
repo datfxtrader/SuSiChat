@@ -213,43 +213,56 @@ export const useDirectTabPersistence = () => {
     };
   }, [forceSaveState, forceRestoreState]);
 
-  // Progress simulation with completion check
+  // Enhanced progress management with auto-completion
   useEffect(() => {
     if (!isResearchInProgress) return;
-
+    
     let progressInterval = setInterval(() => {
       setResearchProgress(prev => {
-        // Stop at 100%
+        // Auto-complete when research is done
+        if (!isSending && prev >= 85) {
+          clearInterval(progressInterval);
+          // Trigger completion after brief delay
+          setTimeout(() => {
+            completeDirectResearch();
+          }, 1000);
+          return 100;
+        }
+        
+        // Stop progression if already complete
         if (prev >= 100) {
           clearInterval(progressInterval);
           return 100;
         }
-
-        // Calculate next progress increment
-        const increment = Math.random() * 3 + 1;
-        const newProgress = prev + increment;
-
-        // Stage-based progress caps
-        if (researchStage >= 5) {
+        
+        // Dynamic increment based on actual status
+        const baseIncrement = isSending ? Math.random() * 4 + 2 : Math.random() * 8 + 4;
+        const newProgress = prev + baseIncrement;
+        
+        // Stage-based caps with research completion detection
+        if (!isSending && newProgress >= 85) {
+          // Research is complete, allow final progression
           return Math.min(newProgress, 100);
+        } else if (researchStage >= 5) {
+          return Math.min(newProgress, isSending ? 90 : 100);
         } else if (researchStage >= 4) {
-          return Math.min(newProgress, 95);
+          return Math.min(newProgress, isSending ? 80 : 95);
         } else if (researchStage >= 3) {
-          return Math.min(newProgress, 80);
+          return Math.min(newProgress, 70);
         } else if (researchStage >= 2) {
-          return Math.min(newProgress, 60);
+          return Math.min(newProgress, 50);
         } else {
-          return Math.min(newProgress, 40);
+          return Math.min(newProgress, 35);
         }
       });
-    }, 2000);
-
+    }, 1500); // Slightly faster updates
+    
     return () => {
       if (progressInterval) {
         clearInterval(progressInterval);
       }
     };
-  }, [isResearchInProgress, researchStage]);
+  }, [isResearchInProgress, researchStage, isSending, completeDirectResearch]);
 
   // Initial restore on mount
   useEffect(() => {
