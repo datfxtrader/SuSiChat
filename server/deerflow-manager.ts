@@ -17,17 +17,17 @@ export class DeerFlowManager {
 
   static async checkDeerFlowService(): Promise<boolean> {
     try {
-      console.log(`Checking DeerFlow health at ${DeerFlowManager.HEALTH_CHECK_URL}`);
+      console.log(`🔍 Checking DeerFlow health at ${DeerFlowManager.HEALTH_CHECK_URL}`);
 
       const response = await axios.get(DeerFlowManager.HEALTH_CHECK_URL, {
-        timeout: 3000,
+        timeout: 5000,
         validateStatus: (status) => status === 200
       });
 
-      console.log('DeerFlow health check response:', response.status, response.data);
-      return response.data?.status === 'ok';
+      console.log(`✅ DeerFlow health check response:`, response.data);
+      return response.data?.status === 'ok' || response.data?.status === 'healthy';
     } catch (error) {
-      console.log(`DeerFlow health check failed:`, error instanceof Error ? error.message : String(error));
+      console.log(`⚠️ DeerFlow health check failed:`, error.message);
       return false;
     }
   }

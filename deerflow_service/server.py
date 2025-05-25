@@ -619,6 +619,16 @@ Format your report in Markdown, but make it readable and professional."""
         
         asyncio.create_task(cleanup_research_state())
 
+@app.get("/")
+async def root():
+    """Root endpoint with API info."""
+    return {
+        "name": "DeerFlow Research Service",
+        "version": "1.0",
+        "status": "running",
+        "endpoints": ["/health", "/research", "/docs"]
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint to verify API is working."""
