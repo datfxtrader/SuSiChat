@@ -43,10 +43,6 @@ args = "python deerflow_service/server.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "sleep 5"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
 args = "npm run dev"
 
 [[ports]]
