@@ -1022,4 +1022,17 @@ async def list_available_tools():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    import os
+    
+    # Ensure we bind to the correct port
+    port = int(os.environ.get("DEERFLOW_PORT", 8000))
+    print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
+    
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=port, 
+        log_level="info",
+        access_log=True,
+        loop="asyncio"
+    )

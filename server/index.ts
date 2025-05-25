@@ -228,7 +228,7 @@ app.use((req, res, next) => {
       console.log('🔄 Starting DeerFlow research request...');
 
       // Make request to DeerFlow service
-      const deerflowResponse = await fetch('http://localhost:8000/research', {
+      const deerflowResponse = await fetch('http://0.0.0.0:8000/research', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
