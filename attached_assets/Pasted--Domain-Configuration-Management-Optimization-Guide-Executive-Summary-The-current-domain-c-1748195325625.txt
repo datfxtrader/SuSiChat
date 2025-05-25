@@ -1,0 +1,853 @@
+# Domain Configuration Management Optimization Guide
+
+## Executive Summary
+
+The current domain configuration management system has a solid foundation but lacks several critical features including schema validation, hot reloading, environment variable support, configuration inheritance, and proper caching. This optimization guide addresses these issues while improving performance and reliability.
+
+## Key Optimization Areas
+
+### 1. Schema Validation and Type Safety
+
+#### Current Problem:
+- No validation of configuration structure
+- No type checking for configuration values
+- Potential runtime errors from invalid configs
+
+#### Optimized Solution:
+
+```python
+from typing import Dict, Any, Optional, List, Union
+from pydantic import BaseModel, Field, validator
+from enum import Enum
+import jsonschema
+
+class KeywordCategory(str, Enum):
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    CONTEXTUAL = "contextual"
+
+class ThresholdConfig(BaseModel):
+    """Validated threshold configuration"""
+    relevance_score: float = Field(default=0.5, ge=0.0, le=1.0)
+    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    min_evidence_count: int = Field(default=3, ge=1)
+    
+    @validator('relevance_score', 'confidence_threshold')
+    def validate_threshold_range(cls, v):
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Threshold must be between 0.0 and 1.0, got {v}")
+        return v
+
+class KeywordConfig(BaseModel):
+    """Validated keyword configuration"""
+    primary: List[str] = Field(default_factory=list)
+    secondary: List[str] = Field(default_factory=list)
+    contextual: List[str] = Field(default_factory=list)
+    
+    @validator('primary', 'secondary', 'contextual')
+    def validate_keywords(cls, v):
+        # Remove empty strings and duplicates
+        return list(set(filter(None, v)))
+
+class DomainConfigSchema(BaseModel):
+    """Schema for domain configuration"""
+    keywords: KeywordConfig
+    thresholds: ThresholdConfig
+    analysis_patterns: Dict[str, List[str]] = Field(default_factory=dict)
+    enabled: bool = Field(default=True)
+    priority: int = Field(default=5, ge=1, le=10)
+
+class GlobalConfigSchema(BaseModel):
+    """Schema for global configuration"""
+    cache_size: int = Field(default=128, ge=1)
+    max_concurrent_analyses: int = Field(default=5, ge=1)
+    error_threshold: int = Field(default=10, ge=0)
+    config_reload_interval: int = Field(default=300)  # seconds
+    enable_hot_reload: bool = Field(default=True)
+
+class ConfigValidator:
+    """Validates configuration against schemas"""
+    
+    @staticmethod
+    def validate_domain_config(config: Dict[str, Any]) -> DomainConfigSchema:
+        """Validate and parse domain configuration"""
+        return DomainConfigSchema(**config)
+    
+    @staticmethod
+    def validate_global_config(config: Dict[str, Any]) -> GlobalConfigSchema:
+        """Validate and parse global configuration"""
+        return GlobalConfigSchema(**config)
+    
+    @staticmethod
+    def validate_full_config(config: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate entire configuration"""
+        validated = {}
+        
+        # Validate global config
+        if "global" in config:
+            validated["global"] = ConfigValidator.validate_global_config(
+                config["global"]
+            ).dict()
+        
+        # Validate each domain config
+        for domain, domain_config in config.items():
+            if domain != "global":
+                try:
+                    validated[domain] = ConfigValidator.validate_domain_config(
+                        domain_config
+                    ).dict()
+                except Exception as e:
+                    logger.error(f"Invalid configuration for domain {domain}: {e}")
+                    # Use default configuration for invalid domains
+                    validated[domain] = DomainConfigSchema().dict()
+        
+        return validated
+```
+
+### 2. Environment Variable Support
+
+#### Current Problem:
+- No support for environment-specific configurations
+- Hardcoded values in configuration files
+- No secure way to manage sensitive data
+
+#### Optimized Solution:
+
+```python
+import os
+import re
+from typing import Any, Dict, Union
+
+class EnvironmentResolver:
+    """Resolves environment variables in configuration"""
+    
+    ENV_VAR_PATTERN = re.compile(r'\${([^}]+)}')
+    
+    @classmethod
+    def resolve_value(cls, value: Any) -> Any:
+        """Resolve environment variables in a value"""
+        if isinstance(value, str):
+            return cls._resolve_string(value)
+        elif isinstance(value, dict):
+            return {k: cls.resolve_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [cls.resolve_value(item) for item in value]
+        return value
+    
+    @classmethod
+    def _resolve_string(cls, value: str) -> Union[str, int, float, bool]:
+        """Resolve environment variables in a string"""
+        def replacer(match):
+            env_var = match.group(1)
+            default = None
+            
+            # Support default values: ${VAR_NAME:default_value}
+            if ':' in env_var:
+                env_var, default = env_var.split(':', 1)
+            
+            env_value = os.environ.get(env_var, default)
+            
+            if env_value is None:
+                logger.warning(f"Environment variable {env_var} not found")
+                return match.group(0)  # Return original if not found
+            
+            return env_value
+        
+        resolved = cls.ENV_VAR_PATTERN.sub(replacer, value)
+        
+        # Try to convert to appropriate type
+        if resolved.lower() in ('true', 'false'):
+            return resolved.lower() == 'true'
+        
+        try:
+            return int(resolved)
+        except ValueError:
+            try:
+                return float(resolved)
+            except ValueError:
+                return resolved
+    
+    @classmethod
+    def resolve_config(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve all environment variables in configuration"""
+        return cls.resolve_value(config)
+```
+
+### 3. Configuration Inheritance and Overlays
+
+#### Current Problem:
+- No way to inherit from base configurations
+- Difficult to manage environment-specific overrides
+- No configuration composition
+
+#### Optimized Solution:
+
+```python
+from abc import ABC, abstractmethod
+from pathlib import Path
+import copy
+
+class ConfigurationSource(ABC):
+    """Abstract base for configuration sources"""
+    
+    @abstractmethod
+    async def load(self) -> Dict[str, Any]:
+        """Load configuration from source"""
+        pass
+    
+    @abstractmethod
+    def get_priority(self) -> int:
+        """Get source priority (higher = higher priority)"""
+        pass
+
+class FileConfigSource(ConfigurationSource):
+    """File-based configuration source"""
+    
+    def __init__(self, file_path: Path, priority: int = 0):
+        self.file_path = file_path
+        self.priority = priority
+    
+    async def load(self) -> Dict[str, Any]:
+        """Load configuration from file"""
+        if not self.file_path.exists():
+            return {}
+        
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                if self.file_path.suffix == '.yaml' or self.file_path.suffix == '.yml':
+                    return yaml.safe_load(f) or {}
+                elif self.file_path.suffix == '.json':
+                    return json.load(f)
+                else:
+                    raise ValueError(f"Unsupported file format: {self.file_path.suffix}")
+        except Exception as e:
+            logger.error(f"Failed to load config from {self.file_path}: {e}")
+            return {}
+    
+    def get_priority(self) -> int:
+        return self.priority
+
+class EnvironmentConfigSource(ConfigurationSource):
+    """Environment variable configuration source"""
+    
+    def __init__(self, prefix: str = "DOMAIN_", priority: int = 10):
+        self.prefix = prefix
+        self.priority = priority
+    
+    async def load(self) -> Dict[str, Any]:
+        """Load configuration from environment variables"""
+        config = {}
+        
+        for key, value in os.environ.items():
+            if key.startswith(self.prefix):
+                # Convert DOMAIN_FINANCIAL_KEYWORDS_PRIMARY to financial.keywords.primary
+                path = key[len(self.prefix):].lower().split('_')
+                self._set_nested_value(config, path, value)
+        
+        return config
+    
+    def _set_nested_value(self, config: Dict, path: List[str], value: str):
+        """Set a value in nested dictionary using path"""
+        current = config
+        for i, key in enumerate(path[:-1]):
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+        
+        # Try to parse value
+        try:
+            current[path[-1]] = json.loads(value)
+        except json.JSONDecodeError:
+            current[path[-1]] = value
+    
+    def get_priority(self) -> int:
+        return self.priority
+
+class ConfigurationManager:
+    """Manages configuration from multiple sources with inheritance"""
+    
+    def __init__(self):
+        self.sources: List[ConfigurationSource] = []
+        self.merged_config: Dict[str, Any] = {}
+        self.base_config: Dict[str, Any] = {}
+    
+    def add_source(self, source: ConfigurationSource):
+        """Add a configuration source"""
+        self.sources.append(source)
+        # Sort by priority
+        self.sources.sort(key=lambda s: s.get_priority())
+    
+    async def load_all(self) -> Dict[str, Any]:
+        """Load and merge all configurations"""
+        configs = []
+        
+        # Load from all sources
+        for source in self.sources:
+            config = await source.load()
+            if config:
+                configs.append((source.get_priority(), config))
+        
+        # Sort by priority and merge
+        configs.sort(key=lambda x: x[0])
+        
+        merged = {}
+        for _, config in configs:
+            merged = self._deep_merge(merged, config)
+        
+        # Apply inheritance
+        merged = self._apply_inheritance(merged)
+        
+        # Resolve environment variables
+        merged = EnvironmentResolver.resolve_config(merged)
+        
+        # Validate
+        self.merged_config = ConfigValidator.validate_full_config(merged)
+        
+        return self.merged_config
+    
+    def _deep_merge(self, base: Dict, overlay: Dict) -> Dict:
+        """Deep merge two dictionaries"""
+        result = copy.deepcopy(base)
+        
+        for key, value in overlay.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = copy.deepcopy(value)
+        
+        return result
+    
+    def _apply_inheritance(self, config: Dict) -> Dict:
+        """Apply configuration inheritance"""
+        # Look for _extends key
+        if "_extends" in config:
+            base_name = config.pop("_extends")
+            if base_name in config:
+                base = config[base_name]
+                # Merge current config with base
+                for key, value in config.items():
+                    if key != base_name:
+                        config[key] = self._deep_merge(base, value)
+        
+        return config
+```
+
+### 4. Hot Reloading and File Watching
+
+#### Current Problem:
+- Manual reload required for configuration changes
+- No automatic detection of configuration updates
+- No notification system for configuration changes
+
+#### Optimized Solution:
+
+```python
+import asyncio
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler, FileModifiedEvent
+from typing import Callable, Set
+import hashlib
+
+class ConfigFileWatcher(FileSystemEventHandler):
+    """Watches configuration files for changes"""
+    
+    def __init__(self, config_manager: 'OptimizedDomainConfig'):
+        self.config_manager = config_manager
+        self.file_hashes: Dict[str, str] = {}
+        self.debounce_timer: Optional[asyncio.Task] = None
+        self.pending_reload = False
+    
+    def on_modified(self, event: FileModifiedEvent):
+        """Handle file modification events"""
+        if event.is_directory:
+            return
+        
+        if event.src_path.endswith(('.yaml', '.yml', '.json')):
+            # Check if file actually changed (content-based)
+            new_hash = self._calculate_file_hash(event.src_path)
+            old_hash = self.file_hashes.get(event.src_path)
+            
+            if new_hash != old_hash:
+                self.file_hashes[event.src_path] = new_hash
+                self._schedule_reload()
+    
+    def _calculate_file_hash(self, file_path: str) -> str:
+        """Calculate hash of file contents"""
+        try:
+            with open(file_path, 'rb') as f:
+                return hashlib.md5(f.read()).hexdigest()
+        except Exception:
+            return ""
+    
+    def _schedule_reload(self):
+        """Schedule configuration reload with debounce"""
+        self.pending_reload = True
+        
+        if self.debounce_timer:
+            self.debounce_timer.cancel()
+        
+        async def delayed_reload():
+            await asyncio.sleep(1.0)  # 1 second debounce
+            if self.pending_reload:
+                await self.config_manager.reload_configuration()
+                self.pending_reload = False
+        
+        self.debounce_timer = asyncio.create_task(delayed_reload())
+
+class ConfigChangeNotifier:
+    """Notifies subscribers of configuration changes"""
+    
+    def __init__(self):
+        self.subscribers: Set[Callable] = set()
+    
+    def subscribe(self, callback: Callable[[Dict[str, Any]], None]):
+        """Subscribe to configuration changes"""
+        self.subscribers.add(callback)
+    
+    def unsubscribe(self, callback: Callable):
+        """Unsubscribe from configuration changes"""
+        self.subscribers.discard(callback)
+    
+    async def notify(self, changes: Dict[str, Any]):
+        """Notify all subscribers of changes"""
+        tasks = []
+        for subscriber in self.subscribers:
+            if asyncio.iscoroutinefunction(subscriber):
+                tasks.append(subscriber(changes))
+            else:
+                subscriber(changes)
+        
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+```
+
+### 5. Caching and Performance Optimization
+
+#### Current Problem:
+- No caching of processed configurations
+- Repeated parsing of keyword lists
+- Inefficient keyword lookups
+
+#### Optimized Solution:
+
+```python
+from functools import lru_cache
+import time
+from typing import Tuple, FrozenSet
+
+class CachedKeywordMatcher:
+    """Optimized keyword matching with caching"""
+    
+    def __init__(self):
+        self.keyword_sets: Dict[str, Dict[str, FrozenSet[str]]] = {}
+        self.compiled_patterns: Dict[str, re.Pattern] = {}
+        self.cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "evictions": 0
+        }
+    
+    def build_keyword_index(self, domain: str, keywords: Dict[str, List[str]]):
+        """Build optimized keyword index for a domain"""
+        if domain not in self.keyword_sets:
+            self.keyword_sets[domain] = {}
+        
+        for category, keyword_list in keywords.items():
+            # Use frozenset for O(1) lookups
+            self.keyword_sets[domain][category] = frozenset(
+                kw.lower() for kw in keyword_list
+            )
+            
+            # Pre-compile regex patterns for complex matching
+            pattern = '|'.join(re.escape(kw) for kw in keyword_list)
+            if pattern:
+                self.compiled_patterns[f"{domain}_{category}"] = re.compile(
+                    pattern, re.IGNORECASE
+                )
+    
+    @lru_cache(maxsize=1024)
+    def match_keywords(
+        self, 
+        text: str, 
+        domain: str, 
+        category: Optional[str] = None
+    ) -> Tuple[bool, List[str]]:
+        """Match keywords in text with caching"""
+        text_lower = text.lower()
+        matches = []
+        
+        if domain not in self.keyword_sets:
+            self.cache_stats["misses"] += 1
+            return False, []
+        
+        categories = [category] if category else self.keyword_sets[domain].keys()
+        
+        for cat in categories:
+            if cat in self.keyword_sets[domain]:
+                # Fast set intersection
+                text_words = set(text_lower.split())
+                keyword_matches = text_words & self.keyword_sets[domain][cat]
+                matches.extend(keyword_matches)
+        
+        self.cache_stats["hits"] += 1
+        return len(matches) > 0, list(matches)
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics"""
+        total = self.cache_stats["hits"] + self.cache_stats["misses"]
+        hit_rate = self.cache_stats["hits"] / total if total > 0 else 0
+        
+        return {
+            **self.cache_stats,
+            "hit_rate": hit_rate,
+            "cache_info": self.match_keywords.cache_info()
+        }
+    
+    def clear_cache(self):
+        """Clear the cache"""
+        self.match_keywords.cache_clear()
+        self.cache_stats["evictions"] += self.cache_stats["hits"]
+        self.cache_stats["hits"] = 0
+        self.cache_stats["misses"] = 0
+```
+
+### 6. Complete Optimized Implementation
+
+```python
+import asyncio
+import yaml
+import json
+import os
+import logging
+from typing import Dict, Any, Optional, List, Set, Callable, Union
+from pathlib import Path
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+import aiofiles
+from watchdog.observers import Observer
+
+logger = logging.getLogger("domain_config")
+
+class OptimizedDomainConfig:
+    """Optimized domain configuration management with all features"""
+    
+    def __init__(
+        self, 
+        config_dir: str = None,
+        enable_hot_reload: bool = True,
+        enable_caching: bool = True
+    ):
+        self.config_dir = Path(config_dir) if config_dir else Path(__file__).parent
+        self.enable_hot_reload = enable_hot_reload
+        self.enable_caching = enable_caching
+        
+        # Core components
+        self.config_manager = ConfigurationManager()
+        self.validator = ConfigValidator()
+        self.keyword_matcher = CachedKeywordMatcher()
+        self.notifier = ConfigChangeNotifier()
+        
+        # Configuration state
+        self.configs: Dict[str, Any] = {}
+        self.validated_configs: Dict[str, Union[DomainConfigSchema, GlobalConfigSchema]] = {}
+        self.last_reload: Optional[datetime] = None
+        
+        # File watching
+        self.observer: Optional[Observer] = None
+        self.file_watcher: Optional[ConfigFileWatcher] = None
+        
+        # Initialize
+        asyncio.create_task(self._initialize())
+    
+    async def _initialize(self):
+        """Initialize configuration system"""
+        # Add configuration sources
+        self.config_manager.add_source(
+            FileConfigSource(self.config_dir / "domain_config.yaml", priority=0)
+        )
+        self.config_manager.add_source(
+            FileConfigSource(self.config_dir / "domain_config.local.yaml", priority=5)
+        )
+        self.config_manager.add_source(
+            EnvironmentConfigSource(prefix="DOMAIN_", priority=10)
+        )
+        
+        # Load initial configuration
+        await self.reload_configuration()
+        
+        # Start file watching if enabled
+        if self.enable_hot_reload:
+            self._start_file_watching()
+    
+    def _start_file_watching(self):
+        """Start watching configuration files"""
+        self.file_watcher = ConfigFileWatcher(self)
+        self.observer = Observer()
+        self.observer.schedule(
+            self.file_watcher,
+            str(self.config_dir),
+            recursive=False
+        )
+        self.observer.start()
+        logger.info("Configuration file watching enabled")
+    
+    async def reload_configuration(self):
+        """Reload configuration from all sources"""
+        try:
+            old_configs = self.configs.copy()
+            
+            # Load and merge configurations
+            self.configs = await self.config_manager.load_all()
+            
+            # Validate configurations
+            self._validate_all_configs()
+            
+            # Rebuild keyword indices
+            self._rebuild_keyword_indices()
+            
+            # Clear caches
+            if self.enable_caching:
+                self.keyword_matcher.clear_cache()
+            
+            self.last_reload = datetime.now()
+            
+            # Notify subscribers of changes
+            changes = self._detect_changes(old_configs, self.configs)
+            if changes:
+                await self.notifier.notify(changes)
+            
+            logger.info("Configuration reloaded successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to reload configuration: {e}")
+            # Keep old configuration on error
+            if not self.configs:
+                self.configs = self._get_default_config()
+    
+    def _validate_all_configs(self):
+        """Validate all domain configurations"""
+        self.validated_configs = {}
+        
+        # Validate global config
+        if "global" in self.configs:
+            try:
+                self.validated_configs["global"] = GlobalConfigSchema(
+                    **self.configs["global"]
+                )
+            except Exception as e:
+                logger.error(f"Invalid global configuration: {e}")
+                self.validated_configs["global"] = GlobalConfigSchema()
+        
+        # Validate domain configs
+        for domain, config in self.configs.items():
+            if domain != "global":
+                try:
+                    self.validated_configs[domain] = DomainConfigSchema(**config)
+                except Exception as e:
+                    logger.error(f"Invalid configuration for domain {domain}: {e}")
+                    self.validated_configs[domain] = DomainConfigSchema()
+    
+    def _rebuild_keyword_indices(self):
+        """Rebuild keyword indices for all domains"""
+        for domain, config in self.validated_configs.items():
+            if isinstance(config, DomainConfigSchema):
+                self.keyword_matcher.build_keyword_index(
+                    domain,
+                    config.keywords.dict()
+                )
+    
+    def _detect_changes(
+        self, 
+        old_config: Dict[str, Any], 
+        new_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Detect changes between configurations"""
+        changes = {
+            "added": {},
+            "removed": {},
+            "modified": {}
+        }
+        
+        # Find added and modified
+        for key, value in new_config.items():
+            if key not in old_config:
+                changes["added"][key] = value
+            elif old_config[key] != value:
+                changes["modified"][key] = {
+                    "old": old_config[key],
+                    "new": value
+                }
+        
+        # Find removed
+        for key in old_config:
+            if key not in new_config:
+                changes["removed"][key] = old_config[key]
+        
+        return changes if any(changes.values()) else {}
+    
+    def get_domain_config(self, domain: str) -> Optional[DomainConfigSchema]:
+        """Get validated configuration for a domain"""
+        config = self.validated_configs.get(domain)
+        if isinstance(config, DomainConfigSchema):
+            return config
+        return None
+    
+    def get_keywords(
+        self, 
+        domain: str, 
+        category: Optional[str] = None
+    ) -> List[str]:
+        """Get keywords with caching"""
+        config = self.get_domain_config(domain)
+        if not config:
+            return []
+        
+        if category:
+            return getattr(config.keywords, category, [])
+        
+        # Return all keywords
+        all_keywords = []
+        for cat in ["primary", "secondary", "contextual"]:
+            all_keywords.extend(getattr(config.keywords, cat, []))
+        
+        return all_keywords
+    
+    def match_keywords_in_text(
+        self,
+        text: str,
+        domain: str,
+        category: Optional[str] = None
+    ) -> Tuple[bool, List[str]]:
+        """Match keywords in text with caching"""
+        if self.enable_caching:
+            return self.keyword_matcher.match_keywords(text, domain, category)
+        
+        # Non-cached version
+        keywords = self.get_keywords(domain, category)
+        text_lower = text.lower()
+        matches = [kw for kw in keywords if kw.lower() in text_lower]
+        return len(matches) > 0, matches
+    
+    def get_threshold(self, domain: str, threshold_name: str) -> float:
+        """Get threshold value for a domain"""
+        config = self.get_domain_config(domain)
+        if config:
+            return getattr(config.thresholds, threshold_name, 0.5)
+        return 0.5
+    
+    def get_global_setting(self, setting_name: str) -> Any:
+        """Get global configuration setting"""
+        global_config = self.validated_configs.get("global")
+        if isinstance(global_config, GlobalConfigSchema):
+            return getattr(global_config, setting_name, None)
+        return None
+    
+    def subscribe_to_changes(self, callback: Callable[[Dict[str, Any]], None]):
+        """Subscribe to configuration changes"""
+        self.notifier.subscribe(callback)
+    
+    def get_configuration_health(self) -> Dict[str, Any]:
+        """Get configuration system health status"""
+        return {
+            "status": "healthy" if self.configs else "unhealthy",
+            "last_reload": self.last_reload.isoformat() if self.last_reload else None,
+            "domains_loaded": len([d for d in self.validated_configs if d != "global"]),
+            "hot_reload_enabled": self.enable_hot_reload,
+            "caching_enabled": self.enable_caching,
+            "cache_stats": self.keyword_matcher.get_cache_stats() if self.enable_caching else {},
+            "file_watching": self.observer.is_alive() if self.observer else False
+        }
+    
+    def __del__(self):
+        """Cleanup resources"""
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+```
+
+### 7. Usage Examples
+
+```python
+# Example configuration file (domain_config.yaml)
+"""
+global:
+  cache_size: 256
+  max_concurrent_analyses: 10
+  error_threshold: 5
+  config_reload_interval: 300
+  enable_hot_reload: true
+
+financial:
+  keywords:
+    primary:
+      - market
+      - trading
+      - investment
+      - portfolio
+    secondary:
+      - risk
+      - volatility
+      - equity
+      - bond
+    contextual:
+      - earnings
+      - revenue
+      - profit
+  thresholds:
+    relevance_score: 0.35
+    confidence_threshold: 0.7
+  enabled: true
+  priority: 8
+
+# Environment-specific overlay (domain_config.local.yaml)
+financial:
+  thresholds:
+    relevance_score: ${FINANCIAL_RELEVANCE_SCORE:0.4}
+    confidence_threshold: ${FINANCIAL_CONFIDENCE:0.8}
+"""
+
+# Usage example
+async def main():
+    # Initialize optimized config
+    config = OptimizedDomainConfig(
+        config_dir="/path/to/config",
+        enable_hot_reload=True,
+        enable_caching=True
+    )
+    
+    # Subscribe to changes
+    async def on_config_change(changes):
+        print(f"Configuration changed: {changes}")
+    
+    config.subscribe_to_changes(on_config_change)
+    
+    # Use configuration
+    financial_config = config.get_domain_config("financial")
+    print(f"Financial keywords: {financial_config.keywords.primary}")
+    
+    # Match keywords with caching
+    has_match, matches = config.match_keywords_in_text(
+        "The stock market is volatile today",
+        "financial"
+    )
+    print(f"Matches: {matches}")
+    
+    # Get configuration health
+    health = config.get_configuration_health()
+    print(f"Config health: {health}")
+```
+
+## Summary of Optimizations
+
+1. **Schema Validation**: Pydantic models ensure type safety and validation
+2. **Environment Variables**: Support for environment-specific configurations
+3. **Configuration Inheritance**: Multiple sources with priority-based merging
+4. **Hot Reloading**: Automatic detection and reload of configuration changes
+5. **Caching**: LRU cache for keyword matching with performance metrics
+6. **Change Notifications**: Subscribe to configuration changes
+7. **Health Monitoring**: Configuration system health status
+8. **Optimized Keyword Matching**: Frozenset-based O(1) lookups
+9. **Async Support**: Fully async configuration loading
+10. **Error Resilience**: Graceful handling of invalid configurations
+
+These optimizations transform the configuration system into a production-ready, high-performance component with excellent observability and flexibility.
