@@ -326,14 +326,62 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000");
   
-  server.listen(port, "0.0.0.0", (err?: Error) => {
-    if (err) {
-      console.error(`Failed to start server on port ${port}:`, err);
-      process.exit(1);
+  // Check if port is already in use
+  const { createServer } = await import('net');
+  const testServer = createServer();
+  
+  testServer.once('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} is already in use!`);
+      console.error('This might be caused by:');
+      console.error('1. Another instance of this server running');
+      console.error('2. Vite dev server using the same port');
+      console.error('3. Another Node.js process');
+      console.error('\nTrying to kill conflicting processes...');
+      
+      // Try to find and kill conflicting processes
+      import('child_process').then(({ exec }) => {
+        exec(`lsof -ti:${port}`, (error, stdout) => {
+          if (stdout.trim()) {
+            const pids = stdout.trim().split('\n');
+            pids.forEach(pid => {
+              console.log(`Killing process ${pid} on port ${port}`);
+              exec(`kill -9 ${pid}`);
+            });
+            
+            // Retry after killing processes
+            setTimeout(() => {
+              startServer();
+            }, 1000);
+          } else {
+            process.exit(1);
+          }
+        });
+      });
+      return;
     }
-    log(`🚀 Server successfully running on port ${port}`);
-    log(`🌐 Access your app at: http://0.0.0.0:${port}`);
+    console.error('Server error during port test:', err);
+    process.exit(1);
   });
+  
+  testServer.once('listening', () => {
+    testServer.close();
+    startServer();
+  });
+  
+  testServer.listen(port, "0.0.0.0");
+  
+  function startServer() {
+    server.listen(port, "0.0.0.0", (err?: Error) => {
+      if (err) {
+        console.error(`Failed to start server on port ${port}:`, err);
+        process.exit(1);
+      }
+      log(`🚀 Server successfully running on port ${port}`);
+      log(`🌐 Access your app at: http://0.0.0.0:${port}`);
+      log(`🔧 Environment: ${app.get("env")}`);
+    });
+  }
 
   // Handle server errors
   server.on('error', (err: Error) => {
