@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -91,15 +92,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
               Personal Account
             </div>
           </div>
-          <button 
-            onClick={() => {
-              handleItemClick();
-              window.location.href = '/profile';
-            }}
-            className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 rounded-lg transition-all duration-200"
-          >
-            <span className="text-lg">{icons.settings}</span>
-          </button>
+          <Link href="/profile" onClick={handleItemClick}>
+            <a className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 rounded-lg transition-all duration-200">
+              <span className="text-lg">{icons.settings}</span>
+            </a>
+          </Link>
         </div>
       </div>
 
@@ -108,24 +105,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.path}>
-              <button
-                onClick={() => {
-                  handleItemClick();
-                  window.location.href = item.path;
-                }}
-                className={cn(
+              <Link href={item.path} onClick={handleItemClick}>
+                <a className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 w-full",
                   isActive(item.path)
                     ? "bg-gradient-to-r from-blue-600/25 to-purple-600/25 text-zinc-50 border border-blue-500/40 shadow-lg backdrop-blur-sm"
                     : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60"
-                )}
-              >
-                <span className="text-lg flex-shrink-0">{icons[item.icon]}</span>
-                <span className="truncate">{item.label}</span>
-                {isActive(item.path) && (
-                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full ml-auto animate-pulse" />
-                )}
-              </button>
+                )}>
+                  <span className="text-lg flex-shrink-0">{icons[item.icon]}</span>
+                  <span className="truncate">{item.label}</span>
+                  {isActive(item.path) && (
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full ml-auto animate-pulse" />
+                  )}
+                </a>
+              </Link>
             </li>
           ))}
         </ul>
@@ -137,22 +130,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
               <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-2" />
               Family Rooms
             </h2>
-            <Link href="/family-room/new" onClick={handleItemClick} className="p-1 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/50 rounded-md transition-all duration-200">
-              <span className="text-sm">{icons.add}</span>
+            <Link href="/family-room/new" onClick={handleItemClick}>
+              <a className="p-1 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/50 rounded-md transition-all duration-200">
+                <span className="text-sm">{icons.add}</span>
+              </a>
             </Link>
           </div>
 
           {/* Family Room Links */}
           <div className="space-y-1">
-            <Link 
-              href={`/family-room/1`} 
-              onClick={handleItemClick}
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 hover:text-zinc-200 transition-all duration-200 text-zinc-400 w-full group"
-            >
-              <div className="w-6 h-6 bg-zinc-700/60 group-hover:bg-zinc-600/70 rounded-lg flex items-center justify-center transition-colors">
-                <span className="text-sm">{icons.home}</span>
-              </div>
-              <span className="text-sm truncate">Family Chat</span>
+            <Link href={`/family-room/1`} onClick={handleItemClick}>
+              <a className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 hover:text-zinc-200 transition-all duration-200 text-zinc-400 w-full group">
+                <div className="w-6 h-6 bg-zinc-700/60 group-hover:bg-zinc-600/70 rounded-lg flex items-center justify-center transition-colors">
+                  <span className="text-sm">{icons.home}</span>
+                </div>
+                <span className="text-sm truncate">Family Chat</span>
+              </a>
             </Link>
           </div>
         </div>

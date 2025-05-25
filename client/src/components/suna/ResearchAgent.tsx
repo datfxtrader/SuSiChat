@@ -34,14 +34,13 @@ const Select = ({ value, onValueChange }: { value: string; onValueChange: (value
         onClick={() => setIsOpen(!isOpen)}
         className="px-4 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 flex items-center space-x-2"
       >
-        <span>{value === '4' ? 'Comprehensive (News+Wiki+Academic)' : value === '3' ? 'Deep (25K)' : value === '2' ? 'Standard (25K)' : value === '1' ? 'Quick (25K)' : value}</span>
+        <span>{value === '3' ? 'Deep (25K)' : value === '2' ? 'Standard (25K)' : value === '1' ? 'Quick (25K)' : value}</span>
       </button>
       {isOpen && (
         <div className="absolute top-full mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10">
           <div onClick={() => { onValueChange('1'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Quick (25K)</div>
           <div onClick={() => { onValueChange('2'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Standard (25K)</div>
           <div onClick={() => { onValueChange('3'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Deep (25K)</div>
-          <div onClick={() => { onValueChange('4'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer border-t border-zinc-600 text-blue-300">🔍 Comprehensive (News+Wiki+Academic)</div>
         </div>
       )}
     </div>

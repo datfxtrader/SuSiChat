@@ -1,6 +1,5 @@
 // server/deerflow-integration.ts
 import { deerflowClient, DeerFlowResearchParams, DeerFlowResearchResponse } from './deerflow-client';
-import { enhancedResearchService, EnhancedResearchResult } from './enhanced-research-service';
 import { llmService } from './llm';
 
 /**
@@ -9,8 +8,7 @@ import { llmService } from './llm';
 export enum ResearchDepth {
   Basic = 1,      // Simple web search
   Enhanced = 2,   // More comprehensive web search with better processing
-  Deep = 3,       // Full DeerFlow research capabilities
-  Comprehensive = 4 // Enhanced multi-source research (News + Wikipedia + Academic + DeerFlow)
+  Deep = 3        // Full DeerFlow research capabilities
 }
 
 /**
@@ -77,8 +75,8 @@ export class ResearchService {
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
     try {
-      // For ALL research depths, use DeerFlow agent intelligence with external search engines
-      console.log(`🔍 Using DeerFlow agent intelligence with Brave/Tavily/Yahoo search engines for depth ${depth}`);
+      // For ALL research depths, use DeerFlow to ensure consistent access to external search engines
+      console.log(`🔍 Using DeerFlow system with Brave/Tavily/Yahoo search engines for depth ${depth}`);
       return await this.performDeepResearch(params);
 
     } catch (error) {
@@ -127,12 +125,17 @@ export class ResearchService {
     try {
       console.log('🚀 Starting DeerFlow deep research with external search engines...');
 
-      // Let DeerFlow agent intelligently handle ALL queries without restrictive filtering
-      console.log('🤖 Using DeerFlow agent intelligence for comprehensive analysis');
+      // Check if this is a financial query
+      const isFinancialQuery = /(?:forex|currency|exchange rate|trading|market|price|financial|investment|stock|crypto|bitcoin|ethereum|USD|EUR|GBP|JPY|analysis)/i.test(params.query);
 
-      // Prepare DeerFlow parameters - let the agent decide how to handle the query
+      if (isFinancialQuery) {
+        console.log('🏦 Financial query detected - using specialized financial research');
+        return await this.performFinancialResearch(params);
+      }
+
+      // Prepare DeerFlow parameters
       const deerflowParams: DeerFlowResearchParams = {
-        research_question: params.query,
+        query: params.query,
         model_id: params.modelId || 'deepseek-chat',
         research_depth: params.researchDepth || 3,
         research_length: params.researchLength || 'comprehensive',
@@ -234,143 +237,47 @@ export class ResearchService {
   }
 
   /**
-   * Perform comprehensive research using multiple data sources
+   * Perform specialized financial research
    */
-  private async performComprehensiveResearch(params: ResearchParams): Promise<ResearchResult> {
+  private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
     const startTime = Date.now();
 
     try {
-      console.log('🚀 Starting comprehensive multi-source research...');
+      // Check for currency pair patterns
+      const currencyPairMatch = params.query.match(/([A-Z]{3})[\s\/]?([A-Z]{3})/);
+      const currencyPair = currencyPairMatch ? `${currencyPairMatch[1]}/${currencyPairMatch[2]}` : null;
 
-      // Execute enhanced research with multiple data providers
-      const enhancedResult = await enhancedResearchService.performResearch(params.query);
+      if (currencyPair) {
+        console.log(`💱 Currency pair detected: ${currencyPair}`);
 
-      // Also get DeerFlow analysis for deeper insights
-      const deerflowResult = await this.performDeepResearch(params);
+        // Enhanced financial research with multiple data sources
+        const financialResearch = await this.performComprehensiveFinancialAnalysis(params.query, currencyPair);
 
-      // Combine results from both enhanced research and DeerFlow
-      const combinedSources = [
-        ...enhancedResult.sources,
-        ...deerflowResult.sources
-      ];
-
-      // Create comprehensive report combining both analyses
-      const combinedReport = this.combineResearchResults(
-        enhancedResult.report,
-        deerflowResult.report,
-        params.query,
-        enhancedResult.sourceBreakdown
-      );
-
-      return {
-        report: combinedReport,
-        sources: combinedSources,
-        depth: ResearchDepth.Comprehensive,
-        processingTime: Math.max(enhancedResult.processingTime, deerflowResult.processingTime)
-      };
-
-    } catch (error) {
-      console.error('Comprehensive research error:', error);
-      
-      // Fallback to enhanced research only if DeerFlow fails
-      try {
-        console.log('🔄 Falling back to enhanced multi-source research...');
-        const enhancedResult = await enhancedResearchService.performResearch(params.query);
-        
         return {
-          report: enhancedResult.report,
-          sources: enhancedResult.sources,
-          depth: ResearchDepth.Comprehensive,
-          processingTime: enhancedResult.processingTime
-        };
-      } catch (fallbackError) {
-        console.error('Enhanced research fallback error:', fallbackError);
-        
-        return {
-          report: `# Comprehensive Research: ${params.query}\n\nTo enable comprehensive research with multiple data sources, please provide the necessary API keys for NewsAPI and other external services.`,
-          sources: [],
-          depth: ResearchDepth.Basic,
+          report: financialResearch.content || `# Market Analysis\n\nAnalysis for ${currencyPair} is currently unavailable. Please try:\n\n1. Being more specific with your query\n2. Including a timeframe\n3. Specifying particular metrics you're interested in`,
+          sources: financialResearch.sources || [],
+          depth: ResearchDepth.Deep,
           processingTime: Date.now() - startTime
         };
       }
+
+      // Basic research without currency pair
+      return {
+        report: `# Financial Analysis\n\nUnable to analyze the market without a valid currency pair. Please specify a currency pair like "EUR/USD" or "GBP/JPY" for detailed analysis.`,
+        sources: [],
+        depth: ResearchDepth.Basic,
+        processingTime: Date.now() - startTime
+      };
+
+    } catch (error) {
+      console.error('Financial research error:', error);
+      return {
+        report: `## Financial Market Analysis\n\nI apologize, but I was unable to provide a detailed analysis for your query. To get better results, please:\n\n1. Specify the time period you're interested in\n2. Include specific aspects you want to analyze (e.g., technical indicators, fundamentals)\n3. Mention any particular market events or factors you want to focus on\n\nExample query: "Analyze AUDUSD technical trends over the past week focusing on moving averages and support levels"`,
+        sources: [],
+        depth: ResearchDepth.Basic,
+        processingTime: Date.now() - startTime
+      };
     }
-  }
-
-  /**
-   * Combine results from enhanced research and DeerFlow analysis
-   */
-  private combineResearchResults(
-    enhancedReport: string,
-    deerflowReport: string,
-    query: string,
-    sourceBreakdown: { web: number; news: number; wikipedia: number; academic: number }
-  ): string {
-    let combinedReport = `# Comprehensive Research Analysis: ${query}\n\n`;
-
-    // Research Overview
-    combinedReport += `## Research Overview\n\n`;
-    combinedReport += `This comprehensive analysis combines multiple data sources with AI-powered research:\n`;
-    combinedReport += `- **News Sources**: ${sourceBreakdown.news} current articles\n`;
-    combinedReport += `- **Wikipedia**: ${sourceBreakdown.wikipedia} reference articles\n`;
-    combinedReport += `- **Academic Papers**: ${sourceBreakdown.academic} scholarly sources\n`;
-    combinedReport += `- **Web Research**: ${sourceBreakdown.web} additional sources\n`;
-    combinedReport += `- **AI Analysis**: Deep research with external search engines\n\n`;
-
-    // Extract sections from enhanced report
-    const enhancedSections = this.extractReportSections(enhancedReport);
-    
-    // Add latest news section if available
-    if (enhancedSections.news) {
-      combinedReport += enhancedSections.news + '\n\n';
-    }
-
-    // Add background information if available
-    if (enhancedSections.background) {
-      combinedReport += enhancedSections.background + '\n\n';
-    }
-
-    // Add AI-powered analysis from DeerFlow
-    combinedReport += `## AI-Powered Analysis\n\n`;
-    const deerflowContent = deerflowReport.replace(/^#.*$/gm, '').trim();
-    combinedReport += deerflowContent + '\n\n';
-
-    // Add academic research if available
-    if (enhancedSections.academic) {
-      combinedReport += enhancedSections.academic + '\n\n';
-    }
-
-    return combinedReport;
-  }
-
-  /**
-   * Extract sections from enhanced research report
-   */
-  private extractReportSections(report: string): {
-    news?: string;
-    background?: string;
-    academic?: string;
-  } {
-    const sections: any = {};
-
-    // Extract news section
-    const newsMatch = report.match(/## Latest News & Developments\n\n(.*?)(?=\n## |$)/s);
-    if (newsMatch) {
-      sections.news = `## Latest News & Developments\n\n${newsMatch[1].trim()}`;
-    }
-
-    // Extract background section
-    const backgroundMatch = report.match(/## Background Information\n\n(.*?)(?=\n## |$)/s);
-    if (backgroundMatch) {
-      sections.background = `## Background Information\n\n${backgroundMatch[1].trim()}`;
-    }
-
-    // Extract academic section
-    const academicMatch = report.match(/## Academic Research\n\n(.*?)(?=\n## |$)/s);
-    if (academicMatch) {
-      sections.academic = `## Academic Research\n\n${academicMatch[1].trim()}`;
-    }
-
-    return sections;
   }
 
   /**
