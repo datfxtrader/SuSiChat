@@ -343,17 +343,17 @@ export const ResearchAgent = () => {
       // Start progress simulation
       let currentProgress = 5;
       progressIntervalRef.current = setInterval(() => {
-        setResearchProgress(prev => {
-          const newProgress = Math.min(prev + Math.random() * 3, 95);
-          // Update stages
-          if (newProgress >= 80) setResearchStage(6);
-          else if (newProgress >= 65) setResearchStage(5);
-          else if (newProgress >= 50) setResearchStage(4);
-          else if (newProgress >= 35) setResearchStage(3);
-          else if (newProgress >= 20) setResearchStage(2);
-          return newProgress;
-        });
-      }, 800);
+          setResearchProgress(prev => {
+            const newProgress = Math.min(prev + Math.random() * 2, 90);
+            // Update stages
+            if (newProgress >= 80) setResearchStage(6);
+            else if (newProgress >= 65) setResearchStage(5);
+            else if (newProgress >= 50) setResearchStage(4);
+            else if (newProgress >= 35) setResearchStage(3);
+            else if (newProgress >= 20) setResearchStage(2);
+            return newProgress;
+          });
+        }, 1000);
 
       const response = await fetch('/api/suna-research', {
         method: 'POST',
