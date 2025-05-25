@@ -75,8 +75,8 @@ export class ResearchService {
     console.log(`Performing research at depth level ${depth} for query: "${params.query}"`);
 
     try {
-      // For ALL research depths, use DeerFlow to ensure consistent access to external search engines
-      console.log(`🔍 Using DeerFlow system with Brave/Tavily/Yahoo search engines for depth ${depth}`);
+      // For ALL research depths, use DeerFlow agent intelligence with external search engines
+      console.log(`🔍 Using DeerFlow agent intelligence with Brave/Tavily/Yahoo search engines for depth ${depth}`);
       return await this.performDeepResearch(params);
 
     } catch (error) {
@@ -125,17 +125,12 @@ export class ResearchService {
     try {
       console.log('🚀 Starting DeerFlow deep research with external search engines...');
 
-      // Check if this is a financial query
-      const isFinancialQuery = /(?:forex|currency|exchange rate|trading|market|price|financial|investment|stock|crypto|bitcoin|ethereum|USD|EUR|GBP|JPY|analysis)/i.test(params.query);
+      // Let DeerFlow agent intelligently handle ALL queries without restrictive filtering
+      console.log('🤖 Using DeerFlow agent intelligence for comprehensive analysis');
 
-      if (isFinancialQuery) {
-        console.log('🏦 Financial query detected - using specialized financial research');
-        return await this.performFinancialResearch(params);
-      }
-
-      // Prepare DeerFlow parameters
+      // Prepare DeerFlow parameters - let the agent decide how to handle the query
       const deerflowParams: DeerFlowResearchParams = {
-        query: params.query,
+        research_question: params.query,
         model_id: params.modelId || 'deepseek-chat',
         research_depth: params.researchDepth || 3,
         research_length: params.researchLength || 'comprehensive',
@@ -236,49 +231,7 @@ export class ResearchService {
     }
   }
 
-  /**
-   * Perform specialized financial research
-   */
-  private async performFinancialResearch(params: ResearchParams): Promise<ResearchResult> {
-    const startTime = Date.now();
 
-    try {
-      // Check for currency pair patterns
-      const currencyPairMatch = params.query.match(/([A-Z]{3})[\s\/]?([A-Z]{3})/);
-      const currencyPair = currencyPairMatch ? `${currencyPairMatch[1]}/${currencyPairMatch[2]}` : null;
-
-      if (currencyPair) {
-        console.log(`💱 Currency pair detected: ${currencyPair}`);
-
-        // Enhanced financial research with multiple data sources
-        const financialResearch = await this.performComprehensiveFinancialAnalysis(params.query, currencyPair);
-
-        return {
-          report: financialResearch.content || `# Market Analysis\n\nAnalysis for ${currencyPair} is currently unavailable. Please try:\n\n1. Being more specific with your query\n2. Including a timeframe\n3. Specifying particular metrics you're interested in`,
-          sources: financialResearch.sources || [],
-          depth: ResearchDepth.Deep,
-          processingTime: Date.now() - startTime
-        };
-      }
-
-      // Basic research without currency pair
-      return {
-        report: `# Financial Analysis\n\nUnable to analyze the market without a valid currency pair. Please specify a currency pair like "EUR/USD" or "GBP/JPY" for detailed analysis.`,
-        sources: [],
-        depth: ResearchDepth.Basic,
-        processingTime: Date.now() - startTime
-      };
-
-    } catch (error) {
-      console.error('Financial research error:', error);
-      return {
-        report: `## Financial Market Analysis\n\nI apologize, but I was unable to provide a detailed analysis for your query. To get better results, please:\n\n1. Specify the time period you're interested in\n2. Include specific aspects you want to analyze (e.g., technical indicators, fundamentals)\n3. Mention any particular market events or factors you want to focus on\n\nExample query: "Analyze AUDUSD technical trends over the past week focusing on moving averages and support levels"`,
-        sources: [],
-        depth: ResearchDepth.Basic,
-        processingTime: Date.now() - startTime
-      };
-    }
-  }
 
   /**
    * Create a fallback report when DeerFlow doesn't provide structured content
