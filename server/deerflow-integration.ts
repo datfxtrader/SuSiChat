@@ -274,8 +274,12 @@ export class ResearchService {
       
     } catch (error) {
       console.error('Financial research error:', error);
-      // Fallback to enhanced research
-      return await this.performDeepResearch(params);
+      return {
+        report: `## Financial Market Analysis\n\nI apologize, but I was unable to provide a detailed analysis for your query. To get better results, please:\n\n1. Specify the time period you're interested in\n2. Include specific aspects you want to analyze (e.g., technical indicators, fundamentals)\n3. Mention any particular market events or factors you want to focus on\n\nExample query: "Analyze AUDUSD technical trends over the past week focusing on moving averages and support levels"`,
+        sources: [],
+        depth: ResearchDepth.Basic,
+        processingTime: Date.now() - startTime
+      };
     }
   }
 
