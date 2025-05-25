@@ -89,6 +89,7 @@ research_state = {}
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def get_token_limit_by_depth(research_depth: int) -> int:
     """
@@ -105,8 +106,44 @@ def get_token_limit_by_depth(research_depth: int) -> int:
     return token_mapping.get(research_depth, 8000)  # Default to 8000 if invalid depth
 
 # Helper functions for research
+async def search_news(query: str, max_results: int = 8):
+    """Search news using NewsAPI."""
+    if not NEWS_API_KEY:
+        logger.warning("NEWS_API_KEY not configured, skipping news search")
+        return []
+        
+    try:
+        url = "https://newsapi.org/v2/everything"
+        params = {
+            "q": query,
+            "pageSize": max_results,
+            "language": "en",
+            "sortBy": "relevancy",
+            "apiKey": NEWS_API_KEY
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            articles = data.get("articles", [])
+            return [{
+                "title": article.get("title", ""),
+                "url": article.get("url", ""),
+                "content": article.get("description", ""),
+                "source": "newsapi",
+                "score": 1.0 - (idx / len(articles)) if articles else 0,
+                "timestamp": article.get("publishedAt")
+            } for idx, article in enumerate(articles)]
+    except Exception as e:
+        logger.error(f"NewsAPI search error: {e}")
+        return []
+
 async def search_web(query: str, max_results: int = 8):
     """Search the web using available search engines with DuckDuckGo as primary."""
+    
+    # Add news results
+    results = await search_news(query, max_results=3)
     logger.info(f"Searching web for: {query}")
     
     # Primary: Use DuckDuckGo (no API key required)
