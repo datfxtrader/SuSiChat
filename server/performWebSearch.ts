@@ -34,15 +34,55 @@ export async function performWebSearch(
   maxResults: number = 5,
   retries: number = MAX_SEARCH_RETRIES
 ): Promise<WebSearchResponse> {
-  console.log(`Performing web search for: "${query}"`);
+  console.log(`Performing optimized web search for: "${query}"`);
 
-  const results: SearchResult[] = [];
-  let tavilyResults = null;
-  let braveResults = null;
-  let duckduckgoResults = null;
+  try {
+    // Use the intelligent search manager for better rate limiting
+    const searchResult = await intelligentSearchManager.performIntelligentSearch(
+      query,
+      maxResults,
+      'all',
+      'week'
+    );
 
-  // Run DuckDuckGo, Brave, and Tavily searches in parallel for maximum efficiency
-  const searchPromises = [];
+    // Convert to expected format
+    const results: SearchResult[] = searchResult.results.map(result => ({
+      title: result.title,
+      content: result.content,
+      url: result.url,
+      score: result.score,
+      publishedDate: result.publishedDate,
+      source: result.source
+    }));
+
+    return {
+      results,
+      tavilyResults: { results: results.filter(r => r.source === 'Tavily') },
+      braveResults: { web: { results: results.filter(r => r.source === 'Brave') } },
+      query,
+      timestamp: searchResult.timestamp,
+      metadata: {
+        totalSources: searchResult.searchEnginesUsed.length,
+        sourceBreakdown: searchResult.searchEnginesUsed.reduce((acc, source) => {
+          acc[source] = results.filter(r => r.source === source).length;
+          return acc;
+        }, {} as Record<string, number>),
+        braveSuccess: searchResult.searchEnginesUsed.includes('Brave'),
+        tavilySuccess: searchResult.searchEnginesUsed.includes('Tavily'),
+        fallbackUsed: searchResult.searchEnginesUsed.includes('DuckDuckGo'),
+        searchTime: searchResult.performance.searchTime
+      }
+    };
+  } catch (error) {
+    console.error('Intelligent search failed, using legacy fallback:', error);
+    
+    // Fallback to original logic with better rate limiting
+    const results: SearchResult[] = [];
+    let tavilyResults = null;
+    let braveResults = null;
+    let duckduckgoResults = null;
+
+    const searchPromises = [];
 
   // DuckDuckGo search (free, no rate limits)
   searchPromises.push(

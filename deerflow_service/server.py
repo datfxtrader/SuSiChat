@@ -107,66 +107,86 @@ def get_token_limit_by_depth(research_depth: int) -> int:
 
 # Helper functions for research
 async def search_web(query: str, max_results: int = 8):
-    """Enhanced web search using multiple providers with intelligent fallback."""
+    """Enhanced web search using intelligent rate limiting and caching."""
     logger.info(f"Enhanced web search for: {query} with {max_results} results")
 
+    try:
+        # Use the intelligent search manager from the Node.js server
+        import aiohttp
+        import asyncio
+
+        async with aiohttp.ClientSession() as session:
+            # Call our intelligent search endpoint
+            async with session.post(
+                'http://localhost:5000/api/enhanced-web-search/search',
+                json={
+                    'query': query,
+                    'maxResults': max_results,
+                    'searchType': 'all',
+                    'freshness': 'week'
+                },
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = data.get('results', [])
+
+                    # Convert to DeerFlow format
+                    formatted_results = []
+                    for result in results:
+                        formatted_results.append({
+                            'title': result.get('title', 'Untitled'),
+                            'url': result.get('url', ''),
+                            'content': result.get('content', ''),
+                            'source': result.get('source', 'Web'),
+                            'score': result.get('score', 1.0)
+                        })
+
+                    logger.info(f"Intelligent search returned {len(formatted_results)} results from {data.get('searchEnginesUsed', [])}")
+                    return formatted_results
+                else:
+                    logger.error(f"Search endpoint returned status: {response.status}")
+
+    except Exception as e:
+        logger.error(f"Intelligent search failed, using fallback: {e}")
+
+    # Fallback to direct search with basic rate limiting
     all_results = []
     search_engines_used = []
 
-    # Try Tavily first if available (most comprehensive)
+    # Try Tavily with rate limiting
     if TAVILY_API_KEY:
         try:
+            await asyncio.sleep(1)  # Basic rate limiting
             tavily_results = await search_tavily(query, max_results // 2)
             if tavily_results:
                 all_results.extend(tavily_results)
                 search_engines_used.append("Tavily")
-                logger.info(f"Tavily search returned {len(tavily_results)} results")
+                logger.info(f"Tavily fallback returned {len(tavily_results)} results")
         except Exception as e:
-            logger.error(f"Tavily search error: {e}")
+            logger.error(f"Tavily fallback error: {e}")
 
-    # Try Brave search
-    if BRAVE_API_KEY and len(all_results) < max_results:
+    # Try Brave with rate limiting
+    if len(all_results) < max_results and BRAVE_API_KEY:
         try:
+            await asyncio.sleep(2)  # Longer delay for Brave
             brave_results = await search_brave(query, max_results - len(all_results))
             if brave_results:
                 all_results.extend(brave_results)
                 search_engines_used.append("Brave")
-                logger.info(f"Brave search returned {len(brave_results)} results")
+                logger.info(f"Brave fallback returned {len(brave_results)} results")
         except Exception as e:
-            if "RATE_LIMITED" in str(e):
-                logger.warning("Brave search rate limited, skipping")
-            else:
-                logger.error(f"Brave search error: {e}")
+            logger.error(f"Brave fallback error: {e}")
 
-    # Fallback to DuckDuckGo if we need more results
-    if len(all_results) < max_results:
-        try:
-            duckduckgo_results = await search_duckduckgo(query, max_results - len(all_results))
-            if duckduckgo_results:
-                all_results.extend(duckduckgo_results)
-                search_engines_used.append("DuckDuckGo")
-                logger.info(f"DuckDuckGo search returned {len(duckduckgo_results)} results")
-        except Exception as e:
-            logger.error(f"DuckDuckGo search error: {e}")
-
-    # Remove duplicates and format results
+    # Remove duplicates
     seen_urls = set()
     unique_results = []
     for result in all_results:
-        url = result.get('url', '')
-        if url and url not in seen_urls:
-            seen_urls.add(url)
-            # Standardize result format
-            formatted_result = {
-                'title': result.get('title', 'Untitled'),
-                'url': url,
-                'content': result.get('content', result.get('snippet', '')),
-                'score': result.get('score', 1.0),
-                'source': result.get('source', 'web_search')
-            }
-            unique_results.append(formatted_result)
+        if result.get('url') and result['url'] not in seen_urls:
+            seen_urls.add(result['url'])
+            unique_results.append(result)
 
-    logger.info(f"Web search completed: {len(unique_results)} unique results from {search_engines_used}")
+    logger.info(f"Fallback search completed. Found {len(unique_results)} unique results from {search_engines_used}")
     return unique_results[:max_results]
 
 async def search_tavily(query: str, max_results: int = 8):
@@ -288,7 +308,7 @@ async def search_newsdata(query: str, max_results: int = 5):
     """Search for news using NewsData.io API for current events."""
     if not os.getenv("NEWSDATA_API_KEY"):
         return []
-    
+
     try:
         url = "https://newsdata.io/api/1/news"
         params = {
@@ -298,7 +318,7 @@ async def search_newsdata(query: str, max_results: int = 5):
             "size": max_results,
             "prioritydomain": "top"
         }
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params, timeout=15) as response:
                 if response.status == 200:
@@ -490,7 +510,7 @@ async def perform_deep_research(research_question: str, research_id: str, resear
             except Exception as e:
                 logger.error(f"Search error for query '{query}': {e}")
                 continue
-            
+
             # Add small delay to prevent rate limiting
             await asyncio.sleep(0.5)
 

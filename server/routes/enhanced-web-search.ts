@@ -27,17 +27,11 @@ export interface EnhancedSearchResponse {
 }
 
 import express from 'express';
-import axios from 'axios';
-import { performance } from 'perf_hooks';
+import { intelligentSearchManager } from '../intelligentSearchManager';
 
 const router = express.Router();
 
-// Environment variables
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
-const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
-const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
-
-// Enhanced web search endpoint
+// Enhanced web search endpoint with intelligent rate limiting
 router.post('/search', async (req, res) => {
   try {
     const { 
@@ -53,25 +47,33 @@ router.post('/search', async (req, res) => {
     }
     
     console.log(`Enhanced web search: "${query}" (type: ${searchType}, max: ${maxResults})`);
-    const startTime = performance.now();
     
-    const results = await performEnhancedSearch(query, maxResults, searchType, freshness, sources);
+    const results = await intelligentSearchManager.performIntelligentSearch(
+      query, 
+      maxResults, 
+      searchType, 
+      freshness
+    );
     
-    const endTime = performance.now();
-    console.log(`Search completed in ${Math.round(endTime - startTime)}ms`);
-    
-    return res.json({
-      ...results,
-      performance: {
-        searchTime: Math.round(endTime - startTime),
-        timestamp: new Date().toISOString()
-      }
-    });
+    return res.json(results);
   } catch (error) {
     console.error('Enhanced search error:', error);
     return res.status(500).json({
       error: 'Failed to perform enhanced search',
       message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Status endpoint to monitor search engine health
+router.get('/status', async (req, res) => {
+  try {
+    const status = intelligentSearchManager.getStatus();
+    return res.json(status);
+  } catch (error) {
+    console.error('Status check error:', error);
+    return res.status(500).json({
+      error: 'Failed to get search status'
     });
   }
 });

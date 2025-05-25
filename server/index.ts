@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import financialResearchRoutes from './routes/financial-research';
 import webSearchRoutes from './routes/webSearch';
 import enhancedWebSearchRoutes from './routes/enhanced-web-search';
+import { intelligentSearchManager } from './intelligentSearchManager';
 
 const app = express();
 app.use(express.json());
@@ -215,7 +216,18 @@ app.use((req, res, next) => {
 
   app.use('/api/financial-research', financialResearchRoutes);
   app.use('/api/web-search', webSearchRoutes);
+  // Enhanced web search route
   app.use('/api/enhanced-search', enhancedWebSearchRoutes);
+
+  // Search system status endpoint
+  app.get('/api/search-status', (req, res) => {
+    try {
+      const status = intelligentSearchManager.getStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get search status' });
+    }
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
