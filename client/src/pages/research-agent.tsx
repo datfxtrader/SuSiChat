@@ -361,7 +361,7 @@ Current market conditions show several critical factors influencing Bitcoin's tr
                             <Bot className="w-3 h-3" />
                             <span>AI Response</span>
                             <span>•</span>
-                            <span>{formatRelativeTime(msg.timestamp)}</span>
+                            <span>{formatRelativeTime(msg.timestamp || new Date().toISOString())}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-slate-800/50">
