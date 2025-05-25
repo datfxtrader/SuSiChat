@@ -254,7 +254,7 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
           setResearchStage(2);
           setStageLabel('Gathering information...');
         }
-        
+
         return newProgress;
       });
     }, 800);

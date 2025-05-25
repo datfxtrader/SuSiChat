@@ -52,20 +52,20 @@ const ResearchProgress = ({ stage, progress, query, isActive }: {
         <p className="text-xs text-zinc-400">{query}</p>
       </div>
     </div>
-    
+
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <span className="text-xs text-blue-400">Stage {stage}/6</span>
         <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
       </div>
-      
+
       <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden">
         <div 
           className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
           style={{ width: `${Math.max(progress, 5)}%` }}
         />
       </div>
-      
+
       {isActive && (
         <div className="flex items-center space-x-2 text-xs text-blue-400">
           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
@@ -165,7 +165,7 @@ const ResearchResponse = ({ content, timestamp, sources }: {
           })}
         </div>
       </div>
-      
+
       {sources && sources.length > 0 && (
         <div className="mt-8 pt-6 border-t border-zinc-800/50">
           <div className="flex items-center justify-between mb-4">
@@ -274,7 +274,7 @@ export const ResearchAgent = () => {
   // Handle research completion
   const completeResearch = () => {
     console.log('✅ Completing research');
-    
+
     const completedMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant' as const,
@@ -315,16 +315,16 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
         { title: 'Financial Times Economic Analysis', url: '#', domain: 'ft.com' }
       ]
     };
-    
+
     setMessages(prev => [...prev, completedMessage]);
-    
+
     // Clear all research-related state
     setIsResearchInProgress(false);
     setResearchProgress(0);
     setResearchStage(1);
     setIsSending(false);
     setCurrentResearchQuery('');
-    
+
     // Clear any running intervals/timeouts
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -338,9 +338,9 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
 
   const handleSendMessage = () => {
     if (!message.trim() || isSending || isResearchInProgress) return;
-    
+
     console.log('🚀 Starting research:', message);
-    
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -349,23 +349,23 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     // Store the query before clearing message
     const queryText = message;
-    
+
     // Clear message input immediately
     setMessage('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    
+
     // Set research state
     setIsSending(true);
     setIsResearchInProgress(true);
     setResearchProgress(0);
     setResearchStage(1);
     setCurrentResearchQuery(queryText);
-    
+
     // Clear any existing intervals/timeouts
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -373,35 +373,35 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
     if (progressTimeoutRef.current) {
       clearTimeout(progressTimeoutRef.current);
     }
-    
+
     // Simulate research progress with smooth progression
     let currentProgress = 0;
     const targetProgress = 100;
     const duration = 4000; // 4 seconds total
     const updateInterval = 50; // Update every 50ms for smoother animation
-    
+
     progressIntervalRef.current = setInterval(() => {
       // Smooth exponential progression
       const remainingProgress = targetProgress - currentProgress;
       const increment = remainingProgress * 0.05; // 5% of remaining each time
-      
+
       currentProgress += Math.max(increment, 0.5); // Minimum 0.5% increment
-      
+
       if (currentProgress >= targetProgress - 0.1) {
         currentProgress = targetProgress;
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
           progressIntervalRef.current = null;
         }
-        
+
         // Complete research after reaching 100%
         setTimeout(() => {
           completeResearch();
         }, 200);
       }
-      
+
       setResearchProgress(Math.min(currentProgress, targetProgress));
-      
+
       // Update stages based on progress
       const progress = Math.min(currentProgress, targetProgress);
       if (progress >= 83) setResearchStage(6);
@@ -411,7 +411,7 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
       else if (progress >= 17) setResearchStage(2);
       else setResearchStage(1);
     }, updateInterval);
-    
+
     // Failsafe timeout to ensure completion
     progressTimeoutRef.current = setTimeout(() => {
       if (isResearchInProgress) {
@@ -437,7 +437,7 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
 
   const handleNewResearch = () => {
     console.log('🔄 Starting new research session');
-    
+
     // Clear all intervals and timeouts first
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -451,7 +451,7 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
       clearTimeout(progressTimeoutRef.current);
       progressTimeoutRef.current = null;
     }
-    
+
     // Then reset all state
     setMessages([]);
     setIsResearchInProgress(false);
@@ -478,6 +478,49 @@ Your research query "${currentResearchQuery}" has been completed successfully wi
       gradient: "from-blue-500 to-indigo-600"
     }
   ];
+
+  // Handle completion detection
+  useEffect(() => {
+    // Prevent completion handling during active sending
+    if (!isResearchInProgress || isSending) return;
+
+    // Complete when progress hits certain thresholds
+    if (researchProgress >= 100 || (!isSending && researchProgress >= 90)) {
+      console.log('✅ Research completed at', Math.round(researchProgress), '% - showing results');
+      completeResearch();
+    }
+  }, [isResearchInProgress, isSending, researchProgress]);
+
+  // Add progress recovery for stuck states
+  useEffect(() => {
+    if (isResearchInProgress && !isSending) {
+      // If progress seems stuck, complete it
+      const stuckTimer = setTimeout(() => {
+        if (isResearchInProgress && !isSending && researchProgress < 100) {
+          console.log('⚡ Progress recovery - completing research');
+          setResearchProgress(100);
+        }
+      }, 3000); // Wait 3 seconds after sending stops
+
+      return () => clearTimeout(stuckTimer);
+    }
+  }, [isResearchInProgress, isSending, researchProgress]);
+
+  // Add cleanup effect for stale research state
+  useEffect(() => {
+    if (!isResearchInProgress && progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    if (!isResearchInProgress && progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
+      progressTimeoutRef.current = null;
+    }
+    if (!isResearchInProgress && completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+  }, [isResearchInProgress]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
