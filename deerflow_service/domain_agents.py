@@ -871,7 +871,7 @@ class DomainAgentOrchestrator:
             "recent_analyses_count": len(recent_analyses),
             "most_used_agents": sorted(agent_usage.items(), key=lambda x: x[1], reverse=True),
             "recent_queries": [a["query"][:50] + "..." for a in recent_analyses[-5:]],
-            ""average_confidence": sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0,
+            "average_confidence": sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0,
             "performance_metrics": performance_stats,
             "cache_stats": {
                 "cache_size": len(self.cache_manager._cache),
