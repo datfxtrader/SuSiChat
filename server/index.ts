@@ -233,33 +233,38 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = process.env.PORT || 5000;
-  
-  // Force close any existing listeners on this port
-  process.on('uncaughtException', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      console.log('Port conflict detected, retrying with different port...');
-      const altPort = parseInt(port.toString()) + Math.floor(Math.random() * 100);
-      server.listen({
-        port: altPort,
-        host: "0.0.0.0",
-        reusePort: true,
-      }, () => {
-        log(`serving on alternative port ${altPort}`);
-      });
-      return;
+  // Always try port 5000 first, then increment if needed
+  const tryPort = async (startPort: number): Promise<number> => {
+    let port = startPort;
+    const maxAttempts = 10;
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        await new Promise((resolve, reject) => {
+          server.listen({
+            port,
+            host: "0.0.0.0",
+            reusePort: true
+          }, () => resolve(port))
+          .on('error', () => {
+            port++;
+            reject();
+          });
+        });
+        return port;
+      } catch {
+        continue;
+      }
     }
-    throw err;
-  });
-  
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+    throw new Error('Could not find available port');
+  };
+
+  tryPort(5000)
+    .then(port => {
+      log(`serving on port ${port}`);
+    })
+    .catch(err => {
+      console.error('Failed to start server:', err);
+      process.exit(1);
+    });
 })();
