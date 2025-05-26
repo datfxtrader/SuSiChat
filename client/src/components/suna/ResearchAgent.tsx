@@ -551,10 +551,18 @@ const BelgaCatIcon = () => (
   </svg>
 );
 
+type LLMModel =
+  | "auto"
+  | "deepseek-chat"
+  | "gemini-1.5-flash"
+  | "openrouter/openai/gpt-4o-mini"
+  | "openrouter/deepseek/deepseek-r1-distill-llama-70b"
+  | "bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0";
+
 export const ResearchAgent = () => {
   const [message, setMessage] = useState('');
   const [researchDepth, setResearchDepth] = useState('3');
-  const [selectedModel, setSelectedModel] = useState('auto');
+  const [selectedModel, setSelectedModel] = useState<LLMModel>('auto');
   const [isSending, setIsSending] = useState(false);
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [researchProgress, setResearchProgress] = useState(0);
@@ -782,7 +790,6 @@ I wasn't able to complete research on "${query}" at this time. This might be due
     console.log('🔄 Starting new research session');
     cleanup();
     setMessages([]);
-```python
     resetResearchState();
     setMessage('');
   }, [cleanup, resetResearchState]);
@@ -919,43 +926,3 @@ I wasn't able to complete research on "${query}" at this time. This might be due
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center space-x-4 mb-4">
               <Select value={researchDepth} onValueChange={setResearchDepth} />
-              <Select value={selectedModel} onValueChange={setSelectedModel} />
-            </div>
-
-            <div className="relative">
-              <Textarea
-                ref={textareaRef}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask a research question..."
-                className="min-h-[100px] pr-24"
-                rows={1}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!message.trim() || isSending || isResearchInProgress}
-                className="absolute bottom-4 right-4"
-              >
-                {isSending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <ProgressDebugger
-        isResearchInProgress={isResearchInProgress}
-        researchProgress={researchProgress}
-        researchStage={researchStage}
-        currentQuery={currentResearchQuery}
-        isSending={isSending}
-        messagesCount={messages.length}
-      />
-    </div>
-  );
-};

@@ -1614,6 +1614,9 @@ Use the current date and web search information when responding about current ev
         'gemini-1.5-flash': 'Gemini 1.5 Flash',
         'gemini-1.0-pro': 'Gemini 1.5 Pro',
         'deepseek-chat': 'DeepSeek',
+        'openrouter/openai/gpt-4o-mini': 'GPT-4o Mini',
+        'openrouter/deepseek/deepseek-r1-distill-llama-70b': 'DeepSeek R1',
+        'bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0': 'Claude 3.7 Sonnet',
         'auto': 'Auto'
       };
 
@@ -1646,6 +1649,45 @@ Use the current date and web search information when responding about current ev
           );
 
           // Extract the AI response
+          aiResponse = response.data.choices[0].message.content;
+        } else if (selectedModel.startsWith('openrouter/')) {
+          // Use OpenRouter API
+          const response = await axios.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            {
+              model: selectedModel.replace('openrouter/', ''),
+              messages,
+              temperature: 0.7,
+              max_tokens: 2000
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                'HTTP-Referer': 'https://susi-chat.replit.app',
+                'X-Title': 'SuSi Chat'
+              }
+            }
+          );
+
+          aiResponse = response.data.choices[0].message.content;
+        } else if (selectedModel.startsWith('bedrock/')) {
+          // Use AWS Bedrock via the Suna backend
+          const response = await axios.post(
+            'http://localhost:8000/api/llm/chat',
+            {
+              model_name: selectedModel,
+              messages,
+              temperature: 0.7,
+              max_tokens: 2000
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
           aiResponse = response.data.choices[0].message.content;
         }
       } catch (error) {

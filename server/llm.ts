@@ -1,4 +1,3 @@
-
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { storage } from './storage';
 
@@ -52,7 +51,7 @@ export class LLMService {
   private readonly model: string;
   private readonly systemPrompt: string;
   private readonly axiosInstance: AxiosInstance;
-  
+
   // Cache for user contexts to avoid repeated DB queries
   private userContextCache = new Map<string, { context: string; timestamp: number }>();
   private readonly contextCacheTimeout = 5 * 60 * 1000; // 5 minutes
@@ -63,13 +62,13 @@ export class LLMService {
     if (!this.apiKey) {
       console.warn('DEEPSEEK_API_KEY not set - LLM service will not function');
     }
-    
+
     this.apiEndpoint = process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions';
     this.model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-    
+
     // Pre-compile system prompt
     this.systemPrompt = this.getSystemPrompt();
-    
+
     // Create axios instance with defaults
     this.axiosInstance = axios.create({
       baseURL: this.apiEndpoint,
@@ -82,7 +81,7 @@ export class LLMService {
   }
 
   private getSystemPrompt(): string {
-    return `You are Suna, an advanced open-source generalist AI agent designed to help accomplish real-world tasks. 
+    return `You are SuSi, an advanced open-source generalist AI agent designed to help accomplish real-world tasks. 
 You are currently running in Tongkeeper, a family-oriented assistant platform.
 
 In your full implementation, you have several powerful capabilities:
@@ -117,7 +116,7 @@ Always prioritize providing accurate, helpful information while maintaining a ba
     try {
       // Get or build user context
       const context = await this.getUserContext(userId, message);
-      
+
       // Prepare messages
       const messages: DeepSeekMessage[] = [
         {
@@ -126,7 +125,7 @@ Always prioritize providing accurate, helpful information while maintaining a ba
         },
         { role: 'user', content: message }
       ];
-      
+
       // Make API call with retry logic
       const responseText = await this.callDeepSeekWithRetry({
         model: this.model,
@@ -134,19 +133,19 @@ Always prioritize providing accurate, helpful information while maintaining a ba
         temperature: CONFIG.DEFAULT_TEMPERATURE,
         max_tokens: CONFIG.DEFAULT_MAX_TOKENS
       });
-      
+
       // Asynchronously extract and store memory (don't wait)
       this.extractAndStoreMemory(userId, message, responseText).catch(err => 
         console.error('Failed to store memory:', err)
       );
-      
+
       return responseText;
     } catch (error) {
       console.error('Error in generateResponse:', error);
       return this.getErrorMessage(error);
     }
   }
-  
+
   async generateResearchReport(
     messages: DeepSeekMessage[],
     temperature: number = CONFIG.DEFAULT_TEMPERATURE,
@@ -163,30 +162,30 @@ Always prioritize providing accurate, helpful information while maintaining a ba
         temperature,
         max_tokens: maxTokens
       });
-      
+
       return { message: responseText };
     } catch (error) {
       console.error('Error generating research report:', error);
       return { message: this.getErrorMessage(error) };
     }
   }
-  
+
   private async getUserContext(userId: string, message: string): Promise<string> {
     // Check cache first
     const cached = this.userContextCache.get(userId);
     if (cached && Date.now() - cached.timestamp < this.contextCacheTimeout) {
       return cached.context;
     }
-    
+
     try {
       // Fetch data in parallel
       const [userPreferences, relevantMemories] = await Promise.all([
         storage.getUserPreferences(userId),
         storage.searchUserMemories(userId, message)
       ]);
-      
+
       let context = '';
-      
+
       // Build preferences context
       if (userPreferences.length > 0) {
         const prefLines = userPreferences
@@ -194,7 +193,7 @@ Always prioritize providing accurate, helpful information while maintaining a ba
           .join('\n');
         context += `User preferences:\n${prefLines}\n\n`;
       }
-      
+
       // Build memories context
       if (relevantMemories.length > 0) {
         const memoryLines = relevantMemories
@@ -203,51 +202,51 @@ Always prioritize providing accurate, helpful information while maintaining a ba
           .join('\n');
         context += `Relevant information about the user:\n${memoryLines}\n`;
       }
-      
+
       // Cache the context
       this.userContextCache.set(userId, { context, timestamp: Date.now() });
-      
+
       return context;
     } catch (error) {
       console.error('Error building user context:', error);
       return '';
     }
   }
-  
+
   private async callDeepSeekWithRetry(config: DeepSeekConfig): Promise<string> {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt < CONFIG.RETRY_ATTEMPTS; attempt++) {
       try {
         const response = await this.axiosInstance.post<DeepSeekResponse>('', config);
-        
+
         if (response.data?.choices?.[0]?.message?.content) {
           return response.data.choices[0].message.content;
         }
-        
+
         throw new Error('Invalid response format from DeepSeek API');
       } catch (error) {
         lastError = error as Error;
-        
+
         // Don't retry on client errors (4xx)
         if (axios.isAxiosError(error) && error.response?.status && error.response.status < 500) {
           break;
         }
-        
+
         // Wait before retrying (exponential backoff)
         if (attempt < CONFIG.RETRY_ATTEMPTS - 1) {
           await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * Math.pow(2, attempt)));
         }
       }
     }
-    
+
     throw lastError || new Error('Failed to call DeepSeek API');
   }
-  
+
   private async extractAndStoreMemory(userId: string, userMessage: string, aiResponse: string): Promise<void> {
     // Check if message contains personal information using pre-compiled patterns
     const containsPersonalInfo = PERSONAL_PATTERNS.some(pattern => pattern.test(userMessage));
-    
+
     if (containsPersonalInfo) {
       try {
         await storage.createMemory({
@@ -255,7 +254,7 @@ Always prioritize providing accurate, helpful information while maintaining a ba
           content: userMessage,
           embedding: null // Would store vector embeddings in a production system
         });
-        
+
         // Clear user context cache to include new memory
         this.userContextCache.delete(userId);
       } catch (error) {
@@ -263,7 +262,7 @@ Always prioritize providing accurate, helpful information while maintaining a ba
       }
     }
   }
-  
+
   private getErrorMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 429) {
@@ -274,10 +273,10 @@ Always prioritize providing accurate, helpful information while maintaining a ba
         return "The request took too long. Please try again with a simpler query.";
       }
     }
-    
+
     return "I'm sorry, I encountered an issue while processing your request. Please try again in a moment.";
   }
-  
+
   // Utility method to clear context cache
   clearContextCache(userId?: string): void {
     if (userId) {

@@ -19,7 +19,7 @@ type SunaConversation = {
   createdAt: string;
 };
 
-export type LLMModel = 'auto' | 'deepseek-chat' | 'gemini-1.5-flash' | 'gemini-1.0-pro';
+export type LLMModel = 'auto' | 'deepseek-chat' | 'gemini-1.5-flash' | 'openrouter/openai/gpt-4o-mini' | 'openrouter/deepseek/deepseek-r1-distill-llama-70b' | 'bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0';
 
 export type SearchPreferences = {
   forceSearch?: boolean;          // Force web search even if not detected automatically
