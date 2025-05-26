@@ -791,8 +791,7 @@ async def health_check():
             "tavily": bool(config.api.tavily_api_key),
             "brave": bool(config.api.brave_api_key)
         }
-        health_data["api_keys"] = api```python
-status
+        health_data["api_keys"] = api_status
 
         # Get system metrics
         system_health = metrics.get_system_health()
