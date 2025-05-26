@@ -16,6 +16,11 @@ import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
 import homework from './routes/homework';
 
+// Add after existing imports
+import { researchOrchestrator } from './advanced-research-orchestrator';
+import { knowledgeGraph } from './knowledge-graph-integration';
+import { factVerificationService } from './real-time-fact-verification';
+
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
   userId: string;
@@ -122,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  // Set up WebSocket server for real-time chat
+  // Set up WebSocket server for real-timeserver for real-time chat
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const connections: ClientConnection[] = [];
 
@@ -622,6 +627,132 @@ router.post('/research/background', async (req, res) => {
 });
 
   app.use('/api', router);
+
+  // Add these endpoints after existing routes
+
+  // Advanced research with multi-stage pipeline
+  app.post('/api/research/advanced', async (req, res) => {
+    try {
+      const { query, options = {} } = req.body;
+
+      if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+      }
+
+      const result = await researchOrchestrator.processResearchQuery(query, options);
+      res.json(result);
+
+    } catch (error) {
+      logger.error('Advanced research failed', error, {
+        component: 'api'
+      });
+      res.status(500).json({ error: 'Advanced research failed' });
+    }
+  });
+
+  // Knowledge graph endpoints
+  app.post('/api/knowledge-graph/extract', async (req, res) => {
+    try {
+      const { text } = req.body;
+
+      if (!text) {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+
+      const graph = await knowledgeGraph.buildKnowledgeGraph(text);
+      const entities = await knowledgeGraph.extractEntities(text);
+
+      res.json({
+        entities,
+        graphSize: graph.size,
+        success: true
+      });
+
+    } catch (error) {
+      logger.error('Knowledge graph extraction failed', error, {
+        component: 'api'
+      });
+      res.status(500).json({ error: 'Knowledge graph extraction failed' });
+    }
+  });
+
+  app.get('/api/knowledge-graph/search', async (req, res) => {
+    try {
+      const { query, limit = 10 } = req.query;
+
+      if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+      }
+
+      const entities = await knowledgeGraph.semanticSearch(query as string, parseInt(limit as string));
+      res.json({ entities });
+
+    } catch (error) {
+      logger.error('Knowledge graph search failed', error, {
+        component: 'api'
+      });
+      res.status(500).json({ error: 'Knowledge graph search failed' });
+    }
+  });
+
+  // Fact verification endpoints
+  app.post('/api/fact-check', async (req, res) => {
+    try {
+      const { text } = req.body;
+
+      if (!text) {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+
+      const verificationResults = await factVerificationService.verifyFacts(text);
+
+      res.json({
+        results: verificationResults,
+        summary: {
+          totalClaims: verificationResults.length,
+          verifiedClaims: verificationResults.filter(r => r.isVerified).length,
+          averageConfidence: verificationResults.reduce((sum, r) => sum + r.confidence, 0) / verificationResults.length || 0
+        }
+      });
+
+    } catch (error) {
+      logger.error('Fact verification failed', error, {
+        component: 'api'
+      });
+      res.status(500).json({ error: 'Fact verification failed' });
+    }
+  });
+
+  // System capabilities endpoint
+  app.get('/api/research/capabilities', async (req, res) => {
+    try {
+      res.json({
+        features: {
+          multiStageResearch: true,
+          knowledgeGraph: true,
+          factVerification: true,
+          domainAgents: true,
+          semanticSearch: true,
+          realTimeProcessing: true
+        },
+        capabilities: {
+          maxComplexity: 'expert',
+          supportedDomains: ['financial', 'technical', 'scientific', 'news', 'academic', 'general'],
+          verificationSources: ['web', 'knowledge_graph', 'authoritative_sources'],
+          responseFormats: ['comprehensive', 'summary', 'structured'],
+          languages: ['english']
+        },
+        performance: {
+          averageResponseTime: '30-120 seconds',
+          maxConcurrentQueries: 10,
+          cacheEnabled: true,
+          fallbackSystems: 3
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get capabilities' });
+    }
+  });
 
 
   return httpServer;
