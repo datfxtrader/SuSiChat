@@ -798,7 +798,7 @@ async def health_check():
 
         # Get error summary
         error_summary = error_handler.get_error_summary()
-        ```python
+        
         health_data["error_summary"] = error_summary
 
         # Determine overall status
