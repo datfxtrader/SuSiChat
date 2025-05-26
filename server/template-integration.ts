@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import LRU from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 
 // Types and Interfaces
 interface TemplateVariable {
@@ -107,7 +107,7 @@ class TemplateServiceError extends Error {
 
 // High-performance rate limiter with sliding window
 class OptimizedRateLimiter {
-  private windows = new LRU<string, number[]>({
+  private windows = new LRUCache<string, number[]>({
     max: 1000,
     ttl: CONFIG.RATE_LIMIT.WINDOW * 2,
   });
@@ -201,7 +201,7 @@ class CircuitBreaker {
 class OptimizedTemplateService {
   private static instance: OptimizedTemplateService;
   private axiosInstance: AxiosInstance;
-  private cache: LRU<string, any>;
+  private cache: LRUCache<string, any>;
   private rateLimiter = new OptimizedRateLimiter();
   private circuitBreaker = new CircuitBreaker();
   private defaultCategories: TemplateCategory[];
@@ -216,7 +216,7 @@ class OptimizedTemplateService {
   
   private constructor() {
     // Initialize LRU cache for better memory management
-    this.cache = new LRU<string, any>({
+    this.cache = new LRUCache<string, any>({
       max: CONFIG.CACHE.MAX_SIZE,
       ttl: CONFIG.CACHE.TTL.TEMPLATES,
       updateAgeOnGet: true,
