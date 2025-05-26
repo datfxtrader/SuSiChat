@@ -1,55 +1,10 @@
 // server/deerflow-integration.ts
-import { deerflowClient, DeerFlowResearchParams, DeerFlowResearchResponse } from './deerflow-client';
-import { llmService } from './llm';
-
-/**
- * Research depth levels
- */
-export enum ResearchDepth {
-  Basic = 1,      // Simple web search
-  Enhanced = 2,   // More comprehensive web search with better processing
-  Deep = 3        // Full DeerFlow research capabilities
-}
-
-/**
- * Research source interface
- */
-export interface ResearchSource {
-  title: string;
-  url: string;
-  domain: string;
-  content?: string;
-}
-
-/**
- * Research result interface
- */
-export interface ResearchResult {
-  report: string;
-  sources: ResearchSource[];
-  depth: ResearchDepth;
-  processingTime: number;
-  progress?: {
-    step: string;
-    percent: number;
-    statusMessage?: string;
-  };
-}
-
-/**
- * Research parameters interface
- */
-export interface ResearchParams {
-  query: string;
-  depth?: ResearchDepth;
-  modelId?: string;
-  includeMarketData?: boolean;
-  includeNews?: boolean;
-  researchLength?: string;
-  researchTone?: string;
-  minWordCount?: number;
-  researchDepth?: number; // For universal token allocation (1=8K, 2=15K, 3=25K tokens)
-}
+import { 
+  researchService, 
+  ResearchDepth, 
+  ResearchResult, 
+  ResearchParams 
+} from './deerflow-integration-optimized';
 
 /**
  * Service for performing research at different depth levels
@@ -178,7 +133,7 @@ export class ResearchService {
         try {
           // Use the same comprehensive formatting as Enhanced/Deep research
           const systemPrompt = 'You are an expert research analyst providing detailed, well-structured reports with comprehensive analysis and professional formatting.';
-          
+
           const userPrompt = `Create a comprehensive research report about "${params.query}" using the following sources.
 
 The report should include:
@@ -220,12 +175,12 @@ Your report should be detailed, data-driven, and professionally formatted to mat
 
         } catch (error) {
           console.error('Error generating formatted report:', error);
-          
+
           // Fallback to enhanced formatting if LLM fails
           report = `# Research Report: ${params.query}\n\n`;
           report += `## Executive Summary\n\nBased on my research, here are the key findings about "${params.query}".\n\n`;
           report += `## Key Findings\n\n`;
-          
+
           results.slice(0, 3).forEach((result: any, index: number) => {
             report += `### ${index + 1}. ${result.title || 'Key Finding'}\n`;
             report += `${result.snippet || result.content || 'Information not available'}\n\n`;
@@ -800,3 +755,36 @@ Your report should:
 
 // Export singleton instance
 export const researchService = new ResearchService();
+/**
+ * Perform research with optimized service
+ */
+export async function performResearch(params: ResearchParams): Promise<ResearchResult> {
+  return await researchService.performResearch(params);
+}
+/**
+ * Cancel a research request
+ */
+export function cancelResearch(researchId: string): boolean {
+  return researchService.cancelResearch(researchId);
+}
+
+/**
+ * Get service metrics
+ */
+export function getResearchMetrics() {
+  return researchService.getMetrics();
+}
+
+/**
+ * Clear research caches
+ */
+export function clearResearchCaches() {
+  researchService.clearCaches();
+}
+
+/**
+ * Shutdown research service
+ */
+export async function shutdownResearchService() {
+  await researchService.shutdown();
+}

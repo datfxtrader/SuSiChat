@@ -5,6 +5,14 @@ import financialResearchRoutes from './routes/financial-research';
 import webSearchRoutes from './routes/webSearch';
 import enhancedWebSearchRoutes from './routes/enhanced-web-search';
 import { intelligentSearchManager } from './intelligentSearchManager';
+import { 
+  performResearch, 
+  ResearchDepth, 
+  cancelResearch, 
+  getResearchMetrics, 
+  clearResearchCaches, 
+  shutdownResearchService 
+} from './deerflow-integration';
 
 const app = express();
 app.use(express.json());
@@ -288,6 +296,79 @@ app.use((req, res, next) => {
     }
   });
 
+  // DeerFlow Integration with Optimized Service
+  app.post('/api/research/deerflow', async (req, res) => {
+    try {
+      const { query, depth = 3, ...otherParams } = req.body;
+
+      if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+      }
+
+      console.log(`🔍 Optimized DeerFlow research request: ${query} (depth: ${depth})`);
+
+      const result = await performResearch({
+        query,
+        depth,
+        cacheEnabled: true,
+        priority: 'normal',
+        ...otherParams
+      });
+
+      res.json({
+        success: true,
+        result: {
+          report: result.report,
+          sources: result.sources,
+          depth: result.depth,
+          processingTime: result.processingTime,
+          fromCache: result.fromCache || false
+        }
+      });
+
+    } catch (error) {
+      console.error('DeerFlow research error:', error);
+      res.status(500).json({
+        error: 'Research failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Research metrics endpoint
+  app.get('/api/research/metrics', (req, res) => {
+    try {
+      const metrics = getResearchMetrics();
+      res.json({ success: true, metrics });
+    } catch (error) {
+      console.error('Metrics error:', error);
+      res.status(500).json({ error: 'Failed to get metrics' });
+    }
+  });
+
+  // Cancel research endpoint
+  app.post('/api/research/cancel', (req, res) => {
+    try {
+      const { researchId } = req.body;
+      const cancelled = cancelResearch(researchId);
+      res.json({ success: true, cancelled });
+    } catch (error) {
+      console.error('Cancel error:', error);
+      res.status(500).json({ error: 'Failed to cancel research' });
+    }
+  });
+
+  // Clear cache endpoint
+  app.post('/api/research/clear-cache', (req, res) => {
+    try {
+      clearResearchCaches();
+      res.json({ success: true, message: 'Caches cleared' });
+    } catch (error) {
+      console.error('Clear cache error:', error);
+      res.status(500).json({ error: 'Failed to clear caches' });
+    }
+  });
+
   app.use('/api/financial-research', financialResearchRoutes);
   // Use enhanced web search as the primary search system
   app.use('/api/web-search', enhancedWebSearchRoutes);
@@ -325,11 +406,11 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000");
-  
+
   // Check if port is already in use
   const { createServer } = await import('net');
   const testServer = createServer();
-  
+
   testServer.once('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`❌ Port ${port} is already in use!`);
@@ -338,7 +419,7 @@ app.use((req, res, next) => {
       console.error('2. Vite dev server using the same port');
       console.error('3. Another Node.js process');
       console.error('\nTrying to kill conflicting processes...');
-      
+
       // Try to find and kill conflicting processes
       import('child_process').then(({ exec }) => {
         exec(`lsof -ti:${port}`, (error, stdout) => {
@@ -348,7 +429,7 @@ app.use((req, res, next) => {
               console.log(`Killing process ${pid} on port ${port}`);
               exec(`kill -9 ${pid}`);
             });
-            
+
             // Retry after killing processes
             setTimeout(() => {
               startServer();
@@ -363,14 +444,14 @@ app.use((req, res, next) => {
     console.error('Server error during port test:', err);
     process.exit(1);
   });
-  
+
   testServer.once('listening', () => {
     testServer.close();
     startServer();
   });
-  
+
   testServer.listen(port, "0.0.0.0");
-  
+
   function startServer() {
     server.listen(port, "0.0.0.0", (err?: Error) => {
       if (err) {
@@ -392,18 +473,20 @@ app.use((req, res, next) => {
   });
 
   // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('Received SIGTERM, shutting down gracefully');
+  process.on('SIGTERM', async () => {
+    console.log('🛑 SIGTERM signal received: closing HTTP server');
+    await shutdownResearchService();
     server.close(() => {
-      console.log('Server closed');
+      console.log('🔒 HTTP server closed');
       process.exit(0);
     });
   });
 
-  process.on('SIGINT', () => {
-    console.log('Received SIGINT, shutting down gracefully');
+  process.on('SIGINT', async () => {
+    console.log('🛑 SIGINT signal received: closing HTTP server');
+    await shutdownResearchService();
     server.close(() => {
-      console.log('Server closed');
+      console.log('🔒 HTTP server closed');
       process.exit(0);
     });
   });
