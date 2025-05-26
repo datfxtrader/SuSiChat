@@ -48,15 +48,15 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
 
   const showActions = !isLatest || typewriterComplete;
 
-  // Reset typewriter state when isLatest changes
+  // Reset typewriter state when isLatest changes with better detection
   useEffect(() => {
-    if (isLatest) {
-      console.log('🎬 Starting typewriter animation for latest message');
+    if (isLatest && content && content.length > 0) {
+      console.log('🎬 Starting typewriter animation for latest message', content.length, 'chars');
       setTypewriterComplete(false);
     } else {
       setTypewriterComplete(true);
     }
-  }, [isLatest]);
+  }, [isLatest, content]);
 
   return (
     <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg">

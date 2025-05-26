@@ -341,23 +341,28 @@ export const ResearchAgent = () => {
       console.log('📡 Sending research request to backend...');
       setIsSending(false);
 
-      // Start progress simulation - much slower and more realistic
+      // Start progress simulation with proper completion handling
       progressIntervalRef.current = setInterval(() => {
           setResearchProgress(prev => {
-            // Very slow progress that caps at 80% to wait for actual reports
-            const increment = prev < 50 ? Math.random() * 0.8 : Math.random() * 0.3;
-            const newProgress = Math.min(prev + increment, 80);
-            
-            // Update stages based on progress - more conservative
-            if (newProgress >= 70) setResearchStage(5);
+            // Dynamic progress that allows natural completion
+            const baseIncrement = prev < 30 ? Math.random() * 1.2 : 
+                                 prev < 60 ? Math.random() * 0.8 : 
+                                 prev < 85 ? Math.random() * 0.5 : 
+                                 Math.random() * 0.2;
+
+            const newProgress = Math.min(prev + baseIncrement, 95);
+
+            // Update stages based on progress
+            if (newProgress >= 85) setResearchStage(6);
+            else if (newProgress >= 70) setResearchStage(5);
             else if (newProgress >= 50) setResearchStage(4);
             else if (newProgress >= 30) setResearchStage(3);
             else if (newProgress >= 15) setResearchStage(2);
             else setResearchStage(1);
-            
+
             return newProgress;
           });
-        }, 2500); // Slower interval
+        }, 1800); // Optimized interval
 
       const response = await fetch('/api/suna-research', {
         method: 'POST',
@@ -396,13 +401,13 @@ export const ResearchAgent = () => {
         console.log('📝 Research message added to chat - completion will be handled by useEffect');
       } else {
         console.log('⚠️ Empty or missing report, adding fallback message');
-        
+
         // Clear progress for failed research
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
           progressIntervalRef.current = null;
         }
-        
+
         setIsResearchInProgress(false);
         setResearchProgress(0);
         setResearchStage(1);
@@ -612,7 +617,7 @@ The research service logs show it's working, so this might be a temporary connec
           {messages.map((msg, index) => {
             const isLatestMessage = index === messages.length - 1;
             const shouldShowTypewriter = isLatestMessage && msg.role === 'assistant' && !isResearchInProgress;
-            
+
             return (
               <div key={msg.id} className="mb-4">
                 <div className="flex items-start space-x-3">

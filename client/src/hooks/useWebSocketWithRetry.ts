@@ -58,30 +58,30 @@ export function useWebSocketWithRetry({
   }, []);
 
   const connect = useCallback(() => {
-    if (reconnectingRef.current || wsRef.current?.readyState === WebSocket.CONNECTING) {
-      return;
-    }
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      console.log('Attempting to connect to WebSocket...');
+      console.log('🔌 Attempting WebSocket connection to:', url);
+      const ws = new WebSocket(url);
 
-      // Clean up existing connection
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      // Set connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+          console.log('⏰ WebSocket connection timeout');
+        }
+      }, 10000);
 
-      wsRef.current = new WebSocket(url);
-
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
+      ws.onopen = () => {
+        clearTimeout(connectionTimeout);
+        console.log('✅ WebSocket connected successfully');
         setIsConnected(true);
         setRetryCount(0);
-        reconnectingRef.current = false;
         startPing();
         onConnect?.();
       };
 
-      wsRef.current.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
 
@@ -100,12 +100,12 @@ export function useWebSocketWithRetry({
         }
       };
 
-      wsRef.current.onerror = (error) => {
+      ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         onError?.(error);
       };
 
-      wsRef.current.onclose = (event) => {
+      ws.onclose = (event) => {
         console.log('WebSocket connection closed', event.code, event.reason);
         setIsConnected(false);
         stopPing();

@@ -25,6 +25,7 @@ interface MainLayoutProps {
   maxContentWidth?: string;
   showBreadcrumbs?: boolean;
   breadcrumbs?: BreadcrumbItem[];
+  showSidebar?: boolean;
 }
 
 interface BreadcrumbItem {
@@ -204,7 +205,8 @@ const MainLayout = memo<MainLayoutProps>(({
   sidebarDefaultOpen = false,
   maxContentWidth,
   showBreadcrumbs = false,
-  breadcrumbs
+  breadcrumbs,
+  showSidebar = true
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const [location, navigate] = useLocation();
@@ -272,22 +274,24 @@ const MainLayout = memo<MainLayoutProps>(({
       </a>
 
       {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed lg:sticky top-0 h-screen z-40",
-          "transition-transform duration-300 ease-in-out",
-          "lg:w-auto", // Let sidebar control its own width
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        )}
-        aria-label="Main navigation"
-      >
-        <Sidebar 
-          collapsed={sidebarCollapsed}
-          onCollapsedChange={setSidebarCollapsed}
-          onItemClick={isMobile ? closeSidebar : undefined}
-          className="block" // Ensure sidebar is always visible
-        />
-      </aside>
+      {showSidebar && (
+        <aside
+          className={cn(
+            "fixed lg:sticky top-0 h-screen z-40",
+            "transition-transform duration-300 ease-in-out",
+            "lg:w-auto", // Let sidebar control its own width
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          )}
+          aria-label="Main navigation"
+        >
+          <Sidebar 
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
+            onItemClick={isMobile ? closeSidebar : undefined}
+            className="block" // Ensure sidebar is always visible
+          />
+        </aside>
+      )}
 
       {/* Main content area */}
       <div 

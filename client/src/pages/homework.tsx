@@ -404,12 +404,14 @@ const Homework: React.FC = () => {
     </div>
   );
 
-  // Corrections panel
+  // Corrections panel with improved visibility
   const renderCorrectionsPanel = () => corrections.length > 0 && (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="fixed left-4 top-20 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto z-50"
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="fixed left-4 top-20 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4 max-h-96 overflow-y-auto z-50"
     >
       <h4 className="font-semibold mb-3 flex items-center gap-2">
         <BookOpen className="w-4 h-4" />
@@ -464,6 +466,7 @@ const Homework: React.FC = () => {
       title="Study Assistant" 
       subtitle="Personalized learning help with AI tutoring"
       showHeader={true}
+      showSidebar={true}
     >
       <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
         {/* Quick Tips Section */}
