@@ -319,7 +319,7 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({
         <div className="flex items-center space-x-3 text-xs text-zinc-400">
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span>AI Research Assistant</span>
+            <span>SuSi Research</span>
           </div>
           <span>•</span>
           <span>{formatRelativeTime(timestamp)}</span>

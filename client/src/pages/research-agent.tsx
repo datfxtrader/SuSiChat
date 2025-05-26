@@ -207,6 +207,10 @@ Current market conditions show several critical factors influencing Bitcoin's tr
     }
   ];
 
+  useEffect(() => {
+    document.title = 'SuSi Research';
+  }, []);
+
   return (
     <MainLayout
       showHeader={false}

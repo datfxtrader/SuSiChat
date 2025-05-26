@@ -544,6 +544,13 @@ interface Message {
   }>;
 }
 
+// BelgaCatIcon component (New component)
+const BelgaCatIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 6 12ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM12 6C10.34 6 9 7.34 9 9C9 10.66 10.34 12 12 12C13.66 12 15 10.66 15 9C15 7.34 13.66 6 12 6ZM6 14H18V15H6V14Z" fill="currentColor"/>
+  </svg>
+);
+
 export const ResearchAgent = () => {
   const [message, setMessage] = useState('');
   const [researchDepth, setResearchDepth] = useState('3');
@@ -775,6 +782,7 @@ I wasn't able to complete research on "${query}" at this time. This might be due
     console.log('🔄 Starting new research session');
     cleanup();
     setMessages([]);
+```python
     resetResearchState();
     setMessage('');
   }, [cleanup, resetResearchState]);
@@ -826,11 +834,11 @@ I wasn't able to complete research on "${query}" at this time. This might be due
             <div className="flex-1 flex items-center justify-center min-h-[60vh]">
               <div className="text-center max-w-4xl mx-auto px-8">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
-                  <Bot className="w-8 h-8 text-white" />
+                  <BelgaCatIcon className="w-8 h-8 text-white" />
                 </div>
 
                 <h1 className="text-3xl font-bold text-zinc-100 mb-3">
-                  Welcome to Research Agent
+                  Welcome to SuSi Research
                 </h1>
                 <p className="text-lg text-zinc-400 mb-12">
                   Get comprehensive, AI-powered research on any topic with real-time data
@@ -866,7 +874,7 @@ I wasn't able to complete research on "${query}" at this time. This might be due
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'
                 }`}>
-                  {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
+                  {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <BelgaCatIcon className="w-5 h-5 text-white" />}
                 </div>
                 <div className="flex-1">
                   {msg.role === 'user' ? (
@@ -892,7 +900,7 @@ I wasn't able to complete research on "${query}" at this time. This might be due
             <div className="mb-4">
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-5 h-5 text-white" />
+                  <BelgaCatIcon className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
                   <ResearchProgress 

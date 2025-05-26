@@ -2,6 +2,7 @@
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Bot, Settings, User, MessageSquare } from 'lucide-react';
+import { BelgaCatIcon } from './BelgaCatIcon';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import UIStandards, { UITheme } from '@/config/ui-standards.config';
@@ -26,8 +27,8 @@ const StandardizedHeader = memo<StandardizedHeaderProps>(({
   theme,
   title,
   subtitle,
-  assistantName = 'AI Assistant',
-  assistantIcon = <Bot className="w-5 h-5" />,
+  assistantName = 'SuSi',
+  assistantIcon = <BelgaCatIcon className="w-5 h-5" />,
   userProfile,
   mood = 'neutral',
   moodEmojis = {

@@ -1,12 +1,15 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { BestFriendChat } from '@/components/chat/BestFriendChat';
 import { useAuth } from '@/hooks/useAuth';
-import { Heart, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 const VietnameseChat: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    document.title = 'SuSi Chat';
+  }, []);
 
   if (!isAuthenticated || !user) {
     return null; // Will be redirected by auth system
@@ -18,8 +21,8 @@ const VietnameseChat: React.FC = () => {
       subtitle="Your Vietnamese-aware AI companion"
       headerRight={
         <div className="flex items-center space-x-3">
-          <button 
-            className="text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300" 
+          <button
+            className="text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
             title="Chat Settings"
           >
             <Settings className="h-5 w-5" />

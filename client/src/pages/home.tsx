@@ -14,6 +14,10 @@ const Home: React.FC = () => {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
+  useEffect(() => {
+    document.title = 'SuSi - Your AI Assistant Friend';
+  }, []);
+
   return (
     <MainLayout showHeader={false}>
       <div className="flex-1 flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-4">
@@ -26,7 +30,7 @@ const Home: React.FC = () => {
             Your personal AI assistant for the whole family. Schedule reminders, get homework help, 
             plan trips, and collaborate with your family - all through a natural conversation.
           </p>
-          
+
           {isAuthenticated ? (
             <div className="space-y-4">
               <p className="text-primary">You're logged in! Redirecting to chat...</p>

@@ -1,6 +1,16 @@
 
 export const UIStandards = {
   // ============================================
+  // SUSI BRANDING
+  // ============================================
+  branding: {
+    appName: 'SuSi',
+    assistantName: 'SuSi',
+    chatName: 'SuSi Chat',
+    tagline: 'Your AI Assistant Friend'
+  },
+
+  // ============================================
   // TYPEWRITER CONFIGURATION
   // ============================================
   typewriter: {

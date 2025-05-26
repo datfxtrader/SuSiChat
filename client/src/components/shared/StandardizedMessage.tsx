@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, User, Copy, Share2, Bookmark, CheckCircle, Clock } from 'lucide-react';
@@ -7,6 +6,7 @@ import { TypewriterConfig } from '@/config/typewriter.config';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import UIStandards, { UITheme } from '@/config/ui-standards.config';
+import { BelgaCatIcon } from './BelgaCatIcon';
 
 interface Message {
   id: string;

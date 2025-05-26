@@ -2,6 +2,7 @@
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Bot } from 'lucide-react';
+import { BelgaCatIcon } from './BelgaCatIcon';
 import UIStandards, { UITheme } from '@/config/ui-standards.config';
 
 interface StandardizedTypingIndicatorProps {
