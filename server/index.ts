@@ -14,6 +14,8 @@ import {
   shutdownResearchService 
 } from './deerflow-integration';
 import searchMetricsRoutes from './routes/searchMetrics';
+import cacheMonitoringRoutes from './routes/cache-monitoring';
+import yahooFinanceMetricsRoutes from './routes/yahoo-finance-metrics';
 
 const app = express();
 app.use(express.json());
@@ -245,7 +247,7 @@ app.use((req, res, next) => {
     try {
       const { researchCache } = await import('./optimized-research-cache');
       const metrics = researchCache.getMetrics();
-      
+
       res.json({
         success: true,
         metrics,
@@ -264,7 +266,7 @@ app.use((req, res, next) => {
     try {
       const { researchCache } = await import('./optimized-research-cache');
       researchCache.clear();
-      
+
       res.json({
         success: true,
         message: 'Optimized research cache cleared successfully'
@@ -464,10 +466,10 @@ app.use((req, res, next) => {
   app.use('/api/web-search', webSearchRoutes);
   app.use('/api/enhanced-web-search', enhancedWebSearchRoutes);
   app.use('/api/search-metrics', searchMetricsRoutes);
-  
+
   // Import and use cache monitoring routes
-  const cacheMonitoringRoutes = (await import('./routes/cache-monitoring')).default;
-  app.use('/api/cache-monitoring', cacheMonitoringRoutes);
+  app.use('/api/cache', cacheMonitoringRoutes);
+  app.use('/api/yahoo-finance', yahooFinanceMetricsRoutes);
 
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {

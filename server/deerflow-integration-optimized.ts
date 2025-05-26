@@ -790,10 +790,20 @@ export class OptimizedResearchService extends EventEmitter {
   private isFinancialQuery(query: string): boolean {
     const financialPatterns = [
       /\b(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)\/\w{3}\b/i,
-      /\b(forex|currency|exchange rate|stock|trading|investment|market)\b/i
+      /\b(forex|currency|exchange rate|stock|trading|investment|market)\b/i,
+      /\b(bitcoin|btc|cryptocurrency|crypto)\b/i
     ];
     
     return financialPatterns.some(pattern => pattern.test(query));
+  }
+  
+  private isBitcoinQuery(query: string): boolean {
+    const bitcoinPatterns = [
+      /\b(bitcoin|btc)\b/i,
+      /\b(cryptocurrency|crypto)\b/i
+    ];
+    
+    return bitcoinPatterns.some(pattern => pattern.test(query));
   }
   
   private updateAverageResponseTime(responseTime: number): void {
@@ -1022,6 +1032,18 @@ ${sourcesList}`;
     const startTime = Date.now();
     
     try {
+      // Check if Bitcoin-related query
+      if (this.isBitcoinQuery(params.query)) {
+        const bitcoinResult = await this.requestQueue.add(
+          () => this.fetchBitcoinAnalysis(params.query, abortController.signal),
+          { priority: 1 }
+        );
+        
+        if (bitcoinResult) {
+          return bitcoinResult;
+        }
+      }
+      
       // Try specialized forex API first
       const currencyPair = this.extractCurrencyPair(params.query);
       
@@ -1065,6 +1087,77 @@ ${sourcesList}`;
   private extractCurrencyPair(query: string): string | null {
     const match = query.match(/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)\/(EUR|GBP|USD|JPY|AUD|NZD|CAD|CHF)/i);
     return match ? match[0].toUpperCase() : null;
+  }
+  
+  private async fetchBitcoinAnalysis(
+    query: string,
+    signal: AbortSignal
+  ): Promise<ResearchResult | null> {
+    try {
+      const { yahooFinanceService } = await import('./yahoo-finance-integration');
+      const bitcoinData = await yahooFinanceService.getCurrentBitcoinPrice();
+      
+      if (!bitcoinData) {
+        return null;
+      }
+      
+      const marketContext = await yahooFinanceService.getBitcoinMarketContext();
+      const enhancedQuery = await yahooFinanceService.enhanceBitcoinQuery(query);
+      
+      // Generate comprehensive Bitcoin analysis using LLM
+      const { llmService } = await import('./llm');
+      
+      const analysisPrompt = `
+Based on the current Bitcoin market data and the user query "${query}", create a comprehensive analysis.
+
+Current Market Data:
+${marketContext}
+
+Enhanced Query Context: ${enhancedQuery}
+
+Provide a detailed analysis covering:
+1. Current Market Status
+2. Technical Analysis
+3. Market Trends
+4. Price Outlook
+5. Investment Considerations
+
+Be data-driven and include specific numbers from the market data.
+`;
+
+      const response = await llmService.generateResearchReport(
+        [
+          {
+            role: 'system',
+            content: 'You are a Bitcoin and cryptocurrency market analyst providing detailed market analysis.'
+          },
+          {
+            role: 'user',
+            content: analysisPrompt
+          }
+        ],
+        0.7,
+        2000
+      );
+      
+      return {
+        report: response.message || 'Unable to generate Bitcoin analysis',
+        sources: [
+          {
+            title: 'Yahoo Finance - Bitcoin USD',
+            url: 'https://finance.yahoo.com/quote/BTC-USD',
+            domain: 'finance.yahoo.com',
+            content: marketContext
+          }
+        ],
+        depth: ResearchDepth.Deep,
+        processingTime: 0
+      };
+      
+    } catch (error) {
+      console.error('Bitcoin analysis error:', error);
+      return null;
+    }
   }
   
   private async fetchForexData(
