@@ -1,0 +1,994 @@
+// optimized-research-cache.ts
+import { LRUCache } from 'lru-cache';
+import { db, storeResearchResults, getResearchResults } from './db';
+import { EventEmitter } from 'events';
+import pRetry from 'p-retry';
+import { Pool } from 'pg';
+
+interface CachedResearchResult {
+  conversationId: string;
+  message: any;
+  timestamp: string;
+  userId: string;
+  size: number; // Track memory usage
+}
+
+interface CacheMetrics {
+  hits: number;
+  misses: number;
+  evictions: number;
+  dbFallbacks: number;
+}
+
+/**
+ * Optimized Research Results Cache with LRU eviction and batch operations
+ */
+export class OptimizedResearchResultsCache extends EventEmitter {
+  private cache: LRUCache<string, CachedResearchResult>;
+  private conversationsByUser: LRUCache<string, Set<string>>;
+  private pendingWrites: Map<string, CachedResearchResult>;
+  private writeTimer: NodeJS.Timeout | null = null;
+  private metrics: CacheMetrics = {
+    hits: 0,
+    misses: 0,
+    evictions: 0,
+    dbFallbacks: 0
+  };
+
+  constructor(options: {
+    maxSize?: number;
+    maxAge?: number;
+    batchWriteInterval?: number;
+  } = {}) {
+    super();
+    
+    // LRU cache with size-based eviction
+    this.cache = new LRUCache<string, CachedResearchResult>({
+      max: options.maxSize || 1000,
+      maxSize: 100 * 1024 * 1024, // 100MB max memory
+      sizeCalculation: (value) => value.size,
+      ttl: options.maxAge || 1000 * 60 * 60 * 24, // 24 hours
+      dispose: (value, key) => {
+        this.metrics.evictions++;
+        this.emit('eviction', { key, value });
+      },
+      updateAgeOnGet: true,
+      updateAgeOnHas: true
+    });
+    
+    // User conversation index with LRU
+    this.conversationsByUser = new LRUCache<string, Set<string>>({
+      max: 10000,
+      ttl: options.maxAge || 1000 * 60 * 60 * 24
+    });
+    
+    // Batch write buffer
+    this.pendingWrites = new Map();
+    
+    // Start batch write timer
+    this.startBatchWriteTimer(options.batchWriteInterval || 5000);
+  }
+
+  /**
+   * Store result with optimized batch writing
+   */
+  async storeResult(userId: string, conversationId: string, message: any): Promise<void> {
+    const cacheKey = `${userId}-${conversationId}`;
+    const timestamp = new Date().toISOString();
+    
+    // Calculate approximate size
+    const size = JSON.stringify(message).length;
+    
+    const cacheEntry: CachedResearchResult = {
+      conversationId,
+      message,
+      timestamp,
+      userId,
+      size
+    };
+    
+    // Store in cache immediately
+    this.cache.set(cacheKey, cacheEntry);
+    
+    // Update user index
+    let userConversations = this.conversationsByUser.get(userId);
+    if (!userConversations) {
+      userConversations = new Set();
+      this.conversationsByUser.set(userId, userConversations);
+    }
+    userConversations.add(conversationId);
+    
+    // Add to pending writes for batch processing
+    this.pendingWrites.set(cacheKey, cacheEntry);
+    
+    // Emit event for real-time updates
+    this.emit('resultStored', { userId, conversationId });
+  }
+
+  /**
+   * Get user conversations with efficient caching
+   */
+  async getUserConversations(userId: string): Promise<any[]> {
+    try {
+      // Check if we have cached conversation IDs for this user
+      const cachedConvIds = this.conversationsByUser.get(userId);
+      
+      if (cachedConvIds && cachedConvIds.size > 0) {
+        this.metrics.hits++;
+        
+        // Batch retrieve from cache
+        const conversations = Array.from(cachedConvIds).map(convId => {
+          const cacheKey = `${userId}-${convId}`;
+          const cached = this.cache.get(cacheKey);
+          
+          if (cached) {
+            return {
+              id: convId,
+              title: this.extractTitleFromMessage(cached.message.content),
+              userId: userId,
+              createdAt: cached.timestamp,
+              updatedAt: cached.timestamp,
+              messages: [cached.message]
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        
+        if (conversations.length > 0) {
+          return conversations;
+        }
+      }
+      
+      this.metrics.misses++;
+      this.metrics.dbFallbacks++;
+      
+      // Fallback to database with retry
+      const dbResults = await pRetry(
+        async () => {
+          const { conversations } = await import('@shared/schema');
+          const { eq } = await import('drizzle-orm');
+          
+          return db.select()
+            .from(conversations)
+            .where(eq(conversations.userId, userId))
+            .limit(100); // Prevent huge queries
+        },
+        {
+          retries: 3,
+          minTimeout: 1000,
+          maxTimeout: 5000
+        }
+      );
+      
+      // Cache the results
+      for (const conv of dbResults) {
+        const cacheKey = `${userId}-${conv.id}`;
+        if (!this.cache.has(cacheKey)) {
+          this.cache.set(cacheKey, {
+            conversationId: conv.id,
+            message: { content: conv.title || '' },
+            timestamp: conv.createdAt,
+            userId: userId,
+            size: JSON.stringify(conv).length
+          });
+        }
+      }
+      
+      return dbResults;
+      
+    } catch (error) {
+      console.error('Failed to get user conversations:', error);
+      
+      // Return cached data even if database fails
+      const cachedConvIds = this.conversationsByUser.get(userId);
+      if (cachedConvIds) {
+        return Array.from(cachedConvIds).map(convId => {
+          const cached = this.cache.get(`${userId}-${convId}`);
+          return cached ? {
+            id: convId,
+            title: this.extractTitleFromMessage(cached.message.content),
+            userId,
+            messages: [cached.message],
+            createdAt: cached.timestamp,
+            updatedAt: cached.timestamp
+          } : null;
+        }).filter(Boolean);
+      }
+      
+      return [];
+    }
+  }
+
+  /**
+   * Get specific conversation with caching
+   */
+  async getConversation(userId: string, conversationId: string): Promise<any> {
+    const cacheKey = `${userId}-${conversationId}`;
+    
+    // Check cache first
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      this.metrics.hits++;
+      return {
+        id: conversationId,
+        title: this.extractTitleFromMessage(cached.message.content),
+        userId: userId,
+        messages: [cached.message],
+        createdAt: cached.timestamp,
+        updatedAt: cached.timestamp
+      };
+    }
+    
+    this.metrics.misses++;
+    
+    try {
+      // Try database with retry
+      const dbResult = await pRetry(
+        () => getResearchResults(conversationId),
+        {
+          retries: 2,
+          minTimeout: 500
+        }
+      );
+      
+      if (dbResult) {
+        // Cache the result
+        this.cache.set(cacheKey, {
+          conversationId,
+          message: dbResult.messages?.[0] || { content: '' },
+          timestamp: dbResult.createdAt,
+          userId,
+          size: JSON.stringify(dbResult).length
+        });
+        
+        return dbResult;
+      }
+    } catch (error) {
+      console.error('Database retrieval failed:', error);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Batch write pending changes to database
+   */
+  private async batchWritePendingChanges(): Promise<void> {
+    if (this.pendingWrites.size === 0) return;
+    
+    const writesToProcess = Array.from(this.pendingWrites.entries());
+    this.pendingWrites.clear();
+    
+    try {
+      // Batch insert/update
+      const promises = writesToProcess.map(([key, data]) => 
+        pRetry(
+          () => storeResearchResults(data.conversationId, {
+            message: data.message,
+            userId: data.userId,
+            timestamp: data.timestamp
+          }),
+          {
+            retries: 2,
+            minTimeout: 500,
+            onFailedAttempt: (error) => {
+              console.warn(`Batch write attempt ${error.attemptNumber} failed:`, error.message);
+            }
+          }
+        ).catch(error => {
+          // Re-add to pending writes on failure
+          this.pendingWrites.set(key, data);
+          console.error('Failed to write to database:', error);
+        })
+      );
+      
+      await Promise.allSettled(promises);
+      
+      console.log(`✅ Batch wrote ${writesToProcess.length} research results to database`);
+      
+    } catch (error) {
+      console.error('Batch write failed:', error);
+      
+      // Re-add all failed writes
+      writesToProcess.forEach(([key, data]) => {
+        this.pendingWrites.set(key, data);
+      });
+    }
+  }
+
+  /**
+   * Start batch write timer
+   */
+  private startBatchWriteTimer(interval: number): void {
+    this.writeTimer = setInterval(() => {
+      this.batchWritePendingChanges().catch(console.error);
+    }, interval);
+  }
+
+  /**
+   * Extract title with optimization
+   */
+  private extractTitleFromMessage(content: string): string {
+    if (!content) return 'Research Analysis';
+    
+    // Use regex for efficient extraction
+    const titleMatch = content.match(/^#+\s*(.+?)$/m) || 
+                      content.match(/(Analysis|Research|Market|Study).*?(?=\n|$)/i);
+    
+    if (titleMatch) {
+      return titleMatch[1].replace(/[#*]/g, '').trim().substring(0, 50) + 
+             (titleMatch[1].length > 50 ? '...' : '');
+    }
+    
+    // Fallback to first line
+    const firstLine = content.split('\n')[0];
+    return firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : '');
+  }
+
+  /**
+   * Get cache metrics
+   */
+  getMetrics(): CacheMetrics & { cacheSize: number; hitRate: number } {
+    const total = this.metrics.hits + this.metrics.misses;
+    return {
+      ...this.metrics,
+      cacheSize: this.cache.size,
+      hitRate: total > 0 ? this.metrics.hits / total : 0
+    };
+  }
+
+  /**
+   * Clear cache
+   */
+  clear(): void {
+    this.cache.clear();
+    this.conversationsByUser.clear();
+    this.pendingWrites.clear();
+  }
+
+  /**
+   * Graceful shutdown
+   */
+  async shutdown(): Promise<void> {
+    // Stop timer
+    if (this.writeTimer) {
+      clearInterval(this.writeTimer);
+      this.writeTimer = null;
+    }
+    
+    // Flush pending writes
+    await this.batchWritePendingChanges();
+    
+    // Clear caches
+    this.clear();
+    
+    this.emit('shutdown');
+  }
+}
+
+// Create optimized instance
+export const researchCache = new OptimizedResearchResultsCache({
+  maxSize: 1000,
+  maxAge: 1000 * 60 * 60 * 24, // 24 hours
+  batchWriteInterval: 5000 // 5 seconds
+});
+
+// Graceful shutdown on process exit
+process.on('SIGINT', async () => {
+  await researchCache.shutdown();
+  process.exit(0);
+});
+
+// =====================================================
+// optimized-routes.ts
+// =====================================================
+
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+import CircuitBreaker from "opossum";
+import compression from "compression";
+import helmet from "helmet";
+
+// Optimized WebSocket connection manager
+class WebSocketConnectionManager {
+  private connections = new Map<string, Set<ClientConnection>>();
+  private userConnections = new Map<string, ClientConnection>();
+  private roomConnections = new Map<number, Set<ClientConnection>>();
+  
+  addConnection(connection: ClientConnection): void {
+    // Index by user
+    this.userConnections.set(connection.userId, connection);
+    
+    // Index by room if applicable
+    if (connection.familyRoomId) {
+      if (!this.roomConnections.has(connection.familyRoomId)) {
+        this.roomConnections.set(connection.familyRoomId, new Set());
+      }
+      this.roomConnections.get(connection.familyRoomId)!.add(connection);
+    }
+  }
+  
+  removeConnection(connection: ClientConnection): void {
+    this.userConnections.delete(connection.userId);
+    
+    if (connection.familyRoomId) {
+      const roomSet = this.roomConnections.get(connection.familyRoomId);
+      if (roomSet) {
+        roomSet.delete(connection);
+        if (roomSet.size === 0) {
+          this.roomConnections.delete(connection.familyRoomId);
+        }
+      }
+    }
+  }
+  
+  getConnectionsForRoom(roomId: number): ClientConnection[] {
+    return Array.from(this.roomConnections.get(roomId) || []);
+  }
+  
+  getConnectionForUser(userId: string): ClientConnection | undefined {
+    return this.userConnections.get(userId);
+  }
+  
+  broadcast(connections: ClientConnection[], message: any): void {
+    const messageStr = JSON.stringify(message);
+    
+    for (const client of connections) {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(messageStr);
+      }
+    }
+  }
+}
+
+export async function registerOptimizedRoutes(app: Express): Promise<Server> {
+  // Security and compression middleware
+  app.use(helmet());
+  app.use(compression());
+  
+  // Rate limiters
+  const apiRateLimiter = new RateLimiterMemory({
+    points: 100,
+    duration: 60, // Per minute
+    blockDuration: 60
+  });
+  
+  const wsRateLimiter = new RateLimiterMemory({
+    points: 50,
+    duration: 60,
+    blockDuration: 60
+  });
+  
+  // Circuit breakers for external services
+  const storageCircuitBreaker = new CircuitBreaker(
+    async (fn: Function, ...args: any[]) => fn(...args),
+    {
+      timeout: 5000,
+      errorThresholdPercentage: 50,
+      resetTimeout: 30000
+    }
+  );
+  
+  // Rate limiting middleware
+  const rateLimitMiddleware = async (req: any, res: any, next: any) => {
+    try {
+      await apiRateLimiter.consume(req.ip);
+      next();
+    } catch {
+      res.status(429).json({ message: 'Too many requests' });
+    }
+  };
+  
+  // Apply rate limiting to all API routes
+  app.use('/api/', rateLimitMiddleware);
+  
+  // Auth middleware
+  await setupAuth(app);
+  
+  // Mount routes with error boundaries
+  app.use('/api/financial-research', financialResearchRoutes);
+  app.use('/api/web-search', webSearchRoutes);
+  
+  // Template routes with caching headers
+  const templateRoutes = Router();
+  
+  templateRoutes.get('/categories', 
+    isAuthenticated,
+    cacheControl('public, max-age=3600'), // 1 hour cache
+    templateRoutes.getTemplateCategories
+  );
+  
+  // ... other template routes with appropriate caching
+  
+  app.use('/api/templates', templateRoutes);
+  
+  const httpServer = createServer(app);
+  
+  // Optimized WebSocket server
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    perMessageDeflate: true, // Enable compression
+    maxPayload: 1024 * 1024 // 1MB max message size
+  });
+  
+  const connectionManager = new WebSocketConnectionManager();
+  
+  wss.on('connection', async (ws: WebSocket, req: any) => {
+    console.log('WebSocket connection established');
+    
+    let clientInfo: ClientConnection = { 
+      userId: '', 
+      ws,
+      lastActivity: Date.now()
+    };
+    
+    // Set up ping/pong for connection health
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+      }
+    }, 30000);
+    
+    ws.on('pong', () => {
+      clientInfo.lastActivity = Date.now();
+    });
+    
+    ws.on('message', async (message: Buffer) => {
+      try {
+        // Rate limit WebSocket messages
+        await wsRateLimiter.consume(req.socket.remoteAddress);
+        
+        const data = JSON.parse(message.toString());
+        
+        // Message validation
+        if (!validateWebSocketMessage(data)) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+          return;
+        }
+        
+        // Handle different message types with optimized logic
+        switch (data.type) {
+          case 'auth':
+            await handleAuth(clientInfo, data, connectionManager);
+            break;
+            
+          case 'join_family_room':
+            await handleJoinRoom(clientInfo, data, connectionManager);
+            break;
+            
+          case 'leave_family_room':
+            handleLeaveRoom(clientInfo, connectionManager);
+            break;
+            
+          case 'message':
+            await handleMessage(clientInfo, data, connectionManager, storageCircuitBreaker);
+            break;
+            
+          default:
+            ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
+        }
+        
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+        
+        if (error.name === 'RateLimiterError') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Rate limit exceeded' }));
+        } else {
+          ws.send(JSON.stringify({ type: 'error', message: 'Message processing failed' }));
+        }
+      }
+    });
+    
+    ws.on('close', () => {
+      clearInterval(pingInterval);
+      connectionManager.removeConnection(clientInfo);
+      console.log('WebSocket connection closed');
+    });
+    
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      clearInterval(pingInterval);
+    });
+  });
+  
+  // Optimized REST endpoints with batching support
+  
+  // Batch endpoint for fetching multiple resources
+  app.post('/api/batch', isAuthenticated, async (req: any, res) => {
+    try {
+      const { requests } = req.body;
+      
+      if (!Array.isArray(requests) || requests.length > 10) {
+        return res.status(400).json({ message: 'Invalid batch request' });
+      }
+      
+      const results = await Promise.allSettled(
+        requests.map(request => 
+          processApiRequest(request, req.user.claims.sub)
+        )
+      );
+      
+      res.json({
+        responses: results.map((result, index) => ({
+          id: requests[index].id,
+          status: result.status,
+          data: result.status === 'fulfilled' ? result.value : null,
+          error: result.status === 'rejected' ? result.reason.message : null
+        }))
+      });
+      
+    } catch (error) {
+      console.error('Batch request error:', error);
+      res.status(500).json({ message: 'Batch request failed' });
+    }
+  });
+  
+  // Optimized reminder endpoints with caching
+  app.get('/api/reminders', isAuthenticated, cacheableRoute(300), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const reminders = await storageCircuitBreaker.fire(
+        storage.getUserReminders,
+        userId
+      );
+      res.json(reminders);
+    } catch (error) {
+      console.error("Error fetching reminders:", error);
+      res.status(500).json({ message: "Failed to fetch reminders" });
+    }
+  });
+  
+  // ... other optimized endpoints
+  
+  return httpServer;
+}
+
+// Helper functions
+function validateWebSocketMessage(data: any): boolean {
+  return data && typeof data.type === 'string';
+}
+
+function cacheControl(directive: string) {
+  return (req: any, res: any, next: any) => {
+    res.set('Cache-Control', directive);
+    next();
+  };
+}
+
+function cacheableRoute(maxAge: number) {
+  return (req: any, res: any, next: any) => {
+    res.set('Cache-Control', `private, max-age=${maxAge}`);
+    next();
+  };
+}
+
+// =====================================================
+// optimized-storage.ts
+// =====================================================
+
+import { Pool } from 'pg';
+import { LRUCache } from 'lru-cache';
+import DataLoader from 'dataloader';
+import { db } from './db';
+import { eq, and, desc, isNull, SQL, sql, gt, count, inArray } from "drizzle-orm";
+
+interface QueryCache {
+  user: LRUCache<string, any>;
+  reminder: LRUCache<string, any>;
+  familyRoom: LRUCache<number, any>;
+  message: LRUCache<string, any>;
+}
+
+export class OptimizedDatabaseStorage implements IStorage {
+  private queryCache: QueryCache;
+  private userLoader: DataLoader<string, User>;
+  private reminderLoader: DataLoader<number, Reminder>;
+  private familyRoomLoader: DataLoader<number, FamilyRoom>;
+  private batchInsertQueue: Map<string, any[]>;
+  private batchTimer: NodeJS.Timeout | null = null;
+  
+  constructor() {
+    // Initialize caches with TTL
+    this.queryCache = {
+      user: new LRUCache({ max: 1000, ttl: 1000 * 60 * 5 }), // 5 min
+      reminder: new LRUCache({ max: 5000, ttl: 1000 * 60 * 2 }), // 2 min
+      familyRoom: new LRUCache({ max: 500, ttl: 1000 * 60 * 10 }), // 10 min
+      message: new LRUCache({ max: 10000, ttl: 1000 * 60 * 1 }) // 1 min
+    };
+    
+    // Initialize DataLoaders for batch fetching
+    this.userLoader = new DataLoader(async (userIds: string[]) => {
+      const users = await db.select()
+        .from(users)
+        .where(inArray(users.id, userIds));
+      
+      const userMap = new Map(users.map(u => [u.id, u]));
+      return userIds.map(id => userMap.get(id));
+    });
+    
+    this.reminderLoader = new DataLoader(async (reminderIds: number[]) => {
+      const reminders = await db.select()
+        .from(reminders)
+        .where(inArray(reminders.id, reminderIds));
+      
+      const reminderMap = new Map(reminders.map(r => [r.id, r]));
+      return reminderIds.map(id => reminderMap.get(id));
+    });
+    
+    this.familyRoomLoader = new DataLoader(async (roomIds: number[]) => {
+      const rooms = await db.select()
+        .from(familyRooms)
+        .where(inArray(familyRooms.id, roomIds));
+      
+      const roomMap = new Map(rooms.map(r => [r.id, r]));
+      return roomIds.map(id => roomMap.get(id));
+    });
+    
+    // Batch insert queue
+    this.batchInsertQueue = new Map();
+    this.startBatchTimer();
+  }
+  
+  // Optimized user operations with caching
+  async getUser(id: string): Promise<User | undefined> {
+    const cached = this.queryCache.user.get(id);
+    if (cached) return cached;
+    
+    const user = await this.userLoader.load(id);
+    if (user) {
+      this.queryCache.user.set(id, user);
+    }
+    return user;
+  }
+  
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db.transaction(async (tx) => {
+      return tx.insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            ...userData,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+    });
+    
+    // Update cache
+    this.queryCache.user.set(user.id, user);
+    this.userLoader.clear(user.id);
+    
+    return user;
+  }
+  
+  // Batch operations for messages
+  async createMessage(message: InsertMessage): Promise<Message> {
+    // Add to batch queue
+    if (!this.batchInsertQueue.has('messages')) {
+      this.batchInsertQueue.set('messages', []);
+    }
+    
+    const messageWithId = { ...message, id: Date.now() }; // Temporary ID
+    this.batchInsertQueue.get('messages')!.push(message);
+    
+    // For immediate response, return with temporary data
+    return {
+      id: messageWithId.id,
+      ...message,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as Message;
+  }
+  
+  // Optimized reminder operations with prefetching
+  async getUserReminders(userId: string): Promise<Reminder[]> {
+    const cacheKey = `reminders:${userId}`;
+    const cached = this.queryCache.reminder.get(cacheKey);
+    if (cached) return cached;
+    
+    const reminders = await db.select()
+      .from(reminders)
+      .where(eq(reminders.userId, userId))
+      .orderBy(reminders.datetime)
+      .execute();
+    
+    // Cache the result
+    this.queryCache.reminder.set(cacheKey, reminders);
+    
+    // Prefetch individual reminders into loader cache
+    reminders.forEach(r => this.reminderLoader.prime(r.id, r));
+    
+    return reminders;
+  }
+  
+  async getUserUpcomingReminders(userId: string, limit: number = 5): Promise<Reminder[]> {
+    const cacheKey = `upcoming:${userId}:${limit}`;
+    const cached = this.queryCache.reminder.get(cacheKey);
+    if (cached) return cached;
+    
+    const reminders = await db.select()
+      .from(reminders)
+      .where(and(
+        eq(reminders.userId, userId),
+        eq(reminders.completed, false),
+        gt(reminders.datetime, new Date())
+      ))
+      .orderBy(reminders.datetime)
+      .limit(limit)
+      .execute();
+    
+    this.queryCache.reminder.set(cacheKey, reminders);
+    return reminders;
+  }
+  
+  // Optimized family room operations
+  async getUserFamilyRooms(userId: string): Promise<FamilyRoom[]> {
+    const cacheKey = `user_rooms:${userId}`;
+    const cached = this.queryCache.familyRoom.get(cacheKey);
+    if (cached) return cached;
+    
+    // Optimized query using proper JOIN
+    const rooms = await db
+      .select({
+        id: familyRooms.id,
+        name: familyRooms.name,
+        createdById: familyRooms.createdById,
+        createdAt: familyRooms.createdAt,
+        updatedAt: familyRooms.updatedAt
+      })
+      .from(familyRooms)
+      .innerJoin(
+        familyRoomMembers,
+        eq(familyRooms.id, familyRoomMembers.familyRoomId)
+      )
+      .where(eq(familyRoomMembers.userId, userId))
+      .execute();
+    
+    // Remove duplicates (in case of multiple member entries)
+    const uniqueRooms = Array.from(
+      new Map(rooms.map(r => [r.id, r])).values()
+    );
+    
+    this.queryCache.familyRoom.set(cacheKey, uniqueRooms);
+    return uniqueRooms;
+  }
+  
+  // Optimized message retrieval with pagination
+  async getPersonalMessages(
+    userId: string, 
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<Message[]> {
+    const cacheKey = `personal_messages:${userId}:${limit}:${offset}`;
+    const cached = this.queryCache.message.get(cacheKey);
+    if (cached) return cached;
+    
+    const messages = await db.select()
+      .from(messages)
+      .where(and(
+        eq(messages.userId, userId),
+        isNull(messages.familyRoomId)
+      ))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit)
+      .offset(offset)
+      .execute();
+    
+    this.queryCache.message.set(cacheKey, messages);
+    return messages;
+  }
+  
+  async getFamilyRoomMessages(
+    roomId: number, 
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<Message[]> {
+    const cacheKey = `room_messages:${roomId}:${limit}:${offset}`;
+    const cached = this.queryCache.message.get(cacheKey);
+    if (cached) return cached;
+    
+    const messages = await db.select()
+      .from(messages)
+      .where(eq(messages.familyRoomId, roomId))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit)
+      .offset(offset)
+      .execute();
+    
+    this.queryCache.message.set(cacheKey, messages);
+    return messages;
+  }
+  
+  // Batch processing for inserts
+  private async processBatchInserts(): Promise<void> {
+    for (const [table, items] of this.batchInsertQueue.entries()) {
+      if (items.length === 0) continue;
+      
+      try {
+        if (table === 'messages' && items.length > 0) {
+          await db.insert(messages)
+            .values(items)
+            .execute();
+          
+          console.log(`Batch inserted ${items.length} messages`);
+        }
+        
+        // Clear the queue for this table
+        this.batchInsertQueue.set(table, []);
+        
+      } catch (error) {
+        console.error(`Batch insert failed for ${table}:`, error);
+      }
+    }
+  }
+  
+  private startBatchTimer(): void {
+    this.batchTimer = setInterval(() => {
+      this.processBatchInserts().catch(console.error);
+    }, 1000); // Process batch every second
+  }
+  
+  // Cache invalidation methods
+  invalidateUserCache(userId: string): void {
+    this.queryCache.user.delete(userId);
+    this.userLoader.clear(userId);
+    this.queryCache.familyRoom.delete(`user_rooms:${userId}`);
+  }
+  
+  invalidateReminderCache(userId: string): void {
+    // Remove all reminder-related cache entries for user
+    for (const key of this.queryCache.reminder.keys()) {
+      if (key.includes(userId)) {
+        this.queryCache.reminder.delete(key);
+      }
+    }
+  }
+  
+  invalidateMessageCache(userId?: string, roomId?: number): void {
+    if (userId) {
+      for (const key of this.queryCache.message.keys()) {
+        if (key.includes(`personal_messages:${userId}`)) {
+          this.queryCache.message.delete(key);
+        }
+      }
+    }
+    
+    if (roomId) {
+      for (const key of this.queryCache.message.keys()) {
+        if (key.includes(`room_messages:${roomId}`)) {
+          this.queryCache.message.delete(key);
+        }
+      }
+    }
+  }
+  
+  // Cleanup
+  async shutdown(): Promise<void> {
+    if (this.batchTimer) {
+      clearInterval(this.batchTimer);
+      await this.processBatchInserts();
+    }
+    
+    // Clear all caches
+    Object.values(this.queryCache).forEach(cache => cache.clear());
+  }
+  
+  // Transaction support
+  async transaction<T>(
+    callback: (tx: any) => Promise<T>
+  ): Promise<T> {
+    return db.transaction(callback);
+  }
+}
+
+export const storage = new OptimizedDatabaseStorage();
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await storage.shutdown();
+  process.exit(0);
+});
