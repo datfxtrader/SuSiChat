@@ -1,0 +1,66 @@
+{
+  "feature": "SuSi Chat",
+  "timestamp": "20250526_160135",
+  "duration": 0.02384662628173828,
+  "config": {
+    "base_url": "http://0.0.0.0:3000",
+    "timeout_short": 5,
+    "timeout_medium": 15,
+    "timeout_long": 30,
+    "max_retries": 3,
+    "retry_delay": 1.0,
+    "performance_threshold": 2.0,
+    "success_rate_threshold": 0.8,
+    "parallel_tests": true,
+    "max_workers": 4
+  },
+  "results": [
+    {
+      "name": "SuSi Health Check",
+      "status": "TestStatus.FAILED",
+      "duration": 0.022838354110717773,
+      "details": {
+        "status_code": 0,
+        "success": false,
+        "error": "HTTPConnectionPool(host='0.0.0.0', port=3000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ff76a418910>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "error": "Health check failed",
+      "warnings": [],
+      "metrics": {}
+    },
+    {
+      "name": "SuSi Chat API",
+      "status": "TestStatus.FAILED",
+      "duration": 0.022782325744628906,
+      "details": {
+        "status_code": 0,
+        "success": false,
+        "error": "HTTPConnectionPool(host='0.0.0.0', port=3000): Max retries exceeded with url: /api/chat/message (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ff76a418950>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "error": "Chat API failed",
+      "warnings": [],
+      "metrics": {}
+    },
+    {
+      "name": "SuSi Performance Test",
+      "status": "TestStatus.PASSED",
+      "duration": 0.022730350494384766,
+      "details": {
+        "avg_time": 0.0018836021423339843,
+        "min_time": 0.0017862319946289062,
+        "max_time": 0.0020608901977539062,
+        "success_rate": 1.0,
+        "total_errors": 0
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {}
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "warnings": 0
+  }
+}
