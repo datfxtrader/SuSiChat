@@ -151,6 +151,15 @@ mode = "sequential"
 task = "shell.exec"
 args = "python test_model_config_integration.py"
 
+[[workflows.workflow]]
+name = "Quick System Test"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_comprehensive.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
