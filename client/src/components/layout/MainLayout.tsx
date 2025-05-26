@@ -213,7 +213,7 @@ const MainLayout = memo<MainLayoutProps>(({
   const mainRef = useRef<HTMLDivElement>(null);
   
   const { isOpen: isSidebarOpen, isAnimating, toggle: toggleSidebar, close: closeSidebar } = 
-    useSidebarState(sidebarDefaultOpen, isMobile);
+    useSidebarState(!isMobile || sidebarDefaultOpen, isMobile);
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -286,6 +286,7 @@ const MainLayout = memo<MainLayoutProps>(({
           collapsed={sidebarCollapsed}
           onCollapsedChange={setSidebarCollapsed}
           onItemClick={isMobile ? closeSidebar : undefined}
+          className="block" // Ensure sidebar is always visible
         />
       </aside>
 
@@ -311,7 +312,23 @@ const MainLayout = memo<MainLayoutProps>(({
           <Header
             title={title}
             subtitle={subtitle}
-            headerRight={headerRight}
+            headerRight={
+              <div className="flex items-center gap-2">
+                {/* Sidebar toggle for desktop */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleSidebar}
+                  className="lg:inline-flex hidden"
+                  aria-label="Toggle sidebar"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </Button>
+                {headerRight}
+              </div>
+            }
             className={headerClassName}
             breadcrumbs={showBreadcrumbs ? breadcrumbs : undefined}
           />

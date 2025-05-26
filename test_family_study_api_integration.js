@@ -1,11 +1,11 @@
-
 /**
  * FamilyStudy API Integration Test
  * Tests the actual API endpoints to ensure they're working correctly
  */
 
-const axios = require('axios');
-const WebSocket = require('ws');
+import axios from 'axios';
+import WebSocket from 'ws';
+import { execSync } from 'child_process';
 
 const BASE_URL = 'http://0.0.0.0:3000';
 const API_URL = `${BASE_URL}/api`;
@@ -21,7 +21,7 @@ class FamilyStudyAPITest {
     log(test, status, details, error = null) {
         const result = { test, status, details, error, timestamp: new Date().toISOString() };
         this.results.push(result);
-        
+
         const emoji = status === 'PASS' ? '✅' : status === 'FAIL' ? '❌' : '⚠️';
         console.log(`${emoji} ${test}: ${status}`);
         if (details) console.log(`   ${details}`);
@@ -229,7 +229,7 @@ class FamilyStudyAPITest {
         return new Promise((resolve) => {
             try {
                 const ws = new WebSocket(`${WS_URL}?token=mock_token_${this.testUserId}`);
-                
+
                 const timeout = setTimeout(() => {
                     ws.close();
                     this.log(
@@ -243,7 +243,7 @@ class FamilyStudyAPITest {
 
                 ws.on('open', () => {
                     clearTimeout(timeout);
-                    
+
                     // Test message sending
                     const testMessage = {
                         type: 'learning-progress',
@@ -252,22 +252,22 @@ class FamilyStudyAPITest {
                         concept: 'greetings',
                         progress: 75
                     };
-                    
+
                     ws.send(JSON.stringify(testMessage));
-                    
+
                     this.log(
                         'WebSocket Connection',
                         'PASS',
                         'WebSocket connection established and test message sent'
                     );
-                    
+
                     ws.close();
                     resolve(true);
                 });
 
                 ws.on('error', (error) => {
                     clearTimeout(timeout);
-                    
+
                     if (error.code === 'ECONNREFUSED') {
                         this.log(
                             'WebSocket Connection',
@@ -303,24 +303,24 @@ class FamilyStudyAPITest {
         // Validate that the endpoint files exist and have correct structure
         const fs = require('fs');
         const path = require('path');
-        
+
         const endpointFiles = [
             'server/routes/homework.ts',
             'server/services/familyWebSocket.ts',
             'deerflow_service/language_tutor_agent.py',
             'server/services/contentPreparation.ts'
         ];
-        
+
         let allFilesExist = true;
         const missingFiles = [];
-        
+
         for (const file of endpointFiles) {
             if (!fs.existsSync(file)) {
                 allFilesExist = false;
                 missingFiles.push(file);
             }
         }
-        
+
         if (allFilesExist) {
             this.log(
                 'Endpoint File Structure',
@@ -343,7 +343,7 @@ class FamilyStudyAPITest {
         const passedTests = this.results.filter(r => r.status === 'PASS').length;
         const failedTests = this.results.filter(r => r.status === 'FAIL').length;
         const warningTests = this.results.filter(r => r.status === 'WARNING').length;
-        
+
         const report = {
             testSuite: 'FamilyStudy API Integration Test',
             timestamp: new Date().toISOString(),
@@ -356,7 +356,7 @@ class FamilyStudyAPITest {
             },
             results: this.results
         };
-        
+
         return report;
     }
 
@@ -367,35 +367,35 @@ class FamilyStudyAPITest {
 
         // Validate file structure first
         this.validateEndpointStructure();
-        
+
         // Test API endpoints
         await this.testHomeworkEndpoint();
         await this.testEnhancedLearningEndpoint();
         await this.testLearningProfileEndpoint();
         await this.testFamilyMembersEndpoint();
-        
+
         // Test WebSocket connection
         await this.testWebSocketConnection();
-        
+
         // Generate report
         const report = this.generateReport();
-        
+
         console.log('');
         console.log('==========================================');
         console.log('🎯 API Integration Test Complete!');
         console.log(`📊 Results: ${report.summary.passed}/${report.summary.totalTests} tests passed (${report.summary.successRate})`);
         console.log(`⚠️  Warnings: ${report.summary.warnings} (expected in test environment)`);
-        
+
         if (report.summary.failed > 0) {
             console.log(`❌ Failed: ${report.summary.failed} tests failed`);
         }
-        
+
         // Save report
         const fs = require('fs');
         const reportFile = `family_study_api_test_${new Date().toISOString().replace(/:/g, '-').split('.')[0]}.json`;
         fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
         console.log(`📄 Report saved to: ${reportFile}`);
-        
+
         return report;
     }
 }
