@@ -1,0 +1,632 @@
+// types/web-search.types.ts
+export interface WebSearchRequest {
+  query: string;
+  maxResults?: number;
+  options?: SearchOptions;
+}
+
+export interface SearchOptions {
+  searchEngines?: string[];
+  includeDomains?: string[];
+  excludeDomains?: string[];
+  searchDepth?: 'basic' | 'advanced';
+  country?: string;
+  language?: string;
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  safeSearch?: boolean;
+}
+
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+  description: string;
+  snippet: string;
+  score?: number;
+  publishedDate?: string;
+  source: string;
+  domain?: string;
+}
+
+export interface WebSearchResponse {
+  results: SearchResult[];
+  query: string;
+  totalResults: number;
+  searchEnginesUsed: string[];
+  processingTime: number;
+  timestamp: string;
+  cached?: boolean;
+}
+
+// config/search-engines.config.ts
+export interface SearchEngineConfig {
+  name: string;
+  priority: number;
+  timeout: number;
+  maxRetries: number;
+  rateLimit: {
+    requests: number;
+    window: number; // in ms
+  };
+}
+
+export const SEARCH_ENGINE_CONFIGS: Record<string, SearchEngineConfig> = {
+  tavily: {
+    name: 'Tavily',
+    priority: 1,
+    timeout: 10000,
+    maxRetries: 2,
+    rateLimit: {
+      requests: 100,
+      window: 60000 // 1 minute
+    }
+  },
+  brave: {
+    name: 'Brave',
+    priority: 2,
+    timeout: 8000,
+    maxRetries: 2,
+    rateLimit: {
+      requests: 50,
+      window: 60000
+    }
+  }
+};
+
+// services/search-engines/base-search-engine.ts
+import axios, { AxiosInstance } from 'axios';
+import pRetry from 'p-retry';
+import pTimeout from 'p-timeout';
+import { RateLimiter } from '../rate-limiter.service';
+
+export abstract class BaseSearchEngine {
+  protected client: AxiosInstance;
+  protected rateLimiter: RateLimiter;
+  
+  constructor(
+    protected name: string,
+    protected apiKey: string,
+    protected config: SearchEngineConfig
+  ) {
+    this.client = axios.create({
+      timeout: config.timeout,
+      validateStatus: (status) => status < 500
+    });
+    
+    this.rateLimiter = new RateLimiter(
+      config.rateLimit.requests,
+      config.rateLimit.window
+    );
+  }
+
+  async search(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    if (!this.isAvailable()) return [];
+
+    try {
+      await this.rateLimiter.checkLimit();
+      
+      const results = await pTimeout(
+        pRetry(
+          () => this.performSearch(query, options),
+          {
+            retries: this.config.maxRetries,
+            onFailedAttempt: (error) => {
+              console.log(`[${this.name}] Retry ${error.attemptNumber} failed:`, error.message);
+            }
+          }
+        ),
+        this.config.timeout,
+        `${this.name} search timed out`
+      );
+
+      return results.map(r => ({ ...r, source: this.name }));
+    } catch (error) {
+      console.error(`[${this.name}] Search failed:`, error);
+      return [];
+    }
+  }
+
+  abstract performSearch(query: string, options: SearchOptions): Promise<SearchResult[]>;
+  
+  isAvailable(): boolean {
+    return !!this.apiKey;
+  }
+  
+  getPriority(): number {
+    return this.config.priority;
+  }
+}
+
+// services/search-engines/tavily-search.ts
+export class TavilySearchEngine extends BaseSearchEngine {
+  constructor(apiKey: string) {
+    super('Tavily', apiKey, SEARCH_ENGINE_CONFIGS.tavily);
+  }
+
+  async performSearch(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    const response = await this.client.post(
+      'https://api.tavily.com/search',
+      {
+        api_key: this.apiKey,
+        query,
+        search_depth: options.searchDepth || 'advanced',
+        include_domains: options.includeDomains || [],
+        exclude_domains: options.excludeDomains || [],
+        max_results: options.maxResults || 10,
+        include_answer: true,
+        include_images: false,
+        include_raw_content: false
+      },
+      {
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+    if (!response.data?.results) {
+      throw new Error('Invalid Tavily response');
+    }
+
+    return response.data.results.map((item: any) => ({
+      title: item.title || '',
+      url: item.url || '',
+      content: item.content || '',
+      description: item.content || '',
+      snippet: this.extractSnippet(item.content),
+      score: item.score,
+      publishedDate: item.published_date,
+      domain: this.extractDomain(item.url)
+    }));
+  }
+
+  private extractSnippet(content: string, maxLength = 200): string {
+    if (!content) return '';
+    return content.length > maxLength 
+      ? content.substring(0, maxLength) + '...'
+      : content;
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return '';
+    }
+  }
+}
+
+// services/search-engines/brave-search.ts
+export class BraveSearchEngine extends BaseSearchEngine {
+  constructor(apiKey: string) {
+    super('Brave', apiKey, SEARCH_ENGINE_CONFIGS.brave);
+  }
+
+  async performSearch(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    const params: any = {
+      q: query,
+      count: options.maxResults || 10,
+      safesearch: options.safeSearch ? 'strict' : 'moderate'
+    };
+
+    if (options.country) params.country = options.country;
+    if (options.language) params.search_lang = options.language;
+    if (options.freshness) params.freshness = this.mapFreshness(options.freshness);
+
+    const response = await this.client.get(
+      'https://api.search.brave.com/res/v1/web/search',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X-Subscription-Token': this.apiKey
+        },
+        params
+      }
+    );
+
+    if (!response.data?.web?.results) {
+      throw new Error('Invalid Brave response');
+    }
+
+    return response.data.web.results.map((item: any) => ({
+      title: item.title || '',
+      url: item.url || '',
+      content: item.description || '',
+      description: item.description || '',
+      snippet: item.description || '',
+      publishedDate: item.age,
+      domain: this.extractDomain(item.url)
+    }));
+  }
+
+  private mapFreshness(freshness: string): string {
+    const freshnessMap: Record<string, string> = {
+      'day': 'pd',
+      'week': 'pw',
+      'month': 'pm',
+      'year': 'py'
+    };
+    return freshnessMap[freshness] || 'pw';
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return '';
+    }
+  }
+}
+
+// services/web-search.service.ts
+import { LRUCache } from 'lru-cache';
+import crypto from 'crypto';
+import pLimit from 'p-limit';
+import { BaseSearchEngine } from './search-engines/base-search-engine';
+import { TavilySearchEngine } from './search-engines/tavily-search';
+import { BraveSearchEngine } from './search-engines/brave-search';
+
+export class WebSearchService {
+  private searchEngines: BaseSearchEngine[] = [];
+  private cache: LRUCache<string, WebSearchResponse>;
+  private concurrencyLimit = pLimit(2);
+  private metrics = {
+    totalSearches: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    engineUsage: new Map<string, number>(),
+    errors: new Map<string, number>()
+  };
+
+  constructor() {
+    this.initializeSearchEngines();
+    this.cache = new LRUCache<string, WebSearchResponse>({
+      max: 200,
+      ttl: 10 * 60 * 1000, // 10 minutes
+      updateAgeOnGet: true
+    });
+  }
+
+  private initializeSearchEngines() {
+    const tavilyKey = process.env.TAVILY_API_KEY;
+    const braveKey = process.env.BRAVE_API_KEY;
+
+    if (tavilyKey) {
+      this.searchEngines.push(new TavilySearchEngine(tavilyKey));
+    }
+    if (braveKey) {
+      this.searchEngines.push(new BraveSearchEngine(braveKey));
+    }
+
+    // Sort by priority
+    this.searchEngines.sort((a, b) => a.getPriority() - b.getPriority());
+  }
+
+  async search(
+    query: string,
+    maxResults = 10,
+    options: SearchOptions = {}
+  ): Promise<WebSearchResponse> {
+    const startTime = Date.now();
+    this.metrics.totalSearches++;
+
+    // Check cache
+    const cacheKey = this.getCacheKey(query, maxResults, options);
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      this.metrics.cacheHits++;
+      return { ...cached, cached: true };
+    }
+    this.metrics.cacheMisses++;
+
+    // Select search engines
+    const selectedEngines = this.selectEngines(options.searchEngines);
+    if (selectedEngines.length === 0) {
+      throw new Error('No search engines available');
+    }
+
+    // Perform searches
+    const searchPromises = selectedEngines.map(engine =>
+      this.concurrencyLimit(() => 
+        this.searchWithEngine(engine, query, { ...options, maxResults })
+      )
+    );
+
+    const searchResults = await Promise.allSettled(searchPromises);
+    
+    // Collect and merge results
+    const allResults: SearchResult[] = [];
+    const usedEngines: string[] = [];
+
+    searchResults.forEach((result, index) => {
+      const engine = selectedEngines[index];
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        allResults.push(...result.value);
+        usedEngines.push(engine.name);
+        this.updateEngineMetrics(engine.name, true);
+      } else {
+        this.updateEngineMetrics(engine.name, false);
+        if (result.status === 'rejected') {
+          console.error(`[${engine.name}] Search failed:`, result.reason);
+        }
+      }
+    });
+
+    // Process results
+    const processedResults = this.processResults(allResults, maxResults);
+
+    const response: WebSearchResponse = {
+      results: processedResults,
+      query,
+      totalResults: processedResults.length,
+      searchEnginesUsed: usedEngines,
+      processingTime: Date.now() - startTime,
+      timestamp: new Date().toISOString()
+    };
+
+    // Cache the response
+    this.cache.set(cacheKey, response);
+
+    return response;
+  }
+
+  private async searchWithEngine(
+    engine: BaseSearchEngine,
+    query: string,
+    options: SearchOptions
+  ): Promise<SearchResult[]> {
+    try {
+      return await engine.search(query, options);
+    } catch (error) {
+      this.metrics.errors.set(
+        engine.name,
+        (this.metrics.errors.get(engine.name) || 0) + 1
+      );
+      throw error;
+    }
+  }
+
+  private selectEngines(requestedEngines?: string[]): BaseSearchEngine[] {
+    if (!requestedEngines || requestedEngines.length === 0) {
+      return this.searchEngines;
+    }
+
+    const requested = new Set(requestedEngines.map(e => e.toLowerCase()));
+    return this.searchEngines.filter(engine =>
+      requested.has(engine.name.toLowerCase())
+    );
+  }
+
+  private processResults(results: SearchResult[], maxResults: number): SearchResult[] {
+    // Remove duplicates
+    const uniqueResults = this.removeDuplicates(results);
+    
+    // Score and rank results
+    const scoredResults = this.scoreResults(uniqueResults);
+    
+    // Sort by score
+    scoredResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+    
+    return scoredResults.slice(0, maxResults);
+  }
+
+  private removeDuplicates(results: SearchResult[]): SearchResult[] {
+    const seen = new Map<string, SearchResult>();
+    
+    results.forEach(result => {
+      const key = this.normalizeUrl(result.url);
+      if (!seen.has(key) || (result.score || 0) > (seen.get(key)!.score || 0)) {
+        seen.set(key, result);
+      }
+    });
+    
+    return Array.from(seen.values());
+  }
+
+  private normalizeUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.hostname}${parsed.pathname}`.toLowerCase().replace(/\/$/, '');
+    } catch {
+      return url.toLowerCase();
+    }
+  }
+
+  private scoreResults(results: SearchResult[]): SearchResult[] {
+    const engineBoost: Record<string, number> = {
+      'Tavily': 1.1,
+      'Brave': 1.0
+    };
+
+    return results.map(result => ({
+      ...result,
+      score: (result.score || 0.5) * (engineBoost[result.source] || 1.0)
+    }));
+  }
+
+  private getCacheKey(query: string, maxResults: number, options: SearchOptions): string {
+    const data = `${query}:${maxResults}:${JSON.stringify(options)}`;
+    return crypto.createHash('md5').update(data).digest('hex');
+  }
+
+  private updateEngineMetrics(engineName: string, success: boolean) {
+    this.metrics.engineUsage.set(
+      engineName,
+      (this.metrics.engineUsage.get(engineName) || 0) + 1
+    );
+  }
+
+  getMetrics() {
+    return {
+      totalSearches: this.metrics.totalSearches,
+      cacheHitRate: this.metrics.totalSearches > 0
+        ? this.metrics.cacheHits / this.metrics.totalSearches
+        : 0,
+      cacheSize: this.cache.size,
+      engineUsage: Object.fromEntries(this.metrics.engineUsage),
+      errors: Object.fromEntries(this.metrics.errors),
+      availableEngines: this.searchEngines.map(e => e.name)
+    };
+  }
+
+  clearCache() {
+    this.cache.clear();
+  }
+}
+
+// services/rate-limiter.service.ts
+export class RateLimiter {
+  private requests: number[] = [];
+
+  constructor(
+    private maxRequests: number,
+    private windowMs: number
+  ) {}
+
+  async checkLimit(): Promise<void> {
+    const now = Date.now();
+    this.requests = this.requests.filter(time => now - time < this.windowMs);
+    
+    if (this.requests.length >= this.maxRequests) {
+      const oldestRequest = this.requests[0];
+      const waitTime = this.windowMs - (now - oldestRequest);
+      throw new Error(`Rate limit exceeded. Wait ${Math.ceil(waitTime / 1000)}s`);
+    }
+    
+    this.requests.push(now);
+  }
+}
+
+// routes/web-search.route.ts
+import express, { Request, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+import { WebSearchService } from '../services/web-search.service';
+import { WebSearchRequest } from '../types/web-search.types';
+
+const router = express.Router();
+const searchService = new WebSearchService();
+
+// Middleware
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Rate limiting
+const searchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute
+  message: 'Too many search requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Validation
+const validateSearchRequest = [
+  body('query')
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 500 })
+    .withMessage('Query must be between 1 and 500 characters'),
+  body('maxResults')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('maxResults must be between 1 and 50'),
+  body('options')
+    .optional()
+    .isObject()
+    .withMessage('Options must be an object')
+];
+
+// Logging middleware
+const logRequest = (req: Request, res: Response, next: NextFunction) => {
+  const requestId = `search-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  req.requestId = requestId;
+  console.log(`[${requestId}] Web search: ${req.body.query}`);
+  res.setHeader('X-Request-Id', requestId);
+  next();
+};
+
+/**
+ * POST /api/web-search
+ * Perform web search with multiple engines
+ */
+router.post('/',
+  searchLimiter,
+  logRequest,
+  validateSearchRequest,
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: errors.array()
+      });
+    }
+
+    const { query, maxResults = 10, options }: WebSearchRequest = req.body;
+
+    try {
+      const results = await searchService.search(query, maxResults, options);
+      
+      console.log(`[${req.requestId}] Search completed: ${results.totalResults} results in ${results.processingTime}ms`);
+      res.json(results);
+      
+    } catch (error) {
+      console.error(`[${req.requestId}] Search error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * GET /api/web-search/status
+ * Get search service status and metrics
+ */
+router.get('/status', (req: Request, res: Response) => {
+  const metrics = searchService.getMetrics();
+  
+  res.json({
+    service: 'web-search',
+    status: 'operational',
+    metrics,
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
+ * POST /api/web-search/cache/clear
+ * Clear search cache
+ */
+router.post('/cache/clear',
+  asyncHandler(async (req: Request, res: Response) => {
+    searchService.clearCache();
+    
+    res.json({
+      success: true,
+      message: 'Search cache cleared successfully',
+      timestamp: new Date().toISOString()
+    });
+  })
+);
+
+// Error handling
+router.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  const requestId = req.requestId || 'unknown';
+  console.error(`[${requestId}] Unhandled error:`, error);
+
+  res.status(500).json({
+    error: 'Search service error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Failed to perform web search',
+    requestId
+  });
+});
+
+// TypeScript augmentation
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
+export default router;
