@@ -513,10 +513,10 @@ async def perform_deep_research(research_question: str, research_id: str, resear
         # Validate input parameters
         if not research_question or len(research_question.strip()) < 3:
             raise ValueError("Research question is too short or empty")
-        
+
         if research_depth not in [1, 2, 3]:
             research_depth = 3  # Default to comprehensive
-            
+
         # Update the state with proper research depth
         research_state[research_id] = {
             "status": "in_progress",
@@ -582,11 +582,11 @@ async def perform_deep_research(research_question: str, research_id: str, resear
 
             # Add delay to prevent rate limiting
             await asyncio.sleep(0.8)
-            
+
             # Break if we have enough results
             if len(all_search_results) >= 20:
                 break
-        
+
         log_entries.append(f"Completed {successful_searches} successful searches out of {len(query_variations[:6])}")
 
         # Step 3: Process and validate results
@@ -597,42 +597,6 @@ async def perform_deep_research(research_question: str, research_id: str, resear
         for result in all_search_results:
             try:
                 # Ensure result is valid
-
-
-@app.get("/research/health")
-async def research_health_check():
-    """Check research endpoint health"""
-    try:
-        # Test basic research functionality
-        test_result = {
-            "research_endpoint": "available",
-            "api_keys": {
-                "deepseek": bool(DEEPSEEK_API_KEY),
-                "gemini": bool(os.environ.get("GEMINI_API_KEY")),
-                "tavily": bool(TAVILY_API_KEY),
-                "brave": bool(BRAVE_API_KEY)
-            },
-            "active_research_tasks": len(research_state),
-            "last_check": time.time()
-        }
-        
-        # Check if we can perform a minimal search
-        try:
-            test_search = await search_web("test query", max_results=1)
-            test_result["search_capability"] = "working" if test_search else "limited"
-        except Exception as e:
-            test_result["search_capability"] = f"error: {str(e)}"
-            
-        return test_result
-        
-    except Exception as e:
-        logger.error(f"Research health check failed: {e}")
-        return {
-            "research_endpoint": "error",
-            "error": str(e),
-            "last_check": time.time()
-        }
-
                 if not result or not isinstance(result, dict):
                     continue
 
@@ -747,7 +711,7 @@ Format your report in Markdown, but make it readable and professional."""
     except Exception as e:
         logger.error(f"Research error: {e}")
         log_entries.append(f"Error: {str(e)}")
-        
+
         # Try fallback research
         logger.info("Attempting fallback research...")
         try:
@@ -772,6 +736,40 @@ Format your report in Markdown, but make it readable and professional."""
 
         asyncio.create_task(cleanup_research_state())
 
+@app.get("/research/health")
+async def research_health_check():
+    """Check research endpoint health"""
+    try:
+        # Test basic research functionality
+        test_result = {
+            "research_endpoint": "available",
+            "api_keys": {
+                "deepseek": bool(DEEPSEEK_API_KEY),
+                "gemini": bool(os.environ.get("GEMINI_API_KEY")),
+                "tavily": bool(TAVILY_API_KEY),
+                "brave": bool(BRAVE_API_KEY)
+            },
+            "active_research_tasks": len(research_state),
+            "last_check": time.time()
+        }
+
+        # Check if we can perform a minimal search
+        try:
+            test_search = await search_web("test query", max_results=1)
+            test_result["search_capability"] = "working" if test_search else "limited"
+        except Exception as e:
+            test_result["search_capability"] = f"error: {str(e)}"
+
+        return test_result
+
+    except Exception as e:
+        logger.error(f"Research health check failed: {e}")
+        return {
+            "research_endpoint": "error",
+            "error": str(e),
+            "last_check": time.time()
+        }
+
 @app.get("/health")
 async def health_check():
     """Comprehensive health check endpoint."""
@@ -793,7 +791,8 @@ async def health_check():
             "tavily": bool(config.api.tavily_api_key),
             "brave": bool(config.api.brave_api_key)
         }
-        health_data["api_keys"] = api_status
+        health_data["api_keys"] = api```python
+status
 
         # Get system metrics
         system_health = metrics.get_system_health()
@@ -1269,10 +1268,10 @@ async def fallback_research(research_question: str, research_id: str) -> Researc
             "Using fallback research system",
             "Performing basic analysis without web search"
         ]
-        
+
         # Simple analysis using available LLM
         system_prompt = """You are a research assistant. Provide a comprehensive analysis based on your knowledge."""
-        
+
         user_prompt = f"""Please provide a detailed research analysis on: "{research_question}"
 
 Include:
@@ -1316,7 +1315,7 @@ This analysis was generated using fallback capabilities due to service limitatio
                 timestamp=datetime.datetime.now().isoformat(),
                 service_process_log=log_entries
             )
-            
+
         except Exception as e:
             logger.error(f"Fallback research error: {e}")
             return ResearchResponse(
@@ -1325,7 +1324,7 @@ This analysis was generated using fallback capabilities due to service limitatio
                 sources=[],
                 service_process_log=log_entries + [f"Fallback error: {str(e)}"]
             )
-            
+
     except Exception as e:
         logger.error(f"Critical fallback error: {e}")
         return ResearchResponse(
@@ -1369,7 +1368,7 @@ async def validate_optimization():
             active_tasks = len(agent_core.active_agents) if agent_core else 0
         except:
             active_tasks = 0
-            
+
         if active_tasks >= 5:
             readiness_score += 0.3
         elif active_tasks >= 1:
@@ -1523,7 +1522,7 @@ async def apply_quick_optimization_wins():
 
 
 
-        
+
 
 @app.get("/optimize/recommendations")
 async def get_optimization_recommendations():
@@ -1692,7 +1691,7 @@ class StateManager:
         try:
             # Sanitize state data for JSON serialization
             sanitized_state = self._sanitize_state_data(state)
-            
+
             self.tasks[task_id] = {
                 **sanitized_state,
                 "last_updated": time.time(),
@@ -1710,7 +1709,7 @@ class StateManager:
                 "persistent": False,
                 "task_id": task_id
             }
-    
+
     def _sanitize_state_data(self, state: dict) -> dict:
         """Sanitize state data for JSON serialization"""
         def sanitize_value(value):
@@ -1722,7 +1721,7 @@ class StateManager:
                 return value
             else:
                 return str(value)
-        
+
         return sanitize_value(state)
 
     def get_task_state(self, task_id: str):
@@ -1738,7 +1737,8 @@ class StateManager:
     def disconnect(self, websocket: WebSocket):
         """Disconnect a WebSocket"""
         if websocket in self.active_websockets:
-            self.active_websockets.remove(websocket)
+            self.python
+            active_websockets.remove(websocket)
             logger.info(f"WebSocket disconnected, remaining connections: {len(self.active_websockets)}")
 
     async def broadcast(self, message: str):
@@ -1898,7 +1898,7 @@ if __name__ == "__main__":
 
     # Get port from environment or use default 9000
     port = int(os.environ.get("PORT", 9000))
-    
+
     print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
 
     uvicorn.run(
