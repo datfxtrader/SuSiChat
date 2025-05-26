@@ -528,7 +528,7 @@ The research service logs show it's working, so this might be a temporary connec
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const hasNewAssistantMessage = lastMessage?.role === 'assistant';
-    const hasResearchContent = lastMessage?.content && lastMessage.content.length > 500; // Increased threshold
+    const hasResearchContent = lastMessage?.content && lastMessage.content.length > 500;
     const isActualResearchReport = hasResearchContent && 
       (lastMessage?.content.includes('# ') || lastMessage?.content.includes('## ') || lastMessage?.sources);
 
@@ -542,17 +542,17 @@ The research service logs show it's working, so this might be a temporary connec
         progressIntervalRef.current = null;
       }
 
-      // Set progress to 100% and complete
+      // Set progress to 100% immediately
       setResearchProgress(100);
       setResearchStage(6);
 
-      // Complete after brief animation
+      // Wait a bit longer to let typewriter animation start, then complete
       setTimeout(() => {
         setIsResearchInProgress(false);
         setCurrentResearchQuery('');
         setResearchProgress(0);
         setResearchStage(1);
-      }, 1500);
+      }, 3000); // Increased delay to allow typewriter to start
     } else if (isResearchInProgress && hasNewAssistantMessage && !isActualResearchReport) {
       console.log(`⚠️ Got assistant message but not a research report (${lastMessage?.content?.length || 0} chars) - continuing...`);
     }
@@ -609,33 +609,38 @@ The research service logs show it's working, so this might be a temporary connec
             </div>
           )}
 
-          {messages.map((msg, index) => (
-            <div key={msg.id} className="mb-4">
-              <div className="flex items-start space-x-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'
-                }`}>
-                  {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
-                </div>
-                <div className="flex-1">
-                  {msg.role === 'user' ? (
-                    <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
-                      <div className="prose prose-invert max-w-none">
-                        {msg.content}
+          {messages.map((msg, index) => {
+            const isLatestMessage = index === messages.length - 1;
+            const shouldShowTypewriter = isLatestMessage && msg.role === 'assistant' && !isResearchInProgress;
+            
+            return (
+              <div key={msg.id} className="mb-4">
+                <div className="flex items-start space-x-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'
+                  }`}>
+                    {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
+                  </div>
+                  <div className="flex-1">
+                    {msg.role === 'user' ? (
+                      <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
+                        <div className="prose prose-invert max-w-none">
+                          {msg.content}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <ResearchResponse 
-                      content={msg.content}
-                      timestamp={msg.timestamp}
-                      sources={msg.sources}
-                      isLatest={index === messages.length - 1}
-                    />
-                  )}
+                    ) : (
+                      <ResearchResponse 
+                        content={msg.content}
+                        timestamp={msg.timestamp}
+                        sources={msg.sources}
+                        isLatest={shouldShowTypewriter}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Show research progress in main chat area instead of duplicating */}
           {isResearchInProgress && (

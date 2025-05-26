@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X, Clock } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TypewriterText } from '@/components/shared/TypewriterText';
 import { TypewriterConfig } from '@/config/typewriter.config';
@@ -33,7 +33,7 @@ const formatRelativeTime = (timestamp: string) => {
 // Enhanced Research Response Component
 const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp, sources, isLatest = false }) => {
   const [copySuccess, setCopySuccess] = useState('');
-  const [typewriterComplete, setTypewriterComplete] = useState(false);
+  const [typewriterComplete, setTypewriterComplete] = useState(!isLatest); // Start as complete if not latest
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -42,10 +42,21 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
   };
 
   const handleTypewriterComplete = () => {
+    console.log('🎬 Typewriter animation completed');
     setTypewriterComplete(true);
   };
 
   const showActions = !isLatest || typewriterComplete;
+
+  // Reset typewriter state when isLatest changes
+  useEffect(() => {
+    if (isLatest) {
+      console.log('🎬 Starting typewriter animation for latest message');
+      setTypewriterComplete(false);
+    } else {
+      setTypewriterComplete(true);
+    }
+  }, [isLatest]);
 
   return (
     <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg">
@@ -80,7 +91,8 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
             onComplete={handleTypewriterComplete}
             enableSound={true}
             robust={true}
-            showProgress={content.length > 2000}
+            showProgress={content.length > 1500}
+            className="space-y-6 text-zinc-200"
           />
         ) : (
           <div className="space-y-6 text-zinc-200">
