@@ -49,7 +49,6 @@ class AgentMessage:
 
 @dataclass
 class Task:
-    ```python
     """Enhanced task representation"""
     task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     query: str = ""
