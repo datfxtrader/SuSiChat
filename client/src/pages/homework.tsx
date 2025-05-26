@@ -1,29 +1,16 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { 
-  GraduationCap, 
-  BookOpen, 
-  Calculator, 
-  Globe, 
-  Microscope, 
-  Palette,
-  Music,
-  Users,
-  Send,
-  Lightbulb,
-  Clock,
-  Star
+  Send, BookOpen, Calculator, Microscope, Globe, Palette, Music, Users, 
+  Lightbulb, MessageCircle, Star, Clock, HelpCircle
 } from 'lucide-react';
-import MainLayout from '@/components/layout/MainLayout';
 import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import MainLayout from '@/components/layout/MainLayout';
 
 interface HomeworkMessage {
   id: string;
@@ -201,14 +188,14 @@ const HomeworkHelp: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center py-12">
-                <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <HelpCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Ready to Help with Your Homework!
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
                   Choose your subject and grade level, then ask your question below.
                 </p>
-                
+
                 {/* Subject Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
                   {SUBJECTS.slice(0, -1).map((subject) => {
@@ -301,7 +288,7 @@ const HomeworkHelp: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Grade Level

@@ -8,6 +8,7 @@ const router = express.Router();
 router.post('/help', isAuthenticated, async (req, res) => {
   try {
     const { question, subject, difficulty, userId } = req.body;
+    const authenticatedUserId = req.user?.id || userId || 'anonymous';
 
     if (!question || !subject || !difficulty) {
       return res.status(400).json({
@@ -36,7 +37,7 @@ Provide a helpful, educational response:`;
 
     // Use the existing LLM service
     const llmService = await import('../llm');
-    const response = await llmService.generateResponse(prompt, userId);
+    const response = await llmService.generateResponse(prompt, authenticatedUserId);
 
     res.json({
       success: true,

@@ -124,6 +124,15 @@ args = "python test_optimized_comprehensive.py"
 task = "shell.exec"
 args = "python test_optimized_complete_app.py"
 
+[[workflows.workflow]]
+name = "Test Homework System"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_homework_functionality.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
