@@ -1,4 +1,3 @@
-
 import React, { memo, useMemo, useCallback, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,7 +23,8 @@ import {
   LogOut,
   Search,
   Moon,
-  Sun
+  Sun,
+  Heart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -178,7 +178,7 @@ const UserProfile = memo<{
           </Avatar>
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-zinc-950" />
         </div>
-        
+
         {!collapsed && (
           <>
             <div className="flex-1 min-w-0">

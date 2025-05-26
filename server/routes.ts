@@ -398,6 +398,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/suna/conversations/:conversationId', isAuthenticated, getSunaConversation);
   app.get('/api/suna/conversations', isAuthenticated, getUserConversations);
 
+  // Vietnamese Chat endpoints
+  const vietnameseChatRouter = await import('./routes/vietnamese-chat');
+  app.use('/api', vietnameseChatRouter.default);
+
 
 
   return httpServer;

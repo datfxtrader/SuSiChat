@@ -17,6 +17,8 @@ import TemplatesPage from "@/pages/templates";
 import DebugTabPersistence from "@/pages/debug-tab-persistence";
 
 import NotFound from "@/pages/not-found";
+import VietnameseChat from './pages/vietnamese-chat';
+import Admin from './pages/admin';
 
 function App() {
   const { user, isAuthenticated } = useAuth();
@@ -44,6 +46,8 @@ function App() {
       <Route path="/templates" component={TemplatesPage} />
       <Route path="/debug-tab-persistence" component={DebugTabPersistence} />
       <Route path="/trip" component={TripPlanning} />
+      <Route path="/vietnamese-chat" component={VietnameseChat} />
+      <Route path="/admin" component={Admin} />
 
       <Route component={NotFound} />
     </Switch>
