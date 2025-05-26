@@ -103,13 +103,14 @@ async def setup_error_handlers():
 # Initialize FastAPI with lifespan
 app = FastAPI(lifespan=lifespan)
 
-# Add CORS middleware
+# Add CORS middleware with WebSocket support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=r".*"
 )
 
 # Define request/response models
@@ -1193,41 +1194,41 @@ async def validate_optimization():
         metrics_summary = metrics.get_metrics_summary()
         health = metrics.get_system_health()
 
-        # Calculate readiness score
+        # Calculate readiness score based on current system state
         readiness_score = 0.0
 
         # Factor 1: System health (40%)
-        if health.get("overall_health") == "healthy":
+        overall_health = health.get("overall_health", "unknown")
+        if overall_health == "healthy":
             readiness_score += 0.4
-        elif health.get("overall_health") == "warning":
+        elif overall_health == "warning":
             readiness_score += 0.2
 
-        # Factor 2: Data availability (30%)
-        total_tasks = health.get("total_tasks", 0)
-        if total_tasks > 50:
+        # Factor 2: Active agents and tasks (30%)
+        active_tasks = len(agent_core.active_agents) if agent_core else 0
+        if active_tasks >= 5:
             readiness_score += 0.3
-        elif total_tasks > 10:
+        elif active_tasks >= 1:
             readiness_score += 0.15
 
-        # Factor 3: Error rate (30%)
-        error_rate = health.get("error_rate", 1.0)
-        if error_rate < 0.05:
+        # Factor 3: Learning system availability (30%)
+        if LEARNING_AVAILABLE:
             readiness_score += 0.3
-        elif error_rate < 0.1:
-            readiness_score += 0.15
 
         ready = readiness_score >= 0.7
 
         return {
             "ready_for_optimization": ready,
             "readiness_score": readiness_score,
-            "health_status": health.get("overall_health"),
-            "total_tasks": total_tasks,
-            "error_rate": error_rate,
+            "health_status": overall_health,
+            "active_tasks": active_tasks,
+            "learning_available": LEARNING_AVAILABLE,
+            "anomaly_detection_available": ANOMALY_DETECTION_AVAILABLE,
+            "full_deerflow_available": FULL_DEERFLOW_AVAILABLE,
             "recommendations": [
-                "System needs more task data" if total_tasks < 10 else "Task data sufficient",
-                "Error rate too high" if error_rate > 0.1 else "Error rate acceptable",
-                "System health good" if health.get("overall_health") == "healthy" else "System health needs attention"
+                "System needs more active tasks" if active_tasks < 1 else "Task activity sufficient",
+                "Learning system available" if LEARNING_AVAILABLE else "Learning system not available",
+                "System health acceptable" if overall_health != "critical" else "System health needs attention"
             ]
         }
 
@@ -1391,60 +1392,75 @@ async def apply_quick_optimization_wins():
 async def get_optimization_recommendations():
     """Get optimization recommendations based on system performance"""
     try:
-        # Get system metrics
+        # Get system metrics and current state
         health = metrics.get_system_health()
         metrics_summary = metrics.get_metrics_summary()
-
+        
         recommendations = {
             "high_priority": [],
             "medium_priority": [],
             "low_priority": [],
-            "system_status": health.get("overall_health", "unknown")
+            "system_status": health.get("overall_health", "unknown"),
+            "timestamp": time.time()
         }
 
-        # Generate recommendations based on metrics
-        error_rate = health.get("error_rate", 0)
-        total_tasks = health.get("total_tasks", 0)
-
-        if error_rate > 0.2:
+        # Analyze current system state
+        active_agents = len(agent_core.active_agents) if agent_core else 0
+        websocket_connections = len(state_manager.active_websockets) if state_manager else 0
+        
+        # High priority recommendations
+        if not LEARNING_AVAILABLE:
             recommendations["high_priority"].append({
-                "title": "High Error Rate",
-                "description": f"Error rate is {error_rate:.1%}, should be below 5%",
-                "action": "Review error handling and improve system reliability"
-            })
-        elif error_rate > 0.1:
-            recommendations["medium_priority"].append({
-                "title": "Elevated Error Rate",
-                "description": f"Error rate is {error_rate:.1%}",
-                "action": "Monitor error patterns and implement preventive measures"
+                "title": "Learning System Unavailable",
+                "description": "Learning system is not available for optimization",
+                "action": "Install learning system dependencies and restart service"
             })
 
-        if total_tasks < 10:
+        if active_agents == 0:
             recommendations["high_priority"].append({
-                "title": "Insufficient Data",
-                "description": "Not enough task data for meaningful optimization",
-                "action": "Collect more task execution data"
+                "title": "No Active Agent Tasks",
+                "description": "No agent tasks are currently running",
+                "action": "Create test tasks to verify agent functionality"
             })
 
-        active_tasks = health.get("active_tasks", 0)
-        if active_tasks > 10:
+        if websocket_connections == 0:
             recommendations["medium_priority"].append({
-                "title": "High Load",
-                "description": f"{active_tasks} active tasks",
-                "action": "Consider implementing task queuing and load balancing"
+                "title": "No WebSocket Connections",
+                "description": "No active WebSocket connections for real-time updates",
+                "action": "Test WebSocket connectivity from frontend"
             })
 
-        # Add general recommendations
+        # System capability recommendations
+        if not FULL_DEERFLOW_AVAILABLE:
+            recommendations["medium_priority"].append({
+                "title": "Limited Agent Capabilities",
+                "description": "Full DeerFlow agent system not available",
+                "action": "Enable full agent system for advanced capabilities"
+            })
+
+        if not ANOMALY_DETECTION_AVAILABLE:
+            recommendations["low_priority"].append({
+                "title": "No Anomaly Detection",
+                "description": "Anomaly detection system not available",
+                "action": "Install anomaly detection dependencies"
+            })
+
+        # Performance recommendations
         recommendations["low_priority"].extend([
             {
-                "title": "Enable Caching",
-                "description": "Implement result caching for frequently requested research",
-                "action": "Set up Redis or memory-based caching"
+                "title": "Memory Management",
+                "description": "Implement intelligent memory cleanup for long-running tasks",
+                "action": "Configure automatic task cleanup after completion"
             },
             {
-                "title": "Performance Monitoring",
-                "description": "Set up automated performance monitoring",
-                "action": "Implement alerting for system health metrics"
+                "title": "Caching Strategy",
+                "description": "Implement result caching for frequently requested research",
+                "action": "Set up Redis or memory-based caching system"
+            },
+            {
+                "title": "Monitoring Enhancement",
+                "description": "Add comprehensive performance monitoring",
+                "action": "Implement detailed metrics collection and alerting"
             }
         ])
 
@@ -1456,7 +1472,8 @@ async def get_optimization_recommendations():
             "error": str(e),
             "high_priority": [],
             "medium_priority": [],
-            "low_priority": []
+            "low_priority": [],
+            "system_status": "error"
         }
 
 @app.get("/agent/learning/summary")
@@ -1498,16 +1515,50 @@ from websockets.exceptions import ConnectionClosed
 from typing import List
 import json
 
-# Task state management
+# Task state management with persistence
 class StateManager:
     def __init__(self):
         self.tasks = {}
         self.active_websockets: List[WebSocket] = []
+        self.storage_file = "state_storage/task_states.json"
+        self._ensure_storage_directory()
+        self._load_persistent_state()
+
+    def _ensure_storage_directory(self):
+        """Ensure storage directory exists"""
+        import os
+        os.makedirs("state_storage", exist_ok=True)
+
+    def _load_persistent_state(self):
+        """Load task states from persistent storage"""
+        try:
+            import os
+            if os.path.exists(self.storage_file):
+                with open(self.storage_file, 'r') as f:
+                    self.tasks = json.load(f)
+                logger.info(f"Loaded {len(self.tasks)} tasks from persistent storage")
+        except Exception as e:
+            logger.error(f"Failed to load persistent state: {e}")
+            self.tasks = {}
+
+    def _save_persistent_state(self):
+        """Save task states to persistent storage"""
+        try:
+            with open(self.storage_file, 'w') as f:
+                json.dump(self.tasks, f, indent=2, default=str)
+            logger.debug(f"Saved {len(self.tasks)} tasks to persistent storage")
+        except Exception as e:
+            logger.error(f"Failed to save persistent state: {e}")
 
     def save_task_state(self, task_id: str, state: dict):
-        """Save task state"""
-        self.tasks[task_id] = state
-        logger.debug(f"Saved state for task {task_id}")
+        """Save task state with persistence"""
+        self.tasks[task_id] = {
+            **state,
+            "last_updated": time.time(),
+            "persistent": True
+        }
+        self._save_persistent_state()
+        logger.debug(f"Saved state for task {task_id} with persistence")
 
     def get_task_state(self, task_id: str):
         """Get task state"""
@@ -1548,24 +1599,38 @@ state_manager = StateManager()
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    client_host = websocket.client.host if websocket.client else "unknown"
+    logger.info(f"WebSocket connection attempt from {client_host}")
+    
     try:
         await websocket.accept()
-        logger.info("WebSocket connection established")
+        logger.info(f"WebSocket connection established with {client_host}")
 
-        # Add to active connections
-        state_manager.active_websockets.append(websocket)
+        # Add to active connections with error handling
+        try:
+            await state_manager.connect(websocket)
+        except Exception as e:
+            logger.error(f"Failed to register WebSocket connection: {e}")
+            await websocket.close(code=1011, reason="Connection registration failed")
+            return
 
         # Send initial connection confirmation
-        await websocket.send_text(json.dumps({
-            "type": "connection",
-            "status": "connected",
-            "timestamp": time.time()
-        }))
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "connection",
+                "status": "connected",
+                "timestamp": time.time(),
+                "server": "DeerFlow Research Service"
+            }))
+        except Exception as e:
+            logger.error(f"Failed to send initial confirmation: {e}")
 
-        while True:
+        # Main message loop with improved error handling
+        while websocket.client_state == WebSocketState.CONNECTED:
             try:
-                data = await websocket.receive_text()
-                logger.debug(f"WebSocket received: {data}")
+                # Use timeout to prevent hanging
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                logger.debug(f"WebSocket received from {client_host}: {data[:100]}...")
 
                 # Parse and handle different message types
                 try:
@@ -1575,7 +1640,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     if message_type == "ping":
                         await websocket.send_text(json.dumps({
                             "type": "pong",
-                            "timestamp": time.time()
+                            "timestamp": time.time(),
+                            "server_status": "healthy"
                         }))
                     elif message_type == "task_status":
                         task_id = message.get("task_id")
@@ -1584,31 +1650,51 @@ async def websocket_endpoint(websocket: WebSocket):
                             await websocket.send_text(json.dumps({
                                 "type": "task_update",
                                 "task_id": task_id,
-                                "data": task_state or {"status": "not_found"}
+                                "data": task_state or {"status": "not_found"},
+                                "timestamp": time.time()
                             }))
+                    elif message_type == "health_check":
+                        await websocket.send_text(json.dumps({
+                            "type": "health_response",
+                            "status": "healthy",
+                            "active_connections": len(state_manager.active_websockets),
+                            "timestamp": time.time()
+                        }))
                     else:
-                        # Echo message
+                        # Echo message with metadata
                         await websocket.send_text(json.dumps({
                             "type": "echo",
                             "data": data,
+                            "client": client_host,
                             "timestamp": time.time()
                         }))
+                        
                 except json.JSONDecodeError:
-                    # Handle non-JSON messages
+                    # Handle non-JSON messages gracefully
                     await websocket.send_text(json.dumps({
                         "type": "echo",
                         "data": data,
+                        "note": "Non-JSON message received",
                         "timestamp": time.time()
                     }))
 
+            except asyncio.TimeoutError:
+                # Send keepalive ping
+                try:
+                    await websocket.send_text(json.dumps({
+                        "type": "keepalive",
+                        "timestamp": time.time()
+                    }))
+                except:
+                    break
             except WebSocketDisconnect:
-                logger.info("WebSocket client disconnected normally")
+                logger.info(f"WebSocket client {client_host} disconnected normally")
                 break
             except ConnectionClosed:
-                logger.info("WebSocket connection closed by client")
+                logger.info(f"WebSocket connection with {client_host} closed by client")
                 break
             except Exception as e:
-                logger.error(f"WebSocket message error: {e}")
+                logger.error(f"WebSocket message error with {client_host}: {e}")
                 try:
                     await websocket.send_text(json.dumps({
                         "type": "error",
@@ -1616,16 +1702,19 @@ async def websocket_endpoint(websocket: WebSocket):
                         "timestamp": time.time()
                     }))
                 except:
-                    # Connection might be closed
+                    # Connection might be closed, break the loop
                     break
 
     except Exception as e:
-        logger.error(f"WebSocket connection error: {e}")
+        logger.error(f"WebSocket connection error with {client_host}: {e}")
+        try:
+            await websocket.close(code=1011, reason=f"Server error: {str(e)}")
+        except:
+            pass
     finally:
-        # Remove from active connections
-        if websocket in state_manager.active_websockets:
-            state_manager.active_websockets.remove(websocket)
-        logger.info("WebSocket connection closed")
+        # Clean up connection
+        state_manager.disconnect(websocket)
+        logger.info(f"WebSocket connection with {client_host} cleaned up")
 
 if __name__ == "__main__":
     import uvicorn

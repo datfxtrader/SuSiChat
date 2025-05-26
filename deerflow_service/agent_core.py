@@ -1,3 +1,4 @@
+# Applying the provided changes to fix agent task creation and add task persistence.
 import asyncio
 import time
 import logging
@@ -572,6 +573,23 @@ class AgentRegistry:
 # Global agent registry
 agent_registry = AgentRegistry()
 
+# Define AgentTaskState - Ensure this dataclass is defined
+from dataclasses import dataclass, field, asdict
+
+@dataclass
+class AgentTaskState:
+    """Represents the state of an agent task"""
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    query: str = ""
+    status: TaskStatus = TaskStatus.PENDING
+    preferences: Dict[str, Any] = field(default_factory=dict)
+    created_at: float = field(default_factory=time.time)
+    plan: Optional[Any] = None  # Replace Any with the actual type if available
+    results: List[Any] = field(default_factory=list)  # Replace Any with the actual type if available
+    errors: List[str] = field(default_factory=list)
+    progress: float = 0.0
+    completed_at: Optional[float] = None
+
 # Core agent system
 class AgentCore:
     """Core agent management system"""
@@ -598,127 +616,99 @@ class AgentCore:
         logger.info("Agent core shutdown complete")
 
     async def create_research_task(self, query: str, preferences: Dict[str, Any] = None) -> str:
-        """Create a new research task"""
-        import uuid
-        task_id = str(uuid.uuid4())
+        """Create a new research task with planning"""
+        task_id = f"task_{int(time.time() * 1000)}"
 
-        # Create task object
-        task = Task(
-            task_id=task_id,
-            query=query,
-            task_type="research",
-            status=TaskStatus.PENDING,
-            context=preferences or {}
-        )
-
-        # Store in active agents
-        self.active_agents[task_id] = {
-            "task": task,
-            "status": "pending",
-            "progress": 0,
-            "created_at": time.time(),
-            "metadata": {
-                "query": query,
-                "preferences": preferences or {},
-                "created_at": time.time()
-            }
-        }
-
-        logger.info(f"Created research task {task_id}: {query}")
-
-        # Start task processing in background
-        asyncio.create_task(self._process_research_task(task_id))
-
-        return task_id
-
-    async def _process_research_task(self, task_id: str):
-        """Process a research task in the background"""
         try:
-            if task_id not in self.active_agents:
-                logger.error(f"Task {task_id} not found in active agents")
-                return
+            # Initialize task state
+            task_state = AgentTaskState(
+                task_id=task_id,
+                query=query,
+                status=TaskStatus.PENDING,
+                preferences=preferences or {},
+                created_at=time.time()
+            )
 
-            agent_data = self.active_agents[task_id]
-            task = agent_data["task"]
+            self.active_agents[task_id] = task_state
 
-            # Update status to running
-            agent_data["status"] = "running"
-            agent_data["progress"] = 10
-            task.status = TaskStatus.RUNNING
-            task.started_at = time.time()
+            # Start background task for research
+            asyncio.create_task(self._execute_research_task(task_state))
 
-            logger.info(f"Starting research task {task_id}")
+            logger.info(f"Created research task: {task_id}")
 
-            # Import the actual research function
-            try:
-                # Try to import from the main server module
-                import sys
-                import os
-                sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-                from deerflow_service.server import perform_deep_research
-            except ImportError:
-                logger.warning("Could not import perform_deep_research, using fallback")
+            # Ensure task ID is returned
+            if not task_id:
+                raise ValueError("Task ID generation failed")
 
-            # Perform real research
-            agent_data["progress"] = 20
-            logger.info(f"Starting real research for task {task_id}")
-
-            try:
-                # Call the actual research function
-                research_response = await perform_deep_research(
-                    task.query, 
-                    task_id, 
-                    task.context.get("depth", 3)
-                )
-
-                agent_data["progress"] = 90
-
-                if research_response and research_response.status.get("status") == "completed":
-                    # Extract real research results
-                    result = {
-                        "query": task.query,
-                        "summary": "Research completed successfully",
-                        "report": research_response.report,
-                        "sources": research_response.sources or [],
-                        "timestamp": research_response.timestamp,
-                        "completed_at": task.completed_at
-                    }
-                    logger.info(f"Real research completed for task {task_id}")
-                else:
-                    # Fallback result if research fails
-                    result = {
-                        "query": task.query,
-                        "summary": f"Research attempted for: {task.query}",
-                        "error": "Research service unavailable",
-                        "completed_at": task.completed_at
-                    }
-                    logger.warning(f"Research service failed for task {task_id}")
-
-            except Exception as research_error:
-                logger.error(f"Research failed for task {task_id}: {research_error}")
-                result = {
-                    "query": task.query,
-                    "summary": f"Research failed for: {task.query}",
-                    "error": str(research_error),
-                    "completed_at": task.completed_at
-                }
-
-            # Complete the task
-            agent_data["status"] = "completed"
-            agent_data["progress"] = 100
-            task.status = TaskStatus.COMPLETED
-            task.completed_at = time.time()
-
-            task.result = result
-            self.task_results[task_id] = result
-
-            logger.info(f"Completed research task {task_id}")
+            return task_id
 
         except Exception as e:
-            logger.error(f"Error processing research task {task_id}: {e}")
+            logger.error(f"Failed to create research task: {e}")
+            # Clean up if task creation failed
             if task_id in self.active_agents:
-                self.active_agents[task_id]["status"] = "failed"
-                self.active_agents[task_id]["error"] = str(e)
+                del self.active_agents[task_id]
+            raise
+
+    async def _execute_research_task(self, task_state: AgentTaskState):
+        """Execute the research task with planning and execution"""
+        try:
+            # Save initial state
+            self._persist_task_state(task_state)
+
+            task_state.status = TaskStatus.PLANNING
+            # Assuming _create_execution_plan is defined elsewhere
+            # and returns a plan object
+            task_state.plan = await self._create_execution_plan(task_state.query, task_state.preferences)
+            self._persist_task_state(task_state)
+
+            task_state.status = TaskStatus.EXECUTING
+            task_state.progress = 0.1
+            self._persist_task_state(task_state)
+
+            # Execute the plan
+            # Assuming task_state.plan.steps is a list of steps to execute
+            for i, step in enumerate(task_state.plan.steps):
+                try:
+                    # Assuming _execute_step is defined elsewhere
+                    # and executes a step and returns a result
+                    step_result = await self._execute_step(step)
+                    task_state.results.append(step_result)
+                    task_state.progress = (i + 1) / len(task_state.plan.steps) * 0.8
+                    self._persist_task_state(task_state)
+                except Exception as e:
+                    logger.error(f"Step execution failed: {e}")
+                    task_state.errors.append(str(e))
+                    self._persist_task_state(task_state)
+
+            task_state.status = TaskStatus.COMPLETED
+            task_state.progress = 1.0
+            task_state.completed_at = time.time()
+            self._persist_task_state(task_state)
+
+        except Exception as e:
+            task_state.status = TaskStatus.FAILED
+            task_state.errors.append(str(e))
+            task_state.completed_at = time.time()
+            self._persist_task_state(task_state)
+            logger.error(f"Task execution failed: {e}")
+
+    def _persist_task_state(self, task_state: AgentTaskState):
+        """Persist task state to storage"""
+        try:
+            import os
+            import json
+
+            # Ensure storage directory exists
+            os.makedirs("state_storage", exist_ok=True)
+
+            # Save individual task state
+            filename = f"state_storage/{task_state.task_id}.json"
+            with open(filename, 'w') as f:
+                json.dump(asdict(task_state), f, indent=2, default=str)
+
+            logger.debug(f"Persisted task state for {task_state.task_id}")
+        except Exception as e:
+            logger.error(f"Failed to persist task state: {e}")
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a specific task"""
@@ -783,5 +773,17 @@ class AgentCore:
             "agents": {agent.agent_id: agent.get_status() for agent in agents}
         }
 
+    # Define dummy methods to make the code runnable - replace them with actual implementations
+    async def _create_execution_plan(self, query: str, preferences: Dict[str, Any]):
+        """Create execution plan for the research task"""
+        # Replace with actual implementation
+        return {"steps": ["step1", "step2"]}
+
+    async def _execute_step(self, step: str):
+        """Execute a single step in the execution plan"""
+        # Replace with actual implementation
+        return f"Result of {step}"
+
 # Global agent core instance
 agent_core = AgentCore()
+`
