@@ -495,7 +495,7 @@ app.use((req, res, next) => {
   app.use('/api/financial-terms', financialTermsRouter);
 
   // Search engine management routes
-  import searchEnginesRouter from './routes/search-engines';
+  const searchEnginesRouter = (await import('./routes/search-engines')).default;
   app.use('/api/search-engines', searchEnginesRouter);
 
   app.use('/api/enhanced-search', enhancedSearchRouter);
