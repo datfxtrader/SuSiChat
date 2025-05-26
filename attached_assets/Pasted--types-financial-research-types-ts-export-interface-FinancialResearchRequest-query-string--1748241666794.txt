@@ -1,0 +1,546 @@
+// types/financial-research.types.ts
+export interface FinancialResearchRequest {
+  query: string;
+  depth?: ResearchDepth;
+  options?: ResearchOptions;
+}
+
+export interface ResearchOptions {
+  includeCharts?: boolean;
+  timeframe?: 'intraday' | 'daily' | 'weekly' | 'monthly';
+  includeTechnicals?: boolean;
+  includeFundamentals?: boolean;
+  language?: string;
+}
+
+export enum ResearchDepth {
+  BASIC = 1,
+  STANDARD = 3,
+  COMPREHENSIVE = 5
+}
+
+export interface FinancialSource {
+  title: string;
+  url: string;
+  domain: string;
+  category: 'news' | 'analysis' | 'data' | 'charts';
+  reliability: number; // 0-1 score
+}
+
+export interface ResearchReport {
+  report: string;
+  sources: FinancialSource[];
+  depth: number;
+  processingTime: number;
+  metadata?: {
+    model: string;
+    tokensUsed?: number;
+    confidence?: number;
+    lastUpdated?: string;
+  };
+  cached?: boolean;
+}
+
+export interface FinancialDetectionResult {
+  isFinancial: boolean;
+  confidence: number;
+  detectedTerms: string[];
+  suggestedCategory?: string;
+  query: string;
+}
+
+// config/financial-sources.ts
+export const FINANCIAL_SOURCES: FinancialSource[] = [
+  {
+    title: "Investing.com",
+    url: "https://www.investing.com/currencies/",
+    domain: "investing.com",
+    category: "data",
+    reliability: 0.9
+  },
+  {
+    title: "FXStreet",
+    url: "https://www.fxstreet.com/",
+    domain: "fxstreet.com",
+    category: "analysis",
+    reliability: 0.85
+  },
+  {
+    title: "DailyFX",
+    url: "https://www.dailyfx.com/",
+    domain: "dailyfx.com",
+    category: "analysis",
+    reliability: 0.85
+  },
+  {
+    title: "Bloomberg Markets",
+    url: "https://www.bloomberg.com/markets",
+    domain: "bloomberg.com",
+    category: "news",
+    reliability: 0.95
+  },
+  {
+    title: "Reuters Finance",
+    url: "https://www.reuters.com/finance/",
+    domain: "reuters.com",
+    category: "news",
+    reliability: 0.95
+  },
+  {
+    title: "TradingView",
+    url: "https://www.tradingview.com/",
+    domain: "tradingview.com",
+    category: "charts",
+    reliability: 0.9
+  }
+];
+
+// config/financial-terms.ts
+export const FINANCIAL_TERMS = {
+  forex: [
+    'eur/usd', 'gbp/usd', 'usd/jpy', 'aud/usd', 'usd/cad', 'usd/chf',
+    'forex', 'currency', 'exchange rate', 'pip', 'spread', 'leverage'
+  ],
+  stocks: [
+    'stock', 'equity', 'share', 's&p', 'nasdaq', 'dow jones', 'ftse',
+    'market cap', 'pe ratio', 'dividend', 'earnings'
+  ],
+  commodities: [
+    'gold', 'silver', 'oil', 'crude', 'wti', 'brent', 'natural gas',
+    'copper', 'platinum', 'commodity', 'futures'
+  ],
+  crypto: [
+    'bitcoin', 'ethereum', 'btc', 'eth', 'cryptocurrency', 'crypto',
+    'blockchain', 'defi', 'altcoin', 'stablecoin'
+  ],
+  general: [
+    'trading', 'investment', 'portfolio', 'bull market', 'bear market',
+    'volatility', 'liquidity', 'market analysis', 'technical analysis'
+  ]
+};
+
+// services/financial-research.service.ts
+import axios, { AxiosInstance } from 'axios';
+import { LRUCache } from 'lru-cache';
+import pRetry from 'p-retry';
+import pTimeout from 'p-timeout';
+
+export class FinancialResearchService {
+  private client: AxiosInstance;
+  private cache: LRUCache<string, ResearchReport>;
+  private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  private readonly TIMEOUT = 30000;
+  private readonly MAX_RETRIES = 2;
+
+  constructor(private apiKey: string) {
+    this.client = axios.create({
+      baseURL: 'https://api.deepseek.com/v1',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      timeout: this.TIMEOUT
+    });
+
+    this.cache = new LRUCache<string, ResearchReport>({
+      max: 50,
+      ttl: this.CACHE_TTL,
+      updateAgeOnGet: true
+    });
+  }
+
+  async generateResearch(
+    query: string,
+    depth: ResearchDepth = ResearchDepth.STANDARD,
+    options?: ResearchOptions
+  ): Promise<ResearchReport> {
+    const startTime = Date.now();
+    const cacheKey = this.getCacheKey(query, depth, options);
+
+    // Check cache
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return { ...cached, cached: true };
+    }
+
+    try {
+      const report = await pTimeout(
+        pRetry(() => this.callDeepSeekAPI(query, depth, options), {
+          retries: this.MAX_RETRIES,
+          onFailedAttempt: error => {
+            console.log(`DeepSeek attempt ${error.attemptNumber} failed:`, error.message);
+          }
+        }),
+        this.TIMEOUT,
+        'Research generation timed out'
+      );
+
+      const result: ResearchReport = {
+        report,
+        sources: this.selectRelevantSources(query),
+        depth,
+        processingTime: Date.now() - startTime,
+        metadata: {
+          model: 'deepseek-chat',
+          lastUpdated: new Date().toISOString()
+        }
+      };
+
+      // Cache the result
+      this.cache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      console.error('Failed to generate research:', error);
+      throw new Error('Unable to generate financial research at this time');
+    }
+  }
+
+  private async callDeepSeekAPI(
+    query: string,
+    depth: ResearchDepth,
+    options?: ResearchOptions
+  ): Promise<string> {
+    const systemPrompt = this.buildSystemPrompt(options);
+    const userPrompt = this.buildUserPrompt(query, depth, options);
+
+    const response = await this.client.post('/chat/completions', {
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.5,
+      max_tokens: this.getMaxTokens(depth),
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1
+    });
+
+    if (!response.data?.choices?.[0]?.message?.content) {
+      throw new Error('Invalid API response format');
+    }
+
+    return response.data.choices[0].message.content;
+  }
+
+  private buildSystemPrompt(options?: ResearchOptions): string {
+    const base = 'You are an expert financial analyst with deep knowledge of forex, stock markets, commodities, and economic indicators.';
+    
+    const specializations = [];
+    if (options?.includeTechnicals) {
+      specializations.push('technical analysis');
+    }
+    if (options?.includeFundamentals) {
+      specializations.push('fundamental analysis');
+    }
+    
+    return specializations.length > 0
+      ? `${base} You specialize in ${specializations.join(' and ')}.`
+      : base;
+  }
+
+  private buildUserPrompt(
+    query: string,
+    depth: ResearchDepth,
+    options?: ResearchOptions
+  ): string {
+    const sections = this.getRequiredSections(depth, options);
+    const timeframe = options?.timeframe || 'daily';
+    
+    return `Create a detailed ${this.getDepthDescription(depth)} market analysis for "${query}".
+
+Include the following sections:
+${sections.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+Requirements:
+- Use clear section headings (##)
+- Include specific numerical data and price levels
+- Consider ${timeframe} timeframe for analysis
+- Current date: ${new Date().toISOString().split('T')[0]}
+- Be precise with technical levels and economic data
+- Provide actionable insights
+
+Format the response in clean markdown.`;
+  }
+
+  private getRequiredSections(depth: ResearchDepth, options?: ResearchOptions): string[] {
+    const basicSections = [
+      'Current Market Status',
+      'Key Price Levels',
+      'Market Outlook'
+    ];
+
+    const standardSections = [
+      ...basicSections,
+      'Technical Analysis',
+      'Fundamental Factors',
+      'Risk Factors'
+    ];
+
+    const comprehensiveSections = [
+      ...standardSections,
+      'Historical Context',
+      'Correlation Analysis',
+      'Trading Strategies',
+      'Alternative Scenarios'
+    ];
+
+    const sections = {
+      [ResearchDepth.BASIC]: basicSections,
+      [ResearchDepth.STANDARD]: standardSections,
+      [ResearchDepth.COMPREHENSIVE]: comprehensiveSections
+    };
+
+    return sections[depth] || standardSections;
+  }
+
+  private getDepthDescription(depth: ResearchDepth): string {
+    const descriptions = {
+      [ResearchDepth.BASIC]: 'concise',
+      [ResearchDepth.STANDARD]: 'comprehensive',
+      [ResearchDepth.COMPREHENSIVE]: 'in-depth professional'
+    };
+    return descriptions[depth] || 'comprehensive';
+  }
+
+  private getMaxTokens(depth: ResearchDepth): number {
+    const tokenMap = {
+      [ResearchDepth.BASIC]: 1500,
+      [ResearchDepth.STANDARD]: 3000,
+      [ResearchDepth.COMPREHENSIVE]: 4500
+    };
+    return tokenMap[depth] || 3000;
+  }
+
+  private selectRelevantSources(query: string): FinancialSource[] {
+    const lowerQuery = query.toLowerCase();
+    let sources = [...FINANCIAL_SOURCES];
+
+    // Prioritize sources based on query content
+    if (lowerQuery.includes('chart') || lowerQuery.includes('technical')) {
+      sources = sources.sort((a, b) => 
+        (a.category === 'charts' ? -1 : 0) - (b.category === 'charts' ? -1 : 0)
+      );
+    }
+
+    return sources.slice(0, 6);
+  }
+
+  private getCacheKey(query: string, depth: ResearchDepth, options?: ResearchOptions): string {
+    return `${query}:${depth}:${JSON.stringify(options || {})}`;
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
+  getCacheStats() {
+    return {
+      size: this.cache.size,
+      maxSize: this.cache.max,
+      ttl: this.CACHE_TTL
+    };
+  }
+}
+
+// services/financial-detector.service.ts
+export class FinancialDetectorService {
+  private termWeights: Map<string, number>;
+
+  constructor() {
+    this.initializeTermWeights();
+  }
+
+  private initializeTermWeights() {
+    this.termWeights = new Map();
+    
+    // Higher weights for more specific terms
+    Object.entries(FINANCIAL_TERMS).forEach(([category, terms]) => {
+      terms.forEach(term => {
+        const weight = this.getCategoryWeight(category);
+        this.termWeights.set(term.toLowerCase(), weight);
+      });
+    });
+  }
+
+  private getCategoryWeight(category: string): number {
+    const weights: Record<string, number> = {
+      forex: 0.9,
+      stocks: 0.8,
+      commodities: 0.8,
+      crypto: 0.7,
+      general: 0.5
+    };
+    return weights[category] || 0.5;
+  }
+
+  detectFinancialQuery(query: string): FinancialDetectionResult {
+    const lowerQuery = query.toLowerCase();
+    const detectedTerms: string[] = [];
+    let totalWeight = 0;
+
+    // Check for financial terms
+    this.termWeights.forEach((weight, term) => {
+      if (lowerQuery.includes(term)) {
+        detectedTerms.push(term);
+        totalWeight += weight;
+      }
+    });
+
+    // Calculate confidence
+    const confidence = Math.min(totalWeight / 2, 1); // Normalize to 0-1
+
+    // Determine category
+    const suggestedCategory = this.determineCategory(detectedTerms);
+
+    return {
+      isFinancial: confidence > 0.3,
+      confidence,
+      detectedTerms,
+      suggestedCategory,
+      query
+    };
+  }
+
+  private determineCategory(detectedTerms: string[]): string | undefined {
+    const categoryCounts: Record<string, number> = {};
+
+    detectedTerms.forEach(term => {
+      Object.entries(FINANCIAL_TERMS).forEach(([category, terms]) => {
+        if (terms.includes(term)) {
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        }
+      });
+    });
+
+    const topCategory = Object.entries(categoryCounts)
+      .sort(([, a], [, b]) => b - a)[0];
+
+    return topCategory ? topCategory[0] : undefined;
+  }
+}
+
+// routes/financial-research.route.ts
+import express, { Request, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+import { FinancialResearchService } from '../services/financial-research.service';
+import { FinancialDetectorService } from '../services/financial-detector.service';
+import { ResearchDepth } from '../types/financial-research.types';
+
+const router = express.Router();
+
+// Initialize services
+const apiKey = process.env.DEEPSEEK_API_KEY || '';
+const researchService = new FinancialResearchService(apiKey);
+const detectorService = new FinancialDetectorService();
+
+// Rate limiting
+const researchLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 10, // 10 requests per 5 minutes
+  message: 'Too many research requests, please try again later'
+});
+
+// Validation
+const validateResearchRequest = [
+  body('query').isString().trim().isLength({ min: 3, max: 200 }),
+  body('depth').optional().isInt({ min: 1, max: 5 }),
+  body('options').optional().isObject()
+];
+
+// Error handler
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+/**
+ * POST /api/financial-research/research
+ * Generate financial research report
+ */
+router.post('/research',
+  researchLimiter,
+  validateResearchRequest,
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Invalid request',
+        details: errors.array() 
+      });
+    }
+
+    const { query, depth = ResearchDepth.STANDARD, options } = req.body;
+
+    if (!researchService.isConfigured()) {
+      return res.status(503).json({
+        error: 'Service not configured',
+        message: 'Financial research service is temporarily unavailable',
+        sources: FINANCIAL_SOURCES.slice(0, 3),
+        depth
+      });
+    }
+
+    try {
+      const report = await researchService.generateResearch(query, depth, options);
+      res.json(report);
+    } catch (error) {
+      console.error('Research generation failed:', error);
+      res.status(500).json({
+        error: 'Failed to generate research',
+        message: 'Unable to complete financial analysis at this time',
+        sources: FINANCIAL_SOURCES.slice(0, 3),
+        depth
+      });
+    }
+  })
+);
+
+/**
+ * POST /api/financial-research/detect
+ * Detect if query is financial in nature
+ */
+router.post('/detect',
+  body('query').isString().trim().notEmpty(),
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Invalid request',
+        details: errors.array() 
+      });
+    }
+
+    const { query } = req.body;
+    const detection = detectorService.detectFinancialQuery(query);
+    
+    res.json(detection);
+  })
+);
+
+/**
+ * GET /api/financial-research/status
+ * Service status and health check
+ */
+router.get('/status', (req: Request, res: Response) => {
+  res.json({
+    service: 'financial-research',
+    configured: researchService.isConfigured(),
+    cache: researchService.getCacheStats(),
+    sources: {
+      total: FINANCIAL_SOURCES.length,
+      categories: ['news', 'analysis', 'data', 'charts']
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Error handling
+router.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Financial research error:', error);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: 'An unexpected error occurred'
+  });
+});
+
+export default router;
