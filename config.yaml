@@ -1,0 +1,43 @@
+
+# DeerFlow Agent System Configuration
+environment: development
+debug: true
+log_level: INFO
+host: 0.0.0.0
+port: 9000
+
+# Database Configuration
+database:
+  host: localhost
+  port: 5432
+  database: deerflow
+  username: ""
+  password: ""
+  pool_size: 10
+  max_overflow: 20
+  echo: false
+
+# Cache Configuration
+cache:
+  enabled: true
+  ttl: 3600
+  max_size: 1000
+  backend: memory
+  redis_url: null
+
+# Agent System Configuration
+agent:
+  max_concurrent_tasks: 10
+  default_timeout: 300
+  memory_limit_mb: 512
+  enable_learning: true
+  enable_reasoning: true
+
+# API Configuration
+api:
+  deepseek_api_key: null
+  gemini_api_key: null
+  tavily_api_key: null
+  brave_api_key: null
+  rate_limit_requests: 100
+  rate_limit_window: 60

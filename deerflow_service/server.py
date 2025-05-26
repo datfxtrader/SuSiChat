@@ -4,7 +4,7 @@ DeerFlow Research Service
 This service provides a FastAPI server to handle deep research requests using DeerFlow.
 Enhanced with intelligent agent capabilities for advanced planning and reasoning.
 """
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
@@ -18,6 +18,11 @@ import logging
 import time
 import datetime
 import aiohttp
+
+# Import optimization components
+from config_manager import load_config, get_config
+from error_handler import error_handler, with_retry, with_circuit_breaker
+from metrics import MetricsCollector
 
 # Import the new agent core and learning system
 from agent_core import agent_core, TaskStatus
@@ -34,10 +39,14 @@ try:
 except ImportError:
     FULL_DEERFLOW_AVAILABLE = False
 
-# Configure logging
+# Load configuration first
+config = load_config()
+
+# Configure logging based on config
+log_level = getattr(logging, config.log_level.upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=log_level,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler("deerflow.log")
@@ -45,14 +54,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger("deerflow_service")
 
+# Initialize metrics collector
+metrics = MetricsCollector()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events"""
     # Startup
     logger.info("DeerFlow research service starting up...")
+    logger.info(f"Environment: {config.environment}")
+    logger.info(f"Debug mode: {config.debug}")
+    logger.info(f"API keys configured: {bool(config.api.deepseek_api_key)}")
+    
+    # Initialize error recovery handlers
+    await setup_error_handlers()
+    
     yield
+    
     # Shutdown
     logger.info("Shutting down DeerFlow research service...")
+    
+    # Generate final metrics report
+    final_metrics = metrics.get_metrics_summary()
+    logger.info(f"Final metrics: {final_metrics}")
+
+async def setup_error_handlers():
+    """Setup error recovery handlers"""
+    
+    async def api_key_recovery(error_info):
+        """Recovery handler for API key errors"""
+        logger.warning("API key error detected, switching to fallback services")
+        return {"fallback": True, "message": "Using fallback services"}
+    
+    async def rate_limit_recovery(error_info):
+        """Recovery handler for rate limit errors"""
+        logger.warning("Rate limit detected, implementing backoff")
+        await asyncio.sleep(60)  # Wait 1 minute
+        return {"retry_after": 60}
+    
+    error_handler.register_recovery_handler("APIKeyError", api_key_recovery)
+    error_handler.register_recovery_handler("RateLimitError", rate_limit_recovery)
 
 # Initialize FastAPI with lifespan
 app = FastAPI(lifespan=lifespan)
@@ -652,8 +693,108 @@ Format your report in Markdown, but make it readable and professional."""
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint to verify API is working."""
-    return {"status": "ok", "timestamp": datetime.datetime.now().isoformat()}
+    """Comprehensive health check endpoint."""
+    
+    try:
+        # Basic health indicators
+        health_data = {
+            "status": "ok",
+            "timestamp": datetime.datetime.now().isoformat(),
+            "environment": config.environment,
+            "uptime": time.time(),
+            "version": "1.0.0"
+        }
+        
+        # Check API key availability
+        api_status = {
+            "deepseek": bool(config.api.deepseek_api_key),
+            "gemini": bool(config.api.gemini_api_key),
+            "tavily": bool(config.api.tavily_api_key),
+            "brave": bool(config.api.brave_api_key)
+        }
+        health_data["api_keys"] = api_status
+        
+        # Get system metrics
+        system_health = metrics.get_system_health()
+        health_data.update(system_health)
+        
+        # Get error summary
+        error_summary = error_handler.get_error_summary()
+        health_data["error_summary"] = error_summary
+        
+        # Determine overall status
+        if system_health.get("overall_health") == "critical" or error_summary.get("recent_errors", 0) > 10:
+            health_data["status"] = "degraded"
+        
+        return health_data
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "error",
+            "timestamp": datetime.datetime.now().isoformat(),
+            "error": str(e)
+        }
+
+@app.get("/metrics")
+async def get_metrics():
+    """Get detailed system metrics."""
+    
+    try:
+        metrics_data = {
+            "system_metrics": metrics.get_metrics_summary(),
+            "error_metrics": error_handler.get_error_summary(),
+            "configuration": {
+                "environment": config.environment,
+                "agent_config": {
+                    "max_concurrent_tasks": config.agent.max_concurrent_tasks,
+                    "learning_enabled": config.agent.enable_learning,
+                    "reasoning_enabled": config.agent.enable_reasoning
+                },
+                "cache_config": {
+                    "enabled": config.cache.enabled,
+                    "backend": config.cache.backend
+                }
+            }
+        }
+        
+        return metrics_data
+        
+    except Exception as e:
+        logger.error(f"Metrics collection failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Metrics collection failed: {str(e)}")
+
+@app.get("/config")
+async def get_configuration():
+    """Get current system configuration (sanitized)."""
+    
+    try:
+        # Return sanitized configuration (no secrets)
+        sanitized_config = {
+            "environment": config.environment,
+            "debug": config.debug,
+            "host": config.host,
+            "port": config.port,
+            "agent": {
+                "max_concurrent_tasks": config.agent.max_concurrent_tasks,
+                "default_timeout": config.agent.default_timeout,
+                "memory_limit_mb": config.agent.memory_limit_mb,
+                "enable_learning": config.agent.enable_learning,
+                "enable_reasoning": config.agent.enable_reasoning
+            },
+            "cache": {
+                "enabled": config.cache.enabled,
+                "ttl": config.cache.ttl,
+                "max_size": config.cache.max_size,
+                "backend": config.cache.backend
+            }
+        }
+        
+        return sanitized_config
+        
+    except Exception as e:
+        logger.error(f"Configuration retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Configuration retrieval failed: {str(e)}")
 
 # Adding a basic route
 @app.get("/")
@@ -814,8 +955,7 @@ async def submit_feedback(request: FeedbackRequest):
         return {"error": "Learning system not available"}
 
     try:
-        # Convert string to FeedbackType```python
- enum
+        # Convert string to FeedbackType enum
         feedback_type_map = {
             "accuracy": FeedbackType.ACCURACY,
             "relevance": FeedbackType.RELEVANCE,
