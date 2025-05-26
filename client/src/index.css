@@ -135,6 +135,64 @@
   padding: 0 !important;
 }
 
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+.animate-pulse-custom {
+  animation: pulse 2s infinite;
+}
+
+.animate-glow {
+  animation: glow 2s infinite;
+}
+
+/* Enhanced typewriter cursor */
+.typewriter-cursor::after {
+  content: '|';
+  animation: blink 1s infinite;
+  color: #3b82f6;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
 @layer base {
   * {
     @apply border-border;
