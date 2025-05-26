@@ -1523,42 +1523,7 @@ async def apply_quick_optimization_wins():
 
 
 
-        # Factor 2: Data availability (30%)
-        total_tasks = health.get("total_tasks", 0)
-        if total_tasks > 50:
-            readiness_score += 0.3
-        elif total_tasks > 10:
-            readiness_score += 0.15
-
-        # Factor 3: Error rate (30%)
-        error_rate = health.get("error_rate", 1.0)
-        if error_rate < 0.05:
-            readiness_score += 0.3
-        elif error_rate < 0.1:
-            readiness_score += 0.15
-
-        ready = readiness_score >= 0.7
-
-        return {
-            "ready_for_optimization": ready,
-            "readiness_score": readiness_score,
-            "health_status": health.get("overall_health"),
-            "total_tasks": total_tasks,
-            "error_rate": error_rate,
-            "recommendations": [
-                "System needs more task data" if total_tasks < 10 else "Task data sufficient",
-                "Error rate too high" if error_rate > 0.1 else "Error rate acceptable",
-                "System health good" if health.get("overall_health") == "healthy" else "System health needs attention"
-            ]
-        }
-
-    except Exception as e:
-        logger.error(f"Optimization validation error: {e}")
-        return {
-            "ready_for_optimization": False,
-            "error": str(e),
-            "readiness_score": 0.0
-        }
+        
 
 @app.get("/optimize/recommendations")
 async def get_optimization_recommendations():
@@ -1931,15 +1896,9 @@ if __name__ == "__main__":
                 continue
         return None
 
-    # Get port from environment or find available port
-    port = int(os.environ.get("PORT", 0))
-    if port == 0:
-        port = find_available_port(9000)
-
-    if port is None:
-        print("❌ No available ports found")
-        exit(1)
-
+    # Get port from environment or use default 9000
+    port = int(os.environ.get("PORT", 9000))
+    
     print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
 
     uvicorn.run(

@@ -19,6 +19,8 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    PLANNING = "planning"
+    EXECUTING = "executing"
 
 class AgentState(Enum):
     INITIALIZED = "initialized"

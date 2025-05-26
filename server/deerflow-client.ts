@@ -257,5 +257,56 @@ export class DeerFlowClient {
   }
 }
 
+static getInstance(): DeerFlowClient {
+    if (!DeerFlowClient.instance) {
+      DeerFlowClient.instance = new DeerFlowClient();
+    }
+    return DeerFlowClient.instance;
+  }
+
+  async getCapabilities(): Promise<any> {
+    try {
+      const now = Date.now();
+      if (now - this.lastStatusCheck < this.statusCheckInterval) {
+        return this.getCachedCapabilities();
+      }
+
+      const response = await this.axiosInstance.get('/deerflow/capabilities', {
+        timeout: DEERFLOW_CONFIG.TIMEOUT_SHORT
+      });
+
+      this.lastStatusCheck = now;
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to get DeerFlow capabilities:', error);
+      return this.getCachedCapabilities();
+    }
+  }
+
+  async performResearch(params: DeerFlowResearchParams, abortSignal?: AbortSignal): Promise<DeerFlowResearchResponse> {
+    try {
+      // Ensure service is running
+      const serviceUrl = await this.findActiveService();
+      if (!serviceUrl) {
+        await this.startServiceIfNeeded();
+      }
+
+      const response = await this.axiosInstance.post('/research', params, {
+        timeout: DEERFLOW_CONFIG.TIMEOUT_EXTENDED,
+        signal: abortSignal
+      });
+
+      if (response.status === 200) {
+        return response.data;
+      } else {
+        throw new Error(`DeerFlow research failed: ${response.status}`);
+      }
+    } catch (error) {
+      logger.error('DeerFlow research error:', error);
+      return this.createErrorResponse(error);
+    }
+  }
+}
+
 // Export singleton
-export const deerflowClient = DeerFlowClient.getInstance();
+export const deerflowClient = DeerFlowClient.getInstance();nt.getInstance();

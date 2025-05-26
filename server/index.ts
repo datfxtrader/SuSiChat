@@ -28,10 +28,10 @@ const app = express();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
-    'http://localhost:5000',
-    'http://localhost:3000', 
-    'http://0.0.0.0:5000',
+    'http://localhost:3000',
+    'http://localhost:5173', 
     'http://0.0.0.0:3000',
+    'http://0.0.0.0:5173',
     'https://*.replit.dev',
     'https://*.replit.co',
     'https://*.replit.app'
@@ -559,9 +559,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Production server on port 5000 for preview
+  // Production server on port 3000 for API and client
   // this serves both the API and the client.
-  const port = parseInt(process.env.PORT || "5000");
+  const port = parseInt(process.env.PORT || "3000");
 
   // Check if port is already in use
   const { createServer } = await import('net');
