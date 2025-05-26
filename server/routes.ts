@@ -31,9 +31,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/templates/user', isAuthenticated, templateRoutes.getUserTemplates);
   app.post('/api/templates/create', isAuthenticated, templateRoutes.createTemplate);
   app.post('/api/templates/generate', isAuthenticated, templateRoutes.generateTemplateFromQuery);
-  app.get('/api/templates/:templateId/improvements', isAuthenticated, templateRoutes.getTemplateImprovements);
+  // Temporarily disable improvements endpoint until implementation is ready
+  // app.get('/api/templates/:templateId/improvements', isAuthenticated, templateRoutes.getTemplateImprovements);
   app.get('/api/templates/search', isAuthenticated, templateRoutes.searchTemplates);
-  app.post('/api/templates/:templateId/usage', isAuthenticated, templateRoutes.trackTemplateUsage);
+  // Temporarily disable usage tracking endpoint until implementation is ready
+  // app.post('/api/templates/:templateId/usage', isAuthenticated, templateRoutes.trackTemplateUsage);
   app.get('/api/templates/popular', isAuthenticated, templateRoutes.getPopularTemplates);
   app.post('/api/templates/fill', isAuthenticated, templateRoutes.fillTemplate);
   

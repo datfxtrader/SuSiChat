@@ -234,8 +234,6 @@ export default function DebugTabPersistence() {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [events]);rRef.current.scrollHeight;
-    }
   }, [events]);
 
   // Simulate progress updates

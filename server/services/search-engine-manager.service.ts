@@ -9,12 +9,12 @@ import {
   SearchEngineConfigManager,
   getSearchEngineConfig 
 } from '../config/search-engines.config';
-import { RateLimiterService } from './rate-limiter.service';
+import { RateLimiter } from './rate-limiter.service';
 
 export class SearchEngineManagerService {
   private static instance: SearchEngineManagerService;
   private engineStats: Map<string, SearchEngineStats> = new Map();
-  private rateLimiters: Map<string, RateLimiterService> = new Map();
+  private rateLimiters: Map<string, RateLimiter> = new Map();
 
   private constructor() {
     this.initializeEngines();
@@ -46,7 +46,7 @@ export class SearchEngineManagerService {
       });
 
       // Initialize rate limiter
-      this.rateLimiters.set(config.id, new RateLimiterService(config.rateLimit));
+      this.rateLimiters.set(config.id, new RateLimiter(config.rateLimit));
     }
   }
 

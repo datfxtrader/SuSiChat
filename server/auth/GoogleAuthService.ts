@@ -111,6 +111,12 @@ export class GoogleAuthService {
 
   private async loadWhitelist(): Promise<void> {
     try {
+      // Skip database loading if db is not properly initialized
+      if (!db || typeof db.query !== 'function') {
+        console.log('Database not available, using empty whitelist');
+        this.whitelist = new Set();
+        return;
+      }
       const result = await db.query('SELECT email FROM whitelist');
       this.whitelist = new Set(result.rows.map(row => row.email.toLowerCase()));
     } catch (error) {
