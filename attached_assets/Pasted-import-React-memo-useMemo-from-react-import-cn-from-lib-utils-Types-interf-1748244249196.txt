@@ -1,0 +1,268 @@
+import React, { memo, useMemo } from "react";
+import { cn } from "@/lib/utils";
+
+// Types
+interface TypingIndicatorProps {
+  /** Custom avatar content */
+  avatar?: React.ReactNode;
+  /** Avatar size */
+  avatarSize?: "sm" | "md" | "lg";
+  /** Custom label for screen readers */
+  label?: string;
+  /** Number of dots */
+  dots?: number;
+  /** Animation style */
+  animationStyle?: "pulse" | "wave" | "fade" | "bounce";
+  /** Custom colors */
+  dotColor?: string;
+  bubbleColor?: string;
+  /** Additional className */
+  className?: string;
+  /** Show/hide with animation */
+  show?: boolean;
+  /** Custom message */
+  message?: string;
+}
+
+// Constants
+const AVATAR_SIZES = {
+  sm: "w-6 h-6 text-xs",
+  md: "w-8 h-8 text-sm",
+  lg: "w-10 h-10 text-base"
+} as const;
+
+const ANIMATION_STYLES = {
+  pulse: "animate-pulse",
+  wave: "animate-wave",
+  fade: "animate-fade",
+  bounce: "animate-bounce"
+} as const;
+
+const DOT_SIZES = {
+  sm: "w-1.5 h-1.5",
+  md: "w-2 h-2",
+  lg: "w-2.5 h-2.5"
+} as const;
+
+// Animation keyframes (add to your global CSS or Tailwind config)
+const animationKeyframes = `
+  @keyframes wave {
+    0%, 60%, 100% {
+      transform: translateY(0);
+    }
+    30% {
+      transform: translateY(-10px);
+    }
+  }
+  
+  @keyframes fade {
+    0%, 60%, 100% {
+      opacity: 0.3;
+    }
+    30% {
+      opacity: 1;
+    }
+  }
+`;
+
+// Sub-components
+const DefaultAvatar = memo<{ size: keyof typeof AVATAR_SIZES }>(({ size }) => (
+  <div 
+    className={cn(
+      "flex-shrink-0 bg-primary rounded-full flex items-center justify-center",
+      "transition-transform hover:scale-105",
+      AVATAR_SIZES[size]
+    )}
+    role="img"
+    aria-label="AI Assistant"
+  >
+    <span className="material-icons text-white" aria-hidden="true">
+      assistant
+    </span>
+  </div>
+));
+
+DefaultAvatar.displayName = "DefaultAvatar";
+
+const TypingDot = memo<{
+  delay: number;
+  animation: keyof typeof ANIMATION_STYLES;
+  color?: string;
+  size: keyof typeof DOT_SIZES;
+}>(({ delay, animation, color, size }) => {
+  const animationClass = useMemo(() => {
+    switch (animation) {
+      case "wave":
+        return "animate-[wave_1.4s_ease-in-out_infinite]";
+      case "fade":
+        return "animate-[fade_1.4s_ease-in-out_infinite]";
+      case "bounce":
+        return "animate-bounce";
+      default:
+        return "animate-pulse";
+    }
+  }, [animation]);
+
+  return (
+    <div
+      className={cn(
+        "rounded-full",
+        DOT_SIZES[size],
+        animationClass,
+        color || "bg-neutral-400 dark:bg-neutral-500"
+      )}
+      style={{ animationDelay: `${delay}s` }}
+      aria-hidden="true"
+    />
+  );
+});
+
+TypingDot.displayName = "TypingDot";
+
+// Main component
+const TypingIndicator = memo<TypingIndicatorProps>(({
+  avatar,
+  avatarSize = "md",
+  label = "AI is typing",
+  dots = 3,
+  animationStyle = "wave",
+  dotColor,
+  bubbleColor,
+  className,
+  show = true,
+  message
+}) => {
+  // Generate dot delays
+  const dotDelays = useMemo(() => 
+    Array.from({ length: dots }, (_, i) => i * 0.15),
+    [dots]
+  );
+
+  // Determine dot size based on avatar size
+  const dotSize = useMemo(() => {
+    switch (avatarSize) {
+      case "sm": return "sm";
+      case "lg": return "lg";
+      default: return "md";
+    }
+  }, [avatarSize]);
+
+  if (!show) return null;
+
+  return (
+    <>
+      {/* Inject animation keyframes if using custom animations */}
+      {(animationStyle === "wave" || animationStyle === "fade") && (
+        <style dangerouslySetInnerHTML={{ __html: animationKeyframes }} />
+      )}
+      
+      <div 
+        className={cn(
+          "flex items-start gap-2 max-w-3xl",
+          "transition-all duration-300 ease-in-out",
+          show ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2",
+          className
+        )}
+        role="status"
+        aria-live="polite"
+        aria-label={label}
+      >
+        {/* Avatar */}
+        {avatar || <DefaultAvatar size={avatarSize} />}
+        
+        {/* Typing bubble */}
+        <div 
+          className={cn(
+            "px-4 py-3 rounded-lg shadow-sm",
+            "transition-colors duration-200",
+            "border border-neutral-200 dark:border-neutral-700",
+            bubbleColor || "bg-white dark:bg-neutral-800",
+            "chat-bubble-ai"
+          )}
+        >
+          {message ? (
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 italic">
+              {message}
+            </p>
+          ) : (
+            <div 
+              className="flex items-center"
+              style={{ gap: dots > 3 ? "2px" : "4px" }}
+            >
+              {dotDelays.map((delay, index) => (
+                <TypingDot
+                  key={index}
+                  delay={delay}
+                  animation={animationStyle}
+                  color={dotColor}
+                  size={dotSize}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+});
+
+TypingIndicator.displayName = "TypingIndicator";
+
+// Preset variations
+export const TypingIndicatorPresets = {
+  default: {},
+  small: { avatarSize: "sm" as const, dots: 3 },
+  large: { avatarSize: "lg" as const, dots: 4 },
+  minimal: { dots: 3, animationStyle: "fade" as const },
+  playful: { dots: 5, animationStyle: "bounce" as const },
+  subtle: { 
+    dotColor: "bg-neutral-300 dark:bg-neutral-600",
+    animationStyle: "fade" as const
+  }
+} as const;
+
+// Compound component variations
+export const CompactTypingIndicator = memo<Omit<TypingIndicatorProps, "avatarSize" | "dots">>(
+  (props) => <TypingIndicator {...props} avatarSize="sm" dots={3} />
+);
+
+CompactTypingIndicator.displayName = "CompactTypingIndicator";
+
+export const LargeTypingIndicator = memo<Omit<TypingIndicatorProps, "avatarSize" | "dots">>(
+  (props) => <TypingIndicator {...props} avatarSize="lg" dots={4} />
+);
+
+LargeTypingIndicator.displayName = "LargeTypingIndicator";
+
+// Hook for custom typing messages
+export const useTypingMessage = (
+  isTyping: boolean,
+  messages: string[] = [
+    "Thinking...",
+    "Searching...",
+    "Analyzing...",
+    "Processing..."
+  ],
+  interval = 2000
+): string => {
+  const [messageIndex, setMessageIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isTyping) {
+      setMessageIndex(0);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % messages.length);
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, [isTyping, messages, interval]);
+
+  return messages[messageIndex];
+};
+
+// Export everything
+export { DefaultAvatar, TypingDot };
+export default TypingIndicator;
