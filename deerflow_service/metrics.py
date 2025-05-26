@@ -27,6 +27,9 @@ class MetricsCollector:
         # Performance tracking
         self.operation_times: Dict[str, List[float]] = defaultdict(list)
         
+        # Rate tracking
+        self.rate_trackers: Dict[str, defaultdict] = defaultdict(lambda: defaultdict(list))
+        
         # Keep metrics for last 24 hours
         self.retention_period = 86400  # 24 hours
     
@@ -196,3 +199,49 @@ class MetricsCollector:
         self.histograms.clear()
         self.operation_times.clear()
         logger.info("All metrics reset")
+    
+    def _calculate_percentiles(self, values: List[float]) -> Dict[str, float]:
+        """Calculate percentiles for a list of values"""
+        if not values:
+            return {}
+            
+        sorted_values = sorted(values)
+        n = len(sorted_values)
+        
+        if n == 1:
+            return {"p50": sorted_values[0], "p75": sorted_values[0], 
+                   "p90": sorted_values[0], "p95": sorted_values[0], "p99": sorted_values[0]}
+        
+        return {
+            "p50": sorted_values[int(n * 0.50)],
+            "p75": sorted_values[int(n * 0.75)],
+            "p90": sorted_values[int(n * 0.90)],
+            "p95": sorted_values[int(n * 0.95)],
+            "p99": sorted_values[int(n * 0.99)] if n > 100 else sorted_values[-1]
+        }
+    
+    def record_rate_limited_operation(self, operation: str, timestamp: Optional[float] = None):
+        """Track rate-limited operations"""
+        timestamp = timestamp or time.time()
+        hour_bucket = int(timestamp // 3600)
+        self.rate_trackers[operation][hour_bucket].append(timestamp)
+        
+        # Keep only last 24 hours
+        cutoff_bucket = hour_bucket - 24
+        for bucket in list(self.rate_trackers[operation].keys()):
+            if bucket < cutoff_bucket:
+                del self.rate_trackers[operation][bucket]
+    
+    def get_operation_rate(self, operation: str, window_seconds: int = 60) -> float:
+        """Calculate operations per second over a time window"""
+        if operation not in self.rate_trackers:
+            return 0.0
+            
+        now = time.time()
+        cutoff = now - window_seconds
+        
+        total_ops = 0
+        for timestamps in self.rate_trackers[operation].values():
+            total_ops += sum(1 for ts in timestamps if ts > cutoff)
+        
+        return total_ops / window_seconds if window_seconds > 0 else 0.0

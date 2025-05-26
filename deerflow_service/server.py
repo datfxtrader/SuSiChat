@@ -29,10 +29,13 @@ from metrics import MetricsCollector
 # Import the new agent core and learning system
 from agent_core import agent_core, TaskStatus
 try:
-    from learning_system import learning_system, UserFeedback, FeedbackType
+    from learning_system import learning_system, UserFeedback, FeedbackType, LearningConfig
+    from anomaly_detector import anomaly_detector
     LEARNING_AVAILABLE = True
+    ANOMALY_DETECTION_AVAILABLE = True
 except ImportError:
     LEARNING_AVAILABLE = False
+    ANOMALY_DETECTION_AVAILABLE = False
 
 # Import full DeerFlow agent system
 try:
@@ -746,6 +749,7 @@ async def get_metrics():
         metrics_data = {
             "system_metrics": metrics.get_metrics_summary(),
             "error_metrics": error_handler.get_error_summary(),
+            "anomaly_detection": anomaly_detector.get_anomaly_summary() if ANOMALY_DETECTION_AVAILABLE else {"status": "unavailable"},
             "configuration": {
                 "environment": config.environment,
                 "agent_config": {
@@ -1198,6 +1202,42 @@ async def validate_optimization():
         elif health.get("overall_health") == "warning":
             readiness_score += 0.2
 
+        # Factor 2: Data availability (30%)
+        total_tasks = health.get("total_tasks", 0)
+        if total_tasks > 50:
+            readiness_score += 0.3
+        elif total_tasks > 10:
+            readiness_score += 0.15
+
+        # Factor 3: Error rate (30%)
+        error_rate = health.get("error_rate", 1.0)
+        if error_rate < 0.05:
+            readiness_score += 0.3
+        elif error_rate < 0.1:
+            readiness_score += 0.15
+
+        ready = readiness_score >= 0.7
+
+        return {
+            "ready_for_optimization": ready,
+            "readiness_score": readiness_score,
+            "health_status": health.get("overall_health"),
+            "total_tasks": total_tasks,
+            "error_rate": error_rate,
+            "recommendations": [
+                "System needs more task data" if total_tasks < 10 else "Task data sufficient",
+                "Error rate too high" if error_rate > 0.1 else "Error rate acceptable",
+                "System health good" if health.get("overall_health") == "healthy" else "System health needs attention"
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Optimization validation error: {e}")
+        return {
+            "ready_for_optimization": False,
+            "error": str(e),
+            "readiness_score": 0.0
+        }
 
 # Optimization Coordinator Endpoints
 @app.post("/optimize/start")

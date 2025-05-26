@@ -15,9 +15,39 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
 from collections import defaultdict, deque
+from functools import lru_cache
 import math
 
 logger = logging.getLogger("learning_system")
+
+class LearningError(Exception):
+    """Base exception for learning system errors"""
+    pass
+
+class StrategyNotFoundError(LearningError):
+    """Raised when strategy is not found"""
+    pass
+
+def safe_operation(default_return=None):
+    """Decorator for safe operation execution"""
+    def decorator(func):
+        if asyncio.iscoroutinefunction(func):
+            async def async_wrapper(*args, **kwargs):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    logger.error(f"Error in {func.__name__}: {e}")
+                    return default_return
+            return async_wrapper
+        else:
+            def sync_wrapper(*args, **kwargs):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    logger.error(f"Error in {func.__name__}: {e}")
+                    return default_return
+            return sync_wrapper
+    return decorator
 
 class LearningMode(Enum):
     EXPLORATION = "exploration"  # Try new strategies
@@ -30,6 +60,30 @@ class FeedbackType(Enum):
     COMPLETENESS = "completeness"
     TIMELINESS = "timeliness"
     OVERALL = "overall"
+
+@dataclass
+class LearningConfig:
+    """Configuration for learning system"""
+    # Strategy optimization
+    strategy_performance_window: int = 100
+    learning_rate: float = 0.1
+    exploration_rate: float = 0.2
+    strategy_cache_ttl: int = 300
+    
+    # Feedback processing
+    feedback_window_size: int = 50
+    quality_trend_window: int = 20
+    min_feedback_for_insights: int = 5
+    
+    # Performance monitoring
+    metrics_retention_hours: int = 24
+    metrics_window_size: int = 200
+    operation_history_size: int = 100
+    
+    # System behavior
+    enable_auto_optimization: bool = True
+    enable_real_time_adjustments: bool = True
+    confidence_threshold: float = 0.7
 
 @dataclass
 class PerformanceMetric:
@@ -69,6 +123,11 @@ class StrategyOptimizer:
         self.performance_window = 100  # Keep last 100 results per strategy
         self.learning_rate = 0.1
         self.exploration_rate = 0.2
+        
+        # Performance optimizations
+        self._strategy_cache = {}
+        self._cache_ttl = 300  # 5 minutes
+        self._last_cache_clear = time.time()
         
     def record_strategy_performance(
         self, 
@@ -163,6 +222,37 @@ class StrategyOptimizer:
         
         return strategy_name, confidence
     
+    @lru_cache(maxsize=128)
+    def _calculate_strategy_score(self, strategy_name: str, domain: str, timestamp: float) -> float:
+        """Cached strategy score calculation with timestamp for cache busting"""
+        perf = self.strategy_history.get(strategy_name)
+        if not perf or perf.total_attempts == 0:
+            return 0.0
+            
+        success_rate = perf.success_count / perf.total_attempts
+        domain_score = perf.domain_effectiveness.get(domain, success_rate)
+        rating_score = perf.average_rating / 5.0
+        
+        # Apply time decay
+        decay_factor = self._apply_time_decay(perf)
+        
+        return (success_rate * 0.4 + domain_score * 0.4 + rating_score * 0.2) * decay_factor
+    
+    def _apply_time_decay(self, perf: StrategyPerformance) -> float:
+        """Apply time decay to old strategies"""
+        time_since_update = time.time() - perf.last_updated
+        days_old = time_since_update / 86400
+        
+        # Exponential decay: lose 50% confidence after 30 days
+        decay_factor = 0.5 ** (days_old / 30)
+        return max(decay_factor, 0.1)  # Minimum 10% confidence
+    
+    def _clear_cache_if_needed(self):
+        """Clear cache periodically"""
+        if time.time() - self._last_cache_clear > self._cache_ttl:
+            self._calculate_strategy_score.cache_clear()
+            self._last_cache_clear = time.time()
+    
     def get_strategy_insights(self) -> Dict[str, Any]:
         """Get insights about strategy performance"""
         insights = {
@@ -199,7 +289,7 @@ class FeedbackProcessor:
     """Processes and learns from user feedback"""
     
     def __init__(self):
-        self.feedback_history: List[UserFeedback] = []
+        self.feedback_history = deque(maxlen=50)  # Automatically maintains size
         self.feedback_window = 50  # Keep last 50 feedback items
         self.quality_trends: Dict[str, deque] = defaultdict(lambda: deque(maxlen=20))
         
@@ -207,10 +297,6 @@ class FeedbackProcessor:
         """Process user feedback and extract learning insights"""
         
         self.feedback_history.append(feedback)
-        
-        # Maintain window size
-        if len(self.feedback_history) > self.feedback_window:
-            self.feedback_history.pop(0)
         
         # Update quality trends
         self.quality_trends[feedback.feedback_type.value].append(feedback.rating)
@@ -430,13 +516,14 @@ class PerformanceMonitor:
 class AdaptiveLearningSystem:
     """Main learning system that coordinates all learning components"""
     
-    def __init__(self):
+    def __init__(self, config: Optional[LearningConfig] = None):
+        self.config = config or LearningConfig()
         self.strategy_optimizer = StrategyOptimizer()
         self.feedback_processor = FeedbackProcessor()
         self.performance_monitor = PerformanceMonitor()
         self.learning_mode = LearningMode.BALANCED
         
-        logger.info("AdaptiveLearningSystem initialized")
+        logger.info("AdaptiveLearningSystem initialized with configuration")
     
     async def process_task_completion(
         self, 
@@ -487,6 +574,27 @@ class AdaptiveLearningSystem:
         logger.info(f"Learning processing completed for task {task_id}")
         
         return learning_results
+    
+    async def process_task_completion_batch(
+        self, 
+        tasks: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Process multiple tasks concurrently"""
+        import asyncio
+        
+        results = await asyncio.gather(*[
+            self.process_task_completion(**task) 
+            for task in tasks
+        ], return_exceptions=True)
+        
+        valid_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"Batch processing error: {result}")
+            else:
+                valid_results.append(result)
+        
+        return valid_results
     
     def _generate_learning_recommendations(self, learning_results: Dict[str, Any]) -> List[str]:
         """Generate actionable recommendations based on learning results"""

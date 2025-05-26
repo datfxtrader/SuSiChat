@@ -45,6 +45,15 @@ args = "python deerflow_service/server.py"
 task = "shell.exec"
 args = "npm run dev"
 
+[[workflows.workflow]]
+name = "Test Optimizations"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_system_comprehensive.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
