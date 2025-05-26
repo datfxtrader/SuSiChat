@@ -1,5 +1,5 @@
 {
-  "timestamp": 1748219594.9569142,
+  "timestamp": 1748219766.759522,
   "total_tests": 10,
   "passed_count": 7,
   "failed_count": 3,
@@ -88,7 +88,7 @@
     "Agent System Functionality": {
       "success": true,
       "task_created": true,
-      "task_id": "c18bd94e-6b50-40d6-aa68-ffe6d5e90c1a",
+      "task_id": "33b57b94-a5fb-41d8-ab98-7e64df87d96b",
       "status_retrievable": false,
       "capabilities": {
         "basic_research": true,
@@ -132,9 +132,9 @@
         "error_metrics",
         "configuration"
       ],
-      "response_time": 0.0025086402893066406,
+      "response_time": 0.0021545886993408203,
       "performance_good": true,
-      "uptime": 1748219593.884492
+      "uptime": 1748219765.7119646
     },
     "Frontend Integration": {
       "success": true,

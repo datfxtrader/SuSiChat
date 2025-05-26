@@ -1,0 +1,114 @@
+{
+  "agent_id": "agent_c3b606e0",
+  "task_id": "c3b606e0-bef4-4b6e-a86a-78daa1818101",
+  "status": "TaskStatus.COMPLETED",
+  "current_step": 0,
+  "working_memory": {},
+  "execution_plan": {
+    "strategy": "simple",
+    "steps": [
+      {
+        "id": "search_1",
+        "description": "Search for information about: Test query for agent system validation...",
+        "type": "search",
+        "priority": 1,
+        "dependencies": [],
+        "estimated_time": 30,
+        "status": "pending",
+        "result": null
+      },
+      {
+        "id": "synthesis_1",
+        "description": "Synthesize findings",
+        "type": "synthesis",
+        "priority": 2,
+        "dependencies": [
+          "search_1"
+        ],
+        "estimated_time": 40,
+        "status": "pending",
+        "result": null
+      }
+    ],
+    "total_estimated_time": 70,
+    "adaptation_points": [
+      "after_search_1"
+    ],
+    "success_criteria": [
+      "Information gathered successfully",
+      "High-quality sources identified",
+      "Analysis completed",
+      "User query addressed"
+    ]
+  },
+  "reasoning_chain": [],
+  "confidence_scores": {},
+  "start_time": 1748219718.5888233,
+  "metadata": {
+    "query": "Test query for agent system validation",
+    "analysis": {
+      "query": "Test query for agent system validation",
+      "intent": {
+        "primary": "explanation",
+        "confidence": 0.5,
+        "all_intents": {
+          "comparison": 0,
+          "analysis": 0,
+          "explanation": 0,
+          "prediction": 0
+        }
+      },
+      "domains": [
+        {
+          "domain": "technical",
+          "confidence": 0.14285714285714285
+        }
+      ],
+      "entities": [
+        {
+          "text": "Test",
+          "type": "PROPER_NOUN",
+          "confidence": 0.7
+        }
+      ],
+      "concepts": [
+        "test",
+        "query",
+        "agent",
+        "system",
+        "validation"
+      ],
+      "complexity": {
+        "level": "moderate",
+        "score": 0.31999999999999995,
+        "factors": {
+          "length": 0.4,
+          "unique_words": 1.0,
+          "conjunctions": 0.0,
+          "questions": 0.0,
+          "technical_terms": 0.2
+        }
+      },
+      "capabilities": [
+        "educational_content",
+        "synthesis",
+        "deep_reasoning",
+        "knowledge_base",
+        "multi_step_analysis",
+        "web_search"
+      ],
+      "metadata": {
+        "word_count": 6,
+        "has_questions": false,
+        "sentence_count": 1
+      }
+    },
+    "preferences": {
+      "depth": "standard",
+      "include_reasoning": true,
+      "learning_mode": true
+    },
+    "created_at": "2025-05-26T00:35:18.588824",
+    "last_transition": "2025-05-26T00:35:19.593856"
+  }
+}
