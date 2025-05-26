@@ -1,8 +1,15 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
 
-const MobileNav: React.FC = () => {
+interface MobileNavProps {
+  isSidebarOpen?: boolean;
+  toggleSidebar?: () => void;
+}
+
+const MobileNav: React.FC<MobileNavProps> = ({ isSidebarOpen, toggleSidebar }) => {
   const [location] = useLocation();
   
   const navItems = [
@@ -13,8 +20,24 @@ const MobileNav: React.FC = () => {
   ];
   
   return (
-    <div className="md:hidden border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-2">
-      <div className="flex justify-around">
+    <div className="lg:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+      {/* Top bar with hamburger menu */}
+      <div className="flex items-center justify-between p-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className="lg:hidden"
+          aria-label="Toggle sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <h1 className="text-lg font-semibold">Tongkeeper</h1>
+        <div className="w-10" /> {/* Spacer for centering */}
+      </div>
+      
+      {/* Bottom navigation */}
+      <div className="flex justify-around py-2">
         {navItems.map((item) => (
           <Link 
             key={item.path}
