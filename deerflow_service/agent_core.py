@@ -49,6 +49,7 @@ class AgentMessage:
 
 @dataclass
 class Task:
+    ```python
     """Enhanced task representation"""
     task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     query: str = ""
@@ -632,13 +633,11 @@ class AgentCore:
             self.active_agents[task_id] = task_state
 
             # Start background task for research
-            asyncio.create_task(self._execute_research_task(task_state))
+            # Use await to ensure the task is properly created and its ID is returned
+            task_id = await asyncio.create_task(self._execute_research_task(task_state))
 
             logger.info(f"Created research task: {task_id}")
 
-            # Ensure task ID is returned
-            if not task_id:
-                raise ValueError("Task ID generation failed")
 
             return task_id
 
@@ -685,12 +684,18 @@ class AgentCore:
             task_state.completed_at = time.time()
             self._persist_task_state(task_state)
 
+            # return the ID when complete
+            return task_state.task_id
+
         except Exception as e:
             task_state.status = TaskStatus.FAILED
             task_state.errors.append(str(e))
             task_state.completed_at = time.time()
             self._persist_task_state(task_state)
             logger.error(f"Task execution failed: {e}")
+
+            # Return the task_id even if it fails
+            return task_state.task_id
 
     def _persist_task_state(self, task_state: AgentTaskState):
         """Persist task state to storage"""

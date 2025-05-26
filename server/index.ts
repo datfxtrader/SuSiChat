@@ -23,12 +23,30 @@ import financialFactCheckingRouter from './routes/financial-fact-checking.route'
 
 const app = express();
 
-// Add CORS support for frontend integration
+// Add comprehensive CORS support for frontend integration
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-id, x-user-email');
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:5000',
+    'http://localhost:3000', 
+    'http://0.0.0.0:5000',
+    'http://0.0.0.0:3000',
+    'https://*.replit.dev',
+    'https://*.replit.co',
+    'https://*.replit.app'
+  ];
+  
+  // Allow any replit domain or localhost
+  if (origin && (allowedOrigins.some(allowed => origin.includes(allowed.replace('*', ''))) || origin.includes('replit'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-id, x-user-email, Cache-Control');
   res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
 
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
