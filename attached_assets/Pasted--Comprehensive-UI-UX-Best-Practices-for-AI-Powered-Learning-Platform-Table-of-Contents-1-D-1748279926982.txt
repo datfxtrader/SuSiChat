@@ -1,0 +1,1473 @@
+# Comprehensive UI/UX Best Practices for AI-Powered Learning Platform
+
+## Table of Contents
+1. [Design System Foundation](#design-system)
+2. [Navigation & Information Architecture](#navigation)
+3. [Chat Interface Best Practices](#chat-interface)
+4. [Research Interface Design](#research-interface)
+5. [Agent Interaction Patterns](#agent-patterns)
+6. [Language Learning UX](#language-learning)
+7. [Knowledge Management UI](#knowledge-management)
+8. [Cross-Feature Integration](#integration)
+9. [Responsive & Adaptive Design](#responsive)
+10. [Performance & Feedback](#performance)
+11. [Accessibility & Inclusivity](#accessibility)
+12. [Implementation Examples](#examples)
+
+## 1. Design System Foundation <a id="design-system"></a>
+
+### Core Design Principles
+```yaml
+Principles:
+  1. Consistency: Unified experience across all features
+  2. Clarity: Clear visual hierarchy and purpose
+  3. Efficiency: Minimize cognitive load and clicks
+  4. Delight: Smooth animations and micro-interactions
+  5. Adaptability: Personalized to user preferences
+  6. Accessibility: Usable by everyone
+```
+
+### Color System
+```css
+/* Dark Theme Color Palette */
+:root {
+  /* Primary Colors */
+  --primary-50: #eff6ff;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  
+  /* Background Layers */
+  --bg-base: #09090b;        /* zinc-950 */
+  --bg-surface: #18181b;     /* zinc-900 */
+  --bg-elevated: #27272a;    /* zinc-800 */
+  --bg-overlay: #3f3f46;     /* zinc-700 */
+  
+  /* Text Colors */
+  --text-primary: #fafafa;   /* zinc-50 */
+  --text-secondary: #a1a1aa; /* zinc-400 */
+  --text-muted: #71717a;     /* zinc-500 */
+  
+  /* Semantic Colors */
+  --success: #10b981;        /* emerald-500 */
+  --warning: #f59e0b;        /* amber-500 */
+  --error: #ef4444;          /* red-500 */
+  --info: #3b82f6;           /* blue-500 */
+  
+  /* Feature Colors */
+  --chat-user: #3b82f6;      /* blue */
+  --chat-assistant: #8b5cf6; /* purple */
+  --research: #06b6d4;       /* cyan */
+  --learning: #10b981;       /* emerald */
+}
+```
+
+### Typography Scale
+```css
+/* Typography System */
+.typography {
+  /* Display */
+  --text-display: 4.5rem;    /* 72px */
+  --text-headline: 3rem;     /* 48px */
+  --text-title: 2.25rem;     /* 36px */
+  --text-subtitle: 1.5rem;   /* 24px */
+  
+  /* Body */
+  --text-body-lg: 1.125rem;  /* 18px */
+  --text-body: 1rem;         /* 16px */
+  --text-body-sm: 0.875rem;  /* 14px */
+  
+  /* Utility */
+  --text-caption: 0.75rem;   /* 12px */
+  --text-overline: 0.625rem; /* 10px */
+  
+  /* Font Families */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-learning: 'Noto Sans', sans-serif; /* Multi-language support */
+}
+```
+
+### Spacing & Layout
+```css
+/* Spacing System (8px base) */
+.spacing {
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  
+  /* Container Widths */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1536px;
+}
+```
+
+## 2. Navigation & Information Architecture <a id="navigation"></a>
+
+### Primary Navigation Pattern
+```tsx
+// components/Navigation/PrimaryNav.tsx
+const NavigationStructure = {
+  primary: [
+    {
+      id: 'chat',
+      label: 'Chat',
+      icon: MessageSquare,
+      path: '/chat',
+      shortcut: 'Cmd+1',
+      badge: 'unreadCount'
+    },
+    {
+      id: 'research',
+      label: 'Research',
+      icon: Search,
+      path: '/research',
+      shortcut: 'Cmd+2',
+      subItems: [
+        { label: 'New Research', path: '/research/new' },
+        { label: 'History', path: '/research/history' },
+        { label: 'Saved', path: '/research/saved' }
+      ]
+    },
+    {
+      id: 'learn',
+      label: 'Learn',
+      icon: BookOpen,
+      path: '/learn',
+      shortcut: 'Cmd+3',
+      progress: 'learningProgress'
+    },
+    {
+      id: 'agents',
+      label: 'Agents',
+      icon: Bot,
+      path: '/agents',
+      shortcut: 'Cmd+4'
+    }
+  ],
+  
+  secondary: [
+    { id: 'blog', label: 'Discover', icon: Compass },
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'settings', label: 'Settings', icon: Settings }
+  ]
+};
+```
+
+### Adaptive Navigation States
+```tsx
+// Collapsible sidebar for focus mode
+const NavigationStates = {
+  expanded: {
+    width: '260px',
+    showLabels: true,
+    showSubItems: true
+  },
+  collapsed: {
+    width: '80px',
+    showLabels: false,
+    showSubItems: false,
+    showTooltips: true
+  },
+  hidden: {
+    width: '0px',
+    toggleButton: true
+  }
+};
+
+// Context-aware navigation
+const ContextualNav = ({ currentFeature }) => {
+  switch(currentFeature) {
+    case 'chat':
+      return <ChatContextNav />;
+    case 'research':
+      return <ResearchToolbar />;
+    case 'learn':
+      return <LearningProgress />;
+    default:
+      return null;
+  }
+};
+```
+
+## 3. Chat Interface Best Practices <a id="chat-interface"></a>
+
+### Conversation Layout
+```tsx
+// components/Chat/ChatLayout.tsx
+const ChatLayout = () => {
+  return (
+    <div className="flex h-full">
+      {/* Conversation List - Collapsible */}
+      <aside className="w-80 border-r border-zinc-800 flex flex-col">
+        {/* Search & Filter */}
+        <div className="p-4 border-b border-zinc-800">
+          <SearchInput placeholder="Search conversations..." />
+          <FilterTabs options={['All', 'Today', 'Starred']} />
+        </div>
+        
+        {/* Conversation List with Virtual Scrolling */}
+        <ConversationList className="flex-1 overflow-hidden" />
+        
+        {/* Quick Actions */}
+        <div className="p-4 border-t border-zinc-800">
+          <Button className="w-full" icon={<Plus />}>
+            New Chat
+          </Button>
+        </div>
+      </aside>
+      
+      {/* Main Chat Area */}
+      <main className="flex-1 flex flex-col">
+        {/* Chat Header with Context */}
+        <ChatHeader 
+          title={currentChat.title}
+          subtitle={`${messageCount} messages • ${duration}`}
+          actions={[
+            { icon: Star, action: 'star' },
+            { icon: Share2, action: 'share' },
+            { icon: MoreVertical, action: 'menu' }
+          ]}
+        />
+        
+        {/* Messages Area */}
+        <MessageArea className="flex-1" />
+        
+        {/* Input Area with Tools */}
+        <ChatInput 
+          attachments={true}
+          voiceInput={true}
+          shortcuts={true}
+        />
+      </main>
+      
+      {/* Optional Side Panel */}
+      <SlidingPanel />
+    </div>
+  );
+};
+```
+
+### Message Component Design
+```tsx
+// components/Chat/Message.tsx
+const MessageDesignSystem = {
+  user: {
+    alignment: 'right',
+    background: 'bg-blue-600',
+    textColor: 'text-white',
+    avatar: 'user-photo',
+    maxWidth: '70%'
+  },
+  
+  assistant: {
+    alignment: 'left',
+    background: 'bg-zinc-800',
+    textColor: 'text-zinc-100',
+    avatar: 'ai-icon',
+    maxWidth: '85%',
+    features: {
+      streaming: true,
+      copyButton: true,
+      feedback: true,
+      citations: true,
+      actions: ['regenerate', 'continue', 'simplify']
+    }
+  },
+  
+  system: {
+    alignment: 'center',
+    background: 'transparent',
+    textColor: 'text-zinc-500',
+    fontSize: 'text-sm',
+    padding: 'py-2'
+  }
+};
+
+// Interactive Elements
+const MessageInteractions = () => (
+  <>
+    {/* Hover Actions */}
+    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+      <ActionBar 
+        actions={['copy', 'share', 'bookmark', 'report']}
+        position="top-right"
+      />
+    </div>
+    
+    {/* Feedback */}
+    <div className="flex items-center gap-2 mt-2">
+      <Button size="xs" variant="ghost">
+        <ThumbsUp className="w-3 h-3" />
+      </Button>
+      <Button size="xs" variant="ghost">
+        <ThumbsDown className="w-3 h-3" />
+      </Button>
+    </div>
+    
+    {/* Follow-up Suggestions */}
+    <SuggestedActions 
+      suggestions={['Tell me more', 'Explain simpler', 'Give examples']}
+    />
+  </>
+);
+```
+
+### Input Enhancement
+```tsx
+// components/Chat/EnhancedInput.tsx
+const EnhancedChatInput = () => {
+  const features = {
+    // Smart Composition
+    autoComplete: true,
+    suggestions: true,
+    templates: true,
+    
+    // Rich Input
+    markdown: true,
+    codeBlocks: true,
+    attachments: ['images', 'documents', 'code'],
+    
+    // Voice & Accessibility
+    voiceInput: true,
+    speechToText: true,
+    dictation: true,
+    
+    // Shortcuts
+    slashCommands: [
+      '/research - Start research mode',
+      '/learn - Switch to learning mode',
+      '/agent - Invoke specific agent',
+      '/translate - Translate message'
+    ]
+  };
+  
+  return (
+    <div className="border-t border-zinc-800 p-4">
+      {/* Attachment Preview */}
+      <AttachmentPreview />
+      
+      {/* Main Input */}
+      <div className="relative">
+        <Textarea 
+          placeholder="Ask anything..."
+          className="min-h-[80px] pr-32"
+          onKeyDown={handleShortcuts}
+        />
+        
+        {/* Action Buttons */}
+        <div className="absolute bottom-4 right-4 flex gap-2">
+          <Button size="sm" variant="ghost">
+            <Paperclip className="w-4 h-4" />
+          </Button>
+          <Button size="sm" variant="ghost">
+            <Mic className="w-4 h-4" />
+          </Button>
+          <Button size="sm" disabled={!message}>
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+      
+      {/* Context Indicators */}
+      <div className="flex items-center gap-2 mt-2 text-xs text-zinc-500">
+        <span>Model: GPT-4</span>
+        <span>•</span>
+        <span>Context: 2,451 tokens</span>
+        <span>•</span>
+        <span>Language: English</span>
+      </div>
+    </div>
+  );
+};
+```
+
+## 4. Research Interface Design <a id="research-interface"></a>
+
+### Research Dashboard
+```tsx
+// components/Research/ResearchDashboard.tsx
+const ResearchInterface = () => {
+  return (
+    <div className="h-full grid grid-cols-12 gap-4 p-6">
+      {/* Query Builder */}
+      <div className="col-span-12 lg:col-span-8">
+        <Card className="h-full flex flex-col">
+          {/* Research Input */}
+          <div className="p-6 border-b border-zinc-800">
+            <h2 className="text-xl font-semibold mb-4">Research Query</h2>
+            <QueryBuilder 
+              placeholder="What would you like to research?"
+              suggestions={recentQueries}
+              filters={['Academic', 'News', 'Web', 'Social']}
+            />
+            
+            {/* Advanced Options */}
+            <AdvancedOptions>
+              <DateRangePicker />
+              <SourceSelector />
+              <LanguageFilter />
+              <CredibilitySlider />
+            </AdvancedOptions>
+          </div>
+          
+          {/* Results Area */}
+          <div className="flex-1 overflow-hidden">
+            {isSearching ? (
+              <ResearchProgress 
+                stage={currentStage}
+                sources={sourcesFound}
+                facts={factsExtracted}
+              />
+            ) : (
+              <ResearchResults 
+                results={results}
+                viewMode={viewMode}
+                onSelectResult={openInPanel}
+              />
+            )}
+          </div>
+        </Card>
+      </div>
+      
+      {/* Side Panel */}
+      <div className="col-span-12 lg:col-span-4 space-y-4">
+        {/* Research History */}
+        <Card>
+          <CardHeader>
+            <h3 className="font-medium">Recent Research</h3>
+          </CardHeader>
+          <CardContent>
+            <RecentResearchList />
+          </CardContent>
+        </Card>
+        
+        {/* Saved Sources */}
+        <Card>
+          <CardHeader>
+            <h3 className="font-medium">Saved Sources</h3>
+          </CardHeader>
+          <CardContent>
+            <SourceLibrary />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+```
+
+### Research Result Cards
+```tsx
+// components/Research/ResultCard.tsx
+const ResearchResultCard = ({ result }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group relative"
+    >
+      <Card className="overflow-hidden hover:shadow-xl transition-all">
+        {/* Source Badge */}
+        <div className="absolute top-4 left-4 z-10">
+          <Badge variant={getSourceVariant(result.source)}>
+            {result.source}
+          </Badge>
+        </div>
+        
+        {/* Credibility Indicator */}
+        <div className="absolute top-4 right-4 z-10">
+          <CredibilityScore score={result.credibility} />
+        </div>
+        
+        {/* Content */}
+        <CardContent className="pt-12">
+          <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+            {result.title}
+          </h3>
+          
+          <p className="text-zinc-400 text-sm mb-4 line-clamp-3">
+            {result.summary}
+          </p>
+          
+          {/* Key Facts */}
+          <div className="space-y-2 mb-4">
+            {result.keyFacts.slice(0, 3).map((fact, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5" />
+                <span className="text-sm text-zinc-300">{fact}</span>
+              </div>
+            ))}
+          </div>
+          
+          {/* Actions */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost">
+                <BookOpen className="w-4 h-4 mr-1" />
+                Read
+              </Button>
+              <Button size="sm" variant="ghost">
+                <FileText className="w-4 h-4 mr-1" />
+                Cite
+              </Button>
+            </div>
+            
+            <div className="text-xs text-zinc-500">
+              {formatRelativeTime(result.publishedAt)}
+            </div>
+          </div>
+        </CardContent>
+        
+        {/* Hover Preview */}
+        <div className="absolute inset-0 bg-zinc-900/95 opacity-0 group-hover:opacity-100 transition-opacity p-6 overflow-y-auto">
+          <h4 className="font-medium mb-3">Quick Preview</h4>
+          <div className="text-sm text-zinc-300 space-y-2">
+            {result.preview}
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  );
+};
+```
+
+## 5. Agent Interaction Patterns <a id="agent-patterns"></a>
+
+### Agent Gallery
+```tsx
+// components/Agents/AgentGallery.tsx
+const AgentCard = ({ agent }) => {
+  return (
+    <Card className="group hover:border-zinc-600 transition-all">
+      <CardContent className="p-6">
+        {/* Agent Avatar */}
+        <div className="relative mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <agent.icon className="w-8 h-8 text-white" />
+          </div>
+          
+          {/* Status Indicator */}
+          <div className="absolute -bottom-1 -right-1">
+            <StatusBadge status={agent.status} />
+          </div>
+        </div>
+        
+        {/* Agent Info */}
+        <h3 className="font-semibold text-lg mb-1">{agent.name}</h3>
+        <p className="text-sm text-zinc-400 mb-3">{agent.description}</p>
+        
+        {/* Capabilities */}
+        <div className="flex flex-wrap gap-1 mb-4">
+          {agent.capabilities.map(cap => (
+            <Badge key={cap} variant="secondary" className="text-xs">
+              {cap}
+            </Badge>
+          ))}
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="flex gap-2">
+          <Button 
+            className="flex-1"
+            onClick={() => startChat(agent.id)}
+          >
+            <MessageSquare className="w-4 h-4 mr-1" />
+            Chat
+          </Button>
+          <Button 
+            variant="outline"
+            size="icon"
+            onClick={() => viewDetails(agent.id)}
+          >
+            <Info className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Usage Stats */}
+        <div className="mt-4 pt-4 border-t border-zinc-800 text-xs text-zinc-500">
+          <div className="flex justify-between">
+            <span>Used {agent.usageCount} times</span>
+            <span>{agent.rating} ★</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+### Agent Interaction Modal
+```tsx
+// components/Agents/AgentModal.tsx
+const AgentInteractionModal = ({ agent, isOpen, onClose }) => {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <agent.icon className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">{agent.name}</h2>
+              <p className="text-sm text-zinc-400">{agent.specialty}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Suggested Prompts */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium mb-3">Try asking:</h3>
+          <div className="space-y-2">
+            {agent.suggestedPrompts.map((prompt, i) => (
+              <button
+                key={i}
+                className="w-full text-left p-3 bg-zinc-800/50 rounded-lg hover:bg-zinc-800 transition-colors"
+                onClick={() => sendPrompt(prompt)}
+              >
+                <span className="text-sm text-zinc-300">{prompt}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Custom Input */}
+        <div>
+          <Textarea 
+            placeholder={`Ask ${agent.name} anything...`}
+            className="mb-4"
+          />
+          <Button className="w-full">
+            Start Conversation
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+```
+
+## 6. Language Learning UX <a id="language-learning"></a>
+
+### Learning Dashboard
+```tsx
+// components/Learning/Dashboard.tsx
+const LearningDashboard = () => {
+  return (
+    <div className="container mx-auto p-6">
+      {/* Progress Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatsCard
+          title="Current Streak"
+          value="15 days"
+          icon={<Flame className="text-orange-500" />}
+          trend="+3 from last week"
+        />
+        <StatsCard
+          title="Words Learned"
+          value="342"
+          icon={<BookOpen className="text-blue-500" />}
+          progress={68}
+        />
+        <StatsCard
+          title="Fluency Level"
+          value="B1"
+          icon={<TrendingUp className="text-green-500" />}
+          subtitle="Intermediate"
+        />
+      </div>
+      
+      {/* Active Lessons */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Today's Lesson */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Today's Lesson</h2>
+          </CardHeader>
+          <CardContent>
+            <LessonCard 
+              lesson={todaysLesson}
+              onStart={() => navigateTo('/learn/lesson')}
+            />
+          </CardContent>
+        </Card>
+        
+        {/* Quick Practice */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Quick Practice</h2>
+          </CardHeader>
+          <CardContent>
+            <PracticeOptions />
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Vocabulary Review */}
+      <Card className="mt-6">
+        <CardHeader>
+          <h2 className="text-xl font-semibold">Vocabulary Review</h2>
+        </CardHeader>
+        <CardContent>
+          <VocabularyCarousel words={dueForReview} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+```
+
+### Interactive Lesson Interface
+```tsx
+// components/Learning/LessonInterface.tsx
+const InteractiveLessonUI = () => {
+  return (
+    <div className="h-screen flex flex-col bg-zinc-950">
+      {/* Progress Header */}
+      <header className="border-b border-zinc-800 p-4">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="icon">
+            <X className="w-5 h-5" />
+          </Button>
+          
+          <div className="flex-1 mx-8">
+            <Progress value={lessonProgress} className="h-2" />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Hearts count={lives} />
+            <Streak days={streak} />
+          </div>
+        </div>
+      </header>
+      
+      {/* Lesson Content */}
+      <main className="flex-1 flex items-center justify-center p-8">
+        <div className="max-w-2xl w-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentExercise.id}
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+            >
+              <ExerciseRenderer 
+                exercise={currentExercise}
+                onComplete={handleComplete}
+                onSkip={handleSkip}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+      
+      {/* Action Footer */}
+      <footer className="border-t border-zinc-800 p-4">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost">
+            Skip
+          </Button>
+          
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Volume2 className="w-4 h-4 mr-2" />
+              Replay Audio
+            </Button>
+            <Button 
+              disabled={!answerSelected}
+              onClick={checkAnswer}
+            >
+              Check
+            </Button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+```
+
+### Vocabulary Learning Cards
+```tsx
+// components/Learning/VocabularyCard.tsx
+const VocabularyCard = ({ word, mode = 'learn' }) => {
+  const [isFlipped, setIsFlipped] = useState(false);
+  
+  return (
+    <motion.div
+      className="relative h-64 w-full cursor-pointer"
+      onClick={() => setIsFlipped(!isFlipped)}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      <AnimatePresence mode="wait">
+        {!isFlipped ? (
+          <motion.div
+            key="front"
+            className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl p-8 flex flex-col items-center justify-center"
+            initial={{ rotateY: 0 }}
+            exit={{ rotateY: 90 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Word */}
+            <h2 className="text-3xl font-bold mb-4">{word.text}</h2>
+            
+            {/* Pronunciation */}
+            <button className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100">
+              <Volume2 className="w-5 h-5" />
+              <span className="text-sm">{word.pronunciation}</span>
+            </button>
+            
+            {/* Context Hint */}
+            {mode === 'learn' && (
+              <p className="text-sm text-zinc-500 mt-4 text-center">
+                {word.hint}
+              </p>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="back"
+            className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-8 flex flex-col items-center justify-center"
+            initial={{ rotateY: -90 }}
+            animate={{ rotateY: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Translation */}
+            <h3 className="text-2xl font-semibold mb-4">{word.translation}</h3>
+            
+            {/* Definition */}
+            <p className="text-center mb-4">{word.definition}</p>
+            
+            {/* Example */}
+            <div className="bg-black/20 rounded-lg p-4 w-full">
+              <p className="text-sm italic">{word.example}</p>
+            </div>
+            
+            {/* Difficulty Indicator */}
+            <div className="mt-4">
+              <DifficultyBadge level={word.difficulty} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+```
+
+## 7. Knowledge Management UI <a id="knowledge-management"></a>
+
+### Knowledge Graph Visualization
+```tsx
+// components/Knowledge/GraphView.tsx
+const KnowledgeGraphView = () => {
+  return (
+    <div className="h-full relative">
+      {/* Controls */}
+      <div className="absolute top-4 left-4 z-10 space-y-2">
+        <Card className="p-2">
+          <div className="space-y-2">
+            <Button variant="ghost" size="sm">
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <Maximize className="w-4 h-4" />
+            </Button>
+          </div>
+        </Card>
+      </div>
+      
+      {/* Filter Panel */}
+      <div className="absolute top-4 right-4 z-10">
+        <Card className="p-4 w-64">
+          <h3 className="font-medium mb-3">Filter Nodes</h3>
+          <div className="space-y-2">
+            <CheckboxGroup 
+              options={['Concepts', 'Sources', 'Questions', 'Insights']}
+              selected={selectedFilters}
+              onChange={setSelectedFilters}
+            />
+          </div>
+        </Card>
+      </div>
+      
+      {/* Graph Canvas */}
+      <ForceGraph3D
+        graphData={graphData}
+        nodeThreeObject={node => {
+          const group = new THREE.Group();
+          
+          // Node sphere
+          const geometry = new THREE.SphereGeometry(5);
+          const material = new THREE.MeshBasicMaterial({
+            color: getNodeColor(node.type)
+          });
+          const sphere = new THREE.Mesh(geometry, material);
+          group.add(sphere);
+          
+          // Label
+          const label = new SpriteText(node.label);
+          label.position.y = 8;
+          label.color = '#ffffff';
+          group.add(label);
+          
+          return group;
+        }}
+        onNodeClick={handleNodeClick}
+        onNodeHover={handleNodeHover}
+      />
+      
+      {/* Node Details Panel */}
+      <AnimatePresence>
+        {selectedNode && (
+          <motion.div
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            className="absolute left-4 bottom-4 w-80"
+          >
+            <Card>
+              <CardHeader>
+                <h3 className="font-medium">{selectedNode.label}</h3>
+              </CardHeader>
+              <CardContent>
+                <NodeDetails node={selectedNode} />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+```
+
+## 8. Cross-Feature Integration <a id="integration"></a>
+
+### Unified Command Palette
+```tsx
+// components/Shared/CommandPalette.tsx
+const CommandPalette = () => {
+  const [open, setOpen] = useState(false);
+  
+  // Global keyboard shortcut
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen(true);
+      }
+    };
+    
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
+  
+  const commands = [
+    // Navigation
+    { group: 'Navigation', commands: [
+      { label: 'Go to Chat', shortcut: '⌘1', action: () => navigate('/chat') },
+      { label: 'Go to Research', shortcut: '⌘2', action: () => navigate('/research') },
+      { label: 'Go to Learn', shortcut: '⌘3', action: () => navigate('/learn') }
+    ]},
+    
+    // Actions
+    { group: 'Actions', commands: [
+      { label: 'New Chat', icon: MessageSquare, action: () => createNewChat() },
+      { label: 'Start Research', icon: Search, action: () => startResearch() },
+      { label: 'Quick Translate', icon: Languages, action: () => openTranslate() }
+    ]},
+    
+    // Recent
+    { group: 'Recent', commands: recentItems }
+  ];
+  
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Type a command or search..." />
+      <CommandList>
+        {commands.map(group => (
+          <CommandGroup key={group.group} heading={group.group}>
+            {group.commands.map((command, i) => (
+              <CommandItem
+                key={i}
+                onSelect={() => {
+                  command.action();
+                  setOpen(false);
+                }}
+              >
+                {command.icon && <command.icon className="mr-2 h-4 w-4" />}
+                <span>{command.label}</span>
+                {command.shortcut && (
+                  <kbd className="ml-auto text-xs">{command.shortcut}</kbd>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+      </CommandList>
+    </CommandDialog>
+  );
+};
+```
+
+### Contextual Actions Widget
+```tsx
+// components/Shared/ContextualActions.tsx
+const ContextualActionsWidget = ({ context }) => {
+  const suggestedActions = useMemo(() => {
+    switch(context.type) {
+      case 'selected_text':
+        return [
+          { label: 'Research this', icon: Search, action: 'research' },
+          { label: 'Translate', icon: Languages, action: 'translate' },
+          { label: 'Ask AI', icon: MessageSquare, action: 'ask' },
+          { label: 'Save to notes', icon: BookmarkPlus, action: 'save' }
+        ];
+      
+      case 'learning_word':
+        return [
+          { label: 'Add to deck', icon: Plus, action: 'add_to_deck' },
+          { label: 'See examples', icon: FileText, action: 'examples' },
+          { label: 'Practice', icon: Zap, action: 'practice' }
+        ];
+      
+      case 'research_fact':
+        return [
+          { label: 'Verify', icon: CheckCircle, action: 'verify' },
+          { label: 'Find sources', icon: Link, action: 'sources' },
+          { label: 'Add to graph', icon: Network, action: 'add_to_graph' }
+        ];
+      
+      default:
+        return [];
+    }
+  }, [context]);
+  
+  return (
+    <FloatingMenu
+      position={context.position}
+      isVisible={context.hasSelection}
+    >
+      <div className="flex items-center gap-1 p-1 bg-zinc-800 rounded-lg shadow-xl">
+        {suggestedActions.map((action, i) => (
+          <TooltipProvider key={i}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  onClick={() => handleAction(action.action, context)}
+                >
+                  <action.icon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{action.label}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
+    </FloatingMenu>
+  );
+};
+```
+
+## 9. Responsive & Adaptive Design <a id="responsive"></a>
+
+### Responsive Layout System
+```tsx
+// hooks/useResponsive.ts
+const breakpoints = {
+  mobile: 640,
+  tablet: 768,
+  desktop: 1024,
+  wide: 1280
+};
+
+const useResponsive = () => {
+  const [device, setDevice] = useState(getDevice());
+  
+  useEffect(() => {
+    const handleResize = () => setDevice(getDevice());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  return {
+    isMobile: device === 'mobile',
+    isTablet: device === 'tablet',
+    isDesktop: device === 'desktop' || device === 'wide',
+    device
+  };
+};
+
+// Adaptive Components
+const AdaptiveLayout = ({ children }) => {
+  const { device } = useResponsive();
+  
+  const layouts = {
+    mobile: <MobileLayout>{children}</MobileLayout>,
+    tablet: <TabletLayout>{children}</TabletLayout>,
+    desktop: <DesktopLayout>{children}</DesktopLayout>
+  };
+  
+  return layouts[device] || layouts.desktop;
+};
+```
+
+### Mobile-First Design
+```tsx
+// components/Mobile/MobileNav.tsx
+const MobileNavigation = () => {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50">
+      <div className="flex items-center justify-around py-2">
+        {navItems.map(item => (
+          <NavLink
+            key={item.id}
+            to={item.path}
+            className="flex flex-col items-center p-2"
+          >
+            <item.icon className="w-6 h-6 mb-1" />
+            <span className="text-xs">{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
+      
+      {/* Gesture Area for Quick Actions */}
+      <div className="absolute -top-20 left-0 right-0 h-20">
+        <SwipeableDrawer
+          onSwipeUp={() => openQuickActions()}
+          threshold={50}
+        />
+      </div>
+    </nav>
+  );
+};
+```
+
+## 10. Performance & Feedback <a id="performance"></a>
+
+### Loading States
+```tsx
+// components/Shared/LoadingStates.tsx
+const LoadingPatterns = {
+  // Skeleton Loading
+  MessageSkeleton: () => (
+    <div className="animate-pulse">
+      <div className="flex items-start gap-3 p-4">
+        <div className="w-8 h-8 bg-zinc-800 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 bg-zinc-800 rounded w-3/4" />
+          <div className="h-4 bg-zinc-800 rounded w-1/2" />
+        </div>
+      </div>
+    </div>
+  ),
+  
+  // Progress Indicators
+  ResearchProgress: ({ stage, progress }) => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">
+          {getStageLabel(stage)}
+        </span>
+        <span className="text-sm text-zinc-500">
+          {Math.round(progress)}%
+        </span>
+      </div>
+      <Progress value={progress} className="h-2" />
+      
+      {/* Stage Indicators */}
+      <div className="flex items-center justify-between">
+        {stages.map((s, i) => (
+          <div
+            key={i}
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs
+              ${i <= stage ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}
+          >
+            {i + 1}
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+  
+  // Streaming Indicator
+  StreamingDots: () => (
+    <div className="flex gap-1">
+      {[0, 1, 2].map(i => (
+        <div
+          key={i}
+          className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce"
+          style={{ animationDelay: `${i * 0.1}s` }}
+        />
+      ))}
+    </div>
+  )
+};
+```
+
+### Micro-interactions
+```tsx
+// components/Shared/MicroInteractions.tsx
+const MicroInteractions = {
+  // Button Press
+  ButtonPress: ({ children, onClick }) => (
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="transition-all"
+    >
+      {children}
+    </motion.button>
+  ),
+  
+  // Success Feedback
+  SuccessAnimation: ({ onComplete }) => (
+    <motion.div
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0, opacity: 0 }}
+      onAnimationComplete={onComplete}
+    >
+      <CheckCircle className="w-16 h-16 text-green-500" />
+    </motion.div>
+  ),
+  
+  // Hover Cards
+  HoverCard: ({ trigger, content }) => (
+    <HoverCardPrimitive.Root>
+      <HoverCardPrimitive.Trigger asChild>
+        {trigger}
+      </HoverCardPrimitive.Trigger>
+      <HoverCardPrimitive.Content
+        className="w-80 p-4 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl"
+        sideOffset={5}
+      >
+        {content}
+      </HoverCardPrimitive.Content>
+    </HoverCardPrimitive.Root>
+  )
+};
+```
+
+## 11. Accessibility & Inclusivity <a id="accessibility"></a>
+
+### Accessibility Features
+```tsx
+// components/Accessibility/A11yProvider.tsx
+const AccessibilityProvider = ({ children }) => {
+  const [preferences, setPreferences] = useState({
+    reducedMotion: false,
+    highContrast: false,
+    largeText: false,
+    screenReader: false
+  });
+  
+  return (
+    <A11yContext.Provider value={{ preferences, setPreferences }}>
+      {/* Skip Links */}
+      <div className="sr-only">
+        <a href="#main-content" className="focus:not-sr-only">
+          Skip to main content
+        </a>
+        <a href="#navigation" className="focus:not-sr-only">
+          Skip to navigation
+        </a>
+      </div>
+      
+      {/* Live Regions */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        <LiveAnnouncements />
+      </div>
+      
+      {/* Main App */}
+      <div className={getA11yClasses(preferences)}>
+        {children}
+      </div>
+    </A11yContext.Provider>
+  );
+};
+
+// Keyboard Navigation
+const KeyboardNavigationProvider = () => {
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      // Tab navigation enhancement
+      if (e.key === 'Tab') {
+        document.body.classList.add('keyboard-nav');
+      }
+      
+      // Escape key handling
+      if (e.key === 'Escape') {
+        closeAllModals();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyboard);
+    return () => document.removeEventListener('keydown', handleKeyboard);
+  }, []);
+  
+  return null;
+};
+```
+
+## 12. Implementation Examples <a id="examples"></a>
+
+### Complete Page Example
+```tsx
+// pages/Dashboard.tsx
+const Dashboard = () => {
+  const { user } = useAuth();
+  const { theme } = useTheme();
+  const { t } = useTranslation();
+  
+  return (
+    <MainLayout>
+      {/* Personalized Header */}
+      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">
+                {getGreeting()}, {user.name}
+              </h1>
+              <p className="text-sm text-zinc-400">
+                {getMotivationalMessage()}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <QuickActions />
+              <UserMenu />
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-12 gap-6">
+          {/* Quick Stats */}
+          <div className="col-span-12 lg:col-span-8">
+            <QuickStats stats={userStats} />
+          </div>
+          
+          {/* Activity Feed */}
+          <div className="col-span-12 lg:col-span-4">
+            <ActivityFeed activities={recentActivities} />
+          </div>
+          
+          {/* Feature Cards */}
+          <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FeatureCard
+              title="Continue Learning"
+              description="Pick up where you left off"
+              action={() => navigateTo('/learn/continue')}
+              icon={BookOpen}
+              color="emerald"
+            />
+            <FeatureCard
+              title="New Research"
+              description="Explore topics with AI"
+              action={() => navigateTo('/research/new')}
+              icon={Search}
+              color="blue"
+            />
+            <FeatureCard
+              title="Chat with AI"
+              description="Get instant answers"
+              action={() => navigateTo('/chat')}
+              icon={MessageSquare}
+              color="purple"
+            />
+          </div>
+          
+          {/* Personalized Recommendations */}
+          <div className="col-span-12">
+            <PersonalizedContent
+              recommendations={getRecommendations(user)}
+            />
+          </div>
+        </div>
+      </main>
+    </MainLayout>
+  );
+};
+```
+
+### Style Guide Summary
+```scss
+// styles/design-system.scss
+
+// Animation Timings
+$timing-fast: 150ms;
+$timing-normal: 300ms;
+$timing-slow: 500ms;
+
+// Easing Functions
+$ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+$ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+
+// Focus States
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900;
+}
+
+// Hover Effects
+.hover-lift {
+  @apply transition-transform duration-200 hover:-translate-y-0.5;
+}
+
+// Glass Effect
+.glass {
+  @apply bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/50;
+}
+
+// Gradient Text
+.gradient-text {
+  @apply bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent;
+}
+
+// Loading Shimmer
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    theme('colors.zinc.800') 0%,
+    theme('colors.zinc.700') 50%,
+    theme('colors.zinc.800') 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+```
+
+This comprehensive guide provides a cohesive design system that unifies all your app features while maintaining excellent user experience, performance, and accessibility standards.
