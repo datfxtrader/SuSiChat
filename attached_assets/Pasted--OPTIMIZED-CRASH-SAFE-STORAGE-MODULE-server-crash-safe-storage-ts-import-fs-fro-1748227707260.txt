@@ -1,0 +1,850 @@
+// ===== OPTIMIZED CRASH-SAFE STORAGE MODULE =====
+// server/crash-safe-storage.ts
+
+import fs from 'fs/promises';
+import path from 'path';
+import { createReadStream, createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import zlib from 'zlib';
+
+// Configuration
+const CONFIG = {
+  BACKUP_DIR: path.join(process.cwd(), 'research-backups'),
+  INDEX_FILE: 'research-index.json',
+  COMPRESSION: true,
+  MAX_AGE_DAYS: 7,
+  CLEANUP_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
+  MAX_INDEX_SIZE: 10000, // Maximum entries in index
+} as const;
+
+// Research interfaces
+interface ResearchBackup {
+  conversationId: string;
+  userId: string;
+  query: string;
+  results: any;
+  timestamp: string;
+  completed: boolean;
+  filename: string;
+  compressed?: boolean;
+  size?: number;
+}
+
+interface StorageResult {
+  success: boolean;
+  filename?: string;
+  error?: string;
+}
+
+interface RetrievalResult {
+  success: boolean;
+  results?: any;
+  source?: string;
+  error?: string;
+}
+
+export class CrashSafeStorage {
+  private static instance: CrashSafeStorage;
+  private indexCache: ResearchBackup[] | null = null;
+  private indexLock = false;
+  private cleanupTimer?: NodeJS.Timeout;
+  
+  private constructor() {}
+  
+  static getInstance(): CrashSafeStorage {
+    if (!CrashSafeStorage.instance) {
+      CrashSafeStorage.instance = new CrashSafeStorage();
+    }
+    return CrashSafeStorage.instance;
+  }
+  
+  async initialize(): Promise<void> {
+    try {
+      await fs.mkdir(CONFIG.BACKUP_DIR, { recursive: true });
+      await this.loadIndex(); // Pre-load index into cache
+      
+      // Schedule cleanup
+      this.cleanupTimer = setInterval(() => {
+        this.cleanup().catch(console.error);
+      }, CONFIG.CLEANUP_INTERVAL);
+      
+      console.log('🛡️ Crash-safe storage initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize crash-safe storage:', error);
+    }
+  }
+  
+  async store(
+    conversationId: string,
+    userId: string,
+    query: string,
+    results: any
+  ): Promise<StorageResult> {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const baseFilename = `research-${conversationId}-${timestamp}`;
+      const filename = CONFIG.COMPRESSION ? `${baseFilename}.json.gz` : `${baseFilename}.json`;
+      const filepath = path.join(CONFIG.BACKUP_DIR, filename);
+      
+      const resultData = {
+        conversationId,
+        userId,
+        query,
+        results,
+        timestamp: new Date().toISOString(),
+        completed: true,
+        metadata: {
+          storageType: 'crash-safe-file',
+          compressed: CONFIG.COMPRESSION,
+          backupLocation: filepath
+        }
+      };
+      
+      // Write file (compressed or not)
+      if (CONFIG.COMPRESSION) {
+        await this.writeCompressed(filepath, resultData);
+      } else {
+        await fs.writeFile(filepath, JSON.stringify(resultData, null, 2));
+      }
+      
+      // Get file size
+      const stats = await fs.stat(filepath);
+      
+      // Update index
+      const indexEntry: ResearchBackup = {
+        conversationId,
+        userId,
+        query: query.substring(0, 100), // Truncate for index
+        results: null, // Don't store results in index
+        timestamp: new Date().toISOString(),
+        completed: true,
+        filename,
+        compressed: CONFIG.COMPRESSION,
+        size: stats.size
+      };
+      
+      await this.updateIndex(indexEntry);
+      
+      return { success: true, filename };
+    } catch (error) {
+      console.error('❌ Storage failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+  
+  async retrieve(conversationId: string): Promise<RetrievalResult> {
+    try {
+      // Check cache first
+      const index = await this.loadIndex();
+      const entry = index.find(item => item.conversationId === conversationId);
+      
+      if (entry) {
+        const filepath = path.join(CONFIG.BACKUP_DIR, entry.filename);
+        
+        // Read file (handle compression)
+        const data = entry.compressed 
+          ? await this.readCompressed(filepath)
+          : JSON.parse(await fs.readFile(filepath, 'utf8'));
+        
+        return {
+          success: true,
+          results: data.results,
+          source: 'crash-safe-file'
+        };
+      }
+      
+      return { success: false, error: 'Not found' };
+    } catch (error) {
+      console.error('❌ Retrieval failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+  
+  async getUserResearch(userId: string): Promise<ResearchBackup[]> {
+    try {
+      const index = await this.loadIndex();
+      return index.filter(item => item.userId === userId);
+    } catch (error) {
+      console.error('❌ Failed to get user research:', error);
+      return [];
+    }
+  }
+  
+  private async loadIndex(): Promise<ResearchBackup[]> {
+    // Return cached index if available and not locked
+    if (this.indexCache && !this.indexLock) {
+      return this.indexCache;
+    }
+    
+    try {
+      const indexPath = path.join(CONFIG.BACKUP_DIR, CONFIG.INDEX_FILE);
+      const indexData = await fs.readFile(indexPath, 'utf8');
+      const index = JSON.parse(indexData);
+      
+      // Update cache
+      this.indexCache = index;
+      return index;
+    } catch (error) {
+      // Index doesn't exist, create new one
+      this.indexCache = [];
+      return [];
+    }
+  }
+  
+  private async updateIndex(entry: ResearchBackup): Promise<void> {
+    this.indexLock = true;
+    try {
+      const index = await this.loadIndex();
+      
+      // Check if entry exists
+      const existingIndex = index.findIndex(
+        item => item.conversationId === entry.conversationId
+      );
+      
+      if (existingIndex >= 0) {
+        index[existingIndex] = entry;
+      } else {
+        index.push(entry);
+      }
+      
+      // Maintain index size limit
+      if (index.length > CONFIG.MAX_INDEX_SIZE) {
+        index.splice(0, index.length - CONFIG.MAX_INDEX_SIZE);
+      }
+      
+      // Save index
+      const indexPath = path.join(CONFIG.BACKUP_DIR, CONFIG.INDEX_FILE);
+      await fs.writeFile(indexPath, JSON.stringify(index, null, 2));
+      
+      // Update cache
+      this.indexCache = index;
+    } finally {
+      this.indexLock = false;
+    }
+  }
+  
+  private async writeCompressed(filepath: string, data: any): Promise<void> {
+    const gzip = zlib.createGzip({ level: 9 });
+    const source = createReadStream(Buffer.from(JSON.stringify(data)));
+    const destination = createWriteStream(filepath);
+    await pipeline(source, gzip, destination);
+  }
+  
+  private async readCompressed(filepath: string): Promise<any> {
+    const gunzip = zlib.createGunzip();
+    const source = createReadStream(filepath);
+    const chunks: Buffer[] = [];
+    
+    await pipeline(
+      source,
+      gunzip,
+      async function* (source) {
+        for await (const chunk of source) {
+          chunks.push(chunk);
+          yield chunk;
+        }
+      }
+    );
+    
+    return JSON.parse(Buffer.concat(chunks).toString());
+  }
+  
+  async cleanup(maxAgeDays: number = CONFIG.MAX_AGE_DAYS): Promise<void> {
+    try {
+      const index = await this.loadIndex();
+      const cutoffDate = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
+      
+      const validEntries: ResearchBackup[] = [];
+      const deletePromises: Promise<void>[] = [];
+      
+      for (const entry of index) {
+        if (new Date(entry.timestamp).getTime() > cutoffDate) {
+          validEntries.push(entry);
+        } else {
+          const filepath = path.join(CONFIG.BACKUP_DIR, entry.filename);
+          deletePromises.push(
+            fs.unlink(filepath).catch(err => 
+              console.log(`⚠️ Could not delete: ${entry.filename}`)
+            )
+          );
+        }
+      }
+      
+      // Delete old files in parallel
+      await Promise.all(deletePromises);
+      
+      // Update index
+      this.indexCache = validEntries;
+      const indexPath = path.join(CONFIG.BACKUP_DIR, CONFIG.INDEX_FILE);
+      await fs.writeFile(indexPath, JSON.stringify(validEntries, null, 2));
+      
+      console.log(`🧹 Cleanup: kept ${validEntries.length}, removed ${index.length - validEntries.length}`);
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
+    }
+  }
+  
+  destroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
+  }
+}
+
+// Export singleton instance
+export const crashSafeStorage = CrashSafeStorage.getInstance();
+
+// ===== OPTIMIZED RATE LIMITING MANAGER =====
+// server/api-rate-manager.ts
+
+interface RateLimitInfo {
+  lastCall: number;
+  callCount: number;
+  backoffDelay: number;
+  isBlocked: boolean;
+  blockUntil: number;
+  consecutiveErrors: number;
+}
+
+interface CacheEntry<T = any> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+  hits: number;
+}
+
+interface RateLimitConfig {
+  baseDelay: number;
+  maxDelay: number;
+  cacheTTL: number;
+  blockDuration: number;
+  maxCacheSize: number;
+  cleanupInterval: number;
+}
+
+export class ApiRateManager {
+  private rateLimits = new Map<string, RateLimitInfo>();
+  private cache = new Map<string, CacheEntry>();
+  private readonly config: RateLimitConfig;
+  private cleanupTimer?: NodeJS.Timeout;
+  
+  // LRU tracking for cache eviction
+  private cacheAccessOrder: string[] = [];
+  
+  constructor(config?: Partial<RateLimitConfig>) {
+    this.config = {
+      baseDelay: 0, // Disabled for 15 days
+      maxDelay: 0,  // Disabled for 15 days
+      cacheTTL: 3 * 60 * 1000, // 3 minutes
+      blockDuration: 0, // Disabled
+      maxCacheSize: 1000,
+      cleanupInterval: 10 * 60 * 1000, // 10 minutes
+      ...config
+    };
+    
+    // Start cleanup timer
+    this.startCleanup();
+  }
+  
+  shouldDelay(apiName: string): number {
+    if (this.config.baseDelay === 0) {
+      console.log(`⚡ Rate limiting DISABLED for ${apiName}`);
+      return 0;
+    }
+    
+    const rateInfo = this.rateLimits.get(apiName);
+    if (!rateInfo) return 0;
+    
+    // Check if blocked
+    if (rateInfo.isBlocked && Date.now() < rateInfo.blockUntil) {
+      return rateInfo.blockUntil - Date.now();
+    }
+    
+    // Calculate delay based on last call
+    const timeSinceLastCall = Date.now() - rateInfo.lastCall;
+    const requiredDelay = rateInfo.backoffDelay - timeSinceLastCall;
+    
+    return Math.max(0, requiredDelay);
+  }
+  
+  recordSuccess(apiName: string): void {
+    const rateInfo = this.rateLimits.get(apiName) || this.createRateLimitInfo();
+    
+    rateInfo.lastCall = Date.now();
+    rateInfo.callCount++;
+    rateInfo.consecutiveErrors = 0;
+    
+    // Reduce delay on success (but not below base)
+    rateInfo.backoffDelay = Math.max(
+      this.config.baseDelay,
+      rateInfo.backoffDelay * 0.8
+    );
+    
+    // Unblock if was blocked
+    if (rateInfo.isBlocked && Date.now() >= rateInfo.blockUntil) {
+      rateInfo.isBlocked = false;
+    }
+    
+    this.rateLimits.set(apiName, rateInfo);
+  }
+  
+  recordError(apiName: string, isRateLimit: boolean = false): void {
+    const rateInfo = this.rateLimits.get(apiName) || this.createRateLimitInfo();
+    
+    rateInfo.consecutiveErrors++;
+    
+    if (isRateLimit || rateInfo.consecutiveErrors >= 3) {
+      // Exponential backoff
+      rateInfo.backoffDelay = Math.min(
+        this.config.maxDelay,
+        rateInfo.backoffDelay * 2 || this.config.baseDelay * 2
+      );
+      
+      // Block if rate limited
+      if (isRateLimit) {
+        rateInfo.isBlocked = true;
+        rateInfo.blockUntil = Date.now() + this.config.blockDuration;
+      }
+    }
+    
+    this.rateLimits.set(apiName, rateInfo);
+  }
+  
+  cacheResponse<T>(key: string, data: T, ttl?: number): void {
+    // Enforce cache size limit with LRU eviction
+    if (this.cache.size >= this.config.maxCacheSize) {
+      this.evictLRU();
+    }
+    
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttl || this.config.cacheTTL,
+      hits: 0
+    });
+    
+    // Update access order
+    this.updateAccessOrder(key);
+  }
+  
+  getCachedResponse<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    // Check expiry
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      this.removeFromAccessOrder(key);
+      return null;
+    }
+    
+    // Update hit count and access order
+    entry.hits++;
+    this.updateAccessOrder(key);
+    
+    return entry.data as T;
+  }
+  
+  async executeWithRateLimit<T>(
+    apiName: string,
+    cacheKey: string,
+    apiCall: () => Promise<T>,
+    options?: { ttl?: number; retries?: number }
+  ): Promise<T | null> {
+    // Check cache first
+    const cached = this.getCachedResponse<T>(cacheKey);
+    if (cached !== null) return cached;
+    
+    // Check rate limit
+    const delay = this.shouldDelay(apiName);
+    if (delay > 0) {
+      console.log(`⏳ Rate limit delay for ${apiName}: ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    // Retry logic
+    const maxRetries = options?.retries ?? 3;
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await apiCall();
+        this.recordSuccess(apiName);
+        this.cacheResponse(cacheKey, result, options?.ttl);
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        const isRateLimit = error.response?.status === 429;
+        
+        this.recordError(apiName, isRateLimit);
+        
+        if (isRateLimit || attempt === maxRetries - 1) {
+          console.error(`API call failed for ${apiName}:`, error.message);
+          break;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => 
+          setTimeout(resolve, Math.pow(2, attempt) * 1000)
+        );
+      }
+    }
+    
+    return null;
+  }
+  
+  generateCacheKey(query: string, apiName: string): string {
+    // Simple hash function for consistent keys
+    const hash = query.split('').reduce((acc, char) => {
+      return ((acc << 5) - acc) + char.charCodeAt(0);
+    }, 0);
+    
+    return `${apiName}:${Math.abs(hash)}`;
+  }
+  
+  getStatus(): Record<string, any> {
+    const status: Record<string, any> = {
+      cache: {
+        size: this.cache.size,
+        maxSize: this.config.maxCacheSize,
+        hitRate: this.calculateHitRate()
+      },
+      apis: {}
+    };
+    
+    this.rateLimits.forEach((rateInfo, apiName) => {
+      status.apis[apiName] = {
+        isBlocked: rateInfo.isBlocked,
+        blockUntil: rateInfo.isBlocked ? new Date(rateInfo.blockUntil) : null,
+        backoffDelay: rateInfo.backoffDelay,
+        lastCall: new Date(rateInfo.lastCall),
+        callCount: rateInfo.callCount,
+        consecutiveErrors: rateInfo.consecutiveErrors
+      };
+    });
+    
+    return status;
+  }
+  
+  private createRateLimitInfo(): RateLimitInfo {
+    return {
+      lastCall: 0,
+      callCount: 0,
+      backoffDelay: this.config.baseDelay,
+      isBlocked: false,
+      blockUntil: 0,
+      consecutiveErrors: 0
+    };
+  }
+  
+  private updateAccessOrder(key: string): void {
+    this.removeFromAccessOrder(key);
+    this.cacheAccessOrder.push(key);
+  }
+  
+  private removeFromAccessOrder(key: string): void {
+    const index = this.cacheAccessOrder.indexOf(key);
+    if (index > -1) {
+      this.cacheAccessOrder.splice(index, 1);
+    }
+  }
+  
+  private evictLRU(): void {
+    if (this.cacheAccessOrder.length > 0) {
+      const lruKey = this.cacheAccessOrder.shift()!;
+      this.cache.delete(lruKey);
+    }
+  }
+  
+  private calculateHitRate(): number {
+    let totalHits = 0;
+    let totalRequests = 0;
+    
+    this.cache.forEach(entry => {
+      totalHits += entry.hits;
+      totalRequests += entry.hits + 1;
+    });
+    
+    return totalRequests > 0 ? totalHits / totalRequests : 0;
+  }
+  
+  private cleanupCache(): void {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    
+    this.cache.forEach((entry, key) => {
+      if (now - entry.timestamp > entry.ttl) {
+        keysToDelete.push(key);
+      }
+    });
+    
+    keysToDelete.forEach(key => {
+      this.cache.delete(key);
+      this.removeFromAccessOrder(key);
+    });
+    
+    if (keysToDelete.length > 0) {
+      console.log(`🧹 Cleaned up ${keysToDelete.length} expired cache entries`);
+    }
+  }
+  
+  private startCleanup(): void {
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupCache();
+    }, this.config.cleanupInterval);
+  }
+  
+  destroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
+  }
+}
+
+// Export singleton
+export const apiRateManager = new ApiRateManager();
+
+// ===== OPTIMIZED DEERFLOW CLIENT =====
+// server/deerflow-client.ts
+
+import axios, { AxiosInstance, AxiosError } from 'axios';
+import { checkDeerFlowService, startDeerFlowService } from './deerflow-manager';
+
+// Interfaces remain the same...
+export interface DeerFlowResearchParams {
+  research_question: string;
+  model_id?: string;
+  include_market_data?: boolean;
+  include_news?: boolean;
+  research_length?: string;
+  research_tone?: string;
+  min_word_count?: number;
+}
+
+export interface DeerFlowResearchResponse {
+  status?: any;
+  report?: string;
+  response?: {
+    report?: string;
+    sources?: Array<{
+      title: string;
+      url: string;
+      domain: string;
+    }>;
+  };
+  visualization_path?: string;
+  timestamp?: string;
+  sources?: Array<{
+    title: string;
+    url: string;
+    domain: string;
+  }>;
+  service_process_log?: string[];
+}
+
+const DEERFLOW_CONFIG = {
+  SERVICE_URL: 'http://localhost:9000',
+  TIMEOUT_SHORT: 10000,      // 10 seconds
+  TIMEOUT_MEDIUM: 30000,     // 30 seconds
+  TIMEOUT_LONG: 600000,      // 10 minutes
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 2000,
+  SERVICE_START_TIMEOUT: 30000,
+} as const;
+
+export class DeerFlowClient {
+  private static instance: DeerFlowClient;
+  private axiosInstance: AxiosInstance;
+  private serviceStatus: 'unknown' | 'running' | 'stopped' = 'unknown';
+  private lastStatusCheck = 0;
+  private readonly statusCheckInterval = 60000; // 1 minute
+  
+  private constructor() {
+    this.axiosInstance = axios.create({
+      baseURL: DEERFLOW_CONFIG.SERVICE_URL,
+      validateStatus: (status) => status >= 200 && status < 500,
+    });
+  }
+  
+  static getInstance(): DeerFlowClient {
+    if (!DeerFlowClient.instance) {
+      DeerFlowClient.instance = new DeerFlowClient();
+    }
+    return DeerFlowClient.instance;
+  }
+  
+  async performResearch(params: DeerFlowResearchParams): Promise<DeerFlowResearchResponse> {
+    try {
+      await this.ensureServiceRunning();
+      
+      console.log('📊 Performing DeerFlow research:', params.research_question);
+      
+      const response = await this.axiosInstance.post('/research', params, {
+        timeout: DEERFLOW_CONFIG.TIMEOUT_LONG,
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ DeerFlow research error:', error);
+      return this.createErrorResponse(error);
+    }
+  }
+  
+  async checkResearchStatus(researchId: string): Promise<any> {
+    try {
+      const response = await this.axiosInstance.get(`/research/${researchId}`, {
+        timeout: DEERFLOW_CONFIG.TIMEOUT_SHORT,
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error checking research status:', error);
+      throw error;
+    }
+  }
+  
+  async executeFullAgentResearch(params: {
+    research_question: string;
+    user_id: string;
+    complexity?: string;
+    enable_multi_agent?: boolean;
+    enable_reasoning?: boolean;
+    preferences?: any;
+  }): Promise<any> {
+    try {
+      await this.ensureServiceRunning();
+      
+      console.log('🤖 Executing full agent research:', params.research_question);
+      
+      // Add request ID for tracking
+      const requestId = this.generateRequestId();
+      const enrichedParams = { ...params, request_id: requestId };
+      
+      const response = await this.axiosInstance.post(
+        '/deerflow/full-research', 
+        enrichedParams,
+        { timeout: DEERFLOW_CONFIG.TIMEOUT_LONG }
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Full agent research error:', error);
+      return {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        capabilities: [],
+        request_id: params.user_id
+      };
+    }
+  }
+  
+  async getCapabilities(): Promise<any> {
+    try {
+      // Use cached status if recent
+      if (this.serviceStatus === 'running' && 
+          Date.now() - this.lastStatusCheck < this.statusCheckInterval) {
+        return this.getCachedCapabilities();
+      }
+      
+      const response = await this.axiosInstance.get('/deerflow/capabilities', {
+        timeout: DEERFLOW_CONFIG.TIMEOUT_SHORT,
+      });
+      
+      this.serviceStatus = 'running';
+      this.lastStatusCheck = Date.now();
+      
+      return response.data;
+    } catch (error) {
+      this.serviceStatus = 'stopped';
+      return {
+        service: 'DeerFlow Agent System',
+        status: 'Service unavailable',
+        capabilities: {},
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+  
+  private async ensureServiceRunning(): Promise<void> {
+    // Skip check if recently verified
+    if (this.serviceStatus === 'running' && 
+        Date.now() - this.lastStatusCheck < this.statusCheckInterval) {
+      return;
+    }
+    
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      const isRunning = await checkDeerFlowService();
+      
+      if (isRunning) {
+        this.serviceStatus = 'running';
+        this.lastStatusCheck = Date.now();
+        return;
+      }
+      
+      if (attempts === 0) {
+        console.log('🚀 Starting DeerFlow service...');
+        const started = await startDeerFlowService();
+        
+        if (started) {
+          // Wait for service to be ready
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+      
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, DEERFLOW_CONFIG.RETRY_DELAY));
+      }
+    }
+    
+    throw new Error('Failed to start DeerFlow service after multiple attempts');
+  }
+  
+  private createErrorResponse(error: any): DeerFlowResearchResponse {
+    const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
+    const message = isTimeout 
+      ? 'Research request timed out. The query may be too complex.'
+      : error instanceof Error ? error.message : 'Unknown error';
+    
+    return {
+      status: { status: 'error', message },
+      report: 'Failed to perform deep research due to a service error.',
+      service_process_log: ['Error connecting to or using the DeerFlow service']
+    };
+  }
+  
+  private generateRequestId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  private getCachedCapabilities(): any {
+    return {
+      service: 'DeerFlow Agent System',
+      status: 'Operational',
+      capabilities: {
+        research: true,
+        multi_agent: true,
+        reasoning: true,
+        tools: true
+      },
+      cached: true,
+      last_check: new Date(this.lastStatusCheck).toISOString()
+    };
+  }
+  
+  getDeerFlowServiceUrl(): string {
+    return DEERFLOW_CONFIG.SERVICE_URL;
+  }
+}
+
+// Export singleton
+export const deerflowClient = DeerFlowClient.getInstance();
