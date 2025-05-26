@@ -106,11 +106,19 @@ app = FastAPI(lifespan=lifespan)
 # Add CORS middleware with WebSocket support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5000",
+        "http://localhost:3000", 
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:3000",
+        "https://*.replit.dev",
+        "https://*.replit.app",
+        "*"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
-    allow_origin_regex=r".*"
+    allow_origin_regex=r"https://.*\.replit\.(dev|app)$"
 )
 
 # Define request/response models
@@ -502,13 +510,21 @@ async def perform_deep_research(research_question: str, research_id: str, resear
     log_entries = []
 
     try:
+        # Validate input parameters
+        if not research_question or len(research_question.strip()) < 3:
+            raise ValueError("Research question is too short or empty")
+        
+        if research_depth not in [1, 2, 3]:
+            research_depth = 3  # Default to comprehensive
+            
         # Update the state with proper research depth
         research_state[research_id] = {
             "status": "in_progress",
             "start_time": time.time(),
             "log": log_entries,
             "sources": [],
-            "research_depth": research_depth  # Use the passed research depth parameter
+            "research_depth": research_depth,
+            "error_count": 0
         }
 
         # Step 1: Generate query variations for broader search
@@ -581,6 +597,42 @@ async def perform_deep_research(research_question: str, research_id: str, resear
         for result in all_search_results:
             try:
                 # Ensure result is valid
+
+
+@app.get("/research/health")
+async def research_health_check():
+    """Check research endpoint health"""
+    try:
+        # Test basic research functionality
+        test_result = {
+            "research_endpoint": "available",
+            "api_keys": {
+                "deepseek": bool(DEEPSEEK_API_KEY),
+                "gemini": bool(os.environ.get("GEMINI_API_KEY")),
+                "tavily": bool(TAVILY_API_KEY),
+                "brave": bool(BRAVE_API_KEY)
+            },
+            "active_research_tasks": len(research_state),
+            "last_check": time.time()
+        }
+        
+        # Check if we can perform a minimal search
+        try:
+            test_search = await search_web("test query", max_results=1)
+            test_result["search_capability"] = "working" if test_search else "limited"
+        except Exception as e:
+            test_result["search_capability"] = f"error: {str(e)}"
+            
+        return test_result
+        
+    except Exception as e:
+        logger.error(f"Research health check failed: {e}")
+        return {
+            "research_endpoint": "error",
+            "error": str(e),
+            "last_check": time.time()
+        }
+
                 if not result or not isinstance(result, dict):
                     continue
 
@@ -1291,14 +1343,14 @@ This analysis was generated using fallback capabilities due to service limitatio
 async def validate_optimization():
     """Validate system readiness for optimization"""
     try:
-        # Check system health
+        # Check system health with fallback values
         try:
             metrics_summary = metrics.get_metrics_summary()
             health = metrics.get_system_health()
         except Exception as metrics_error:
             logger.warning(f"Metrics collection error: {metrics_error}")
-            metrics_summary = {}
-            health = {"overall_health": "unknown"}
+            metrics_summary = {"operations_count": 0, "average_response_time": 0}
+            health = {"overall_health": "unknown", "uptime": time.time()}
 
         # Calculate readiness score based on current system state
         readiness_score = 0.0
@@ -1673,8 +1725,11 @@ class StateManager:
     def save_task_state(self, task_id: str, state: dict):
         """Save task state with persistence"""
         try:
+            # Sanitize state data for JSON serialization
+            sanitized_state = self._sanitize_state_data(state)
+            
             self.tasks[task_id] = {
-                **state,
+                **sanitized_state,
                 "last_updated": time.time(),
                 "persistent": True,
                 "task_id": task_id
@@ -1685,11 +1740,25 @@ class StateManager:
             logger.error(f"Failed to save task state for {task_id}: {e}")
             # Store in memory at least
             self.tasks[task_id] = {
-                **state,
+                **self._sanitize_state_data(state),
                 "last_updated": time.time(),
                 "persistent": False,
                 "task_id": task_id
             }
+    
+    def _sanitize_state_data(self, state: dict) -> dict:
+        """Sanitize state data for JSON serialization"""
+        def sanitize_value(value):
+            if isinstance(value, dict):
+                return {k: sanitize_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [sanitize_value(item) for item in value]
+            elif isinstance(value, (str, int, float, bool)) or value is None:
+                return value
+            else:
+                return str(value)
+        
+        return sanitize_value(state)
 
     def get_task_state(self, task_id: str):
         """Get task state"""
