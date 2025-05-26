@@ -83,7 +83,7 @@ const LANGUAGES = [
   { code: 'fr', name: 'French', flag: '🇫🇷' }
 ];
 
-const Study: React.FC = () => {
+const Homework: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<StudyMessage[]>([]);
@@ -117,9 +117,11 @@ const Study: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    loadLearningProfile();
-    loadFamilyMembers();
-    loadLearningStreak();
+    if (user) {
+      loadLearningProfile().catch(console.error);
+      loadFamilyMembers().catch(console.error);
+      loadLearningStreak().catch(console.error);
+    }
   }, [user]);
 
   const scrollToBottom = () => {
@@ -729,4 +731,4 @@ const Study: React.FC = () => {
   );
 };
 
-export default Study;
+export default Homework;
