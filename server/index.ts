@@ -13,7 +13,7 @@ import {
   clearResearchCaches, 
   shutdownResearchService 
 } from './deerflow-integration';
-import searchMetricsRoutes from './routes/searchMetrics';
+import searchMetricsRoutes from './routes/search-metrics';
 import cacheMonitoringRoutes from './routes/cache-monitoring';
 import yahooFinanceMetricsRoutes from './routes/yahoo-finance-metrics';
 import enhancedSearchRouter from './routes/enhanced-search.router';
