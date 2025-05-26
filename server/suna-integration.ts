@@ -939,7 +939,6 @@ class SunaIntegrationService {
       }
 
       // Enhanced web search activation - prioritize financial and current data queries
-```text
       const isFinancialQuery = ['bitcoin', 'btc', 'crypto', 'price', 'forecast', 'market', 'trading', 'usd', 'factors', 'trend'].some(keyword => 
         data.query.toLowerCase().includes(keyword)
       );
