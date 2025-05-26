@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { llmService } from './llm';
 import { v4 as uuidv4 } from 'uuid';
 import { researchService, ResearchDepth } from './deerflow-integration';
-import { CrashSafeResearch } from './crash-safe-storage';
+import { crashSafeStorage } from './crash-safe-storage';
 
 import LRU from 'lru-cache';
 import { getCurrentBitcoinPrice, getBitcoinMarketContext, enhanceBitcoinQuery } from './yahoo-finance-integration';
@@ -92,7 +92,7 @@ export async function completeResearchSafely(
     // STEP 1: Store results using crash-safe system (NO PostgreSQL)
     console.log('💾 CRASH-SAFE: Storing results without database...');
 
-    const storeResult = await CrashSafeResearch.store(
+    const storeResult = await crashSafeStorage.store(
       conversationId,
       userId,
       query,
@@ -229,7 +229,7 @@ export async function saveCompletedResearchToHistory(
     await storeResearchResultsSafely(conversationId, results, query, userId);
 
     // Also store in crash-safe system
-    const safeStorage = await CrashSafeResearch.store(conversationId, userId, query, results);
+    const safeStorage = await crashSafeStorage.store(conversationId, userId, query, results);
 
     if (safeStorage.success) {
       console.log('✅ Research saved to both memory and crash-safe storage');
