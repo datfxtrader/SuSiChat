@@ -239,6 +239,99 @@ export const UIStandards = {
   },
 
   // ============================================
+  // SLIDING PANEL CONFIGURATION
+  // ============================================
+  slidingPanel: {
+    animations: {
+      // Panel slide animation
+      panel: {
+        base: 'transform transition-all duration-300 ease-in-out',
+        hidden: 'translate-x-full',
+        visible: 'translate-x-0',
+        overlay: 'fixed inset-0 bg-black/50 z-30 md:hidden'
+      },
+      // Main content push effect
+      content: {
+        base: 'transition-all duration-300 ease-in-out',
+        pushed: 'md:mr-[600px] lg:mr-[700px] md:scale-[0.98] origin-left'
+      }
+    },
+    
+    widths: {
+      sm: 'w-full md:w-[400px]',
+      md: 'w-full md:w-[600px]',
+      lg: 'w-full md:w-[700px]',
+      xl: 'w-full md:w-[800px]',
+      full: 'w-full'
+    },
+    
+    theme: {
+      dark: {
+        background: 'bg-zinc-900/95 backdrop-blur-xl',
+        border: 'border-l border-zinc-800/60',
+        shadow: 'shadow-2xl shadow-black/50',
+        header: {
+          background: 'bg-zinc-900/80',
+          border: 'border-b border-zinc-800/60',
+          text: 'text-zinc-100'
+        },
+        content: {
+          background: 'bg-transparent',
+          text: 'text-zinc-200'
+        },
+        interactive: {
+          hover: 'hover:bg-zinc-800/60',
+          active: 'bg-zinc-800/80',
+          focus: 'focus:ring-2 focus:ring-blue-500/50'
+        }
+      },
+      light: {
+        background: 'bg-white/95 backdrop-blur-xl',
+        border: 'border-l border-gray-200/60',
+        shadow: 'shadow-2xl shadow-gray-500/20',
+        header: {
+          background: 'bg-white/80',
+          border: 'border-b border-gray-200/60',
+          text: 'text-gray-900'
+        },
+        content: {
+          background: 'bg-transparent',
+          text: 'text-gray-700'
+        },
+        interactive: {
+          hover: 'hover:bg-gray-100/60',
+          active: 'bg-gray-100/80',
+          focus: 'focus:ring-2 focus:ring-blue-500/50'
+        }
+      }
+    },
+    
+    zIndices: {
+      overlay: 'z-30',
+      panel: 'z-40',
+      nested: 'z-50'
+    },
+    
+    responsive: {
+      mobile: {
+        width: '100vw',
+        overlay: true,
+        pushContent: false
+      },
+      tablet: {
+        width: '70vw',
+        overlay: true,
+        pushContent: true
+      },
+      desktop: {
+        width: '600px',
+        overlay: false,
+        pushContent: true
+      }
+    }
+  },
+
+  // ============================================
   // UTILITY FUNCTIONS
   // ============================================
   utils: {
@@ -274,6 +367,54 @@ export const UIStandards = {
 
     combineClasses: (...classes: (string | undefined | null | false)[]) => {
       return classes.filter(Boolean).join(' ');
+    },
+
+    getSlidingPanelClasses: (
+      isOpen: boolean,
+      width: 'sm' | 'md' | 'lg' | 'xl' | 'full' = 'md',
+      theme: 'dark' | 'light' = 'dark'
+    ) => {
+      const config = UIStandards.slidingPanel;
+      const themeConfig = config.theme[theme];
+      
+      return {
+        panel: UIStandards.utils.combineClasses(
+          'fixed right-0 top-0 h-full',
+          config.animations.panel.base,
+          isOpen ? config.animations.panel.visible : config.animations.panel.hidden,
+          config.widths[width],
+          themeConfig.background,
+          themeConfig.border,
+          themeConfig.shadow,
+          config.zIndices.panel
+        ),
+        overlay: UIStandards.utils.combineClasses(
+          config.animations.panel.overlay,
+          isOpen ? 'block' : 'hidden'
+        ),
+        header: UIStandards.utils.combineClasses(
+          'flex items-center justify-between p-6',
+          themeConfig.header.background,
+          themeConfig.header.border
+        ),
+        content: UIStandards.utils.combineClasses(
+          'flex-1 overflow-y-auto p-6',
+          themeConfig.content.background
+        ),
+        mainContent: UIStandards.utils.combineClasses(
+          config.animations.content.base,
+          isOpen ? config.animations.content.pushed : ''
+        ),
+        closeButton: UIStandards.utils.combineClasses(
+          'p-2 rounded-lg transition-colors',
+          themeConfig.interactive.hover,
+          themeConfig.interactive.focus
+        )
+      };
+    },
+
+    getSlidingPanelTheme: (theme: 'dark' | 'light' = 'dark') => {
+      return UIStandards.slidingPanel.theme[theme];
     }
   }
 } as const;
@@ -281,5 +422,7 @@ export const UIStandards = {
 export type UITheme = keyof typeof UIStandards.colors;
 export type ComponentVariant = keyof typeof UIStandards.components.card.variants;
 export type AnimationType = keyof typeof UIStandards.animations;
+export type SlidingPanelWidth = keyof typeof UIStandards.slidingPanel.widths;
+export type SlidingPanelTheme = keyof typeof UIStandards.slidingPanel.theme;
 
 export default UIStandards;

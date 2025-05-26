@@ -384,6 +384,123 @@
   100% { background-position: 100% 0; }
 }
 
+/* ============================================ */
+/* SLIDING PANEL ANIMATIONS */
+/* ============================================ */
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes content-push-left {
+  from {
+    transform: translateX(0) scale(1);
+  }
+  to {
+    transform: translateX(-300px) scale(0.98);
+  }
+}
+
+@keyframes content-push-reset {
+  from {
+    transform: translateX(-300px) scale(0.98);
+  }
+  to {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes panel-backdrop-fade-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+/* Sliding panel utility classes */
+.sliding-panel-enter {
+  animation: slide-in-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sliding-panel-exit {
+  animation: slide-out-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content-pushed {
+  animation: content-push-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content-reset {
+  animation: content-push-reset 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.panel-backdrop {
+  animation: panel-backdrop-fade-in 0.3s ease-out;
+}
+
+/* Enhanced panel scroll behavior */
+.panel-content-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.panel-content-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-content-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-content-scroll::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 3px;
+}
+
+.panel-content-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* Panel content transitions */
+.panel-content-fade-in {
+  animation: fade-in 0.4s ease-out 0.1s both;
+}
+
+/* Responsive panel behavior */
+@media (max-width: 768px) {
+  .sliding-panel-mobile {
+    width: 100vw !important;
+    transform: translateX(0) !important;
+  }
+  
+  .main-content-mobile-overlay {
+    transform: none !important;
+    filter: blur(2px);
+  }
+}
+
 /* Enhanced research UI animations */
 @keyframes fade-in {
   from { 
