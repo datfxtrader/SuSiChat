@@ -524,59 +524,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   router.post('/research', async (req, res) => {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  try {
-    const { research_question, research_depth, options = {} } = req.body;
+    try {
+      const { research_question, research_depth, options = {} } = req.body;
 
-    if (!research_question) {
-      return res.status(400).json({ error: 'Research question is required' });
-    }
-
-    const depth = Math.min(Math.max(parseInt(research_depth) || 3, 1), 5);
-
-    logger.info('Research request received', {
-      requestId,
-      query: research_question.substring(0, 100),
-      depth,
-      component: 'api'
-    });
-
-    // Use enhanced integration layer
-    const result = await enhancedIntegration.performResearch({
-      query: research_question,
-      depth,
-      options: {
-        useParallel: options.parallel || false,
-        timeout: options.timeout || 120000,
-        priority: options.priority || 1,
-        enableFallback: options.fallback !== false
+      if (!research_question) {
+        return res.status(400).json({ error: 'Research question is required' });
       }
-    });
 
-    logger.info('Research request completed', {
-      requestId,
-      status: result.status,
-      executionTime: result.metadata?.executionTime,
-      component: 'api'
-    });
+      const depth = Math.min(Math.max(parseInt(research_depth) || 3, 1), 5);
 
-    res.json(result);
+      logger.info('Research request received', {
+        requestId,
+        query: research_question.substring(0, 100),
+        depth,
+        component: 'api'
+      });
 
-  } catch (error) {
-    logger.error('Research request failed', error, {
-      requestId,
-      component: 'api'
-    });
+      // Use enhanced integration layer
+      const result = await enhancedIntegration.performResearch({
+        query: research_question,
+        depth,
+        options: {
+          useParallel: options.parallel || false,
+          timeout: options.timeout || 120000,
+          priority: options.priority || 1,
+          enableFallback: options.fallback !== false
+        }
+      });
 
-    res.status(500).json({ 
-      error: 'Research failed', 
-      message: error.message,
-      status: 'error',
-      requestId
-    });
-  }
-});
+      logger.info('Research request completed', {
+        requestId,
+        status: result.status,
+        executionTime: result.metadata?.executionTime,
+        component: 'api'
+      });
+
+      res.json(result);
+
+    } catch (error) {
+      logger.error('Research request failed', error, {
+        requestId,
+        component: 'api'
+      });
+
+      res.status(500).json({ 
+        error: 'Research failed', 
+        message: error.message,
+        status: 'error',
+        requestId
+      });
+    }
+  });
 
 // System metrics endpoint
 router.get('/system/metrics', async (req, res) => {
