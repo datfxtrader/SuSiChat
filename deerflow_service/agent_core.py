@@ -1,638 +1,624 @@
 
-"""
-Advanced Agent Core for DeerFlow Research Service
-
-This module implements the core agent infrastructure with planning, reasoning,
-and memory capabilities for sophisticated research tasks.
-"""
-
 import asyncio
-import json
-import logging
 import time
+import logging
 import uuid
-from datetime import datetime
-from typing import Dict, List, Any, Optional, Union
-from dataclasses import dataclass, asdict
+import weakref
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, List, Set
+from dataclasses import dataclass, field
+from collections import deque
 from enum import Enum
-
-# Import shared types
-from shared_types import TaskStatus, AgentState, ExecutionPlan, SubTask
-
-# Import optimization components
-from task_manager import TaskManager
-from state_manager import StateStore, StateTransitionValidator
-from tools import ToolRegistry, WebSearchTool, FinancialSearchTool
-from query_analyzer import EnhancedQueryAnalyzer
-from metrics import MetricsCollector
-
-# Import reasoning engine and domain agents for Phase 2
-try:
-    from reasoning_engine import reasoning_engine, Evidence, EvidenceType
-    from domain_agents import domain_orchestrator
-    ADVANCED_REASONING_AVAILABLE = True
-except ImportError:
-    ADVANCED_REASONING_AVAILABLE = False
-
-# Import learning system for Phase 3
-try:
-    from learning_system import learning_system, UserFeedback, FeedbackType
-    LEARNING_SYSTEM_AVAILABLE = True
-except ImportError:
-    LEARNING_SYSTEM_AVAILABLE = False
+import json
 
 logger = logging.getLogger("agent_core")
 
-class QueryType(Enum):
-    SIMPLE = "simple"
-    COMPARATIVE = "comparative"
-    ANALYTICAL = "analytical"
-    FINANCIAL = "financial"
-    SCIENTIFIC = "scientific"
-    CURRENT_EVENTS = "current_events"
-    MULTI_DOMAIN = "multi_domain"
+class TaskStatus(Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
-class TaskPlanner:
-    """Intelligent task planning with query analysis and strategy selection"""
-    
-    def __init__(self, query_analyzer: EnhancedQueryAnalyzer):
-        self.query_analyzer = query_analyzer
-        self.strategy_templates = {
-            "simple": {
-                "steps": ["search", "synthesize", "report"],
-                "tools": ["web_search", "llm_synthesis"],
-                "depth": 1
-            },
-            "comparative": {
-                "steps": ["analyze_query", "parallel_research", "compare", "synthesize"],
-                "tools": ["web_search", "academic_search", "comparison_engine"],
-                "depth": 3
-            },
-            "analytical": {
-                "steps": ["hypothesis_generation", "evidence_gathering", "analysis", "validation"],
-                "tools": ["web_search", "data_analysis", "reasoning_engine"],
-                "depth": 4
-            },
-            "financial": {
-                "steps": ["market_data", "news_analysis", "trend_analysis", "forecast"],
-                "tools": ["financial_search", "news_search", "sentiment_analysis"],
-                "depth": 3
-            }
-        }
-    
-    def create_execution_plan(self, query: str, analysis: Dict[str, Any]) -> ExecutionPlan:
-        """Create a detailed execution plan based on query analysis"""
-        intent = analysis["intent"]["primary"]
-        complexity = analysis["complexity"]["level"]
-        
-        # Select strategy template
-        strategy_name = self._select_strategy(intent, complexity)
-        template = self.strategy_templates.get(strategy_name, self.strategy_templates["simple"])
-        
-        # Create sub-tasks based on analysis
-        sub_tasks = []
-        
-        # Initial search phase
-        sub_tasks.append(SubTask(
-            id="search_1",
-            description=f"Search for information about: {query[:50]}...",
-            type="search",
-            priority=1,
-            dependencies=[],
-            estimated_time=30
-        ))
-        
-        # Add domain-specific tasks
-        if analysis.get("domains"):
-            for i, domain_info in enumerate(analysis["domains"][:2]):
-                if domain_info["confidence"] > 0.3:
-                    sub_tasks.append(SubTask(
-                        id=f"domain_{i+1}",
-                        description=f"Domain analysis: {domain_info['domain']}",
-                        type="domain_analysis",
-                        priority=2,
-                        dependencies=["search_1"],
-                        estimated_time=45
-                    ))
-        
-        # Add comparison if needed
-        if intent == "comparison":
-            sub_tasks.append(SubTask(
-                id="comparison_1",
-                description="Structured comparison analysis",
-                type="comparison",
-                priority=3,
-                dependencies=["search_1"],
-                estimated_time=60
-            ))
-        
-        # Synthesis phase
-        sub_tasks.append(SubTask(
-            id="synthesis_1",
-            description="Synthesize findings",
-            type="synthesis",
-            priority=len(sub_tasks) + 1,
-            dependencies=[t.id for t in sub_tasks],
-            estimated_time=40
-        ))
-        
-        total_time = sum(t.estimated_time for t in sub_tasks)
-        
-        return ExecutionPlan(
-            strategy=strategy_name,
-            steps=sub_tasks,
-            total_estimated_time=total_time,
-            adaptation_points=[f"after_{t.id}" for t in sub_tasks[:-1]],
-            success_criteria=[
-                "Information gathered successfully",
-                "High-quality sources identified",
-                "Analysis completed",
-                "User query addressed"
-            ]
-        )
-    
-    def _select_strategy(self, intent: str, complexity: str) -> str:
-        """Select the best strategy based on query characteristics"""
-        if intent == "comparison":
-            return "comparative"
-        elif intent == "analysis":
-            return "analytical"
-        elif complexity == "complex":
-            return "analytical"
-        else:
-            return "simple"
+class AgentState(Enum):
+    INITIALIZED = "initialized"
+    STARTING = "starting"
+    RUNNING = "running"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    ERROR = "error"
 
-class OptimizedAgentCore:
-    """Optimized agent core with all improvements"""
+@dataclass
+class AgentMessage:
+    """Optimized message structure for inter-agent communication"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    sender: str = ""
+    recipient: str = ""
+    content: Dict[str, Any] = field(default_factory=dict)
+    priority: int = 0
+    timestamp: float = field(default_factory=time.time)
+    message_type: str = "general"
+    requires_response: bool = False
+    correlation_id: Optional[str] = None
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or {}
-        
-        # Initialize components
-        self.task_manager = TaskManager()
-        self.state_store = StateStore(self.config.get("state_path", "state_storage"))
-        self.tool_registry = ToolRegistry()
-        self.query_analyzer = EnhancedQueryAnalyzer()
-        self.planner = TaskPlanner(self.query_analyzer)
-        self.metrics = MetricsCollector()
-        
-        # Initialize tools
-        self._initialize_tools()
-        
-        # Advanced reasoning integration
-        self.reasoning_enabled = ADVANCED_REASONING_AVAILABLE
-        self.learning_enabled = LEARNING_SYSTEM_AVAILABLE
-        
-        logger.info("OptimizedAgentCore initialized")
+    def __lt__(self, other):
+        # Higher priority messages first, then by timestamp
+        if self.priority != other.priority:
+            return self.priority > other.priority
+        return self.timestamp < other.timestamp
+
+@dataclass
+class Task:
+    """Enhanced task representation"""
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    query: str = ""
+    task_type: str = "general"
+    priority: int = 0
+    status: TaskStatus = TaskStatus.PENDING
+    created_at: float = field(default_factory=time.time)
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+    context: Dict[str, Any] = field(default_factory=dict)
+    requirements: Dict[str, Any] = field(default_factory=dict)
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    assigned_agent: Optional[str] = None
+
+@dataclass
+class AgentPerformance:
+    """Track agent performance metrics"""
+    total_tasks: int = 0
+    successful_tasks: int = 0
+    failed_tasks: int = 0
+    avg_response_time: float = 0.0
+    last_active: float = field(default_factory=time.time)
+    error_rate: float = 0.0
     
-    async def __aenter__(self):
-        """Async context manager entry"""
-        await self.state_store.connect()
-        return self
+    @property
+    def success_rate(self) -> float:
+        if self.total_tasks == 0:
+            return 0.0
+        return self.successful_tasks / self.total_tasks
+
+class BaseAgent(ABC):
+    """Optimized base agent with lifecycle management and performance monitoring"""
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        await self.task_manager.shutdown()
-        await self.state_store.disconnect()
+    def __init__(self, agent_id: str, config: Dict[str, Any]):
+        self.agent_id = agent_id
+        self.config = config
+        self.state = AgentState.INITIALIZED
+        
+        # Message handling
+        self.message_queue = asyncio.PriorityQueue(maxsize=1000)
+        self.processed_messages = deque(maxlen=100)  # Keep last 100 for debugging
+        self.pending_responses: Dict[str, asyncio.Future] = {}
+        
+        # Task management
+        self.current_task: Optional[Task] = None
+        self.task_history = deque(maxlen=50)
+        
+        # Performance tracking
+        self.performance = AgentPerformance()
+        self.health_status = {"status": "healthy", "last_check": time.time()}
+        
+        # Lifecycle management
+        self._running = False
+        self._tasks: List[asyncio.Task] = []
+        self._shutdown_event = asyncio.Event()
+        
+        # Weak references to prevent memory leaks
+        self._connections: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
+        
+        # Configuration
+        self.max_concurrent_tasks = config.get("max_concurrent_tasks", 5)
+        self.health_check_interval = config.get("health_check_interval", 30)
+        self.message_timeout = config.get("message_timeout", 60)
+        
+        logger.info(f"Agent {self.agent_id} initialized")
     
-    def _initialize_tools(self):
-        """Initialize available tools"""
-        # Register basic tools
-        self.tool_registry.register(
-            "web_search",
-            WebSearchTool,
-            self.config.get("web_search", {})
-        )
-        
-        self.tool_registry.register(
-            "financial_search",
-            FinancialSearchTool,
-            self.config.get("financial_search", {})
-        )
-        
-        logger.info(f"Initialized {len(self.tool_registry.tools)} tools")
-    
-    async def create_research_task(
-        self,
-        query: str,
-        preferences: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None
-    ) -> str:
-        """Create optimized research task"""
-        
-        task_id = str(uuid.uuid4())
-        
-        # Analyze query
-        start_time = time.time()
-        analysis = self.query_analyzer.analyze_query(query)
-        analysis_time = time.time() - start_time
-        
-        self.metrics.record_operation_time("query_analysis", analysis_time)
-        
-        # Record metrics
-        intent = analysis["intent"]["primary"]
-        self.metrics.record_task_start(task_id, intent)
-        
-        # Create initial state
-        agent_state = AgentState(
-            agent_id=f"agent_{task_id[:8]}",
-            task_id=task_id,
-            status=TaskStatus.PENDING,
-            current_step=0,
-            working_memory={},
-            execution_plan=None,
-            reasoning_chain=[],
-            confidence_scores={},
-            start_time=time.time(),
-            metadata={
-                "query": query,
-                "analysis": analysis,
-                "preferences": preferences or {},
-                "created_at": datetime.now().isoformat()
-            }
-        )
-        
-        # Save state
-        await self.state_store.save_state(task_id, agent_state)
-        
-        # Create managed task
-        await self.task_manager.create_managed_task(
-            self._execute_research_task(task_id, query, analysis),
-            task_id,
-            timeout=timeout or self.config.get("default_timeout", 300)
-        )
-        
-        logger.info(f"Created optimized research task {task_id}")
-        return task_id
-    
-    async def _execute_research_task(
-        self,
-        task_id: str,
-        query: str,
-        analysis: Dict[str, Any]
-    ):
-        """Execute research task with all optimizations"""
-        
-        state = await self.state_store.get_state(task_id)
-        if not state:
-            raise ValueError(f"State not found for task {task_id}")
-        
-        intent = analysis["intent"]["primary"]
+    async def start(self):
+        """Start agent with proper error handling"""
+        if self._running:
+            logger.warning(f"Agent {self.agent_id} already running")
+            return
         
         try:
-            # Planning phase
-            state = StateTransitionValidator.transition_state(state, TaskStatus.PLANNING)
-            await self.state_store.save_state(task_id, state)
+            self.state = AgentState.STARTING
+            self._running = True
             
-            # Create execution plan
-            plan_start = time.time()
-            plan = self.planner.create_execution_plan(query, analysis)
-            plan_time = time.time() - plan_start
+            # Start core processes
+            self._tasks.extend([
+                asyncio.create_task(self._message_processor()),
+                asyncio.create_task(self._health_monitor()),
+                asyncio.create_task(self._performance_tracker())
+            ])
             
-            self.metrics.record_operation_time("planning", plan_time)
+            # Agent-specific startup
+            await self.on_start()
             
-            state.execution_plan = plan
+            self.state = AgentState.RUNNING
+            self.performance.last_active = time.time()
             
-            # Execution phase
-            state = StateTransitionValidator.transition_state(state, TaskStatus.EXECUTING)
-            await self.state_store.save_state(task_id, state)
-            
-            # Execute plan steps
-            exec_start = time.time()
-            results = await self._execute_plan(task_id, plan, analysis)
-            exec_time = time.time() - exec_start
-            
-            self.metrics.record_operation_time("execution", exec_time)
-            
-            # Reasoning phase (if available)
-            if self.reasoning_enabled:
-                state = StateTransitionValidator.transition_state(state, TaskStatus.REASONING)
-                await self.state_store.save_state(task_id, state)
-                
-                reasoning_start = time.time()
-                reasoning_results = await self._apply_reasoning(query, results, analysis)
-                reasoning_time = time.time() - reasoning_start
-                
-                self.metrics.record_operation_time("reasoning", reasoning_time)
-                state.reasoning_chain.extend(reasoning_results)
-            
-            # Complete
-            state = StateTransitionValidator.transition_state(state, TaskStatus.COMPLETED)
-            await self.state_store.save_state(task_id, state)
-            
-            # Record completion metrics
-            duration = time.time() - state.start_time
-            self.metrics.record_task_end(task_id, intent, "success", duration)
+            logger.info(f"Agent {self.agent_id} started successfully")
             
         except Exception as e:
-            logger.error(f"Task {task_id} failed: {e}")
-            state = await self.state_store.get_state(task_id)
-            if state:
-                state.status = TaskStatus.FAILED
-                state.metadata["error"] = str(e)
-                await self.state_store.save_state(task_id, state)
-            
-            # Record failure metrics
-            duration = time.time() - state.start_time if state else 0
-            self.metrics.record_task_end(task_id, intent, "failed", duration)
+            self.state = AgentState.ERROR
+            logger.error(f"Failed to start agent {self.agent_id}: {e}")
+            await self.stop()
             raise
     
-    async def _execute_plan(
-        self,
-        task_id: str,
-        plan: ExecutionPlan,
-        analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Execute plan with parallel processing where possible"""
+    async def stop(self):
+        """Gracefully stop agent with cleanup"""
+        if not self._running:
+            return
         
-        results = []
-        completed_tasks = set()
-        
-        # Execute tasks in dependency order
-        while len(completed_tasks) < len(plan.steps):
-            # Find tasks ready to execute
-            ready_tasks = [
-                task for task in plan.steps
-                if task.id not in completed_tasks
-                and all(dep in completed_tasks for dep in task.dependencies)
-            ]
-            
-            if not ready_tasks:
-                break
-            
-            # Execute ready tasks
-            for task in ready_tasks:
-                task_start = time.time()
-                result = await self._execute_subtask(task, analysis)
-                task_time = time.time() - task_start
-                
-                self.metrics.record_operation_time(f"subtask_{task.type}", task_time)
-                
-                results.append({
-                    "task_id": task.id,
-                    "type": task.type,
-                    "result": result,
-                    "timestamp": time.time()
-                })
-                completed_tasks.add(task.id)
-                
-                # Update state
-                state = await self.state_store.get_state(task_id)
-                if state:
-                    state.current_step = len(completed_tasks)
-                    await self.state_store.save_state(task_id, state)
-        
-        return results
-    
-    async def _execute_subtask(
-        self,
-        task: SubTask,
-        analysis: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Execute individual subtask"""
+        logger.info(f"Stopping agent {self.agent_id}")
+        self.state = AgentState.STOPPING
+        self._running = False
         
         try:
-            if task.type == "search":
-                return await self._execute_search(analysis["query"], analysis)
-            elif task.type == "domain_analysis":
-                return await self._execute_domain_analysis(analysis)
-            elif task.type == "comparison":
-                return await self._execute_comparison(analysis)
-            elif task.type == "synthesis":
-                return await self._execute_synthesis(analysis)
-            else:
-                return {"status": "skipped", "reason": "Unknown task type"}
-                
+            # Cancel current task if any
+            if self.current_task and self.current_task.status == TaskStatus.RUNNING:
+                self.current_task.status = TaskStatus.CANCELLED
+                logger.info(f"Cancelled current task {self.current_task.task_id}")
+            
+            # Agent-specific cleanup
+            await self.on_stop()
+            
+            # Cancel all background tasks
+            for task in self._tasks:
+                if not task.done():
+                    task.cancel()
+            
+            # Wait for tasks to complete
+            if self._tasks:
+                await asyncio.gather(*self._tasks, return_exceptions=True)
+            
+            self._tasks.clear()
+            self.state = AgentState.STOPPED
+            
+            logger.info(f"Agent {self.agent_id} stopped successfully")
+            
         except Exception as e:
-            logger.error(f"Subtask {task.id} failed: {e}")
-            return {"status": "error", "error": str(e)}
+            logger.error(f"Error stopping agent {self.agent_id}: {e}")
+            self.state = AgentState.ERROR
     
-    async def _execute_search(
-        self,
-        query: str,
-        analysis: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Execute search with multiple tools"""
-        
-        search_results = []
-        
-        # Web search
-        search_start = time.time()
-        web_results = await self.tool_registry.execute_tool("web_search", query, limit=10)
-        search_time = time.time() - search_start
-        
-        self.metrics.record_tool_call("web_search", web_results.get("status", "error"), search_time)
-        
-        if web_results.get("status") == "success":
-            search_results.extend(web_results.get("results", []))
-        
-        # Financial search if relevant
-        domains = analysis.get("domains", [])
-        if domains and domains[0]["domain"] == "financial" and domains[0]["confidence"] > 0.5:
-            fin_start = time.time()
-            fin_results = await self.tool_registry.execute_tool("financial_search", query, limit=5)
-            fin_time = time.time() - fin_start
-            
-            self.metrics.record_tool_call("financial_search", fin_results.get("status", "error"), fin_time)
-            
-            if fin_results.get("status") == "success":
-                search_results.extend(fin_results.get("results", []))
-        
-        return {
-            "status": "success",
-            "results": search_results,
-            "total_results": len(search_results)
-        }
-    
-    async def _execute_domain_analysis(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute domain-specific analysis"""
-        
-        if not ADVANCED_REASONING_AVAILABLE:
-            return {"status": "skipped", "reason": "Domain analysis not available"}
-        
-        try:
-            # Use domain orchestrator
-            domain_results = await domain_orchestrator.process_with_domain_expertise(
-                analysis["query"]
-            )
-            
-            return {
-                "status": "success",
-                "domain_analysis": domain_results,
-                "primary_domain": domain_results.get("primary_domain")
-            }
-        except Exception as e:
-            logger.error(f"Domain analysis failed: {e}")
-            return {"status": "error", "error": str(e)}
-    
-    async def _execute_comparison(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute comparison analysis"""
-        
-        entities = analysis.get("entities", [])
-        if len(entities) < 2:
-            return {
-                "status": "error",
-                "error": "Not enough entities for comparison"
-            }
-        
-        # Extract comparison subjects
-        subjects = [e["text"] for e in entities[:2]]
-        
-        return {
-            "status": "success",
-            "comparison": {
-                "subjects": subjects,
-                "aspects": ["features", "performance", "cost", "reviews"],
-                "methodology": "multi-criteria analysis"
-            }
-        }
-    
-    async def _execute_synthesis(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute synthesis of results"""
-        
-        return {
-            "status": "success",
-            "synthesis": {
-                "method": "abstractive",
-                "confidence": 0.85,
-                "key_findings": []
-            }
-        }
-    
-    async def _apply_reasoning(
-        self,
-        query: str,
-        results: List[Dict[str, Any]],
-        analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Apply advanced reasoning to results"""
-        
-        reasoning_chain = []
-        
-        if ADVANCED_REASONING_AVAILABLE:
+    async def _message_processor(self):
+        """Process incoming messages with timeout handling"""
+        while self._running:
             try:
-                # Convert results to evidence
-                evidence_list = []
-                
-                for result in results:
-                    if result.get("result", {}).get("status") == "success":
-                        search_results = result.get("result", {}).get("results", [])
-                        for item in search_results:
-                            evidence_list.append({
-                                "content": item.get("snippet", ""),
-                                "source": item.get("url", ""),
-                                "relevance_score": item.get("relevance_score", 0.5)
-                            })
-                
-                # Process with reasoning engine
-                if evidence_list:
-                    evidence_objects = reasoning_engine.process_evidence(evidence_list)
-                    
-                    # Domain analysis
-                    domain_insights = await domain_orchestrator.process_with_domain_expertise(
-                        query,
-                        evidence_objects
+                # Wait for message with timeout
+                try:
+                    message = await asyncio.wait_for(
+                        self.message_queue.get(),
+                        timeout=1.0
                     )
-                    
-                    reasoning_chain.append({
-                        "step": "domain_analysis",
-                        "insights": domain_insights,
-                        "timestamp": time.time()
-                    })
-                    
-                    # Record confidence metrics
-                    for domain, report in domain_insights.get("domain_reports", {}).items():
-                        for insight in report.get("insights", []):
-                            self.metrics.record_confidence(
-                                domain,
-                                insight.get("confidence", 0.0)
-                            )
-            except Exception as e:
-                logger.error(f"Reasoning failed: {e}")
-                reasoning_chain.append({
-                    "step": "reasoning_error",
-                    "error": str(e),
+                except asyncio.TimeoutError:
+                    continue
+                
+                # Process message
+                start_time = time.time()
+                response = await self.handle_message(message)
+                processing_time = time.time() - start_time
+                
+                # Track processed messages
+                self.processed_messages.append({
+                    "message_id": message.id,
+                    "sender": message.sender,
+                    "processing_time": processing_time,
                     "timestamp": time.time()
                 })
-        
-        return reasoning_chain
+                
+                # Handle response if required
+                if message.requires_response and response:
+                    await self._send_response(message, response)
+                
+                # Update performance
+                self._update_message_performance(processing_time)
+                
+            except Exception as e:
+                logger.error(f"Agent {self.agent_id} message processing error: {e}")
+                await asyncio.sleep(0.1)  # Brief pause on error
     
-    async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Get optimized task status"""
+    async def _health_monitor(self):
+        """Monitor agent health and attempt recovery"""
+        while self._running:
+            try:
+                await asyncio.sleep(self.health_check_interval)
+                
+                # Check health
+                health = await self.check_health()
+                self.health_status = health
+                
+                if health["status"] != "healthy":
+                    logger.warning(f"Agent {self.agent_id} health issue: {health}")
+                    
+                    # Attempt recovery
+                    try:
+                        await self.attempt_recovery()
+                        logger.info(f"Agent {self.agent_id} recovery successful")
+                    except Exception as e:
+                        logger.error(f"Agent {self.agent_id} recovery failed: {e}")
+                
+            except Exception as e:
+                logger.error(f"Health monitoring failed for {self.agent_id}: {e}")
+    
+    async def _performance_tracker(self):
+        """Track performance metrics"""
+        while self._running:
+            try:
+                await asyncio.sleep(60)  # Update every minute
+                
+                # Calculate current performance metrics
+                current_time = time.time()
+                
+                # Update error rate
+                if self.performance.total_tasks > 0:
+                    self.performance.error_rate = (
+                        self.performance.failed_tasks / self.performance.total_tasks
+                    )
+                
+                # Log performance summary
+                logger.debug(
+                    f"Agent {self.agent_id} performance: "
+                    f"success_rate={self.performance.success_rate:.2f}, "
+                    f"avg_response_time={self.performance.avg_response_time:.2f}s, "
+                    f"total_tasks={self.performance.total_tasks}"
+                )
+                
+            except Exception as e:
+                logger.error(f"Performance tracking failed for {self.agent_id}: {e}")
+    
+    async def execute_task(self, task: Task) -> Dict[str, Any]:
+        """Execute task with proper lifecycle management"""
+        if self.current_task and self.current_task.status == TaskStatus.RUNNING:
+            raise RuntimeError(f"Agent {self.agent_id} is already executing a task")
         
-        state = await self.state_store.get_state(task_id)
-        if not state:
-            return None
+        self.current_task = task
+        task.status = TaskStatus.RUNNING
+        task.started_at = time.time()
+        task.assigned_agent = self.agent_id
         
-        # Get metrics summary
-        metrics_summary = self.metrics.get_metrics_summary()
+        start_time = time.time()
+        
+        try:
+            # Execute the actual task
+            result = await self.process_task(task)
+            
+            # Mark as completed
+            task.status = TaskStatus.COMPLETED
+            task.completed_at = time.time()
+            task.result = result
+            
+            # Update performance metrics
+            self.performance.total_tasks += 1
+            self.performance.successful_tasks += 1
+            
+            execution_time = time.time() - start_time
+            self._update_avg_response_time(execution_time)
+            
+            # Store in history
+            self.task_history.append(task)
+            
+            logger.info(f"Agent {self.agent_id} completed task {task.task_id} in {execution_time:.2f}s")
+            
+            return result
+            
+        except Exception as e:
+            # Mark as failed
+            task.status = TaskStatus.FAILED
+            task.completed_at = time.time()
+            task.error_message = str(e)
+            
+            # Update performance metrics
+            self.performance.total_tasks += 1
+            self.performance.failed_tasks += 1
+            
+            # Store in history
+            self.task_history.append(task)
+            
+            logger.error(f"Agent {self.agent_id} failed task {task.task_id}: {e}")
+            raise
+        
+        finally:
+            self.current_task = None
+            self.performance.last_active = time.time()
+    
+    async def send_message(
+        self, 
+        recipient: str, 
+        content: Dict[str, Any], 
+        priority: int = 0,
+        message_type: str = "general",
+        requires_response: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """Send message to another agent with optional response waiting"""
+        
+        message = AgentMessage(
+            sender=self.agent_id,
+            recipient=recipient,
+            content=content,
+            priority=priority,
+            message_type=message_type,
+            requires_response=requires_response
+        )
+        
+        if requires_response:
+            # Create future for response
+            response_future = asyncio.Future()
+            self.pending_responses[message.id] = response_future
+            message.correlation_id = message.id
+        
+        # Send to recipient
+        if recipient in self._connections:
+            target_agent = self._connections[recipient]
+            if target_agent and target_agent.state == AgentState.RUNNING:
+                try:
+                    await target_agent.message_queue.put(message)
+                    logger.debug(f"Message sent from {self.agent_id} to {recipient}")
+                    
+                    if requires_response:
+                        # Wait for response with timeout
+                        try:
+                            response = await asyncio.wait_for(
+                                response_future, 
+                                timeout=self.message_timeout
+                            )
+                            return response
+                        except asyncio.TimeoutError:
+                            logger.warning(f"Response timeout for message from {self.agent_id} to {recipient}")
+                            return None
+                        finally:
+                            self.pending_responses.pop(message.id, None)
+                    
+                except asyncio.QueueFull:
+                    logger.error(f"Message queue full for agent {recipient}")
+                    raise RuntimeError(f"Cannot send message to {recipient}: queue full")
+            else:
+                raise RuntimeError(f"Agent {recipient} not available")
+        else:
+            raise RuntimeError(f"Agent {recipient} not connected")
+    
+    async def _send_response(self, original_message: AgentMessage, response: Dict[str, Any]):
+        """Send response to original message sender"""
+        if original_message.correlation_id and original_message.sender in self._connections:
+            sender_agent = self._connections[original_message.sender]
+            if sender_agent and original_message.correlation_id in sender_agent.pending_responses:
+                future = sender_agent.pending_responses[original_message.correlation_id]
+                if not future.done():
+                    future.set_result(response)
+    
+    def connect_to_agent(self, agent: 'BaseAgent'):
+        """Connect to another agent for communication"""
+        self._connections[agent.agent_id] = agent
+        agent._connections[self.agent_id] = self
+        logger.debug(f"Connected agents {self.agent_id} and {agent.agent_id}")
+    
+    def disconnect_from_agent(self, agent_id: str):
+        """Disconnect from another agent"""
+        if agent_id in self._connections:
+            del self._connections[agent_id]
+            logger.debug(f"Disconnected agent {self.agent_id} from {agent_id}")
+    
+    async def check_health(self) -> Dict[str, Any]:
+        """Check agent health status"""
+        current_time = time.time()
+        
+        # Check if agent is responsive
+        queue_size = self.message_queue.qsize()
+        last_active_ago = current_time - self.performance.last_active
+        
+        status = "healthy"
+        issues = []
+        
+        # Check queue backlog
+        if queue_size > 100:
+            status = "degraded"
+            issues.append(f"High message queue size: {queue_size}")
+        
+        # Check responsiveness
+        if last_active_ago > 300:  # 5 minutes
+            status = "degraded"
+            issues.append(f"No activity for {last_active_ago:.0f} seconds")
+        
+        # Check error rate
+        if self.performance.error_rate > 0.5:
+            status = "critical"
+            issues.append(f"High error rate: {self.performance.error_rate:.2f}")
         
         return {
-            "task_id": task_id,
-            "status": state.status.value,
-            "current_step": state.current_step,
-            "progress": self._calculate_progress(state),
-            "execution_plan": asdict(state.execution_plan) if state.execution_plan else None,
-            "reasoning_chain": state.reasoning_chain,
-            "confidence_scores": state.confidence_scores,
-            "processing_time": time.time() - state.start_time,
-            "metadata": state.metadata,
-            "metrics": {
-                "task_specific": {
-                    "steps_completed": state.current_step,
-                    "total_steps": len(state.execution_plan.steps) if state.execution_plan else 0
-                },
-                "system": metrics_summary
-            }
+            "status": status,
+            "issues": issues,
+            "queue_size": queue_size,
+            "last_active_ago": last_active_ago,
+            "error_rate": self.performance.error_rate,
+            "success_rate": self.performance.success_rate,
+            "last_check": current_time
         }
     
-    def _calculate_progress(self, state: AgentState) -> float:
-        """Calculate progress with better granularity"""
+    async def attempt_recovery(self):
+        """Attempt to recover from issues"""
+        # Clear message queue if too full
+        if self.message_queue.qsize() > 500:
+            logger.warning(f"Clearing overloaded message queue for agent {self.agent_id}")
+            while not self.message_queue.empty():
+                try:
+                    self.message_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
         
-        if state.status == TaskStatus.COMPLETED:
-            return 1.0
-        elif state.status == TaskStatus.FAILED:
-            return state.current_step / len(state.execution_plan.steps) if state.execution_plan else 0.0
-        elif state.status == TaskStatus.PENDING:
-            return 0.0
-        elif state.status == TaskStatus.PLANNING:
-            return 0.1
-        elif state.status == TaskStatus.EXECUTING and state.execution_plan:
-            total_steps = len(state.execution_plan.steps)
-            if total_steps == 0:
-                return 0.5
-            
-            step_progress = state.current_step / total_steps
-            return 0.1 + (step_progress * 0.8)  # 10% planning, 80% execution, 10% reasoning
-        elif state.status == TaskStatus.REASONING:
-            return 0.9
+        # Reset error counters if needed
+        if self.performance.error_rate > 0.8:
+            logger.info(f"Resetting error counters for agent {self.agent_id}")
+            self.performance.failed_tasks = 0
+            self.performance.total_tasks = max(1, self.performance.successful_tasks)
+    
+    def _update_avg_response_time(self, response_time: float):
+        """Update average response time"""
+        if self.performance.total_tasks == 1:
+            self.performance.avg_response_time = response_time
         else:
-            return 0.5
+            # Exponential moving average
+            alpha = 0.1
+            self.performance.avg_response_time = (
+                alpha * response_time + 
+                (1 - alpha) * self.performance.avg_response_time
+            )
     
-    async def cancel_task(self, task_id: str) -> bool:
-        """Cancel a running task"""
-        
-        # Cancel the async task
-        cancelled = await self.task_manager.cancel_task(task_id)
-        
-        if cancelled:
-            # Update state
-            state = await self.state_store.get_state(task_id)
-            if state and state.status not in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
-                state.status = TaskStatus.FAILED
-                state.metadata["cancelled"] = True
-                state.metadata["cancelled_at"] = datetime.now().isoformat()
-                await self.state_store.save_state(task_id, state)
-        
-        return cancelled
+    def _update_message_performance(self, processing_time: float):
+        """Update message processing performance"""
+        # Could track separate metrics for message processing
+        pass
     
-    async def cleanup_old_tasks(self, max_age_hours: int = 24):
-        """Cleanup old tasks from storage"""
-        logger.info(f"Cleanup requested for tasks older than {max_age_hours} hours")
+    def get_status(self) -> Dict[str, Any]:
+        """Get comprehensive agent status"""
+        return {
+            "agent_id": self.agent_id,
+            "state": self.state.value,
+            "performance": {
+                "total_tasks": self.performance.total_tasks,
+                "successful_tasks": self.performance.successful_tasks,
+                "failed_tasks": self.performance.failed_tasks,
+                "success_rate": self.performance.success_rate,
+                "error_rate": self.performance.error_rate,
+                "avg_response_time": self.performance.avg_response_time,
+                "last_active": self.performance.last_active
+            },
+            "current_task": self.current_task.task_id if self.current_task else None,
+            "queue_size": self.message_queue.qsize(),
+            "connections": list(self._connections.keys()),
+            "health": self.health_status
+        }
     
-    def get_system_health(self) -> Dict[str, Any]:
-        """Get system health status"""
-        return self.metrics.get_system_health()
+    # Abstract methods that subclasses must implement
+    @abstractmethod
+    async def handle_message(self, message: AgentMessage) -> Optional[Dict[str, Any]]:
+        """Handle incoming message"""
+        pass
+    
+    @abstractmethod
+    async def process_task(self, task: Task) -> Dict[str, Any]:
+        """Process assigned task"""
+        pass
+    
+    @abstractmethod
+    async def on_start(self):
+        """Called when agent starts"""
+        pass
+    
+    @abstractmethod
+    async def on_stop(self):
+        """Called when agent stops"""
+        pass
+
+class AgentRegistry:
+    """Registry for managing multiple agents"""
+    
+    def __init__(self):
+        self.agents: Dict[str, BaseAgent] = {}
+        self.agent_types: Dict[str, type] = {}
+    
+    def register_agent_type(self, agent_type: str, agent_class: type):
+        """Register an agent type"""
+        self.agent_types[agent_type] = agent_class
+        logger.info(f"Registered agent type: {agent_type}")
+    
+    async def create_agent(self, agent_type: str, agent_id: str, config: Dict[str, Any]) -> BaseAgent:
+        """Create and register an agent"""
+        if agent_type not in self.agent_types:
+            raise ValueError(f"Unknown agent type: {agent_type}")
+        
+        if agent_id in self.agents:
+            raise ValueError(f"Agent {agent_id} already exists")
+        
+        agent_class = self.agent_types[agent_type]
+        agent = agent_class(agent_id, config)
+        
+        self.agents[agent_id] = agent
+        logger.info(f"Created agent {agent_id} of type {agent_type}")
+        
+        return agent
+    
+    async def start_agent(self, agent_id: str):
+        """Start an agent"""
+        if agent_id not in self.agents:
+            raise ValueError(f"Agent {agent_id} not found")
+        
+        await self.agents[agent_id].start()
+    
+    async def stop_agent(self, agent_id: str):
+        """Stop an agent"""
+        if agent_id not in self.agents:
+            raise ValueError(f"Agent {agent_id} not found")
+        
+        await self.agents[agent_id].stop()
+    
+    async def stop_all_agents(self):
+        """Stop all agents"""
+        tasks = [agent.stop() for agent in self.agents.values()]
+        await asyncio.gather(*tasks, return_exceptions=True)
+    
+    def get_agent(self, agent_id: str) -> Optional[BaseAgent]:
+        """Get agent by ID"""
+        return self.agents.get(agent_id)
+    
+    def list_agents(self) -> List[str]:
+        """List all agent IDs"""
+        return list(self.agents.keys())
+    
+    def get_agents_by_state(self, state: AgentState) -> List[BaseAgent]:
+        """Get agents by state"""
+        return [agent for agent in self.agents.values() if agent.state == state]
+
+# Global agent registry
+agent_registry = AgentRegistry()
+
+# Core agent system
+class AgentCore:
+    """Core agent management system"""
+    
+    def __init__(self):
+        self.registry = agent_registry
+        self.metrics = {
+            "total_agents": 0,
+            "active_agents": 0,
+            "total_tasks": 0,
+            "successful_tasks": 0,
+            "failed_tasks": 0
+        }
+    
+    async def initialize(self):
+        """Initialize agent core"""
+        logger.info("Agent core initialized")
+    
+    async def shutdown(self):
+        """Shutdown agent core"""
+        await self.registry.stop_all_agents()
+        logger.info("Agent core shutdown complete")
+    
+    def get_system_status(self) -> Dict[str, Any]:
+        """Get overall system status"""
+        agents = list(self.registry.agents.values())
+        
+        # Update metrics
+        self.metrics["total_agents"] = len(agents)
+        self.metrics["active_agents"] = len([a for a in agents if a.state == AgentState.RUNNING])
+        
+        # Aggregate task metrics
+        total_tasks = sum(a.performance.total_tasks for a in agents)
+        successful_tasks = sum(a.performance.successful_tasks for a in agents)
+        failed_tasks = sum(a.performance.failed_tasks for a in agents)
+        
+        self.metrics.update({
+            "total_tasks": total_tasks,
+            "successful_tasks": successful_tasks,
+            "failed_tasks": failed_tasks
+        })
+        
+        return {
+            "metrics": self.metrics,
+            "agents": {agent.agent_id: agent.get_status() for agent in agents}
+        }
 
 # Global agent core instance
-agent_core = OptimizedAgentCore()
+agent_core = AgentCore()

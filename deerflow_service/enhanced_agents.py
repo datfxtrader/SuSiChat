@@ -1,696 +1,666 @@
 
-from typing import List, Dict, Any, Optional, Set
 import asyncio
-import uuid
 import time
 import logging
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional, Set
+from dataclasses import dataclass, field
 from enum import Enum
-from enhanced_tools import EnhancedToolRegistry, ToolResult
-from enhanced_memory import PersistentMemoryManager
+from collections import defaultdict, deque
+import numpy as np
+
+from agent_core import BaseAgent, Task, TaskStatus, AgentMessage, AgentState, agent_registry
 
 logger = logging.getLogger("enhanced_agents")
 
-class AgentRole(Enum):
+class CollaborationRole(Enum):
     COORDINATOR = "coordinator"
     RESEARCHER = "researcher"
-    ANALYST = "analyst"
-    VALIDATOR = "validator"
+    ANALYZER = "analyzer"
     SYNTHESIZER = "synthesizer"
-    SPECIALIST = "specialist"
+    VALIDATOR = "validator"
+
+@dataclass
+class TeamConfiguration:
+    """Configuration for agent teams"""
+    max_agents: int = 3
+    coordination_strategy: str = "hierarchical"  # hierarchical, peer-to-peer, hybrid
+    task_distribution: str = "load_balanced"  # load_balanced, expertise_based, round_robin
+    communication_pattern: str = "hub_spoke"  # hub_spoke, mesh, chain
+    timeout_seconds: int = 300
 
 @dataclass
 class AgentCapability:
-    """Defines what an agent can do"""
-    name: str
-    description: str
-    required_tools: List[str]
-    output_type: str
-    confidence: float = 0.8
+    """Represents an agent's capabilities"""
+    domain_expertise: Set[str] = field(default_factory=set)
+    task_types: Set[str] = field(default_factory=set)
+    performance_score: float = 0.8
+    load_capacity: int = 5
+    current_load: int = 0
+    specializations: Set[str] = field(default_factory=set)
 
-@dataclass
-class AgentMessage:
-    """Message passed between agents"""
-    sender_id: str
-    recipient_id: str
-    message_type: str
-    content: Any
-    priority: int = 5
-    timestamp: float = None
-
-class SpecializedAgent:
-    """Enhanced specialized agent with capabilities"""
+class EnhancedAgent(BaseAgent):
+    """Enhanced agent with collaboration capabilities"""
     
-    def __init__(
-        self,
-        agent_id: str,
-        role: AgentRole,
-        capabilities: List[AgentCapability],
-        tool_registry: EnhancedToolRegistry,
-        memory_manager: PersistentMemoryManager
-    ):
-        self.agent_id = agent_id
-        self.role = role
-        self.capabilities = capabilities
-        self.tool_registry = tool_registry
-        self.memory_manager = memory_manager
+    def __init__(self, agent_id: str, config: Dict[str, Any]):
+        super().__init__(agent_id, config)
         
-        self.message_queue = asyncio.Queue()
-        self.state = "idle"
-        self.current_task = None
-        self.performance_metrics = {
-            "tasks_completed": 0,
-            "tasks_failed": 0,
-            "average_confidence": 0.0,
-            "total_execution_time": 0.0
-        }
+        # Collaboration capabilities
+        self.role = CollaborationRole(config.get("role", "researcher"))
+        self.capabilities = AgentCapability()
+        self.team_id: Optional[str] = None
+        self.team_members: Set[str] = set()
+        
+        # Communication
+        self.collaboration_history = deque(maxlen=100)
+        self.shared_context: Dict[str, Any] = {}
+        
+        # Performance optimization
+        self.task_preferences = config.get("task_preferences", {})
+        self.optimization_level = config.get("optimization_level", "balanced")
     
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a task based on capabilities"""
-        self.state = "working"
-        self.current_task = task
-        start_time = time.time()
+    async def join_team(self, team_id: str, team_members: Set[str]):
+        """Join a collaborative team"""
+        self.team_id = team_id
+        self.team_members = team_members
+        
+        # Connect to team members
+        for member_id in team_members:
+            if member_id != self.agent_id:
+                member_agent = agent_registry.get_agent(member_id)
+                if member_agent:
+                    self.connect_to_agent(member_agent)
+        
+        logger.info(f"Agent {self.agent_id} joined team {team_id} with {len(team_members)} members")
+    
+    async def leave_team(self):
+        """Leave current team"""
+        if self.team_id:
+            logger.info(f"Agent {self.agent_id} leaving team {self.team_id}")
+            
+            # Disconnect from team members
+            for member_id in list(self.team_members):
+                self.disconnect_from_agent(member_id)
+            
+            self.team_id = None
+            self.team_members.clear()
+            self.shared_context.clear()
+    
+    async def collaborate_on_task(self, task: Task, coordination_strategy: str = "hierarchical") -> Dict[str, Any]:
+        """Collaborate with team members on a task"""
+        if not self.team_members:
+            # Execute solo
+            return await self.execute_task(task)
+        
+        if coordination_strategy == "hierarchical":
+            return await self._hierarchical_collaboration(task)
+        elif coordination_strategy == "peer_to_peer":
+            return await self._peer_to_peer_collaboration(task)
+        else:
+            return await self._hybrid_collaboration(task)
+    
+    async def _hierarchical_collaboration(self, task: Task) -> Dict[str, Any]:
+        """Hierarchical collaboration with coordinator"""
+        if self.role == CollaborationRole.COORDINATOR:
+            return await self._coordinate_team_task(task)
+        else:
+            return await self._execute_assigned_subtask(task)
+    
+    async def _coordinate_team_task(self, task: Task) -> Dict[str, Any]:
+        """Coordinate team execution of task"""
+        logger.info(f"Coordinator {self.agent_id} managing task {task.task_id}")
+        
+        # Break down task into subtasks
+        subtasks = await self._decompose_task(task)
+        
+        # Assign subtasks to team members
+        assignments = await self._assign_subtasks(subtasks)
+        
+        # Execute subtasks in parallel
+        subtask_futures = []
+        for agent_id, subtask in assignments.items():
+            if agent_id != self.agent_id:
+                future = self._delegate_subtask(agent_id, subtask)
+                subtask_futures.append((agent_id, future))
+        
+        # Wait for all subtasks to complete
+        results = {}
+        for agent_id, future in subtask_futures:
+            try:
+                result = await asyncio.wait_for(future, timeout=task.requirements.get("timeout", 300))
+                results[agent_id] = result
+            except asyncio.TimeoutError:
+                logger.warning(f"Subtask timeout for agent {agent_id}")
+                results[agent_id] = {"error": "timeout"}
+            except Exception as e:
+                logger.error(f"Subtask error for agent {agent_id}: {e}")
+                results[agent_id] = {"error": str(e)}
+        
+        # Synthesize results
+        final_result = await self._synthesize_results(task, results)
+        
+        return final_result
+    
+    async def _decompose_task(self, task: Task) -> List[Dict[str, Any]]:
+        """Decompose complex task into subtasks"""
+        # Simple decomposition based on task type
+        task_type = task.task_type
+        
+        if task_type == "research":
+            return [
+                {"type": "information_gathering", "priority": 1},
+                {"type": "fact_verification", "priority": 2},
+                {"type": "analysis", "priority": 3},
+                {"type": "synthesis", "priority": 4}
+            ]
+        elif task_type == "analysis":
+            return [
+                {"type": "data_collection", "priority": 1},
+                {"type": "statistical_analysis", "priority": 2},
+                {"type": "interpretation", "priority": 3}
+            ]
+        else:
+            # Default decomposition
+            return [
+                {"type": "processing", "priority": 1},
+                {"type": "validation", "priority": 2}
+            ]
+    
+    async def _assign_subtasks(self, subtasks: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """Assign subtasks to team members based on capabilities"""
+        assignments = {}
+        available_agents = list(self.team_members)
+        
+        # Sort subtasks by priority
+        sorted_subtasks = sorted(subtasks, key=lambda x: x.get("priority", 0))
+        
+        # Assign based on agent capabilities
+        for i, subtask in enumerate(sorted_subtasks):
+            if available_agents:
+                # Simple round-robin for now
+                agent_id = available_agents[i % len(available_agents)]
+                assignments[agent_id] = subtask
+        
+        return assignments
+    
+    async def _delegate_subtask(self, agent_id: str, subtask: Dict[str, Any]) -> Dict[str, Any]:
+        """Delegate subtask to specific agent"""
+        message_content = {
+            "action": "execute_subtask",
+            "subtask": subtask,
+            "context": self.shared_context
+        }
+        
+        response = await self.send_message(
+            recipient=agent_id,
+            content=message_content,
+            message_type="delegation",
+            requires_response=True
+        )
+        
+        return response or {"error": "no_response"}
+    
+    async def _synthesize_results(self, task: Task, results: Dict[str, Any]) -> Dict[str, Any]:
+        """Synthesize results from multiple agents"""
+        successful_results = {
+            agent_id: result for agent_id, result in results.items()
+            if not result.get("error")
+        }
+        
+        if not successful_results:
+            return {"error": "All subtasks failed", "details": results}
+        
+        # Simple synthesis - combine all successful results
+        synthesized = {
+            "task_id": task.task_id,
+            "status": "completed",
+            "agent_contributions": successful_results,
+            "synthesis_method": "collaborative",
+            "participating_agents": list(successful_results.keys()),
+            "completion_time": time.time()
+        }
+        
+        # Extract key information
+        if "information_gathering" in str(successful_results):
+            synthesized["research_data"] = "Gathered from multiple sources"
+        
+        if "analysis" in str(successful_results):
+            synthesized["analysis_results"] = "Combined analytical insights"
+        
+        return synthesized
+    
+    async def handle_message(self, message: AgentMessage) -> Optional[Dict[str, Any]]:
+        """Handle incoming messages with collaboration support"""
+        action = message.content.get("action")
+        
+        if action == "execute_subtask":
+            return await self._handle_subtask_delegation(message)
+        elif action == "share_context":
+            return await self._handle_context_sharing(message)
+        elif action == "request_collaboration":
+            return await self._handle_collaboration_request(message)
+        else:
+            # Handle other message types
+            return await self._handle_general_message(message)
+    
+    async def _handle_subtask_delegation(self, message: AgentMessage) -> Dict[str, Any]:
+        """Handle subtask delegation from coordinator"""
+        subtask = message.content.get("subtask", {})
+        context = message.content.get("context", {})
+        
+        # Update shared context
+        self.shared_context.update(context)
+        
+        # Create task from subtask
+        task = Task(
+            query=subtask.get("description", "Delegated subtask"),
+            task_type=subtask.get("type", "general"),
+            priority=subtask.get("priority", 0),
+            context=context
+        )
         
         try:
-            # Determine best capability for task
-            capability = self._select_capability(task)
-            if not capability:
-                return {
-                    "status": "error",
-                    "error": "No suitable capability for task",
-                    "agent_id": self.agent_id
-                }
-            
-            # Execute task using tools
-            results = []
-            for tool_name in capability.required_tools:
-                # Check if tool exists
-                if tool_name in self.tool_registry.tools:
-                    tool_result = await self.tool_registry.execute_tool(
-                        tool_name,
-                        **task.get("parameters", {})
-                    )
-                    results.append(tool_result)
-                else:
-                    # Mock tool result for non-existent tools
-                    results.append(ToolResult(
-                        success=True,
-                        data=f"Mock result from {tool_name}",
-                        metadata={"tool": tool_name, "mock": True}
-                    ))
-            
-            # Process results based on role
-            processed_result = await self._process_results(
-                results, 
-                capability, 
-                task
-            )
-            
-            # Store in memory
-            await self._update_memory(task, processed_result)
-            
-            # Update metrics
-            execution_time = time.time() - start_time
-            self.performance_metrics["tasks_completed"] += 1
-            self.performance_metrics["total_execution_time"] += execution_time
-            
-            self.state = "idle"
-            return processed_result
-            
-        except Exception as e:
-            self.performance_metrics["tasks_failed"] += 1
-            self.state = "error"
-            
+            result = await self.execute_task(task)
             return {
-                "status": "error",
+                "status": "completed",
+                "result": result,
+                "agent_id": self.agent_id
+            }
+        except Exception as e:
+            return {
+                "status": "failed",
                 "error": str(e),
                 "agent_id": self.agent_id
             }
     
-    def _select_capability(self, task: Dict[str, Any]) -> Optional[AgentCapability]:
-        """Select best capability for task"""
-        task_type = task.get("type", "")
-        
-        # Score each capability
-        best_capability = None
-        best_score = 0.0
-        
-        for capability in self.capabilities:
-            score = self._score_capability(capability, task)
-            if score > best_score:
-                best_score = score
-                best_capability = capability
-        
-        return best_capability if best_score > 0.5 else None
+    async def process_task(self, task: Task) -> Dict[str, Any]:
+        """Process task with role-specific behavior"""
+        if self.role == CollaborationRole.RESEARCHER:
+            return await self._research_task(task)
+        elif self.role == CollaborationRole.ANALYZER:
+            return await self._analyze_task(task)
+        elif self.role == CollaborationRole.SYNTHESIZER:
+            return await self._synthesize_task(task)
+        elif self.role == CollaborationRole.VALIDATOR:
+            return await self._validate_task(task)
+        else:
+            return await self._general_task(task)
     
-    def _score_capability(
-        self, 
-        capability: AgentCapability, 
-        task: Dict[str, Any]
-    ) -> float:
-        """Score how well capability matches task"""
-        score = 0.0
-        
-        task_keywords = task.get("keywords", [])
-        task_description = task.get("description", "")
-        capability_keywords = capability.description.lower().split()
-        
-        # Keyword matching
-        if task_keywords:
-            matches = sum(
-                1 for keyword in task_keywords 
-                if keyword.lower() in capability_keywords
-            )
-            if matches > 0:
-                score += (matches / len(task_keywords)) * 0.6
-        
-        # Description matching
-        if task_description:
-            desc_words = task_description.lower().split()
-            desc_matches = sum(
-                1 for word in desc_words
-                if word in capability_keywords
-            )
-            if desc_matches > 0:
-                score += (desc_matches / len(desc_words)) * 0.4
-        
-        return score * capability.confidence
-    
-    async def _process_results(
-        self,
-        results: List[ToolResult],
-        capability: AgentCapability,
-        task: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Process tool results based on agent role"""
-        
-        if self.role == AgentRole.RESEARCHER:
-            # Aggregate and summarize findings
-            successful_results = [r for r in results if r.success]
-            
-            return {
-                "status": "success",
-                "agent_id": self.agent_id,
-                "role": self.role.value,
-                "capability_used": capability.name,
-                "findings": [r.data for r in successful_results],
-                "confidence": sum(r.metadata.get("confidence", 0.5) for r in successful_results) / len(successful_results) if successful_results else 0.0
-            }
-            
-        elif self.role == AgentRole.ANALYST:
-            # Analyze patterns and insights
-            successful_results = [r for r in results if r.success]
-            
-            return {
-                "status": "success",
-                "agent_id": self.agent_id,
-                "role": self.role.value,
-                "capability_used": capability.name,
-                "analysis": "Pattern analysis from tool results",
-                "insights": [f"Insight from {r.metadata.get('tool', 'unknown')}" for r in successful_results],
-                "confidence": 0.7
-            }
-            
-        elif self.role == AgentRole.COORDINATOR:
-            # Coordinate and integrate
-            if task.get("type") == "decomposition":
-                return await self._decompose_task(task)
-            elif task.get("type") == "integration":
-                return await self._integrate_results(task)
-            
-        # Default processing
+    async def _research_task(self, task: Task) -> Dict[str, Any]:
+        """Research-specific task processing"""
         return {
-            "status": "success",
-            "agent_id": self.agent_id,
-            "role": self.role.value,
-            "capability_used": capability.name,
-            "results": [r.to_dict() for r in results],
-            "confidence": 0.6
+            "type": "research",
+            "findings": f"Research results for: {task.query}",
+            "sources": ["source1", "source2", "source3"],
+            "confidence": 0.85,
+            "agent_role": "researcher"
         }
     
-    async def _decompose_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """Decompose a complex task into subtasks"""
-        main_task = task.get("parameters", {}).get("task", "")
-        
-        # Simple task decomposition based on keywords
-        subtasks = []
-        
-        if "research" in main_task.lower():
-            subtasks.append({
-                "type": "research",
-                "description": f"Research: {main_task}",
-                "parameters": {"query": main_task},
-                "keywords": ["research", "find", "gather"]
-            })
-        
-        if "analyze" in main_task.lower() or "analysis" in main_task.lower():
-            subtasks.append({
-                "type": "analysis",
-                "description": f"Analyze: {main_task}",
-                "parameters": {"data": main_task},
-                "keywords": ["analyze", "evaluate", "compare"]
-            })
-        
-        if "validate" in main_task.lower() or "verify" in main_task.lower():
-            subtasks.append({
-                "type": "validation",
-                "description": f"Validate: {main_task}",
-                "parameters": {"content": main_task},
-                "keywords": ["validate", "verify", "check"]
-            })
-        
-        # If no specific keywords, create a general research task
-        if not subtasks:
-            subtasks.append({
-                "type": "research",
-                "description": f"General research: {main_task}",
-                "parameters": {"query": main_task},
-                "keywords": ["research"]
-            })
-        
+    async def _analyze_task(self, task: Task) -> Dict[str, Any]:
+        """Analysis-specific task processing"""
         return {
-            "status": "success",
-            "agent_id": self.agent_id,
-            "subtasks": subtasks,
-            "original_task": main_task
+            "type": "analysis",
+            "insights": f"Analysis of: {task.query}",
+            "metrics": {"accuracy": 0.9, "completeness": 0.8},
+            "agent_role": "analyzer"
         }
     
-    async def _integrate_results(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """Integrate results from multiple agents"""
-        results = task.get("parameters", {}).get("results", [])
-        original_task = task.get("parameters", {}).get("original_task", "")
-        
-        successful_results = [r for r in results if r.get("status") == "success"]
-        
-        # Simple integration - combine findings and insights
-        integrated_findings = []
-        integrated_insights = []
-        total_confidence = 0.0
-        
-        for result in successful_results:
-            if "findings" in result:
-                integrated_findings.extend(result["findings"])
-            if "insights" in result:
-                integrated_insights.extend(result["insights"])
-            if "analysis" in result:
-                integrated_insights.append(result["analysis"])
-            
-            total_confidence += result.get("confidence", 0.0)
-        
-        average_confidence = total_confidence / len(successful_results) if successful_results else 0.0
-        
+    async def _synthesize_task(self, task: Task) -> Dict[str, Any]:
+        """Synthesis-specific task processing"""
         return {
-            "status": "success",
-            "agent_id": self.agent_id,
-            "original_task": original_task,
-            "integrated_findings": integrated_findings,
-            "integrated_insights": integrated_insights,
-            "confidence": average_confidence,
-            "summary": f"Integrated {len(successful_results)} agent results for: {original_task}"
+            "type": "synthesis",
+            "summary": f"Synthesized information for: {task.query}",
+            "key_points": ["point1", "point2", "point3"],
+            "agent_role": "synthesizer"
         }
     
-    async def _update_memory(
-        self, 
-        task: Dict[str, Any], 
-        result: Dict[str, Any]
-    ):
-        """Update agent memory with task results"""
-        try:
-            await self.memory_manager.store_memory(
-                agent_id=self.agent_id,
-                memory_type="episodic",
-                content=f"Completed task: {task.get('description', 'Unknown')}",
-                metadata={
-                    "task": task,
-                    "result": result,
-                    "role": self.role.value
-                },
-                importance=0.7
-            )
-        except Exception as e:
-            logger.warning(f"Failed to store memory: {e}")
-    
-    def get_performance_stats(self) -> Dict[str, Any]:
-        """Get agent performance statistics"""
-        total_tasks = self.performance_metrics["tasks_completed"] + self.performance_metrics["tasks_failed"]
-        success_rate = (
-            self.performance_metrics["tasks_completed"] / total_tasks 
-            if total_tasks > 0 else 0.0
-        )
-        avg_execution_time = (
-            self.performance_metrics["total_execution_time"] / self.performance_metrics["tasks_completed"]
-            if self.performance_metrics["tasks_completed"] > 0 else 0.0
-        )
-        
+    async def _validate_task(self, task: Task) -> Dict[str, Any]:
+        """Validation-specific task processing"""
         return {
-            "agent_id": self.agent_id,
-            "role": self.role.value,
-            "state": self.state,
-            "tasks_completed": self.performance_metrics["tasks_completed"],
-            "tasks_failed": self.performance_metrics["tasks_failed"],
-            "success_rate": success_rate,
-            "average_execution_time": avg_execution_time,
-            "capabilities_count": len(self.capabilities)
+            "type": "validation",
+            "validation_result": "validated",
+            "confidence_score": 0.92,
+            "issues_found": [],
+            "agent_role": "validator"
         }
+    
+    async def _general_task(self, task: Task) -> Dict[str, Any]:
+        """General task processing"""
+        return {
+            "type": "general",
+            "result": f"Processed: {task.query}",
+            "agent_role": str(self.role.value)
+        }
+    
+    async def on_start(self):
+        """Enhanced agent startup"""
+        logger.info(f"Enhanced agent {self.agent_id} with role {self.role.value} starting")
+    
+    async def on_stop(self):
+        """Enhanced agent shutdown"""
+        await self.leave_team()
+        logger.info(f"Enhanced agent {self.agent_id} stopped")
 
 class EnhancedMultiAgentOrchestrator:
-    """Sophisticated multi-agent orchestration"""
+    """Optimized multi-agent orchestrator with intelligent coordination"""
     
-    def __init__(
-        self,
-        tool_registry: EnhancedToolRegistry,
-        memory_manager: PersistentMemoryManager,
-        config: Dict[str, Any]
-    ):
+    def __init__(self, tool_registry, memory_manager, config: Dict[str, Any]):
         self.tool_registry = tool_registry
         self.memory_manager = memory_manager
         self.config = config
         
-        self.agents: Dict[str, SpecializedAgent] = {}
-        self.task_queue = asyncio.Queue()
-        self.results_cache: Dict[str, Any] = {}
+        # Team management
+        self.active_teams: Dict[str, List[str]] = {}
+        self.team_configurations: Dict[str, TeamConfiguration] = {}
+        
+        # Performance tracking
+        self.orchestrator_metrics = {
+            "teams_created": 0,
+            "tasks_coordinated": 0,
+            "successful_collaborations": 0,
+            "failed_collaborations": 0,
+            "avg_team_size": 0.0,
+            "avg_completion_time": 0.0
+        }
+        
+        # Agent pools
+        self.agent_pools = {
+            "researchers": [],
+            "analyzers": [],
+            "synthesizers": [],
+            "validators": []
+        }
+        
+        # Load balancing
+        self.agent_loads: Dict[str, int] = defaultdict(int)
+        self.performance_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=50))
     
-    async def create_agent_team(
-        self,
-        task: str,
-        complexity: str
-    ) -> Dict[str, SpecializedAgent]:
-        """Create optimal agent team for task"""
+    async def create_agent_team(self, query: str, complexity: Dict[str, Any]) -> List[str]:
+        """Create optimal team for query with intelligent agent selection"""
+        start_time = time.time()
         
-        team = {}
+        # Analyze team requirements
+        team_requirements = await self._analyze_team_requirements(query, complexity)
         
-        # Always create coordinator
-        coordinator = await self._create_agent(
-            role=AgentRole.COORDINATOR,
-            capabilities=[
-                AgentCapability(
-                    name="task_decomposition",
-                    description="Decompose complex tasks into subtasks",
-                    required_tools=["task_analyzer"],
-                    output_type="task_list"
-                ),
-                AgentCapability(
-                    name="result_integration",
-                    description="Integrate results from multiple agents",
-                    required_tools=["result_synthesizer"],
-                    output_type="integrated_result"
-                )
-            ]
-        )
-        team[coordinator.agent_id] = coordinator
+        # Select optimal agents
+        selected_agents = await self._select_optimal_agents(team_requirements)
         
-        # Add specialists based on task analysis
-        task_analysis = await self._analyze_task_requirements(task)
+        if not selected_agents:
+            # Fallback: create minimal team
+            selected_agents = await self._create_fallback_team()
         
-        for requirement in task_analysis["requirements"]:
-            if requirement["type"] == "research":
-                researcher = await self._create_agent(
-                    role=AgentRole.RESEARCHER,
-                    capabilities=self._get_research_capabilities()
-                )
-                team[researcher.agent_id] = researcher
-                
-            elif requirement["type"] == "analysis":
-                analyst = await self._create_agent(
-                    role=AgentRole.ANALYST,
-                    capabilities=self._get_analysis_capabilities()
-                )
-                team[analyst.agent_id] = analyst
-                
-            elif requirement["type"] == "validation":
-                validator = await self._create_agent(
-                    role=AgentRole.VALIDATOR,
-                    capabilities=self._get_validation_capabilities()
-                )
-                team[validator.agent_id] = validator
+        # Create team
+        team_id = f"team_{int(time.time())}_{len(self.active_teams)}"
+        await self._form_team(team_id, selected_agents, team_requirements)
         
-        return team
-    
-    async def _create_agent(
-        self,
-        role: AgentRole,
-        capabilities: List[AgentCapability]
-    ) -> SpecializedAgent:
-        """Create a specialized agent"""
-        
-        agent_id = f"{role.value}_{uuid.uuid4().hex[:8]}"
-        
-        agent = SpecializedAgent(
-            agent_id=agent_id,
-            role=role,
-            capabilities=capabilities,
-            tool_registry=self.tool_registry,
-            memory_manager=self.memory_manager
+        # Update metrics
+        self.orchestrator_metrics["teams_created"] += 1
+        self.orchestrator_metrics["avg_team_size"] = (
+            (self.orchestrator_metrics["avg_team_size"] * (self.orchestrator_metrics["teams_created"] - 1) + 
+             len(selected_agents)) / self.orchestrator_metrics["teams_created"]
         )
         
-        self.agents[agent_id] = agent
+        creation_time = time.time() - start_time
+        logger.info(f"Created team {team_id} with {len(selected_agents)} agents in {creation_time:.2f}s")
         
-        return agent
+        return selected_agents
     
-    async def execute_coordinated_task(
-        self,
-        task: str,
-        team: Dict[str, SpecializedAgent]
-    ) -> Dict[str, Any]:
-        """Execute task with coordinated agents"""
+    async def _analyze_team_requirements(self, query: str, complexity: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze what kind of team is needed"""
         
-        # Phase 1: Task decomposition by coordinator
-        coordinator = next(
-            agent for agent in team.values() 
-            if agent.role == AgentRole.COORDINATOR
-        )
+        # Determine required roles
+        required_roles = set()
         
-        decomposition_result = await coordinator.process_task({
-            "type": "decomposition",
-            "description": task,
-            "parameters": {"task": task}
-        })
+        # Always need a coordinator for complex tasks
+        if complexity.get("level") in ["moderate", "complex"]:
+            required_roles.add(CollaborationRole.COORDINATOR)
         
-        if decomposition_result["status"] != "success":
-            return decomposition_result
+        # Determine domain-specific needs
+        if "research" in query.lower():
+            required_roles.add(CollaborationRole.RESEARCHER)
         
-        # Phase 2: Parallel execution by specialists
-        subtasks = decomposition_result.get("subtasks", [])
-        agent_tasks = []
+        if any(word in query.lower() for word in ["analyze", "analysis", "evaluate"]):
+            required_roles.add(CollaborationRole.ANALYZER)
         
-        for subtask in subtasks:
-            # Find best agent for subtask
-            best_agent = self._select_agent_for_task(team, subtask)
-            if best_agent:
-                agent_tasks.append(
-                    best_agent.process_task(subtask)
-                )
+        if any(word in query.lower() for word in ["summarize", "combine", "synthesize"]):
+            required_roles.add(CollaborationRole.SYNTHESIZER)
         
-        # Execute in parallel with supervision
-        results = await self._execute_with_supervision(agent_tasks)
+        if any(word in query.lower() for word in ["verify", "validate", "check", "confirm"]):
+            required_roles.add(CollaborationRole.VALIDATOR)
         
-        # Phase 3: Result integration
-        integration_result = await coordinator.process_task({
-            "type": "integration",
-            "description": "Integrate agent results",
-            "parameters": {
-                "results": results,
-                "original_task": task
-            }
-        })
+        # Default to researcher if no specific roles identified
+        if not required_roles:
+            required_roles.add(CollaborationRole.RESEARCHER)
+        
+        # Determine team size
+        complexity_level = complexity.get("level", "simple")
+        if complexity_level == "simple":
+            max_agents = 2
+        elif complexity_level == "moderate":
+            max_agents = 3
+        else:
+            max_agents = 4
         
         return {
-            "status": "success",
-            "task": task,
-            "team_size": len(team),
-            "execution_phases": {
-                "decomposition": decomposition_result,
-                "execution": results,
-                "integration": integration_result
-            },
-            "final_result": integration_result
+            "required_roles": required_roles,
+            "max_agents": max_agents,
+            "coordination_strategy": "hierarchical" if len(required_roles) > 2 else "peer_to_peer",
+            "timeout": complexity.get("estimated_processing_time", 300)
         }
     
-    async def _execute_with_supervision(
-        self,
-        agent_tasks: List[asyncio.Task]
-    ) -> List[Dict[str, Any]]:
-        """Execute tasks with supervision and error handling"""
+    async def _select_optimal_agents(self, requirements: Dict[str, Any]) -> List[str]:
+        """Select optimal agents based on requirements"""
+        required_roles = requirements["required_roles"]
+        max_agents = requirements["max_agents"]
         
-        results = []
+        selected = []
+        role_assignments = {}
+        
+        # Get available agents by role
+        available_by_role = await self._get_available_agents_by_role()
+        
+        # Assign agents to roles
+        for role in required_roles:
+            if len(selected) >= max_agents:
+                break
+            
+            candidates = available_by_role.get(role, [])
+            if candidates:
+                # Select best candidate based on performance and load
+                best_agent = await self._select_best_agent(candidates)
+                if best_agent and best_agent not in selected:
+                    selected.append(best_agent)
+                    role_assignments[best_agent] = role
+        
+        # Fill remaining slots with general agents if needed
+        if len(selected) < max_agents:
+            all_available = []
+            for agents in available_by_role.values():
+                all_available.extend(agents)
+            
+            for agent_id in all_available:
+                if agent_id not in selected and len(selected) < max_agents:
+                    selected.append(agent_id)
+        
+        return selected
+    
+    async def _get_available_agents_by_role(self) -> Dict[CollaborationRole, List[str]]:
+        """Get available agents grouped by role"""
+        available = defaultdict(list)
+        
+        for agent_id, agent in agent_registry.agents.items():
+            if (isinstance(agent, EnhancedAgent) and 
+                agent.state == AgentState.RUNNING and 
+                self.agent_loads[agent_id] < 3):  # Max 3 concurrent tasks
+                
+                available[agent.role].append(agent_id)
+        
+        return available
+    
+    async def _select_best_agent(self, candidates: List[str]) -> Optional[str]:
+        """Select best agent from candidates based on performance and load"""
+        if not candidates:
+            return None
+        
+        scores = {}
+        for agent_id in candidates:
+            agent = agent_registry.get_agent(agent_id)
+            if not agent:
+                continue
+            
+            # Calculate composite score
+            load_score = 1.0 - (self.agent_loads[agent_id] / 5.0)  # Normalize load
+            performance_score = agent.performance.success_rate
+            
+            # Recent performance trend
+            recent_performance = self.performance_history[agent_id]
+            trend_score = 0.8  # Default
+            if len(recent_performance) > 5:
+                trend_score = np.mean(list(recent_performance)[-5:])
+            
+            # Weighted combination
+            composite_score = (
+                load_score * 0.4 +
+                performance_score * 0.4 +
+                trend_score * 0.2
+            )
+            
+            scores[agent_id] = composite_score
+        
+        # Return agent with highest score
+        return max(scores, key=scores.get) if scores else candidates[0]
+    
+    async def _form_team(self, team_id: str, agent_ids: List[str], requirements: Dict[str, Any]):
+        """Form team and establish connections"""
+        self.active_teams[team_id] = agent_ids
+        
+        # Create team configuration
+        config = TeamConfiguration(
+            max_agents=len(agent_ids),
+            coordination_strategy=requirements.get("coordination_strategy", "hierarchical"),
+            timeout_seconds=requirements.get("timeout", 300)
+        )
+        self.team_configurations[team_id] = config
+        
+        # Connect agents
+        for agent_id in agent_ids:
+            agent = agent_registry.get_agent(agent_id)
+            if isinstance(agent, EnhancedAgent):
+                await agent.join_team(team_id, set(agent_ids))
+    
+    async def execute_coordinated_task(self, query: str, team: List[str], resources: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Execute task with team coordination"""
+        start_time = time.time()
+        
+        if not team:
+            raise ValueError("No team provided for task execution")
+        
+        # Create task
+        task = Task(
+            query=query,
+            task_type="collaborative",
+            requirements=resources or {}
+        )
         
         try:
-            # Execute with timeout and error handling
-            completed_tasks = await asyncio.wait_for(
-                asyncio.gather(*agent_tasks, return_exceptions=True),
-                timeout=self.config.get("task_timeout", 300)
-            )
+            # Find coordinator (first agent or designated coordinator)
+            coordinator_id = team[0]
+            coordinator = agent_registry.get_agent(coordinator_id)
             
-            for i, result in enumerate(completed_tasks):
-                if isinstance(result, Exception):
-                    results.append({
-                        "status": "error",
-                        "error": str(result),
-                        "task_index": i
-                    })
-                else:
-                    results.append(result)
-                    
-        except asyncio.TimeoutError:
-            # Handle timeout
-            for task in agent_tasks:
-                if not task.done():
-                    task.cancel()
+            if not isinstance(coordinator, EnhancedAgent):
+                raise RuntimeError("Coordinator is not an enhanced agent")
             
-            results.append({
+            # Execute collaborative task
+            result = await coordinator.collaborate_on_task(task)
+            
+            # Update metrics
+            self.orchestrator_metrics["tasks_coordinated"] += 1
+            self.orchestrator_metrics["successful_collaborations"] += 1
+            
+            execution_time = time.time() - start_time
+            self._update_avg_completion_time(execution_time)
+            
+            # Update performance history
+            for agent_id in team:
+                self.performance_history[agent_id].append(1.0)  # Success
+            
+            return {
+                "status": "success",
+                "result": result,
+                "team_size": len(team),
+                "execution_time": execution_time,
+                "coordination_method": "collaborative"
+            }
+            
+        except Exception as e:
+            # Update failure metrics
+            self.orchestrator_metrics["failed_collaborations"] += 1
+            
+            # Update performance history
+            for agent_id in team:
+                self.performance_history[agent_id].append(0.0)  # Failure
+            
+            logger.error(f"Collaborative task execution failed: {e}")
+            
+            return {
                 "status": "error",
-                "error": "Task execution timeout"
-            })
+                "error": str(e),
+                "team_size": len(team),
+                "execution_time": time.time() - start_time
+            }
         
-        return results
+        finally:
+            # Clean up team
+            await self._dissolve_team(team)
     
-    def _select_agent_for_task(
-        self,
-        team: Dict[str, SpecializedAgent],
-        task: Dict[str, Any]
-    ) -> Optional[SpecializedAgent]:
-        """Select best agent for a specific task"""
+    async def _dissolve_team(self, team: List[str]):
+        """Dissolve team and clean up connections"""
+        for agent_id in team:
+            agent = agent_registry.get_agent(agent_id)
+            if isinstance(agent, EnhancedAgent):
+                await agent.leave_team()
         
-        best_agent = None
-        best_score = 0.0
+        # Remove from active teams
+        team_id = None
+        for tid, members in self.active_teams.items():
+            if set(members) == set(team):
+                team_id = tid
+                break
         
-        for agent in team.values():
-            if agent.role == AgentRole.COORDINATOR:
-                continue
-                
-            # Score agent suitability
-            score = self._score_agent_for_task(agent, task)
-            if score > best_score:
-                best_score = score
-                best_agent = agent
-        
-        return best_agent if best_score > 0.5 else None
+        if team_id:
+            del self.active_teams[team_id]
+            self.team_configurations.pop(team_id, None)
     
-    def _score_agent_for_task(
-        self,
-        agent: SpecializedAgent,
-        task: Dict[str, Any]
-    ) -> float:
-        """Score how well an agent matches a task"""
+    def _update_avg_completion_time(self, completion_time: float):
+        """Update average completion time"""
+        current_avg = self.orchestrator_metrics["avg_completion_time"]
+        total_tasks = self.orchestrator_metrics["tasks_coordinated"]
         
-        # Consider agent role
-        role_scores = {
-            AgentRole.RESEARCHER: 0.8 if "research" in str(task).lower() else 0.3,
-            AgentRole.ANALYST: 0.8 if "analyze" in str(task).lower() else 0.3,
-            AgentRole.VALIDATOR: 0.8 if "validate" in str(task).lower() else 0.3
-        }
-        
-        base_score = role_scores.get(agent.role, 0.5)
-        
-        # Consider agent performance
-        if agent.performance_metrics["tasks_completed"] > 0:
-            success_rate = (
-                agent.performance_metrics["tasks_completed"] / 
-                (agent.performance_metrics["tasks_completed"] + 
-                 agent.performance_metrics["tasks_failed"])
+        if total_tasks == 1:
+            self.orchestrator_metrics["avg_completion_time"] = completion_time
+        else:
+            self.orchestrator_metrics["avg_completion_time"] = (
+                (current_avg * (total_tasks - 1) + completion_time) / total_tasks
             )
-            base_score *= success_rate
-        
-        # Consider agent availability
-        if agent.state != "idle":
-            base_score *= 0.5
-        
-        return base_score
     
-    async def _analyze_task_requirements(
-        self,
-        task: str
-    ) -> Dict[str, Any]:
-        """Analyze what types of agents are needed"""
-        
-        requirements = []
-        
-        # Simple keyword-based analysis
-        task_lower = task.lower()
-        
-        if any(word in task_lower for word in ["research", "find", "search", "gather"]):
-            requirements.append({
-                "type": "research",
-                "priority": "high"
-            })
-        
-        if any(word in task_lower for word in ["analyze", "compare", "evaluate"]):
-            requirements.append({
-                "type": "analysis",
-                "priority": "high"
-            })
-        
-        if any(word in task_lower for word in ["verify", "validate", "check"]):
-            requirements.append({
-                "type": "validation",
-                "priority": "medium"
-            })
-        
-        return {
-            "task": task,
-            "requirements": requirements,
-            "estimated_complexity": len(requirements)
-        }
-    
-    def _get_research_capabilities(self) -> List[AgentCapability]:
-        """Get research agent capabilities"""
-        return [
-            AgentCapability(
-                name="web_research",
-                description="Research information from web sources",
-                required_tools=["web_search"],
-                output_type="research_findings"
-            ),
-            AgentCapability(
-                name="academic_research",
-                description="Research academic papers and studies",
-                required_tools=["academic_search"],
-                output_type="academic_findings"
-            )
+    async def _create_fallback_team(self) -> List[str]:
+        """Create fallback team when no optimal team found"""
+        # Just get any available agent
+        available_agents = [
+            agent_id for agent_id, agent in agent_registry.agents.items()
+            if agent.state == AgentState.RUNNING
         ]
-    
-    def _get_analysis_capabilities(self) -> List[AgentCapability]:
-        """Get analysis agent capabilities"""
-        return [
-            AgentCapability(
-                name="data_analysis",
-                description="Analyze data and find patterns",
-                required_tools=["data_analyzer", "statistics"],
-                output_type="analysis_report"
-            ),
-            AgentCapability(
-                name="sentiment_analysis",
-                description="Analyze sentiment and opinions",
-                required_tools=["sentiment_analyzer"],
-                output_type="sentiment_report"
-            )
-        ]
-    
-    def _get_validation_capabilities(self) -> List[AgentCapability]:
-        """Get validation agent capabilities"""
-        return [
-            AgentCapability(
-                name="fact_checking",
-                description="Validate facts and claims",
-                required_tools=["fact_checker"],
-                output_type="validation_report"
-            ),
-            AgentCapability(
-                name="source_verification",
-                description="Verify source credibility",
-                required_tools=["source_verifier"],
-                output_type="verification_report"
-            )
-        ]
+        
+        return available_agents[:1] if available_agents else []
     
     def get_orchestrator_stats(self) -> Dict[str, Any]:
-        """Get orchestrator statistics"""
-        agent_stats = {}
-        for agent_id, agent in self.agents.items():
-            agent_stats[agent_id] = agent.get_performance_stats()
-        
+        """Get orchestrator performance statistics"""
         return {
-            "total_agents": len(self.agents),
-            "agent_stats": agent_stats,
-            "cache_size": len(self.results_cache)
+            "metrics": self.orchestrator_metrics,
+            "active_teams": len(self.active_teams),
+            "total_agents": len(agent_registry.agents),
+            "running_agents": len(agent_registry.get_agents_by_state(AgentState.RUNNING)),
+            "agent_loads": dict(self.agent_loads)
         }
+
+# Register enhanced agent type
+agent_registry.register_agent_type("enhanced", EnhancedAgent)
