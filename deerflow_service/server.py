@@ -164,7 +164,7 @@ async def search_web(query: str, max_results: int = 8):
         async with aiohttp.ClientSession() as session:
             # Call our intelligent search endpoint
             async with session.post(
-                'http://0.0.0.0:3000/api/enhanced-web-search/search',
+                'http://127.0.0.1:3000/api/enhanced-web-search/search',
                 json={
                     'query': query,
                     'maxResults': max_results,
