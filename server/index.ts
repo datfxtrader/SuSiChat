@@ -481,6 +481,10 @@ app.use((req, res, next) => {
   app.use('/api/enhanced-search', enhancedSearchRouter);
   app.use('/api/cache', cacheMonitoringRouter);
   app.use('/api/financial-facts', financialFactCheckingRouter);
+  
+  // Import and use the new financial research route
+  const financialResearchRouter = (await import('./routes/financial-research.route')).default;
+  app.use('/api/financial-research', financialResearchRouter);
 
   app.use('/api/enhanced-search', enhancedSearchRouter);
 
