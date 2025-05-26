@@ -469,7 +469,7 @@ Your report should:
         try {
           // Use axios for server-side requests instead of fetch
           const axios = require('axios');
-          const response = await axios.post('http://localhost:3000/api/forex/analyze', {
+          const response = await axios.post('http://0.0.0.0:5000/api/forex/analyze', {
             currencyPair,
             timeframe: 'daily'
           });

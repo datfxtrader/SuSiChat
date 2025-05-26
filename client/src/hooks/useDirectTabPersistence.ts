@@ -268,18 +268,18 @@ export const useDirectTabPersistence = (isSending?: boolean) => {
 
   // Complete only when we reach 100% AND have a response message
   useEffect(() => {
-    if (isResearchInProgress && researchProgress >= 100 && messages.length > 0) {
+    if (isResearchInProgress && researchProgress >= 100) {
       // Add a small delay to ensure all processing is complete
       const timer = setTimeout(() => {
-        console.log('✅ Research completed - triggering completion (progress: 100%, has response)');
-        completeResearch();
+        console.log('✅ Research completed - triggering completion (progress: 100%)');
+        completeDirectResearch();
       }, 500);
 
       return () => clearTimeout(timer);
     } else if (isResearchInProgress && researchProgress < 100) {
       console.log(`⏸️ Research in progress at ${Math.round(researchProgress)}% - waiting for completion`);
     }
-  }, [isResearchInProgress, researchProgress, messages.length, completeResearch]);
+  }, [isResearchInProgress, researchProgress, completeDirectResearch]);
 
   // Initial restore on mount
   useEffect(() => {

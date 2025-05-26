@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface WebSocketOptions {
@@ -22,7 +21,7 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
 
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [retryCount, setRetryCount] = useState(0);
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -49,15 +48,15 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
   const connect = useCallback(() => {
     try {
       clearTimers();
-      
+
       const ws = new WebSocket(url);
       wsRef.current = ws;
-      
+
       ws.onopen = () => {
         setConnectionState('connected');
         setRetryCount(0);
         setupHeartbeat();
-        
+
         if (retryCount > 0) {
           onReconnect?.();
         }
@@ -66,7 +65,7 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           // Ignore pong messages
           if (data.type !== 'pong') {
             onMessage?.(data);
@@ -77,8 +76,12 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
         }
       };
 
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event);
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        // Don't reject immediately, let the close handler manage reconnection
+        if (ws.readyState === WebSocket.CONNECTING) {
+          //reject(error); // Removed reject as per instruction
+        }
         setConnectionState('error');
         onError?.(new Error('WebSocket connection error'));
       };
@@ -86,11 +89,11 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
       ws.onclose = () => {
         setConnectionState('disconnected');
         clearTimers();
-        
+
         // Attempt reconnection
         if (retryCount < maxRetries) {
           const delay = retryDelay * Math.pow(2, retryCount); // Exponential backoff
-          
+
           retryTimeoutRef.current = setTimeout(() => {
             setRetryCount(prev => prev + 1);
             setConnectionState('connecting');
@@ -110,7 +113,7 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
 
   useEffect(() => {
     connect();
-    
+
     return () => {
       clearTimers();
       if (wsRef.current) {

@@ -65,7 +65,7 @@ const ResearchAgent = () => {
     resetResearch,
     forceSave,
     forceRestore
-  } = useDirectTabPersistence();
+  } = useDirectTabPersistence(isSending);
 
   const [rateLimitStatus, setRateLimitStatus] = useState<{isLimited: boolean, queuePosition?: number}>({isLimited: false});
 
@@ -74,7 +74,21 @@ const ResearchAgent = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Let useDirectTabPersistence handle completion logic
+  // Debug tab visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      console.log(`🔍 Research Agent tab visibility changed: ${document.hidden ? 'hidden' : 'visible'}`);
+      if (!document.hidden) {
+        console.log('🔄 Research Agent tab now visible - checking state...');
+        forceRestore();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [forceRestore]);
+
+  // Monitor research progress without interfering
   useEffect(() => {
     if (isResearchInProgress) {
       console.log(`🔄 Research progress: ${Math.round(researchProgress)}%`);
