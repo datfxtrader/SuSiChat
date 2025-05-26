@@ -1,0 +1,360 @@
+# Claude-Style Sliding Panel Implementation Guide
+
+## Overview
+Implement a sliding panel system where clicking certain actions pushes the main content to the left and reveals a right panel, similar to Claude's artifact view. The left content remains visible as reference while users interact with the right panel.
+
+## Core Architecture
+
+### 1. Layout Structure
+```tsx
+// components/layout/SlidingPanelLayout.tsx
+<div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
+  {/* Main Content Area - Shrinks when panel opens */}
+  <div className={`
+    flex-1 transition-all duration-300 ease-in-out
+    ${isPanelOpen ? 'mr-0' : 'mr-0'}
+  `}>
+    {children}
+  </div>
+  
+  {/* Sliding Right Panel */}
+  <div className={`
+    fixed right-0 top-0 h-full bg-zinc-900/95 backdrop-blur-lg
+    border-l border-zinc-800/60 shadow-2xl
+    transition-transform duration-300 ease-in-out
+    ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}
+    w-full md:w-[600px] lg:w-[700px] z-40
+  `}>
+    {panelContent}
+  </div>
+  
+  {/* Overlay for mobile */}
+  {isPanelOpen && (
+    <div 
+      className="fixed inset-0 bg-black/50 z-30 md:hidden"
+      onClick={closePanel}
+    />
+  )}
+</div>
+```
+
+### 2. State Management
+Create a global panel state using React Context:
+
+```tsx
+// contexts/SlidingPanelContext.tsx
+interface PanelState {
+  isOpen: boolean;
+  content: React.ReactNode | null;
+  title?: string;
+  width?: 'sm' | 'md' | 'lg' | 'xl';
+  onClose?: () => void;
+}
+
+const SlidingPanelContext = createContext<{
+  openPanel: (options: Omit<PanelState, 'isOpen'>) => void;
+  closePanel: () => void;
+  panelState: PanelState;
+}>({...});
+```
+
+### 3. Panel Animations
+Use these Tailwind classes for smooth animations:
+
+```css
+/* Main content push effect */
+.main-content {
+  @apply transition-all duration-300 ease-in-out;
+}
+
+.main-content.panel-open {
+  @apply md:mr-[600px] lg:mr-[700px];
+}
+
+/* Panel slide animation */
+.sliding-panel {
+  @apply transform transition-transform duration-300 ease-in-out;
+  @apply translate-x-full; /* Hidden state */
+}
+
+.sliding-panel.open {
+  @apply translate-x-0; /* Visible state */
+}
+
+/* Optional: Scale down main content slightly */
+.main-content.panel-open {
+  @apply md:scale-[0.98] origin-left;
+}
+```
+
+### 4. Panel Component Structure
+```tsx
+// components/ui/SlidingPanel.tsx
+const SlidingPanel = () => {
+  const { panelState, closePanel } = useSlidingPanel();
+  
+  return (
+    <div className={`
+      fixed right-0 top-0 h-full z-50
+      bg-zinc-900/95 backdrop-blur-xl
+      border-l border-zinc-800/60
+      shadow-2xl shadow-black/50
+      transition-all duration-300 ease-in-out
+      ${panelState.isOpen ? 'translate-x-0' : 'translate-x-full'}
+      ${getWidthClass(panelState.width)}
+    `}>
+      {/* Panel Header */}
+      <div className="flex items-center justify-between p-6 border-b border-zinc-800/60">
+        <h2 className="text-xl font-semibold text-zinc-100">
+          {panelState.title || 'Details'}
+        </h2>
+        <button
+          onClick={closePanel}
+          className="p-2 hover:bg-zinc-800/60 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-zinc-400" />
+        </button>
+      </div>
+      
+      {/* Panel Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        {panelState.content}
+      </div>
+    </div>
+  );
+};
+```
+
+### 5. Trigger Actions
+Examples of how to open panels from different components:
+
+```tsx
+// In ResearchAgent component
+const { openPanel } = useSlidingPanel();
+
+const handleViewSources = (sources: Source[]) => {
+  openPanel({
+    title: 'Research Sources',
+    content: <SourcesPanel sources={sources} />,
+    width: 'md'
+  });
+};
+
+// In Blog component
+const handleReadMore = (post: BlogPost) => {
+  openPanel({
+    title: post.title,
+    content: <BlogPostDetail post={post} />,
+    width: 'lg',
+    onClose: () => trackEngagement(post.id, 'closed')
+  });
+};
+
+// In Chat component
+const handleViewContext = (context: any) => {
+  openPanel({
+    title: 'Conversation Context',
+    content: <ContextViewer context={context} />,
+    width: 'md'
+  });
+};
+```
+
+### 6. Responsive Behavior
+```tsx
+// Different behaviors for different screen sizes
+const responsiveConfig = {
+  // Mobile: Full screen overlay
+  mobile: {
+    width: '100vw',
+    overlay: true,
+    pushContent: false
+  },
+  // Tablet: Partial overlay with push
+  tablet: {
+    width: '70vw',
+    overlay: true,
+    pushContent: true
+  },
+  // Desktop: Side panel with content push
+  desktop: {
+    width: '600px',
+    overlay: false,
+    pushContent: true
+  }
+};
+```
+
+### 7. Advanced Features
+
+#### Nested Panels
+Support multiple panels with stack management:
+```tsx
+const [panelStack, setPanelStack] = useState<PanelState[]>([]);
+
+const openNestedPanel = (options: PanelOptions) => {
+  setPanelStack(prev => [...prev, options]);
+};
+
+const closeTopPanel = () => {
+  setPanelStack(prev => prev.slice(0, -1));
+};
+```
+
+#### Panel Persistence
+Save panel state to localStorage:
+```tsx
+useEffect(() => {
+  if (panelState.isOpen) {
+    localStorage.setItem('lastPanelState', JSON.stringify({
+      title: panelState.title,
+      timestamp: Date.now()
+    }));
+  }
+}, [panelState]);
+```
+
+#### Keyboard Navigation
+```tsx
+useEffect(() => {
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && panelState.isOpen) {
+      closePanel();
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyPress);
+  return () => window.removeEventListener('keydown', handleKeyPress);
+}, [panelState.isOpen]);
+```
+
+### 8. Content Examples
+
+#### Research Details Panel
+```tsx
+const ResearchDetailsPanel = ({ research }) => (
+  <div className="space-y-6">
+    <div className="bg-zinc-800/40 rounded-xl p-4">
+      <h3 className="text-sm font-medium text-zinc-400 mb-2">Summary</h3>
+      <p className="text-zinc-200">{research.summary}</p>
+    </div>
+    
+    <div className="space-y-3">
+      <h3 className="text-sm font-medium text-zinc-400">Sources</h3>
+      {research.sources.map((source, idx) => (
+        <SourceCard key={idx} source={source} />
+      ))}
+    </div>
+    
+    <Button 
+      onClick={() => openPanel({
+        title: 'Deep Dive Analysis',
+        content: <DeepDivePanel research={research} />
+      })}
+      className="w-full"
+    >
+      Analyze Further
+    </Button>
+  </div>
+);
+```
+
+#### Blog Article Panel
+```tsx
+const BlogArticlePanel = ({ article }) => (
+  <article className="prose prose-invert max-w-none">
+    <TypewriterText 
+      text={article.content}
+      onComplete={() => trackReading(article.id)}
+    />
+    
+    {article.vocabularyHighlights && (
+      <div className="mt-8 p-4 bg-zinc-800/40 rounded-xl">
+        <h3 className="text-lg font-medium mb-3">Vocabulary</h3>
+        <VocabularyList items={article.vocabularyHighlights} />
+      </div>
+    )}
+  </article>
+);
+```
+
+### 9. Theme Integration
+Ensure consistent styling with your dark theme:
+
+```tsx
+const panelTheme = {
+  background: 'bg-zinc-900/95 backdrop-blur-xl',
+  border: 'border-zinc-800/60',
+  header: 'bg-zinc-900/80 border-b border-zinc-800/60',
+  text: {
+    primary: 'text-zinc-100',
+    secondary: 'text-zinc-400',
+    muted: 'text-zinc-500'
+  },
+  interactive: {
+    hover: 'hover:bg-zinc-800/60',
+    active: 'bg-zinc-800/80',
+    focus: 'focus:ring-2 focus:ring-blue-500/50'
+  }
+};
+```
+
+### 10. Implementation Checklist
+
+- [ ] Create `SlidingPanelContext` for global state management
+- [ ] Implement `SlidingPanelLayout` wrapper component
+- [ ] Add `useSlidingPanel` hook for easy access
+- [ ] Create `SlidingPanel` component with animations
+- [ ] Add responsive breakpoints for mobile/tablet/desktop
+- [ ] Implement keyboard shortcuts (ESC to close)
+- [ ] Add panel stack support for nested panels
+- [ ] Create content templates for common use cases
+- [ ] Add accessibility features (ARIA labels, focus management)
+- [ ] Test animations on different devices
+- [ ] Add panel state persistence (optional)
+- [ ] Implement gesture support for mobile (swipe to close)
+
+### 11. Usage Example
+```tsx
+// In your main App component
+function App() {
+  return (
+    <SlidingPanelProvider>
+      <SlidingPanelLayout>
+        <Router>
+          <Routes>
+            <Route path="/chat" element={<ChatInterface />} />
+            <Route path="/research" element={<ResearchAgent />} />
+            <Route path="/blog" element={<PersonalizedBlog />} />
+          </Routes>
+        </Router>
+      </SlidingPanelLayout>
+    </SlidingPanelProvider>
+  );
+}
+
+// In any component
+function MyComponent() {
+  const { openPanel } = useSlidingPanel();
+  
+  return (
+    <Button onClick={() => openPanel({
+      title: 'Advanced Options',
+      content: <AdvancedSettings />,
+      width: 'md'
+    })}>
+      Open Settings
+    </Button>
+  );
+}
+```
+
+### 12. Performance Optimizations
+
+1. **Lazy Load Panel Content**: Only render panel content when opened
+2. **Memoize Panel Components**: Use React.memo for panel content components
+3. **Virtualize Long Lists**: Use react-window for long lists in panels
+4. **Debounce Resize Events**: Optimize responsive behavior
+5. **Use CSS Transform**: Hardware-accelerated animations with transform instead of left/right
+
+This implementation will give you the same smooth, professional sliding panel experience as Claude, perfectly integrated with your existing dark theme and component library.
