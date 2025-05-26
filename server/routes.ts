@@ -9,6 +9,7 @@ import * as templateRoutes from "./template-integration";
 
 import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
+import homework from './routes/homework';
 
 // WebSocket client connections and their associated rooms
 type ClientConnection = {
@@ -20,11 +21,11 @@ type ClientConnection = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
-  
+
 
   // Mount financial research routes
   app.use('/api/financial-research', financialResearchRoutes);
-  
+
   // Template management routes
   app.get('/api/templates/categories', isAuthenticated, templateRoutes.getTemplateCategories);
   app.get('/api/templates/category/:category', isAuthenticated, templateRoutes.getTemplatesByCategory);
@@ -38,21 +39,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // app.post('/api/templates/:templateId/usage', isAuthenticated, templateRoutes.trackTemplateUsage);
   app.get('/api/templates/popular', isAuthenticated, templateRoutes.getPopularTemplates);
   app.post('/api/templates/fill', isAuthenticated, templateRoutes.fillTemplate);
-  
+
   const httpServer = createServer(app);
-  
+
   // Set up WebSocket server for real-time chat
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const connections: ClientConnection[] = [];
-  
+
   wss.on('connection', (ws: any) => {
     console.log('WebSocket connection established');
     let clientInfo: ClientConnection = { userId: '', ws };
-    
+
     ws.on('message', async (message: string) => {
       try {
         const data = JSON.parse(message);
-        
+
         // Authentication message
         if (data.type === 'auth') {
           clientInfo.userId = data.userId;
@@ -78,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         else if (data.type === 'message') {
           const userId = clientInfo.userId;
           const familyRoomId = clientInfo.familyRoomId;
-          
+
           // Store the message
           const messageData = {
             content: data.content,
@@ -86,14 +87,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             familyRoomId: familyRoomId || null,
             isAiResponse: false
           };
-          
+
           const savedMessage = await storage.createMessage(messageData);
-          
+
           // Broadcast to connected clients in the same room
           const broadcastTarget = familyRoomId 
             ? connections.filter(c => c.familyRoomId === familyRoomId)
             : [clientInfo]; // Personal chat only goes back to sender
-          
+
           for (const client of broadcastTarget) {
             if (client.ws.readyState === 1) { // WebSocket.OPEN
               client.ws.send(JSON.stringify({
@@ -102,10 +103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }));
             }
           }
-          
+
           // Generate AI response
           const aiResponse = await llmService.generateResponse(userId, data.content, familyRoomId);
-          
+
           // Store AI response
           const aiMessageData = {
             content: aiResponse,
@@ -113,9 +114,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             familyRoomId: familyRoomId || null,
             isAiResponse: true
           };
-          
+
           const savedAiMessage = await storage.createMessage(aiMessageData);
-          
+
           // Broadcast AI response to same clients
           for (const client of broadcastTarget) {
             if (client.ws.readyState === 1) { // WebSocket.OPEN
@@ -131,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
       }
     });
-    
+
     ws.on('close', () => {
       console.log('WebSocket connection closed');
       const index = connections.findIndex(c => c.ws === ws);
@@ -140,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   });
-  
+
   // Authentication endpoints
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
@@ -152,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
-  
+
   // Reminder endpoints
   app.post('/api/reminders', isAuthenticated, async (req: any, res) => {
     try {
@@ -165,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to create reminder" });
     }
   });
-  
+
   app.get('/api/reminders', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -176,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch reminders" });
     }
   });
-  
+
   app.get('/api/reminders/upcoming', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -188,18 +189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch upcoming reminders" });
     }
   });
-  
+
   app.put('/api/reminders/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const reminderId = parseInt(req.params.id);
-      
+
       // Verify reminder belongs to user
       const reminder = await storage.getReminder(reminderId);
       if (!reminder || reminder.userId !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       const updatedReminder = await storage.updateReminder(reminderId, req.body);
       res.json(updatedReminder);
     } catch (error) {
@@ -207,18 +208,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update reminder" });
     }
   });
-  
+
   app.delete('/api/reminders/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const reminderId = parseInt(req.params.id);
-      
+
       // Verify reminder belongs to user
       const reminder = await storage.getReminder(reminderId);
       if (!reminder || reminder.userId !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       await storage.deleteReminder(reminderId);
       res.status(204).end();
     } catch (error) {
@@ -226,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to delete reminder" });
     }
   });
-  
+
   // Family Room endpoints
   app.post('/api/family-rooms', isAuthenticated, async (req: any, res) => {
     try {
@@ -242,7 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to create family room" });
     }
   });
-  
+
   app.get('/api/family-rooms', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -253,55 +254,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch family rooms" });
     }
   });
-  
+
   app.get('/api/family-rooms/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const roomId = parseInt(req.params.id);
-      
+
       // Verify user is a member of this room
       const isInRoom = await storage.isUserInFamilyRoom(userId, roomId);
       if (!isInRoom) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       const room = await storage.getFamilyRoom(roomId);
       if (!room) {
         return res.status(404).json({ message: "Family room not found" });
       }
-      
+
       res.json(room);
     } catch (error) {
       console.error("Error fetching family room:", error);
       res.status(500).json({ message: "Failed to fetch family room" });
     }
   });
-  
+
   app.post('/api/family-rooms/:id/members', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const roomId = parseInt(req.params.id);
-      
+
       // Verify user is an admin of this room
       const members = await storage.getFamilyRoomMembers(roomId);
       const isAdmin = members.some(m => m.userId === userId && m.isAdmin);
-      
+
       if (!isAdmin) {
         return res.status(403).json({ message: "Only admins can add members" });
       }
-      
+
       // Add the new member
       const targetUser = await storage.getUser(req.body.userId);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       const memberData = {
         familyRoomId: roomId,
         userId: req.body.userId,
         isAdmin: req.body.isAdmin || false
       };
-      
+
       const member = await storage.addFamilyRoomMember(memberData);
       res.status(201).json(member);
     } catch (error) {
@@ -309,18 +310,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to add family room member" });
     }
   });
-  
+
   app.get('/api/family-rooms/:id/members', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const roomId = parseInt(req.params.id);
-      
+
       // Verify user is a member of this room
       const isInRoom = await storage.isUserInFamilyRoom(userId, roomId);
       if (!isInRoom) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       const members = await storage.getFamilyRoomMembersWithUserDetails(roomId);
       res.json(members);
     } catch (error) {
@@ -328,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch family room members" });
     }
   });
-  
+
   // Message history endpoints
   app.get('/api/messages/personal', isAuthenticated, async (req: any, res) => {
     try {
@@ -341,18 +342,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch personal messages" });
     }
   });
-  
+
   app.get('/api/family-rooms/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const roomId = parseInt(req.params.id);
-      
+
       // Verify user is a member of this room
       const isInRoom = await storage.isUserInFamilyRoom(userId, roomId);
       if (!isInRoom) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       const limit = req.query.limit ? parseInt(req.query.limit) : 50;
       const messages = await storage.getFamilyRoomMessages(roomId, limit);
       res.json(messages);
@@ -361,26 +362,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch family room messages" });
     }
   });
-  
+
   // User preferences endpoints
   app.post('/api/preferences', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { key, value } = req.body;
-      
+
       const preference = await storage.setUserPreference({
         userId,
         key,
         value
       });
-      
+
       res.status(201).json(preference);
     } catch (error) {
       console.error("Error setting preference:", error);
       res.status(500).json({ message: "Failed to set preference" });
     }
   });
-  
+
   app.get('/api/preferences', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -401,6 +402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const vietnameseChatRouter = await import('./routes/vietnamese-chat');
   app.use('/api', vietnameseChatRouter.default);
 
+  // Study routes (includes homework and enhanced learning)
+  app.use('/api/study', homework);
+  app.use('/api/homework', homework); // Keep backward compatibility
+  app.use('/api/learning', homework); // Enhanced learning endpoints
 
 
   return httpServer;

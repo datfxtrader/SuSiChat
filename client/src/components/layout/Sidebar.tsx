@@ -94,7 +94,7 @@ const NAV_ITEMS: NavItem[] = [
   { 
     path: "/homework", 
     icon: GraduationCap, 
-    label: "Homework Help",
+    label: "Study Assistant",
     description: "Educational support",
     shortcut: "⌘6"
   },
