@@ -1,3 +1,4 @@
+
 import {
   users,
   type User,
@@ -22,7 +23,7 @@ import {
   type InsertMemory,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull, SQL, sql, gt, count } from "drizzle-orm";
+import { eq, and, desc, isNull, sql, gt, count, inArray } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -66,9 +67,28 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Cache for frequently accessed data
+  private readonly userCache = new Map<string, { user: User; timestamp: number }>();
+  private readonly cacheTimeout = 5 * 60 * 1000; // 5 minutes
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    // Check cache first
+    const cached = this.userCache.get(id);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.user;
+    }
+
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    
+    if (user) {
+      this.userCache.set(id, { user, timestamp: Date.now() });
+    }
+    
     return user;
   }
 
@@ -84,10 +104,14 @@ export class DatabaseStorage implements IStorage {
         },
       })
       .returning();
+    
+    // Update cache
+    this.userCache.set(user.id, { user, timestamp: Date.now() });
+    
     return user;
   }
   
-  // User preferences
+  // User preferences - Optimized with single query
   async getUserPreference(userId: string, key: string): Promise<UserPreference | undefined> {
     const [preference] = await db
       .select()
@@ -95,27 +119,23 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(userPreferences.userId, userId),
         eq(userPreferences.key, key)
-      ));
+      ))
+      .limit(1);
+    
     return preference;
   }
   
   async setUserPreference(preference: InsertUserPreference): Promise<UserPreference> {
-    const existing = await this.getUserPreference(preference.userId, preference.key);
+    const [result] = await db
+      .insert(userPreferences)
+      .values(preference)
+      .onConflictDoUpdate({
+        target: [userPreferences.userId, userPreferences.key],
+        set: { value: preference.value }
+      })
+      .returning();
     
-    if (existing) {
-      const [updated] = await db
-        .update(userPreferences)
-        .set({ value: preference.value })
-        .where(eq(userPreferences.id, existing.id))
-        .returning();
-      return updated;
-    } else {
-      const [created] = await db
-        .insert(userPreferences)
-        .values(preference)
-        .returning();
-      return created;
-    }
+    return result;
   }
   
   async getUserPreferences(userId: string): Promise<UserPreference[]> {
@@ -138,7 +158,9 @@ export class DatabaseStorage implements IStorage {
     const [reminder] = await db
       .select()
       .from(reminders)
-      .where(eq(reminders.id, id));
+      .where(eq(reminders.id, id))
+      .limit(1);
+    
     return reminder;
   }
   
@@ -151,13 +173,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getUserUpcomingReminders(userId: string, limit: number = 5): Promise<Reminder[]> {
+    const now = new Date();
     return db
       .select()
       .from(reminders)
       .where(and(
         eq(reminders.userId, userId),
         eq(reminders.completed, false),
-        gt(reminders.datetime, new Date())
+        gt(reminders.datetime, now)
       ))
       .orderBy(reminders.datetime)
       .limit(limit);
@@ -169,6 +192,7 @@ export class DatabaseStorage implements IStorage {
       .set(reminderUpdate)
       .where(eq(reminders.id, id))
       .returning();
+    
     return updated;
   }
   
@@ -177,76 +201,70 @@ export class DatabaseStorage implements IStorage {
       .delete(reminders)
       .where(eq(reminders.id, id))
       .returning({ id: reminders.id });
+    
     return result.length > 0;
   }
   
-  // Family rooms
+  // Family rooms - Optimized with transaction
   async createFamilyRoom(room: InsertFamilyRoom): Promise<FamilyRoom> {
-    const [created] = await db
-      .insert(familyRooms)
-      .values(room)
-      .returning();
-    
-    // Add creator as admin
-    await db
-      .insert(familyRoomMembers)
-      .values({
-        familyRoomId: created.id,
-        userId: room.createdById,
-        isAdmin: true,
-      });
+    return await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(familyRooms)
+        .values(room)
+        .returning();
       
-    return created;
+      // Add creator as admin
+      await tx
+        .insert(familyRoomMembers)
+        .values({
+          familyRoomId: created.id,
+          userId: room.createdById,
+          isAdmin: true,
+        });
+      
+      return created;
+    });
   }
   
   async getFamilyRoom(id: number): Promise<FamilyRoom | undefined> {
     const [room] = await db
       .select()
       .from(familyRooms)
-      .where(eq(familyRooms.id, id));
+      .where(eq(familyRooms.id, id))
+      .limit(1);
+    
     return room;
   }
   
+  // Optimized with join instead of two queries
   async getUserFamilyRooms(userId: string): Promise<FamilyRoom[]> {
-    const memberRooms = await db
-      .select({
-        roomId: familyRoomMembers.familyRoomId,
-      })
-      .from(familyRoomMembers)
-      .where(eq(familyRoomMembers.userId, userId));
-    
-    if (memberRooms.length === 0) return [];
-    
-    const roomIds = memberRooms.map(r => r.roomId);
-    
     return db
-      .select()
+      .select({
+        id: familyRooms.id,
+        name: familyRooms.name,
+        createdById: familyRooms.createdById,
+        createdAt: familyRooms.createdAt,
+      })
       .from(familyRooms)
-      .where(sql`${familyRooms.id} IN (${roomIds.join(',')})`);
+      .innerJoin(
+        familyRoomMembers,
+        eq(familyRooms.id, familyRoomMembers.familyRoomId)
+      )
+      .where(eq(familyRoomMembers.userId, userId));
   }
   
-  // Family room members
+  // Family room members - Optimized with upsert
   async addFamilyRoomMember(member: InsertFamilyRoomMember): Promise<FamilyRoomMember> {
-    const [created] = await db
+    const [result] = await db
       .insert(familyRoomMembers)
       .values(member)
-      .onConflictDoNothing({
+      .onConflictDoUpdate({
         target: [familyRoomMembers.familyRoomId, familyRoomMembers.userId],
+        set: { isAdmin: member.isAdmin ?? false }
       })
       .returning();
     
-    if (!created) {
-      const [existing] = await db
-        .select()
-        .from(familyRoomMembers)
-        .where(and(
-          eq(familyRoomMembers.familyRoomId, member.familyRoomId),
-          eq(familyRoomMembers.userId, member.userId)
-        ));
-      return existing;
-    }
-    
-    return created;
+    return result;
   }
   
   async getFamilyRoomMembers(roomId: number): Promise<FamilyRoomMember[]> {
@@ -256,29 +274,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(familyRoomMembers.familyRoomId, roomId));
   }
   
+  // Optimized with better join selection
   async getFamilyRoomMembersWithUserDetails(roomId: number): Promise<(FamilyRoomMember & User)[]> {
     const results = await db
-      .select()
+      .select({
+        // FamilyRoomMember fields
+        familyRoomId: familyRoomMembers.familyRoomId,
+        userId: familyRoomMembers.userId,
+        isAdmin: familyRoomMembers.isAdmin,
+        joinedAt: familyRoomMembers.joinedAt,
+        // User fields
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        phoneNumber: users.phoneNumber,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
       .from(familyRoomMembers)
       .innerJoin(users, eq(familyRoomMembers.userId, users.id))
       .where(eq(familyRoomMembers.familyRoomId, roomId));
-      
-    return results.map(row => ({
-      ...row.family_room_members,
-      ...row.users
-    })) as (FamilyRoomMember & User)[];
+    
+    return results as (FamilyRoomMember & User)[];
   }
   
+  // Optimized to use EXISTS for better performance
   async isUserInFamilyRoom(userId: string, roomId: number): Promise<boolean> {
     const [result] = await db
-      .select({ count: count() })
+      .select({ exists: sql<boolean>`1` })
       .from(familyRoomMembers)
       .where(and(
         eq(familyRoomMembers.userId, userId),
         eq(familyRoomMembers.familyRoomId, roomId)
-      ));
+      ))
+      .limit(1);
     
-    return result.count > 0;
+    return !!result;
   }
   
   // Messages
@@ -328,16 +359,28 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(memories.createdAt));
   }
   
+  // Optimized with parameterized query for safety
   async searchUserMemories(userId: string, query: string): Promise<Memory[]> {
-    // For now, a simple text search without vector embeddings
+    // Sanitize query for ILIKE pattern
+    const sanitizedQuery = query.replace(/[%_]/g, '\\$&');
+    
     return db
       .select()
       .from(memories)
       .where(and(
         eq(memories.userId, userId),
-        sql`${memories.content} ILIKE ${'%' + query + '%'}`
+        sql`${memories.content} ILIKE ${`%${sanitizedQuery}%`}`
       ))
       .orderBy(desc(memories.createdAt));
+  }
+  
+  // Utility method to clear user cache
+  clearUserCache(userId?: string): void {
+    if (userId) {
+      this.userCache.delete(userId);
+    } else {
+      this.userCache.clear();
+    }
   }
 }
 
