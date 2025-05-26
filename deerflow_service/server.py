@@ -1741,4 +1741,53 @@ class StateManager:
             logger.info(f"WebSocket disconnected, remaining connections: {len(self.active_websockets)}")
 
     async def broadcast(self, message: str):
-        """Broadcast message to all connected
+        """Broadcast message to all connected WebSocket clients"""
+        if not self.active_websockets:
+            return
+            
+        disconnected = []
+        for websocket in self.active_websockets:
+            try:
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    await websocket.send_text(message)
+                else:
+                    disconnected.append(websocket)
+            except ConnectionClosed:
+                disconnected.append(websocket)
+            except Exception as e:
+                logger.error(f"Error broadcasting to websocket: {e}")
+                disconnected.append(websocket)
+        
+        # Remove disconnected websockets
+        for ws in disconnected:
+            if ws in self.active_websockets:
+                self.active_websockets.remove(ws)
+        
+        logger.debug(f"Broadcasted message to {len(self.active_websockets)} clients")
+
+    def get_all_tasks(self):
+        """Get all tasks with their current state"""
+        return dict(self.tasks)
+
+    def cleanup_old_tasks(self, max_age_hours: int = 24):
+        """Clean up old tasks from persistent storage"""
+        try:
+            cutoff_time = time.time() - (max_age_hours * 3600)
+            tasks_to_remove = []
+            
+            for task_id, task_data in self.tasks.items():
+                if task_data.get("last_updated", 0) < cutoff_time:
+                    tasks_to_remove.append(task_id)
+            
+            for task_id in tasks_to_remove:
+                del self.tasks[task_id]
+            
+            if tasks_to_remove:
+                self._save_persistent_state()
+                logger.info(f"Cleaned up {len(tasks_to_remove)} old tasks")
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up old tasks: {e}")
+
+# Initialize state manager
+state_manager = StateManager()
