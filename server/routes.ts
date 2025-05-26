@@ -1,11 +1,16 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { enhancedStorage } from "./storage-enhanced";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
 import { sendMessageToSuna, getSunaConversation, getUserConversations } from "./suna-integration";
 import * as templateRoutes from "./template-integration";
+import { validateContent, sanitizeUserInput } from "./middleware/content-validation.middleware";
+import { requestLogger, logger } from "./monitoring/logger";
+import { metricsCollector } from "./monitoring/metrics-collector";
+import { jobQueue } from "./queue/job-processor";
+import { dbManager } from "./db-connection-pool";
 
 import financialResearchRoutes from "./routes/financial-research";
 import webSearchRoutes from "./routes/webSearch";
@@ -19,8 +24,83 @@ type ClientConnection = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Add structured logging middleware
+  app.use(requestLogger);
+  
+  // Add input sanitization middleware
+  app.use(sanitizeUserInput);
+  
   // Auth middleware
   await setupAuth(app);
+  
+  // Health check endpoints
+  app.get('/api/health/database', async (req, res) => {
+    try {
+      const health = await dbManager.healthCheck();
+      res.json(health);
+    } catch (error) {
+      res.status(500).json({ status: 'unhealthy', error: error.message });
+    }
+  });
+  
+  // Metrics endpoint
+  app.get('/api/metrics', async (req, res) => {
+    try {
+      const metrics = metricsCollector.getSystemHealth();
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to collect metrics' });
+    }
+  });
+  
+  // Job queue endpoints
+  app.post('/api/jobs/submit', validateContent({ maxLength: 1000 }), async (req, res) => {
+    try {
+      const { type, data, priority, delay } = req.body;
+      const jobId = await jobQueue.add(type, data, { priority, delay });
+      
+      logger.info('Job submitted', { 
+        jobId, 
+        type, 
+        component: 'job_queue' 
+      });
+      
+      res.json({ job_id: jobId, status: 'submitted' });
+    } catch (error) {
+      logger.error('Failed to submit job', error);
+      res.status(500).json({ error: 'Failed to submit job' });
+    }
+  });
+  
+  app.get('/api/jobs/:jobId/status', async (req, res) => {
+    try {
+      const job = jobQueue.getJob(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      
+      res.json({
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        attempts: job.attempts,
+        maxAttempts: job.maxAttempts,
+        createdAt: job.createdAt,
+        result: job.result,
+        error: job.error
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get job status' });
+    }
+  });
+  
+  // Content validation test endpoint
+  app.post('/api/test/sanitization', validateContent({ enableProfanityFilter: true }), async (req, res) => {
+    res.json({ 
+      message: 'Content validated and sanitized',
+      sanitized_content: req.body.content 
+    });
+  });
 
 
   // Mount financial research routes
@@ -88,7 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isAiResponse: false
           };
 
-          const savedMessage = await storage.createMessage(messageData);
+          const savedMessage = await enhancedStorage.createMessage(messageData);
+          
+          // Record metrics
+          metricsCollector.incrementCounter('messages.created', 1, {
+            type: familyRoomId ? 'family' : 'personal'
+          });
 
           // Broadcast to connected clients in the same room
           const broadcastTarget = familyRoomId 
@@ -146,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await enhancedStorage.getUser(userId);
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
