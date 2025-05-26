@@ -111,11 +111,11 @@ def test_enhanced_metrics():
         
         # Test percentile calculation
         test_values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-        percentiles = metrics._calculate_percentiles(test_values)
+        percentiles = metrics.calculate_percentiles(test_values)
         
         assert "p50" in percentiles, "p50 percentile missing"
         assert "p95" in percentiles, "p95 percentile missing"
-        assert percentiles["p50"] == 5.0, f"p50 incorrect: {percentiles['p50']}"
+        assert abs(percentiles["p50"] - 5.5) < 0.1, f"p50 incorrect: {percentiles['p50']}"
         
         # Test rate limiting metrics
         for i in range(10):
@@ -124,9 +124,15 @@ def test_enhanced_metrics():
         
         rate = metrics.get_operation_rate("test_operation", window_seconds=1)
         
+        # Test enhanced metrics
+        enhanced = metrics.get_enhanced_metrics()
+        assert "percentiles" in enhanced, "Enhanced metrics missing percentiles"
+        assert "alerts" in enhanced, "Enhanced metrics missing alerts"
+        
         print(f"   ✅ Percentile calculations working")
         print(f"   ✅ Rate limiting metrics: {rate:.2f} ops/sec")
         print(f"   ✅ Enhanced metrics collection active")
+        print(f"   ✅ Enhanced analytics working")
         
         return True
         

@@ -200,7 +200,7 @@ class MetricsCollector:
         self.operation_times.clear()
         logger.info("All metrics reset")
     
-    def _calculate_percentiles(self, values: List[float]) -> Dict[str, float]:
+    def calculate_percentiles(self, values: List[float]) -> Dict[str, float]:
         """Calculate percentiles for a list of values"""
         if not values:
             return {}
@@ -212,12 +212,22 @@ class MetricsCollector:
             return {"p50": sorted_values[0], "p75": sorted_values[0], 
                    "p90": sorted_values[0], "p95": sorted_values[0], "p99": sorted_values[0]}
         
+        # Use proper percentile calculation
+        def get_percentile(p):
+            idx = (n - 1) * p
+            if idx == int(idx):
+                return sorted_values[int(idx)]
+            else:
+                lower = sorted_values[int(idx)]
+                upper = sorted_values[int(idx) + 1]
+                return lower + (upper - lower) * (idx - int(idx))
+        
         return {
-            "p50": sorted_values[int(n * 0.50)],
-            "p75": sorted_values[int(n * 0.75)],
-            "p90": sorted_values[int(n * 0.90)],
-            "p95": sorted_values[int(n * 0.95)],
-            "p99": sorted_values[int(n * 0.99)] if n > 100 else sorted_values[-1]
+            "p50": get_percentile(0.50),
+            "p75": get_percentile(0.75),
+            "p90": get_percentile(0.90),
+            "p95": get_percentile(0.95),
+            "p99": get_percentile(0.99)
         }
     
     def record_rate_limited_operation(self, operation: str, timestamp: Optional[float] = None):
@@ -245,3 +255,36 @@ class MetricsCollector:
             total_ops += sum(1 for ts in timestamps if ts > cutoff)
         
         return total_ops / window_seconds if window_seconds > 0 else 0.0
+    
+    def get_enhanced_metrics(self) -> Dict[str, Any]:
+        """Get enhanced metrics with percentiles and advanced analytics"""
+        enhanced = {
+            "basic_metrics": self.get_metrics_summary(),
+            "percentiles": {},
+            "trends": {},
+            "alerts": []
+        }
+        
+        # Calculate percentiles for operation times
+        for operation, times in self.operation_times.items():
+            if times:
+                enhanced["percentiles"][operation] = self.calculate_percentiles(times)
+        
+        # Calculate percentiles for histogram data
+        for key, values in self.histograms.items():
+            if values and len(values) > 5:
+                enhanced["percentiles"][key] = self.calculate_percentiles(values)
+        
+        # Generate alerts for anomalies
+        for operation, times in self.operation_times.items():
+            if len(times) > 10:
+                recent_avg = sum(times[-5:]) / 5
+                overall_avg = sum(times) / len(times)
+                if recent_avg > overall_avg * 2:
+                    enhanced["alerts"].append({
+                        "type": "performance_degradation",
+                        "operation": operation,
+                        "message": f"{operation} is running 2x slower than usual"
+                    })
+        
+        return enhanced
