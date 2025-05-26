@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X, Clock } from 'lucide-react';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { 
+  Bot, Copy, Share2, Bookmark, Clock, CheckCircle, Search, 
+  TrendingUp, AlertCircle, ExternalLink, Download, ThumbsUp, 
+  ThumbsDown, Sparkles, Eye, EyeOff
+} from 'lucide-react';
 import { Button } from '../ui/button';
 import { TypewriterText } from '@/components/shared/TypewriterText';
 import { TypewriterConfig } from '@/config/typewriter.config';
@@ -30,60 +35,137 @@ const formatRelativeTime = (timestamp: string) => {
   return `${Math.floor(diffInMinutes / 1440)}d ago`;
 };
 
-// Enhanced Research Response Component
-const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp, sources, isLatest = false }) => {
+const ResearchResponse: React.FC<ResearchResponseProps> = ({ 
+  content, 
+  timestamp, 
+  sources, 
+  isLatest = false 
+}) => {
   const [copySuccess, setCopySuccess] = useState('');
-  const [typewriterComplete, setTypewriterComplete] = useState(!isLatest); // Start as complete if not latest
+  const [typewriterComplete, setTypewriterComplete] = useState(!isLatest);
+  const [showSources, setShowSources] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const [bookmarked, setBookmarked] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(content);
     setCopySuccess('Copied!');
     setTimeout(() => setCopySuccess(''), 2000);
-  };
+  }, [content]);
 
-  const handleTypewriterComplete = () => {
+  const handleShare = useCallback(() => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'Research Results',
+        text: content.substring(0, 100) + '...',
+        url: window.location.href
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      setCopySuccess('Link copied!');
+      setTimeout(() => setCopySuccess(''), 2000);
+    }
+  }, [content]);
+
+  const handleTypewriterComplete = useCallback(() => {
     console.log('🎬 Typewriter animation completed');
     setTypewriterComplete(true);
-  };
+    setShowSources(true);
+  }, []);
 
-  const showActions = !isLatest || typewriterComplete;
+  const handleFeedback = useCallback((type: 'up' | 'down') => {
+    setFeedback(feedback === type ? null : type);
+  }, [feedback]);
 
-  // Reset typewriter state when isLatest changes with better detection
+  const handleBookmark = useCallback(() => {
+    setBookmarked(!bookmarked);
+  }, [bookmarked]);
+
   useEffect(() => {
     if (isLatest && content && content.length > 0) {
       console.log('🎬 Starting typewriter animation for latest message', content.length, 'chars');
       setTypewriterComplete(false);
+      setShowSources(false);
     } else {
       setTypewriterComplete(true);
+      setShowSources(true);
     }
   }, [isLatest, content]);
 
+  const contentLength = useMemo(() => content.length, [content]);
+  const estimatedReadTime = useMemo(() => Math.ceil(contentLength / 1000), [contentLength]);
+  const wordCount = useMemo(() => content.split(' ').length, [content]);
+
+  const showActions = !isLatest || typewriterComplete;
+
   return (
-    <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg hover:shadow-xl"
+    >
+      {/* Header */}
       <div className="flex items-center justify-between mb-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <div className="flex items-center space-x-3 text-xs text-zinc-400">
           <div className="flex items-center space-x-1">
-            <div className="w-2 h-2 bg-green-400 rounded-full" />
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             <span>AI Research Assistant</span>
           </div>
           <span>•</span>
           <span>{formatRelativeTime(timestamp)}</span>
+          <span>•</span>
+          <span>{estimatedReadTime} min read</span>
+          <span>•</span>
+          <span>{wordCount} words</span>
         </div>
+        
         <div className="flex items-center space-x-1">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
-            <Copy className="w-3 h-3" />
+          <Button 
+            onClick={handleCopy} 
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 hover:bg-zinc-800/60"
+          >
+            {copySuccess ? (
+              <CheckCircle className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3" />
+            )}
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
+          
+          <Button 
+            onClick={handleShare}
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 hover:bg-zinc-800/60"
+          >
             <Share2 className="w-3 h-3" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-800/60">
-            <Bookmark className="w-3 h-3" />
+          
+          <Button 
+            onClick={handleBookmark}
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 hover:bg-zinc-800/60"
+          >
+            <Bookmark className={`w-3 h-3 ${bookmarked ? 'fill-current text-yellow-400' : ''}`} />
+          </Button>
+          
+          <Button 
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 hover:bg-zinc-800/60"
+          >
+            <Download className="w-3 h-3" />
           </Button>
         </div>
       </div>
 
+      {/* Content */}
       <div className="prose prose-invert max-w-none">
-        {isLatest ? (
+        {isLatest && !typewriterComplete ? (
           <TypewriterText
             text={content}
             speed={TypewriterConfig.responseTypes.research.speed}
@@ -95,15 +177,19 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
             className="space-y-6 text-zinc-200"
           />
         ) : (
-          <div className="space-y-6 text-zinc-200">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="space-y-6 text-zinc-200"
+          >
             {content.split('\n\n').map((paragraph, idx) => {
-              // Handle tables (improved detection and formatting)
+              // Enhanced table rendering
               if (paragraph.includes('|') && paragraph.split('|').length > 2) {
                 const lines = paragraph.split('\n').filter(line => line.trim());
                 const tableLines = lines.filter(line => line.includes('|') && line.split('|').length > 2);
 
                 if (tableLines.length >= 2) {
-                  // Remove lines that are just separators (dashes)
                   const contentLines = tableLines.filter(line => !line.match(/^\s*\|[\s\-|]+\|\s*$/));
 
                   if (contentLines.length >= 2) {
@@ -114,8 +200,14 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                     );
 
                     return (
-                      <div key={idx} className="my-6 overflow-x-auto">
-                        <table className="w-full border-collapse bg-zinc-800/40 rounded-xl overflow-hidden shadow-lg">
+                      <motion.div 
+                        key={idx} 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: idx * 0.1 }}
+                        className="my-6 overflow-x-auto rounded-xl shadow-2xl"
+                      >
+                        <table className="w-full border-collapse bg-zinc-800/40 overflow-hidden">
                           <thead>
                             <tr className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b-2 border-blue-500/30">
                               {headers.map((header, i) => (
@@ -137,13 +229,13 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                             ))}
                           </tbody>
                         </table>
-                      </div>
+                      </motion.div>
                     );
                   }
                 }
               }
 
-              // Handle numbered lists (prevent duplication)
+              // Enhanced numbered lists
               if (/^\d+\.\s/.test(paragraph.trim())) {
                 const lines = paragraph.split('\n').filter(line => line.trim());
                 const listItems = [];
@@ -168,49 +260,27 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                         const boldMatch = text.match(/^(.+?):\s*(.+)/);
 
                         return (
-                          <li key={i} className="flex items-start space-x-4 p-4 bg-zinc-800/30 rounded-lg border-l-4 border-blue-500/60">
-                            <span className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white text-sm font-bold rounded-full flex items-center justify-center">
+                          <motion.li 
+                            key={i} 
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3, delay: i * 0.1 }}
+                            className="flex items-start space-x-4 p-4 bg-zinc-800/30 rounded-lg border-l-4 border-blue-500/60 hover:bg-zinc-800/40 transition-colors"
+                          >
+                            <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 text-white text-sm font-bold rounded-full flex items-center justify-center shadow-md">
                               {number}
                             </span>
                             <div className="flex-1 space-y-2">
                               {boldMatch ? (
                                 <>
                                   <div className="font-semibold text-zinc-100 text-base">{boldMatch[1]}</div>
-                                  <div className="text-zinc-300 leading-relaxed">
-                                    {boldMatch[2].split('\n').map((line, lineIdx) => {
-                                      // Handle bullet points within numbered items
-                                      if (line.trim().startsWith('•') || line.trim().startsWith('*')) {
-                                        const bulletText = line.replace(/^[\s•*]+/, '').trim();
-                                        return (
-                                          <div key={lineIdx} className="flex items-start space-x-2 ml-4 my-2">
-                                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
-                                            <span>{bulletText}</span>
-                                          </div>
-                                        );
-                                      }
-                                      return line && <div key={lineIdx} className="mb-1">{line}</div>;
-                                    })}
-                                  </div>
+                                  <div className="text-zinc-300 leading-relaxed">{boldMatch[2]}</div>
                                 </>
                               ) : (
-                                <div className="text-zinc-300 leading-relaxed">
-                                  {text.split('\n').map((line, lineIdx) => {
-                                    // Handle bullet points within numbered items
-                                    if (line.trim().startsWith('•') || line.trim().startsWith('*')) {
-                                      const bulletText = line.replace(/^[\s•*]+/, '').trim();
-                                      return (
-                                        <div key={lineIdx} className="flex items-start space-x-2 ml-4 my-2">
-                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
-                                          <span>{bulletText}</span>
-                                        </div>
-                                      );
-                                    }
-                                    return line && <div key={lineIdx} className="mb-1">{line}</div>;
-                                  })}
-                                </div>
+                                <div className="text-zinc-300 leading-relaxed">{text}</div>
                               )}
                             </div>
-                          </li>
+                          </motion.li>
                         );
                       }
                       return null;
@@ -219,43 +289,76 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                 );
               }
 
+              // Enhanced headers
               if (paragraph.startsWith('# ')) {
                 return (
-                  <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
+                  <motion.h1 
+                    key={idx} 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center"
+                  >
                     <TrendingUp className="w-6 h-6 mr-3 text-blue-400" />
                     {paragraph.replace('# ', '')}
-                  </h1>
+                  </motion.h1>
                 );
               } else if (paragraph.startsWith('## ')) {
                 return (
-                  <h2 key={idx} className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center">
+                  <motion.h2 
+                    key={idx} 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center"
+                  >
                     <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3" />
                     {paragraph.replace('## ', '')}
-                  </h2>
+                  </motion.h2>
                 );
               } else if (paragraph.startsWith('### ')) {
                 return (
-                  <h3 key={idx} className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center">
+                  <motion.h3 
+                    key={idx} 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center"
+                  >
                     <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
                     {paragraph.replace('### ', '')}
-                  </h3>
+                  </motion.h3>
                 );
-              } else if (paragraph.startsWith('- **') || paragraph.match(/^\s*[-*•]\s*\*\*/)) {
+              }
+
+              // Enhanced bullet points
+              if (paragraph.startsWith('- **') || paragraph.match(/^\s*[-*•]\s*\*\*/)) {
                 return (
-                  <div key={idx} className="mb-3 p-4 bg-zinc-800/30 rounded-lg border-l-3 border-blue-500/50">
+                  <motion.div 
+                    key={idx} 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="mb-3 p-4 bg-zinc-800/30 rounded-lg border-l-3 border-blue-500/50 hover:bg-zinc-800/40 transition-colors"
+                  >
                     <div className="font-medium text-zinc-100 mb-2">
                       {paragraph.match(/\*\*(.*?)\*\*/)?.[1] || ''}
                     </div>
                     <div className="text-zinc-300 leading-relaxed">
                       {paragraph.replace(/^[\s\-*•]*\*\*(.*?)\*\*:\s*/, '')}
                     </div>
-                  </div>
+                  </motion.div>
                 );
               } else if (paragraph.match(/^[\s]*[-*•]\s+/)) {
-                // Handle regular bullet points
                 const bulletText = paragraph.replace(/^[\s\-*•]+/, '').trim();
                 return (
-                  <div key={idx} className="flex items-start space-x-3 mb-2">
+                  <motion.div 
+                    key={idx} 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex items-start space-x-3 mb-2"
+                  >
                     <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
                     <div className="text-zinc-300 leading-relaxed flex-1">
                       {bulletText.split('**').map((part, i) => 
@@ -264,23 +367,31 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                           part
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 );
               }
+
               return (
-                <p key={idx} className="text-zinc-200 leading-relaxed">
+                <motion.p 
+                  key={idx} 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                  className="text-zinc-200 leading-relaxed"
+                >
                   {paragraph.split('**').map((part, i) => 
                     i % 2 === 1 ? 
                       <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
                       part
                   )}
-                </p>
+                </motion.p>
               );
             })}
-          </div>
+          </motion.div>
         )}
       </div>
 
+      {/* Sources Section */}
       {sources && sources.length > 0 && (
         <AnimatePresence>
           {showActions && (
@@ -296,23 +407,42 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                   <Search className="w-4 h-4 mr-2 text-blue-400" />
                   Research Sources ({sources.length})
                 </h4>
-                <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
-                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1" />
-                  Verified
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                    <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1 animate-pulse" />
+                    Verified
+                  </Badge>
+                  <Button
+                    onClick={() => setSourcesExpanded(!sourcesExpanded)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                  >
+                    {sourcesExpanded ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {sourcesExpanded ? 'Collapse' : 'Expand'}
+                  </Button>
+                </div>
               </div>
-              <div className="grid gap-3">
+              
+              <div className={`grid gap-3 transition-all duration-300 ${sourcesExpanded ? 'max-h-none' : 'max-h-64 overflow-hidden'}`}>
                 {sources.map((source, idx) => (
-                  <div key={idx} className="group/source flex items-start space-x-3 p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: idx * 0.05 }}
+                    className="group/source flex items-start space-x-3 p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200"
+                  >
                     <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <a 
                         href={source.url} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-zinc-200 hover:text-blue-400 cursor-pointer transition-colors font-medium text-sm block"
+                        className="text-zinc-200 hover:text-blue-400 cursor-pointer transition-colors font-medium text-sm flex items-center group"
                       >
-                        {source.title}
+                        [{idx + 1}] {source.title}
+                        <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </a>
                       <div className="flex items-center space-x-3 mt-2">
                         <span className="text-xs text-zinc-500">{source.domain}</span>
@@ -323,21 +453,56 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
                       </div>
                     </div>
                     <Button 
-                      variant="ghost" 
-                      size="sm" 
                       className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity"
+                      size="sm"
+                      variant="ghost"
                       onClick={() => navigator.clipboard.writeText(source.url)}
                     >
                       <Copy className="w-3 h-3" />
                     </Button>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       )}
-    </div>
+
+      {/* Feedback Section */}
+      {showActions && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="mt-6 pt-4 border-t border-zinc-800/30 flex items-center justify-between"
+        >
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-zinc-500">Was this helpful?</span>
+            <Button
+              onClick={() => handleFeedback('up')}
+              size="sm"
+              variant="ghost"
+              className={`h-6 w-6 p-0 ${feedback === 'up' ? 'text-green-400' : 'text-zinc-500'}`}
+            >
+              <ThumbsUp className="w-3 h-3" />
+            </Button>
+            <Button
+              onClick={() => handleFeedback('down')}
+              size="sm"
+              variant="ghost"
+              className={`h-6 w-6 p-0 ${feedback === 'down' ? 'text-red-400' : 'text-zinc-500'}`}
+            >
+              <ThumbsDown className="w-3 h-3" />
+            </Button>
+          </div>
+          
+          <div className="flex items-center space-x-2 text-xs text-zinc-500">
+            <Sparkles className="w-3 h-3" />
+            <span>Powered by AI Research</span>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
   );
 };
 
