@@ -70,34 +70,36 @@ const BlogPost: React.FC<{ post: BlogPost; variant?: 'featured' | 'regular' | 't
   }, [post.id, variant]);
 
   const difficultyColor = {
-    beginner: 'bg-green-100 text-green-800',
-    intermediate: 'bg-yellow-100 text-yellow-800',
-    advanced: 'bg-red-100 text-red-800'
+    beginner: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
+    intermediate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
+    advanced: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
   };
 
   if (variant === 'featured') {
     return (
-      <Card className="overflow-hidden border-2 border-primary/20 bg-gradient-to-r from-background to-primary/5">
+      <Card className="bg-card text-card-foreground border-2 border-primary/20 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         <CardHeader className="pb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-3">
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary border-primary/20">
                   <TrendingUp className="w-3 h-3" />
                   {post.isPersonalized ? 'Personalized' : 'Featured'}
                 </Badge>
-                <Badge variant="outline">{post.category}</Badge>
-                <Badge className={`text-xs ${difficultyColor[post.readingLevel]}`}>
+                <Badge variant="outline" className="border-muted-foreground/20">
+                  {post.category}
+                </Badge>
+                <Badge className={`text-xs border-0 ${difficultyColor[post.readingLevel]}`}>
                   {post.readingLevel}
                 </Badge>
                 {post.factChecked && (
-                  <Badge variant="secondary" className="gap-1">
+                  <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
                     <CheckCircle className="w-3 h-3" />
                     Verified
                   </Badge>
                 )}
               </div>
-              <CardTitle className="text-2xl mb-3 hover:text-primary transition-colors">
+              <CardTitle className="text-2xl mb-3 text-foreground hover:text-primary transition-colors">
                 <Link to={`/blog/${post.id}`} className="block">
                   {post.title}
                 </Link>
@@ -109,19 +111,19 @@ const BlogPost: React.FC<{ post: BlogPost; variant?: 'featured' | 'regular' | 't
                 <div className="flex gap-1 flex-wrap mb-3">
                   <span className="text-sm text-muted-foreground mr-2">Vocabulary:</span>
                   {post.vocabularyHighlights.slice(0, 4).map((vocab, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
+                    <Badge key={idx} variant="outline" className="text-xs border-accent/20 bg-accent/10">
                       {vocab.word}
                     </Badge>
                   ))}
                   {post.vocabularyHighlights.length > 4 && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs border-accent/20 bg-accent/10">
                       +{post.vocabularyHighlights.length - 4} more
                     </Badge>
                   )}
                 </div>
               )}
             </div>
-            <div className="hidden sm:flex items-center justify-center w-20 h-20 bg-primary/10 rounded-lg">
+            <div className="hidden sm:flex items-center justify-center w-20 h-20 bg-primary/10 rounded-lg backdrop-blur-sm">
               <BookOpen className="w-10 h-10 text-primary" />
             </div>
           </div>
@@ -144,7 +146,7 @@ const BlogPost: React.FC<{ post: BlogPost; variant?: 'featured' | 'regular' | 't
             </div>
             <div className="flex gap-2 flex-wrap">
               {post.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
+                <Badge key={tag} variant="secondary" className="text-xs bg-secondary/80">
                   {tag}
                 </Badge>
               ))}
@@ -156,29 +158,29 @@ const BlogPost: React.FC<{ post: BlogPost; variant?: 'featured' | 'regular' | 't
   }
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
+    <Card className="bg-card text-card-foreground backdrop-blur-sm border-border group hover:shadow-lg transition-all duration-200 hover:-translate-y-1 hover:border-primary/20">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2 mb-2">
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs border-muted-foreground/20">
             {post.category}
           </Badge>
-          <Badge className={`text-xs ${difficultyColor[post.readingLevel]}`}>
+          <Badge className={`text-xs border-0 ${difficultyColor[post.readingLevel]}`}>
             {post.readingLevel}
           </Badge>
           {post.isPersonalized && (
-            <Badge variant="secondary" className="text-xs gap-1">
+            <Badge variant="secondary" className="text-xs gap-1 bg-primary/10 text-primary border-primary/20">
               <Star className="w-3 h-3" />
               For You
             </Badge>
           )}
           {post.factChecked && (
-            <Badge variant="secondary" className="text-xs gap-1">
+            <Badge variant="secondary" className="text-xs gap-1 bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
               <CheckCircle className="w-3 h-3" />
               {post.factCheckScore && `${Math.round(post.factCheckScore * 100)}%`}
             </Badge>
           )}
         </div>
-        <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2">
+        <CardTitle className="text-lg leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2">
           <Link to={`/blog/${post.id}`} className="block">
             {post.title}
           </Link>
@@ -204,12 +206,12 @@ const BlogPost: React.FC<{ post: BlogPost; variant?: 'featured' | 'regular' | 't
         </div>
         <div className="flex gap-1 flex-wrap">
           {post.tags.slice(0, 2).map((tag) => (
-            <Badge key={tag} variant="secondary" className="text-xs">
+            <Badge key={tag} variant="secondary" className="text-xs bg-secondary/80">
               {tag}
             </Badge>
           ))}
           {post.tags.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs bg-secondary/80">
               +{post.tags.length - 2}
             </Badge>
           )}
@@ -229,20 +231,20 @@ const VocabularyProgress: React.FC<{ language: string }> = ({ language }) => {
   const masteryPercentage = (masteredCount / totalCount) * 100;
 
   return (
-    <Card>
+    <Card className="bg-card text-card-foreground backdrop-blur-sm border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Brain className="w-4 h-4" />
+        <CardTitle className="text-sm flex items-center gap-2 text-foreground">
+          <Brain className="w-4 h-4 text-primary" />
           Vocabulary Progress
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="space-y-2">
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-sm text-foreground">
             <span>Mastered Words</span>
             <span>{masteredCount}/{totalCount}</span>
           </div>
-          <Progress value={masteryPercentage} className="h-2" />
+          <Progress value={masteryPercentage} className="h-2 bg-muted" />
           <div className="text-xs text-muted-foreground">
             {Math.round(masteryPercentage)}% mastery rate
           </div>
@@ -286,20 +288,20 @@ const ResearchBlog: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
+      <div className="min-h-screen bg-background">
         {/* Header Section */}
-        <div className="bg-background/80 backdrop-blur-sm border-b sticky top-0 z-10">
+        <div className="bg-card/50 backdrop-blur-sm border-b border-border sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Personalized Blog</h1>
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Personalized Blog</h1>
                   <p className="text-muted-foreground mt-1">
                     AI-powered articles tailored to your interests and language level
                   </p>
                 </div>
                 <Link to="/suna-agent">
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2 border-primary/20 hover:bg-primary/10 hover:text-primary">
                     <Sparkles className="w-4 h-4" />
                     Create Content
                   </Button>
@@ -314,12 +316,12 @@ const ResearchBlog: React.FC = () => {
                     placeholder="Search articles..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 bg-background border-border focus:border-primary"
                   />
                 </div>
                 <div className="flex gap-2">
                   <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32 bg-background border-border">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -331,7 +333,7 @@ const ResearchBlog: React.FC = () => {
                     </SelectContent>
                   </Select>
                   <Select value={selectedLevel} onValueChange={setSelectedLevel}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32 bg-background border-border">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -353,7 +355,11 @@ const ResearchBlog: React.FC = () => {
                     variant={selectedCategory === category ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedCategory(category)}
-                    className="whitespace-nowrap"
+                    className={`whitespace-nowrap transition-all duration-200 ${
+                      selectedCategory === category 
+                        ? 'bg-primary text-primary-foreground shadow-lg' 
+                        : 'border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20'
+                    }`}
                   >
                     {category}
                   </Button>
@@ -369,12 +375,12 @@ const ResearchBlog: React.FC = () => {
             {/* Main Content */}
             <div className="lg:col-span-3">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="personalized" className="gap-2">
+                <TabsList className="grid w-full grid-cols-2 bg-muted/50 border border-border">
+                  <TabsTrigger value="personalized" className="gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
                     <Target className="w-4 h-4" />
                     For You
                   </TabsTrigger>
-                  <TabsTrigger value="trending" className="gap-2">
+                  <TabsTrigger value="trending" className="gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
                     <TrendingUp className="w-4 h-4" />
                     Trending
                   </TabsTrigger>
@@ -384,7 +390,7 @@ const ResearchBlog: React.FC = () => {
                   {isBlogLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                       {[...Array(6)].map((_, i) => (
-                        <Card key={i} className="animate-pulse">
+                        <Card key={i} className="animate-pulse bg-card border-border">
                           <CardHeader>
                             <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
                             <div className="h-6 bg-muted rounded"></div>
@@ -401,7 +407,7 @@ const ResearchBlog: React.FC = () => {
                       {featuredPost && (
                         <div className="mb-8">
                           <div className="flex items-center gap-2 mb-4">
-                            <Badge variant="secondary" className="gap-1">
+                            <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary border-primary/20">
                               <Star className="w-3 h-3" />
                               Featured for You
                             </Badge>
@@ -424,7 +430,7 @@ const ResearchBlog: React.FC = () => {
                   {isTrendingLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {[...Array(4)].map((_, i) => (
-                        <Card key={i} className="animate-pulse">
+                        <Card key={i} className="animate-pulse bg-card border-border">
                           <CardHeader>
                             <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
                             <div className="h-6 bg-muted rounded"></div>
@@ -451,12 +457,12 @@ const ResearchBlog: React.FC = () => {
                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                     <Search className="w-8 h-8 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">No articles found</h3>
+                  <h3 className="text-lg font-semibold mb-2 text-foreground">No articles found</h3>
                   <p className="text-muted-foreground mb-4">
                     Try adjusting your filters or create personalized content.
                   </p>
                   <Link to="/suna-agent">
-                    <Button className="gap-2">
+                    <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                       <Sparkles className="w-4 h-4" />
                       Generate Content
                     </Button>
@@ -469,24 +475,24 @@ const ResearchBlog: React.FC = () => {
             <div className="space-y-6">
               <VocabularyProgress language={selectedLanguage} />
               
-              <Card>
+              <Card className="bg-card text-card-foreground backdrop-blur-sm border-border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4" />
+                  <CardTitle className="text-sm flex items-center gap-2 text-foreground">
+                    <BarChart3 className="w-4 h-4 text-primary" />
                     Reading Stats
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Articles Read</span>
                       <span className="font-medium">12</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Time Spent</span>
                       <span className="font-medium">2h 45m</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Words Learned</span>
                       <span className="font-medium">34</span>
                     </div>
@@ -494,9 +500,9 @@ const ResearchBlog: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Alert>
-                <Sparkles className="h-4 w-4" />
-                <AlertDescription>
+              <Alert className="bg-primary/5 border-primary/20">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-foreground">
                   Articles are personalized based on your interests and reading level. 
                   Interact with content to improve recommendations.
                 </AlertDescription>
