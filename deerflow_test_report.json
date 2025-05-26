@@ -1,0 +1,158 @@
+{
+  "timestamp": 1748219594.9569142,
+  "total_tests": 10,
+  "passed_count": 7,
+  "failed_count": 3,
+  "success_rate": 70.0,
+  "passed_tests": [
+    "Backend Health & Configuration",
+    "Core API Endpoints",
+    "Agent System Functionality",
+    "Error Handling & Resilience",
+    "Performance & Metrics",
+    "Frontend Integration",
+    "WebSocket Connectivity"
+  ],
+  "failed_tests": [
+    "Research Capabilities",
+    "Learning & Optimization",
+    "Data Persistence"
+  ],
+  "detailed_results": {
+    "Backend Health & Configuration": {
+      "success": true,
+      "health_status": "ok",
+      "environment": "development",
+      "api_keys": {
+        "deepseek": true,
+        "gemini": true,
+        "tavily": true,
+        "brave": true
+      },
+      "config_available": true,
+      "metrics_available": true
+    },
+    "Core API Endpoints": {
+      "success": true,
+      "success_rate": 0.7777777777777778,
+      "successful_endpoints": 7,
+      "total_endpoints": 9,
+      "endpoint_results": {
+        "/": {
+          "status_code": 200,
+          "success": true,
+          "description": "Root endpoint"
+        },
+        "/health": {
+          "status_code": 200,
+          "success": true,
+          "description": "Health check"
+        },
+        "/config": {
+          "status_code": 200,
+          "success": true,
+          "description": "Configuration"
+        },
+        "/metrics": {
+          "status_code": 200,
+          "success": true,
+          "description": "Metrics"
+        },
+        "/deerflow/capabilities": {
+          "status_code": 200,
+          "success": true,
+          "description": "DeerFlow capabilities"
+        },
+        "/deerflow/tools": {
+          "status_code": 200,
+          "success": true,
+          "description": "Available tools"
+        },
+        "/agent/tasks": {
+          "status_code": 200,
+          "success": true,
+          "description": "Agent tasks"
+        },
+        "/optimize/validate": {
+          "status_code": 404,
+          "success": false,
+          "description": "Optimization validation"
+        },
+        "/optimize/recommendations": {
+          "status_code": 404,
+          "success": false,
+          "description": "Optimization recommendations"
+        }
+      }
+    },
+    "Agent System Functionality": {
+      "success": true,
+      "task_created": true,
+      "task_id": "c18bd94e-6b50-40d6-aa68-ffe6d5e90c1a",
+      "status_retrievable": false,
+      "capabilities": {
+        "basic_research": true,
+        "agent_planning": true,
+        "domain_expertise": true,
+        "reasoning_engine": true,
+        "learning_system": true,
+        "full_agent_system": false
+      }
+    },
+    "Research Capabilities": {
+      "success": false,
+      "error": "Research endpoint failed: 500"
+    },
+    "Learning & Optimization": {
+      "success": false,
+      "error": "Optimization validation failed: 404"
+    },
+    "Error Handling & Resilience": {
+      "success": true,
+      "scenarios_tested": 2,
+      "scenarios_handled": 2,
+      "error_scenarios": [
+        {
+          "scenario": "Invalid endpoint",
+          "handled": true,
+          "status_code": 404
+        },
+        {
+          "scenario": "Malformed request",
+          "handled": true,
+          "status_code": 422
+        }
+      ]
+    },
+    "Performance & Metrics": {
+      "success": true,
+      "metrics_available": true,
+      "metrics_sections": [
+        "system_metrics",
+        "error_metrics",
+        "configuration"
+      ],
+      "response_time": 0.0025086402893066406,
+      "performance_good": true,
+      "uptime": 1748219593.884492
+    },
+    "Frontend Integration": {
+      "success": true,
+      "frontend_accessible": false,
+      "cors_configured": false,
+      "integration_endpoints": 3,
+      "total_endpoints": 3
+    },
+    "WebSocket Connectivity": {
+      "success": true,
+      "websocket_ready": true,
+      "note": "Basic WebSocket readiness check performed"
+    },
+    "Data Persistence": {
+      "success": false,
+      "task_created": true,
+      "task_persisted": false,
+      "task_listing_works": true
+    }
+  }
+}
