@@ -1,0 +1,1362 @@
+# Vietnamese-Focused Personalized Chatbot Implementation Guide
+
+## System Overview
+
+A best-friend style AI chatbot with:
+- Primary support for English, Vietnamese, and Polish
+- Vietnamese cultural awareness and local references
+- Custom memory retention per user
+- Whitelist-based access control
+- Social media awareness tailored to user interests
+- Natural code-switching between languages
+
+## 1. Authentication & Access Control
+
+### Google Auth Migration with Whitelist
+**File**: `server/src/auth/GoogleAuthService.ts`
+
+```typescript
+import { OAuth2Client } from 'google-auth-library';
+import { db } from '../db';
+
+export class GoogleAuthService {
+  private client: OAuth2Client;
+  private whitelist: Set<string>;
+
+  constructor() {
+    this.client = new OAuth2Client({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      redirectUri: process.env.GOOGLE_REDIRECT_URI
+    });
+    
+    this.loadWhitelist();
+  }
+
+  async verifyAndAuthorize(idToken: string): Promise<AuthResult> {
+    try {
+      // Verify Google token
+      const ticket = await this.client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      
+      const payload = ticket.getPayload();
+      const email = payload?.email;
+      
+      if (!email) {
+        throw new Error('No email in token');
+      }
+      
+      // Check whitelist
+      if (!this.whitelist.has(email.toLowerCase())) {
+        return {
+          authorized: false,
+          reason: 'Email not in whitelist'
+        };
+      }
+      
+      // Create or update user
+      const user = await this.findOrCreateUser({
+        email,
+        name: payload.name,
+        picture: payload.picture,
+        googleId: payload.sub
+      });
+      
+      return {
+        authorized: true,
+        user,
+        token: await this.generateSessionToken(user.id)
+      };
+    } catch (error) {
+      console.error('Auth error:', error);
+      return {
+        authorized: false,
+        reason: 'Authentication failed'
+      };
+    }
+  }
+
+  async addToWhitelist(email: string, addedBy: string): Promise<void> {
+    await db.whitelist.create({
+      data: {
+        email: email.toLowerCase(),
+        addedBy,
+        addedAt: new Date()
+      }
+    });
+    
+    this.whitelist.add(email.toLowerCase());
+  }
+
+  async removeFromWhitelist(email: string): Promise<void> {
+    await db.whitelist.delete({
+      where: { email: email.toLowerCase() }
+    });
+    
+    this.whitelist.delete(email.toLowerCase());
+  }
+
+  private async loadWhitelist(): Promise<void> {
+    const entries = await db.whitelist.findMany();
+    this.whitelist = new Set(entries.map(e => e.email.toLowerCase()));
+  }
+}
+```
+
+### Admin Panel for Whitelist Management
+**File**: `client/src/components/admin/WhitelistManager.tsx`
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { UserPlus, UserMinus, Mail } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
+
+export const WhitelistManager: React.FC = () => {
+  const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchWhitelist();
+  }, []);
+
+  const fetchWhitelist = async () => {
+    const response = await fetch('/api/admin/whitelist');
+    const data = await response.json();
+    setWhitelist(data);
+  };
+
+  const addEmail = async () => {
+    if (!newEmail || !newEmail.includes('@')) {
+      toast({
+        title: 'Invalid email',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      await fetch('/api/admin/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newEmail })
+      });
+      
+      toast({
+        title: 'Email added',
+        description: `${newEmail} can now access the chatbot`
+      });
+      
+      setNewEmail('');
+      fetchWhitelist();
+    } catch (error) {
+      toast({
+        title: 'Failed to add email',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const removeEmail = async (email: string) => {
+    if (!confirm(`Remove ${email} from whitelist?`)) return;
+
+    try {
+      await fetch('/api/admin/whitelist', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      toast({
+        title: 'Email removed',
+        description: `${email} no longer has access`
+      });
+      
+      fetchWhitelist();
+    } catch (error) {
+      toast({
+        title: 'Failed to remove email',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Whitelist Management</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Add new email */}
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              placeholder="Add email to whitelist"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && addEmail()}
+            />
+            <Button onClick={addEmail}>
+              <UserPlus className="w-4 h-4 mr-1" />
+              Add
+            </Button>
+          </div>
+
+          {/* Whitelist entries */}
+          <div className="space-y-2">
+            {whitelist.map((entry) => (
+              <div
+                key={entry.email}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-500" />
+                  <span>{entry.email}</span>
+                  <span className="text-xs text-gray-500">
+                    Added {new Date(entry.addedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => removeEmail(entry.email)}
+                >
+                  <UserMinus className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+## 2. Vietnamese-Focused Personality Engine
+
+### Enhanced Personality Service with Vietnamese Culture
+**File**: `server/src/services/personality/VietnamesePersonalityService.ts`
+
+```typescript
+export class VietnamesePersonalityService {
+  private readonly PERSONALITY_TEMPLATES = {
+    vietnamese: `
+You are a close Vietnamese friend chatting naturally. Be:
+- Warm and caring like a best friend (bạn thân)
+- Use Vietnamese expressions naturally when appropriate
+- Reference Vietnamese culture, food, places when relevant
+- Mix languages naturally (like how young Vietnamese people chat)
+- Use emojis and casual expressions
+- Be playful with Vietnamese humor style
+
+Cultural context:
+- Understand Vietnamese holidays (Tết, Mid-Autumn Festival)
+- Know popular Vietnamese memes and internet culture
+- Reference Vietnamese food, music, celebrities when fitting
+- Use "anh/chị/em" appropriately based on context
+- Understand family values and collectivist culture
+`,
+    english: `
+You are a witty, caring best friend chatting in English. Be:
+- Warm, supportive, and genuinely interested
+- Occasionally playful and humorous
+- Reference current trends and memes
+- Very casual and natural in conversation
+- Use emojis and modern expressions
+- Remember details from past conversations
+`,
+    polish: `
+You are a friendly Polish companion. Be:
+- Warm and direct in Polish communication style
+- Use Polish humor and cultural references
+- Natural and casual like chatting with a friend
+- Reference Polish culture when appropriate
+- Mix in Polish expressions naturally
+`
+  };
+
+  async buildPersonalizedPrompt(context: ChatContext): Promise<string> {
+    const { message, userProfile, recentConversations, language } = context;
+    
+    // Select base personality
+    const basePersonality = this.getBasePersonality(language, userProfile);
+    
+    // Build memory context
+    const memoryContext = this.buildMemoryContext(userProfile, recentConversations);
+    
+    // Add social context if relevant
+    const socialContext = await this.getSocialContext(userProfile);
+    
+    return `
+${basePersonality}
+
+About your friend:
+- Name: ${userProfile.name}
+- Languages: ${userProfile.languages.join(', ')}
+- Interests: ${userProfile.interests.join(', ')}
+- Communication style: ${userProfile.preferredStyle}
+- Memory retention: ${userProfile.memoryDuration} days
+- Cultural background: ${userProfile.culturalBackground || 'Not specified'}
+
+${memoryContext}
+
+${socialContext}
+
+Current time: ${new Date().toLocaleString('vi-VN')}
+Their message: ${message}
+
+Respond naturally as their best friend. Feel free to:
+- Switch between languages if it feels natural
+- Reference shared memories
+- Use appropriate slang/memes
+- Show you remember and care about them
+`;
+  }
+
+  private getBasePersonality(language: string, profile: UserProfile): string {
+    // Check for Vietnamese background
+    if (profile.culturalBackground === 'vietnamese' || 
+        profile.languages.includes('vi')) {
+      return this.PERSONALITY_TEMPLATES.vietnamese;
+    }
+    
+    // Otherwise use language-specific template
+    return this.PERSONALITY_TEMPLATES[language] || this.PERSONALITY_TEMPLATES.english;
+  }
+
+  private buildMemoryContext(profile: UserProfile, conversations: Conversation[]): string {
+    const memories = conversations
+      .filter(conv => this.isWithinMemoryWindow(conv, profile.memoryDuration))
+      .map(conv => this.extractKeyMemories(conv))
+      .flat();
+    
+    if (memories.length === 0) return '';
+    
+    return `
+Recent memories with ${profile.name}:
+${memories.map(m => `- ${m}`).join('\n')}
+`;
+  }
+
+  private extractKeyMemories(conversation: Conversation): string[] {
+    // Extract important moments, emotions, topics
+    return conversation.messages
+      .filter(m => m.importance > 0.7)
+      .map(m => m.summary);
+  }
+}
+```
+
+### Vietnamese Language Processing
+**File**: `server/src/services/language/VietnameseLanguageService.ts`
+
+```typescript
+import * as vnlp from 'vn-nlp';
+
+export class VietnameseLanguageService {
+  private slangDictionary: Map<string, string>;
+  private vietnameseStopwords: Set<string>;
+
+  constructor() {
+    this.loadSlangDictionary();
+    this.loadStopwords();
+  }
+
+  async detectCodeSwitching(text: string): Promise<LanguageAnalysis> {
+    // Detect mixed Vietnamese-English
+    const segments = this.segmentByLanguage(text);
+    
+    return {
+      primaryLanguage: this.determinePrimaryLanguage(segments),
+      segments,
+      hasCodeSwitching: segments.length > 1,
+      slangTerms: this.detectSlang(text)
+    };
+  }
+
+  private segmentByLanguage(text: string): LanguageSegment[] {
+    const words = text.split(/\s+/);
+    const segments: LanguageSegment[] = [];
+    let currentSegment: LanguageSegment | null = null;
+    
+    for (const word of words) {
+      const lang = this.detectWordLanguage(word);
+      
+      if (!currentSegment || currentSegment.language !== lang) {
+        if (currentSegment) segments.push(currentSegment);
+        currentSegment = {
+          language: lang,
+          text: word,
+          start: text.indexOf(word)
+        };
+      } else {
+        currentSegment.text += ' ' + word;
+      }
+    }
+    
+    if (currentSegment) segments.push(currentSegment);
+    return segments;
+  }
+
+  private detectWordLanguage(word: string): 'vi' | 'en' | 'pl' | 'mixed' {
+    // Vietnamese detection
+    if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(word)) {
+      return 'vi';
+    }
+    
+    // Polish detection
+    if (/[ąćęłńóśźż]/i.test(word)) {
+      return 'pl';
+    }
+    
+    // Check common Vietnamese words without diacritics
+    if (this.isCommonVietnameseWord(word.toLowerCase())) {
+      return 'vi';
+    }
+    
+    return 'en';
+  }
+
+  detectSlang(text: string): string[] {
+    const words = text.toLowerCase().split(/\s+/);
+    const slangTerms: string[] = [];
+    
+    for (const word of words) {
+      if (this.slangDictionary.has(word)) {
+        slangTerms.push(word);
+      }
+    }
+    
+    return slangTerms;
+  }
+
+  private loadSlangDictionary(): void {
+    this.slangDictionary = new Map([
+      // Vietnamese slang
+      ['vcl', 'vãi cả lúa'],
+      ['vl', 'vãi lúa'],
+      ['dm', 'đi mẹ'],
+      ['ckia', 'con kia'],
+      ['bae', 'baby/em yêu'],
+      ['crush', 'người thương thầm'],
+      
+      // Common abbreviations
+      ['ko', 'không'],
+      ['dc', 'được'],
+      ['bit', 'biết'],
+      ['hok', 'không'],
+      ['ns', 'nói'],
+      ['ik', 'đi'],
+      ['ak', 'à'],
+      ['uk', 'ừ'],
+      ['tks', 'thanks'],
+      ['bn', 'bạn'],
+      ['mk', 'mình'],
+      ['ny', 'người yêu']
+    ]);
+  }
+}
+```
+
+## 3. Custom Memory System
+
+### User-Configurable Memory Service
+**File**: `server/src/services/memory/CustomMemoryService.ts`
+
+```typescript
+import { Pinecone } from '@pinecone-database/pinecone';
+import { Redis } from 'ioredis';
+
+export class CustomMemoryService {
+  private pinecone: Pinecone;
+  private redis: Redis;
+  
+  async storeMemory(
+    userId: string,
+    interaction: Interaction,
+    retentionDays: number
+  ): Promise<void> {
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + retentionDays);
+    
+    // Generate embedding
+    const embedding = await this.generateEmbedding(interaction.content);
+    
+    // Extract metadata
+    const metadata = await this.extractMetadata(interaction);
+    
+    // Store in Pinecone with expiry
+    await this.pinecone.upsert({
+      id: `${userId}-${interaction.timestamp}`,
+      values: embedding,
+      metadata: {
+        userId,
+        conversationId: interaction.conversationId,
+        timestamp: interaction.timestamp,
+        expiryDate: expiryDate.toISOString(),
+        content: interaction.content,
+        language: metadata.language,
+        topics: metadata.topics,
+        sentiment: metadata.sentiment,
+        importance: metadata.importance,
+        culturalContext: metadata.culturalContext
+      }
+    });
+    
+    // Cache recent memories
+    await this.cacheRecentMemory(userId, interaction, retentionDays);
+  }
+
+  async getRelevantMemories(
+    userId: string,
+    query: string,
+    limit: number = 10
+  ): Promise<Memory[]> {
+    const embedding = await this.generateEmbedding(query);
+    const now = new Date();
+    
+    // Query with expiry filter
+    const results = await this.pinecone.query({
+      vector: embedding,
+      filter: {
+        userId,
+        expiryDate: { $gte: now.toISOString() }
+      },
+      topK: limit,
+      includeMetadata: true
+    });
+    
+    return this.formatMemories(results.matches);
+  }
+
+  async cleanExpiredMemories(): Promise<void> {
+    // Run daily to remove expired memories
+    const now = new Date();
+    
+    await this.pinecone.delete({
+      filter: {
+        expiryDate: { $lt: now.toISOString() }
+      }
+    });
+  }
+
+  async updateUserMemorySettings(
+    userId: string,
+    settings: MemorySettings
+  ): Promise<void> {
+    await this.db.userSettings.upsert({
+      where: { userId },
+      update: {
+        memoryRetentionDays: settings.retentionDays,
+        memoryCategories: settings.categories,
+        forgetPatterns: settings.forgetPatterns
+      },
+      create: {
+        userId,
+        memoryRetentionDays: settings.retentionDays,
+        memoryCategories: settings.categories,
+        forgetPatterns: settings.forgetPatterns
+      }
+    });
+  }
+
+  private async extractMetadata(interaction: Interaction): Promise<Metadata> {
+    // Analyze for importance (personal info, emotions, preferences)
+    const importance = await this.calculateImportance(interaction);
+    
+    // Extract cultural context
+    const culturalContext = await this.extractCulturalContext(interaction);
+    
+    return {
+      language: interaction.language,
+      topics: await this.extractTopics(interaction.content),
+      sentiment: await this.analyzeSentiment(interaction.content),
+      importance,
+      culturalContext
+    };
+  }
+
+  private async calculateImportance(interaction: Interaction): Promise<number> {
+    let score = 0.5; // Base score
+    
+    // Personal information
+    if (/my name is|i am|i'm/i.test(interaction.content)) score += 0.2;
+    
+    // Emotions
+    if (/happy|sad|angry|excited|worried/i.test(interaction.content)) score += 0.15;
+    
+    // Preferences
+    if (/i like|i love|i hate|favorite|prefer/i.test(interaction.content)) score += 0.15;
+    
+    // Future plans
+    if (/will|going to|plan to|want to/i.test(interaction.content)) score += 0.1;
+    
+    // Cultural references
+    if (/tết|phở|áo dài|family|tradition/i.test(interaction.content)) score += 0.1;
+    
+    return Math.min(score, 1.0);
+  }
+}
+```
+
+### Memory Settings UI
+**File**: `client/src/components/settings/MemorySettings.tsx`
+
+```tsx
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Brain, Calendar, Shield } from 'lucide-react';
+
+export const MemorySettings: React.FC = () => {
+  const [settings, setSettings] = useState<MemorySettings>({
+    retentionDays: 30,
+    categories: {
+      personal: true,
+      preferences: true,
+      emotions: true,
+      plans: true,
+      casual: false
+    },
+    forgetPatterns: []
+  });
+
+  const retentionPresets = [
+    { label: '1 Week', days: 7 },
+    { label: '1 Month', days: 30 },
+    { label: '3 Months', days: 90 },
+    { label: '1 Year', days: 365 },
+    { label: 'Forever', days: -1 }
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Brain className="w-5 h-5" />
+          Memory Settings
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Retention Period */}
+        <div>
+          <label className="text-sm font-medium flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4" />
+            How long should I remember our conversations?
+          </label>
+          
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              {retentionPresets.map(preset => (
+                <Button
+                  key={preset.days}
+                  variant={settings.retentionDays === preset.days ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSettings({
+                    ...settings,
+                    retentionDays: preset.days
+                  })}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+            
+            {settings.retentionDays > 0 && (
+              <div>
+                <Slider
+                  value={[settings.retentionDays]}
+                  onValueChange={([days]) => setSettings({
+                    ...settings,
+                    retentionDays: days
+                  })}
+                  min={1}
+                  max={365}
+                  step={1}
+                />
+                <p className="text-sm text-gray-600 mt-1">
+                  {settings.retentionDays} days
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Memory Categories */}
+        <div>
+          <label className="text-sm font-medium mb-3 block">
+            What should I remember?
+          </label>
+          
+          <div className="space-y-3">
+            {Object.entries(settings.categories).map(([category, enabled]) => (
+              <div key={category} className="flex items-center justify-between">
+                <span className="capitalize">{category} Information</span>
+                <Switch
+                  checked={enabled}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    categories: {
+                      ...settings.categories,
+                      [category]: checked
+                    }
+                  })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Privacy Options */}
+        <div className="border-t pt-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Shield className="w-4 h-4" />
+            <span>Your memories are encrypted and only accessible by you</span>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <Button className="w-full" onClick={() => saveSettings(settings)}>
+          Save Memory Settings
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+## 4. Social Media Integration with Personal Focus
+
+### Personalized Social Crawler
+**File**: `server/src/services/social/PersonalizedSocialService.ts`
+
+```typescript
+export class PersonalizedSocialService {
+  private crawlers: Map<string, SocialCrawler>;
+  private adminContentQueue: AdminContent[] = [];
+
+  async getPersonalizedSocialContext(
+    userId: string,
+    userProfile: UserProfile
+  ): Promise<SocialContext> {
+    // Get user's interests and language
+    const { interests, languages, culturalBackground } = userProfile;
+    
+    // Determine regions to focus on
+    const regions = this.determineRegions(languages, culturalBackground);
+    
+    // Fetch relevant social content
+    const [trends, adminContent] = await Promise.all([
+      this.fetchPersonalizedTrends(interests, regions, languages),
+      this.getAdminCuratedContent(userId)
+    ]);
+    
+    return {
+      trends: this.rankByRelevance(trends, userProfile),
+      adminContent,
+      lastUpdated: new Date()
+    };
+  }
+
+  private async fetchPersonalizedTrends(
+    interests: string[],
+    regions: string[],
+    languages: string[]
+  ): Promise<SocialTrend[]> {
+    const trends: SocialTrend[] = [];
+    
+    // Fetch from different platforms based on regions
+    for (const region of regions) {
+      if (region === 'VN') {
+        // Vietnamese social media
+        trends.push(...await this.fetchVietnameseTrends(interests));
+      } else if (region === 'PL') {
+        // Polish social media
+        trends.push(...await this.fetchPolishTrends(interests));
+      } else {
+        // Global trends
+        trends.push(...await this.fetchGlobalTrends(interests, languages));
+      }
+    }
+    
+    return trends;
+  }
+
+  private async fetchVietnameseTrends(interests: string[]): Promise<SocialTrend[]> {
+    const trends: SocialTrend[] = [];
+    
+    // Facebook (popular in Vietnam)
+    const fbTrends = await this.crawlers.get('facebook')?.crawl({
+      region: 'VN',
+      language: 'vi',
+      interests,
+      limit: 20
+    });
+    
+    // TikTok Vietnam
+    const tiktokTrends = await this.crawlers.get('tiktok')?.crawl({
+      region: 'VN',
+      hashtags: this.getVietnameseHashtags(interests),
+      limit: 20
+    });
+    
+    // Zalo trends (if API available)
+    const zaloTrends = await this.crawlers.get('zalo')?.crawl({
+      interests,
+      limit: 10
+    });
+    
+    return [...(fbTrends || []), ...(tiktokTrends || []), ...(zaloTrends || [])];
+  }
+
+  private getVietnameseHashtags(interests: string[]): string[] {
+    const hashtagMap: Record<string, string[]> = {
+      'Technology': ['#congnghe', '#techviet', '#startupviet'],
+      'Food': ['#anvat', '#monngon', '#amthucviet'],
+      'Music': ['#nhacviet', '#vpop', '#nhactreremix'],
+      'Gaming': ['#gameviet', '#lienquan', '#fifa'],
+      'Fashion': ['#thoitrang', '#style', '#outfit'],
+      'Travel': ['#dulich', '#travelvietnam', '#checkin']
+    };
+    
+    return interests
+      .flatMap(interest => hashtagMap[interest] || [])
+      .filter(Boolean);
+  }
+
+  async addAdminContent(content: AdminContent): Promise<void> {
+    // Admin can push positive content to specific users
+    this.adminContentQueue.push({
+      ...content,
+      addedAt: new Date(),
+      targetUsers: content.targetUsers || 'all'
+    });
+    
+    // Store in database
+    await this.db.adminContent.create({ data: content });
+  }
+
+  private async getAdminCuratedContent(userId: string): Promise<AdminContent[]> {
+    return await this.db.adminContent.findMany({
+      where: {
+        OR: [
+          { targetUsers: 'all' },
+          { targetUsers: { contains: userId } }
+        ],
+        expiresAt: { gte: new Date() }
+      },
+      orderBy: { priority: 'desc' },
+      take: 5
+    });
+  }
+
+  private determineRegions(
+    languages: string[],
+    culturalBackground?: string
+  ): string[] {
+    const regions: string[] = [];
+    
+    if (languages.includes('vi') || culturalBackground === 'vietnamese') {
+      regions.push('VN');
+    }
+    if (languages.includes('pl') || culturalBackground === 'polish') {
+      regions.push('PL');
+    }
+    if (languages.includes('en')) {
+      regions.push('GLOBAL');
+    }
+    
+    return regions.length > 0 ? regions : ['GLOBAL'];
+  }
+}
+```
+
+### Admin Content Management
+**File**: `client/src/components/admin/ContentCuration.tsx`
+
+```tsx
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { Plus, Send, Users } from 'lucide-react';
+
+export const ContentCuration: React.FC = () => {
+  const [content, setContent] = useState<AdminContent>({
+    type: 'positive_news',
+    title: '',
+    content: '',
+    source: '',
+    targetUsers: 'all',
+    priority: 'normal',
+    expiresIn: 7
+  });
+
+  const contentTypes = [
+    { value: 'positive_news', label: 'Positive News' },
+    { value: 'motivation', label: 'Motivational Content' },
+    { value: 'cultural', label: 'Cultural Content' },
+    { value: 'educational', label: 'Educational' },
+    { value: 'humor', label: 'Humor/Memes' }
+  ];
+
+  const handleSubmit = async () => {
+    try {
+      await fetch('/api/admin/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...content,
+          expiresAt: new Date(Date.now() + content.expiresIn * 24 * 60 * 60 * 1000)
+        })
+      });
+      
+      // Reset form
+      setContent({
+        type: 'positive_news',
+        title: '',
+        content: '',
+        source: '',
+        targetUsers: 'all',
+        priority: 'normal',
+        expiresIn: 7
+      });
+      
+      toast({
+        title: 'Content added',
+        description: 'Users will see this in their social context'
+      });
+    } catch (error) {
+      toast({
+        title: 'Failed to add content',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Plus className="w-5 h-5" />
+          Curate Content for Users
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Content Type */}
+          <div>
+            <label className="text-sm font-medium">Content Type</label>
+            <Select
+              value={content.type}
+              onValueChange={(type) => setContent({ ...content, type })}
+            >
+              {contentTypes.map(type => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          {/* Title */}
+          <div>
+            <label className="text-sm font-medium">Title</label>
+            <Input
+              value={content.title}
+              onChange={(e) => setContent({ ...content, title: e.target.value })}
+              placeholder="Inspiring news about..."
+            />
+          </div>
+
+          {/* Content */}
+          <div>
+            <label className="text-sm font-medium">Content</label>
+            <Textarea
+              value={content.content}
+              onChange={(e) => setContent({ ...content, content: e.target.value })}
+              placeholder="Share something positive or educational..."
+              rows={4}
+            />
+          </div>
+
+          {/* Source */}
+          <div>
+            <label className="text-sm font-medium">Source (optional)</label>
+            <Input
+              value={content.source}
+              onChange={(e) => setContent({ ...content, source: e.target.value })}
+              placeholder="https://..."
+            />
+          </div>
+
+          {/* Target Users */}
+          <div>
+            <label className="text-sm font-medium">Target Users</label>
+            <div className="flex gap-2 mt-1">
+              <Button
+                variant={content.targetUsers === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setContent({ ...content, targetUsers: 'all' })}
+              >
+                <Users className="w-4 h-4 mr-1" />
+                All Users
+              </Button>
+              <Input
+                placeholder="Specific user emails (comma-separated)"
+                value={content.targetUsers === 'all' ? '' : content.targetUsers}
+                onChange={(e) => setContent({ ...content, targetUsers: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {/* Priority & Expiry */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Priority</label>
+              <Select
+                value={content.priority}
+                onValueChange={(priority) => setContent({ ...content, priority })}
+              >
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">Expires In</label>
+              <Select
+                value={content.expiresIn.toString()}
+                onValueChange={(days) => setContent({ 
+                  ...content, 
+                  expiresIn: parseInt(days) 
+                })}
+              >
+                <option value="1">1 Day</option>
+                <option value="3">3 Days</option>
+                <option value="7">1 Week</option>
+                <option value="30">1 Month</option>
+              </Select>
+            </div>
+          </div>
+
+          <Button onClick={handleSubmit} className="w-full">
+            <Send className="w-4 h-4 mr-1" />
+            Push Content to Users
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+## 5. Best Friend Chat Interface
+
+### Enhanced Chat Component
+**File**: `client/src/components/chat/BestFriendChat.tsx`
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Heart, Smile, Coffee, Music, TrendingUp } from 'lucide-react';
+import { usePersonalizedChat } from '@/hooks/usePersonalizedChat';
+import { TypewriterText } from '@/components/shared/TypewriterText';
+
+export const BestFriendChat: React.FC = () => {
+  const {
+    messages,
+    sendMessage,
+    userProfile,
+    isTyping,
+    socialContext,
+    suggestedTopics
+  } = usePersonalizedChat();
+
+  const [mood, setMood] = useState<string>('neutral');
+  const [showSuggestions, setShowSuggestions] = useState(true);
+
+  // Greeting based on time and language
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    const name = userProfile?.name || 'Friend';
+    
+    if (userProfile?.languages.includes('vi')) {
+      if (hour < 12) return `Chào buổi sáng ${name}! ☀️`;
+      if (hour < 18) return `Chào ${name}! Chiều nay thế nào? 😊`;
+      return `Chào ${name}! Tối nay vui không? 🌙`;
+    }
+    
+    if (hour < 12) return `Good morning ${name}! ☀️`;
+    if (hour < 18) return `Hey ${name}! How's your afternoon? 😊`;
+    return `Evening ${name}! How's it going? 🌙`;
+  };
+
+  const moodEmojis = {
+    happy: '😊',
+    excited: '🎉',
+    thoughtful: '🤔',
+    tired: '😴',
+    stressed: '😰',
+    neutral: '😌'
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-gradient-to-br from-purple-50 to-pink-50">
+      {/* Header */}
+      <div className="p-4 bg-white/80 backdrop-blur border-b">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">{getGreeting()}</h2>
+            <p className="text-sm text-gray-600">
+              I'm here for you {moodEmojis[mood]}
+            </p>
+          </div>
+          
+          {/* Mood selector */}
+          <div className="flex gap-2">
+            {Object.entries(moodEmojis).map(([moodType, emoji]) => (
+              <button
+                key={moodType}
+                onClick={() => setMood(moodType)}
+                className={`
+                  text-2xl p-1 rounded-lg transition-all
+                  ${mood === moodType 
+                    ? 'bg-purple-100 scale-110' 
+                    : 'hover:bg-gray-100'
+                  }
+                `}
+                title={moodType}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-8"
+          >
+            <p className="text-gray-600 mb-4">
+              {userProfile?.languages.includes('vi') 
+                ? 'Mình có thể nói chuyện về bất cứ điều gì bạn muốn! 💬'
+                : 'We can talk about anything you want! 💬'
+              }
+            </p>
+            
+            {/* Topic suggestions */}
+            {showSuggestions && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {suggestedTopics.map((topic, idx) => (
+                  <motion.button
+                    key={idx}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.1 }}
+                    onClick={() => {
+                      sendMessage(topic.prompt);
+                      setShowSuggestions(false);
+                    }}
+                    className="px-4 py-2 bg-white rounded-full shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
+                  >
+                    {topic.icon}
+                    <span>{topic.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        <AnimatePresence>
+          {messages.map((message, index) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, x: message.role === 'user' ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`
+                max-w-[80%] rounded-2xl px-4 py-3
+                ${message.role === 'user' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'bg-white shadow-sm'
+                }
+              `}>
+                {message.role === 'assistant' && index === messages.length - 1 ? (
+                  <TypewriterText
+                    text={message.content}
+                    speed={20}
+                    renderMarkdown={true}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+                )}
+                
+                {/* Show detected language if code-switching */}
+                {message.languages && message.languages.length > 1 && (
+                  <div className="flex gap-1 mt-2 opacity-60">
+                    {message.languages.map(lang => (
+                      <span key={lang} className="text-xs">
+                        {lang === 'vi' ? '🇻🇳' : lang === 'en' ? '🇺🇸' : '🇵🇱'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Typing indicator */}
+        {isTyping && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-3"
+          >
+            <div className="bg-white rounded-full p-3 shadow-sm">
+              <div className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <motion.div
+                    key={i}
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      delay: i * 0.2
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <span className="text-sm text-gray-600">
+              {userProfile?.languages.includes('vi') 
+                ? 'Đang suy nghĩ...' 
+                : 'Thinking...'
+              }
+            </span>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Social context indicator */}
+      {socialContext && socialContext.trends.length > 0 && (
+        <div className="px-4 py-2 bg-white/80 border-t">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <TrendingUp className="w-4 h-4" />
+            <span>
+              Trending: {socialContext.trends[0].topic}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Input area */}
+      <div className="p-4 bg-white border-t">
+        <MessageInput 
+          onSend={sendMessage}
+          placeholder={
+            userProfile?.languages.includes('vi')
+              ? 'Nhắn gì đó...'
+              : 'Say something...'
+          }
+          mood={mood}
+        />
+      </div>
+    </div>
+  );
+};
+```
+
+## Database Schema Updates
+
+```sql
+-- Whitelist table
+CREATE TABLE whitelist (
+  email VARCHAR(255) PRIMARY KEY,
+  added_by VARCHAR(255) NOT NULL,
+  added_at TIMESTAMP DEFAULT NOW()
+);
+
+-- User settings for memory
+CREATE TABLE user_settings (
+  user_id UUID PRIMARY KEY REFERENCES users(id),
+  memory_retention_days INTEGER DEFAULT 30,
+  memory_categories JSONB DEFAULT '{"personal": true, "preferences": true, "emotions": true, "plans": true, "casual": false}',
+  forget_patterns TEXT[],
+  cultural_background VARCHAR(50),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Admin content
+CREATE TABLE admin_content (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  source VARCHAR(500),
+  target_users TEXT DEFAULT 'all',
+  priority VARCHAR(20) DEFAULT 'normal',
+  expires_at TIMESTAMP NOT NULL,
+  added_by VARCHAR(255) NOT NULL,
+  added_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Social trends cache
+CREATE TABLE social_trends_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform VARCHAR(50) NOT NULL,
+  region VARCHAR(10) NOT NULL,
+  trend_data JSONB NOT NULL,
+  fetched_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP NOT NULL
+);
+```
+
+## Implementation Roadmap
+
+### Week 1: Authentication & Core Setup
+- [ ] Implement Google Auth with whitelist
+- [ ] Create admin panel for whitelist management
+- [ ] Set up basic Vietnamese personality
+- [ ] Implement language detection
+
+### Week 2: Memory System
+- [ ] Set up Pinecone vector database
+- [ ] Implement custom retention settings
+- [ ] Create memory settings UI
+- [ ] Build memory search functionality
+
+### Week 3: Social & Cultural Integration
+- [ ] Implement Vietnamese social crawlers
+- [ ] Create admin content curation system
+- [ ] Add cultural context to personality
+- [ ] Build social trends widget
+
+### Week 4: Polish & Optimization
+- [ ] Fine-tune Vietnamese slang and expressions
+- [ ] Add Polish language support
+- [ ] Implement mood-based responses
+- [ ] Create analytics dashboard
+
+This architecture creates a deeply personalized chatbot that feels like a real best friend who understands Vietnamese culture, remembers important conversations based on custom settings, and stays current with social trends relevant to each user.
