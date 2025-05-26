@@ -17,6 +17,9 @@ import searchMetricsRoutes from './routes/searchMetrics';
 import cacheMonitoringRoutes from './routes/cache-monitoring';
 import yahooFinanceMetricsRoutes from './routes/yahoo-finance-metrics';
 import enhancedSearchRouter from './routes/enhanced-search.router';
+import factCheckRouter from './routes/fact-check';
+import cacheMonitoringRouter from './routes/cache-monitoring';
+import financialFactCheckingRouter from './routes/financial-fact-checking.route';
 
 const app = express();
 app.use(express.json());
@@ -472,6 +475,13 @@ app.use((req, res, next) => {
   app.use('/api/cache', cacheMonitoringRoutes);
   app.use('/api/yahoo-finance', yahooFinanceMetricsRoutes);
   app.use('/api/cache-monitoring', cacheMonitoringRoutes);
+
+  // Use routes
+  app.use('/api/fact-check', factCheckRouter);
+  app.use('/api/enhanced-search', enhancedSearchRouter);
+  app.use('/api/cache', cacheMonitoringRouter);
+  app.use('/api/financial-facts', financialFactCheckingRouter);
+
   app.use('/api/enhanced-search', enhancedSearchRouter);
 
   // Search system status endpoint
