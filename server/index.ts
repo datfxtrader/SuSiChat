@@ -16,6 +16,7 @@ import {
 import searchMetricsRoutes from './routes/searchMetrics';
 import cacheMonitoringRoutes from './routes/cache-monitoring';
 import yahooFinanceMetricsRoutes from './routes/yahoo-finance-metrics';
+import enhancedSearchRouter from './routes/enhanced-search.router';
 
 const app = express();
 app.use(express.json());
@@ -471,6 +472,7 @@ app.use((req, res, next) => {
   app.use('/api/cache', cacheMonitoringRoutes);
   app.use('/api/yahoo-finance', yahooFinanceMetricsRoutes);
   app.use('/api/cache-monitoring', cacheMonitoringRoutes);
+  app.use('/api/enhanced-search', enhancedSearchRouter);
 
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {
