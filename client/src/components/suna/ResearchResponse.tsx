@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useEffect } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TypewriterText } from '@/components/shared/TypewriterText';

@@ -45,7 +45,22 @@ const PERSONAL_PATTERNS = [
   /\bi live (?:in|at)\b/i,
 ] as const;
 
-export class LLMService {
+interface ChatContext {
+  userId: string;
+  temperature?: number;
+  maxTokens?: number;
+  conversationId?: string;
+}
+
+interface StreamingChatHandler {
+  handleChatStream(
+    conversationId: string,
+    message: string,
+    context: ChatContext
+  ): Promise<ReadableStream>;
+}
+
+export class LLMService implements StreamingChatHandler {
   private readonly apiKey: string;
   private readonly apiEndpoint: string;
   private readonly model: string;
@@ -55,6 +70,11 @@ export class LLMService {
   // Cache for user contexts to avoid repeated DB queries
   private userContextCache = new Map<string, { context: string; timestamp: number }>();
   private readonly contextCacheTimeout = 5 * 60 * 1000; // 5 minutes
+  
+  // Rate limiting per user
+  private rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+  private readonly RATE_LIMIT_WINDOW = 60000; // 1 minute
+  private readonly MAX_MESSAGES_PER_WINDOW = 20;
 
   constructor() {
     // Validate environment variables
@@ -275,6 +295,171 @@ Always prioritize providing accurate, helpful information while maintaining a ba
     }
 
     return "I'm sorry, I encountered an issue while processing your request. Please try again in a moment.";
+  }
+
+
+
+  async handleChatStream(
+    conversationId: string,
+    message: string,
+    context: ChatContext
+  ): Promise<ReadableStream> {
+    // 1. Validate input
+    const validated = await this.validateInput(message, context.userId);
+    if (!validated.valid) {
+      throw new Error(validated.error);
+    }
+
+    // 2. Check rate limits
+    await this.checkRateLimit(context.userId);
+
+    // 3. Load conversation history
+    const history = await this.loadHistory(conversationId);
+
+    // 4. Prepare prompt with context
+    const prompt = this.buildPrompt(validated.sanitized, history, context);
+
+    // 5. Create streaming response
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'deepseek-chat',
+              messages: prompt,
+              temperature: context.temperature || 0.7,
+              max_tokens: context.maxTokens || 2000,
+              stream: true
+            })
+          });
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n').filter(line => line.trim());
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6);
+                  if (data === '[DONE]') {
+                    controller.close();
+                    return;
+                  }
+
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) {
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                        type: 'token',
+                        content: content
+                      })}\n\n`));
+                    }
+                  } catch (e) {
+                    // Skip invalid JSON
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          controller.error(error);
+        }
+      }
+    });
+  }
+
+  private async validateInput(message: string, userId: string): Promise<{ valid: boolean; sanitized?: string; error?: string }> {
+    const MAX_MESSAGE_LENGTH = 4000;
+
+    // Length check
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return { valid: false, error: 'Message too long' };
+    }
+
+    // Rate limiting
+    const rateLimitOk = await this.checkRateLimit(userId);
+    if (!rateLimitOk) {
+      return { valid: false, error: 'Rate limit exceeded' };
+    }
+
+    // Sanitize input - remove potential prompt injections
+    const sanitized = message
+      .replace(/\[INST\]|\[\/INST\]/g, '')
+      .replace(/\<\|im_start\|\>|\<\|im_end\|\>/g, '')
+      .replace(/^(system|assistant):/gmi, '')
+      .trim();
+
+    return { valid: true, sanitized };
+  }
+
+  private async checkRateLimit(userId: string): Promise<boolean> {
+    const now = Date.now();
+    const userLimit = this.rateLimitMap.get(userId);
+
+    if (!userLimit || now > userLimit.resetTime) {
+      this.rateLimitMap.set(userId, { count: 1, resetTime: now + this.RATE_LIMIT_WINDOW });
+      return true;
+    }
+
+    if (userLimit.count >= this.MAX_MESSAGES_PER_WINDOW) {
+      return false;
+    }
+
+    userLimit.count++;
+    return true;
+  }
+
+  private async loadHistory(conversationId: string): Promise<Array<{ role: string; content: string }>> {
+    // This should integrate with your database to load conversation history
+    // For now, return empty array - implement based on your DB structure
+    return [];
+  }
+
+  private buildPrompt(
+    message: string,
+    history: Array<{ role: string; content: string }>,
+    context: ChatContext
+  ): Array<{ role: string; content: string }> {
+    const systemPrompt = this.getSystemPrompt();
+    const contextWindow = this.selectRelevantHistory(history, 4000);
+
+    return [
+      { role: 'system', content: systemPrompt },
+      ...contextWindow,
+      { role: 'user', content: message }
+    ];
+  }
+
+  private selectRelevantHistory(
+    history: Array<{ role: string; content: string }>,
+    maxTokens: number = 4000
+  ): Array<{ role: string; content: string }> {
+    // Simple implementation - take last N messages that fit in token limit
+    // In production, you'd use proper token counting
+    let tokenCount = 0;
+    const selected = [];
+
+    for (let i = history.length - 1; i >= 0; i--) {
+      const estimated = history[i].content.length / 4; // Rough token estimation
+      if (tokenCount + estimated > maxTokens) break;
+      
+      selected.unshift(history[i]);
+      tokenCount += estimated;
+    }
+
+    return selected;
   }
 
   // Utility method to clear context cache
