@@ -18,6 +18,8 @@ import logging
 import time
 import datetime
 import aiohttp
+from fastapi import WebSocket
+from fastapi.responses import HTMLResponse
 
 # Import optimization components
 from config_manager import load_config, get_config
@@ -827,6 +829,8 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
         int(request.research_depth or 3)
     )
 
+    return initial_response
+
 @app.get("/research/{research_id}/status")
 async def get_research_status(research_id: str):
     """Check the status of a specific research request."""
@@ -1157,6 +1161,268 @@ async def list_available_tools():
     except Exception as e:
         logger.error(f"Error listing tools: {e}")
         return {"error": str(e)}
+
+# Metrics collector and health check
+from metrics import MetricsCollector
+metrics_collector = MetricsCollector()
+
+@app.post("/optimize/validate")
+async def validate_optimization():
+    """Validate system readiness for optimization"""
+    try:
+        # Check system health
+        metrics_summary = metrics_collector.get_metrics_summary()
+        health = metrics_collector.get_system_health()
+
+        # Calculate readiness score
+        readiness_score = 0.0
+
+        # Factor 1: System health (40%)
+        if health.get("overall_health") == "healthy":
+            readiness_score += 0.4
+        elif health.get("overall_health") == "warning":
+            readiness_score += 0.2
+
+        # Factor 2: Data availability (30%)
+        total_tasks = health.get("total_tasks", 0)
+        if total_tasks > 50:
+            readiness_score += 0.3
+        elif total_tasks > 10:
+            readiness_score += 0.15
+
+        # Factor 3: Error rate (30%)
+        error_rate = health.get("error_rate", 1.0)
+        if error_rate < 0.05:
+            readiness_score += 0.3
+        elif error_rate < 0.1:
+            readiness_score += 0.15
+
+        ready = readiness_score >= 0.7
+
+        return {
+            "ready_for_optimization": ready,
+            "readiness_score": readiness_score,
+            "health_status": health.get("overall_health"),
+            "total_tasks": total_tasks,
+            "error_rate": error_rate,
+            "recommendations": [
+                "System needs more task data" if total_tasks < 10 else "Task data sufficient",
+                "Error rate too high" if error_rate > 0.1 else "Error rate acceptable",
+                "System health good" if health.get("overall_health") == "healthy" else "System health needs attention"
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Optimization validation error: {e}")
+        return {
+            "ready_for_optimization": False,
+            "error": str(e),
+            "readiness_score": 0.0
+        }
+
+@app.get("/optimize/recommendations")
+async def get_optimization_recommendations():
+    """Get optimization recommendations based on system performance"""
+    try:
+        # Get system metrics
+        health = metrics_collector.get_system_health()
+        metrics_summary = metrics_collector.get_metrics_summary()
+
+        recommendations = {
+            "high_priority": [],
+            "medium_priority": [],
+            "low_priority": [],
+            "system_status": health.get("overall_health", "unknown")
+        }
+
+        # Generate recommendations based on metrics
+        error_rate = health.get("error_rate", 0)
+        total_tasks = health.get("total_tasks", 0)
+
+        if error_rate > 0.2:
+            recommendations["high_priority"].append({
+                "title": "High Error Rate",
+                "description": f"Error rate is {error_rate:.1%}, should be below 5%",
+                "action": "Review error handling and improve system reliability"
+            })
+        elif error_rate > 0.1:
+            recommendations["medium_priority"].append({
+                "title": "Elevated Error Rate",
+                "description": f"Error rate is {error_rate:.1%}",
+                "action": "Monitor error patterns and implement preventive measures"
+            })
+
+        if total_tasks < 10:
+            recommendations["high_priority"].append({
+                "title": "Insufficient Data",
+                "description": "Not enough task data for meaningful optimization",
+                "action": "Collect more task execution data"
+            })
+
+        active_tasks = health.get("active_tasks", 0)
+        if active_tasks > 10:
+            recommendations["medium_priority"].append({
+                "title": "High Load",
+                "description": f"{active_tasks} active tasks",
+                "action": "Consider implementing task queuing and load balancing"
+            })
+
+        # Add general recommendations
+        recommendations["low_priority"].extend([
+            {
+                "title": "Enable Caching",
+                "description": "Implement result caching for frequently requested research",
+                "action": "Set up Redis or memory-based caching"
+            },
+            {
+                "title": "Performance Monitoring",
+                "description": "Set up automated performance monitoring",
+                "action": "Implement alerting for system health metrics"
+            }
+        ])
+
+        return recommendations
+
+    except Exception as e:
+        logger.error(f"Recommendations error: {e}")
+        return {
+            "error": str(e),
+            "high_priority": [],
+            "medium_priority": [],
+            "low_priority": []
+        }
+
+@app.get("/agent/learning/summary")
+async def get_learning_summary():
+    """Get learning system summary"""
+    try:
+        from learning_system import learning_system
+
+        summary = learning_system.get_learning_summary()
+
+        return {
+            "learning_active": True,
+            "strategy_count": len(summary.get("strategy_performance", {}).get("strategy_rankings", [])),
+            "feedback_count": summary.get("feedback_summary", {}).get("total_feedback", 0),
+            "learning_health": summary.get("system_health", {}).get("health_score", 0.0),
+            "recent_insights": summary.get("strategy_performance", {}).get("strategy_rankings", [])[:3],
+            "summary": summary
+        }
+
+    except ImportError:
+        return {
+            "learning_active": False,
+            "error": "Learning system not available",
+            "strategy_count": 0,
+            "feedback_count": 0
+        }
+    except Exception as e:
+        logger.error(f"Learning summary error: {e}")
+        return {
+            "learning_active": False,
+            "error": str(e),
+            "strategy_count": 0,
+            "feedback_count": 0
+        }
+
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import List
+import json
+
+# Task state management (example)
+class StateManager:
+    def __init__(self):
+        self.tasks = {}
+        self.active_websockets: List[WebSocket] = []
+
+    def save_task_state(self, task_id: str, state: dict):
+        self.tasks[task_id] = state
+
+    def get_task_state(self, task_id: str):
+        return self.tasks.get(task_id)
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_websockets.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_websockets.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for websocket in self.active_websockets:
+            await websocket.send_text(message)
+
+# Initialize state manager
+state_manager = StateManager()
+
+# WebSocket endpoint for real-time updates
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    try:
+        await websocket.accept()
+        logger.info("WebSocket connection established")
+
+        # Send initial connection confirmation
+        await websocket.send_text(json.dumps({
+            "type": "connection",
+            "status": "connected",
+            "timestamp": time.time()
+        }))
+
+        while True:
+            try:
+                data = await websocket.receive_text()
+                logger.debug(f"WebSocket received: {data}")
+
+                # Parse and handle different message types
+                try:
+                    message = json.loads(data)
+                    message_type = message.get("type", "echo")
+
+                    if message_type == "ping":
+                        await websocket.send_text(json.dumps({
+                            "type": "pong",
+                            "timestamp": time.time()
+                        }))
+                    elif message_type == "task_status":
+                        task_id = message.get("task_id")
+                        if task_id:
+                            task_state = state_manager.get_task_state(task_id)
+                            await websocket.send_text(json.dumps({
+                                "type": "task_update",
+                                "task_id": task_id,
+                                "data": task_state or {"status": "not_found"}
+                            }))
+                    else:
+                        # Echo message
+                        await websocket.send_text(json.dumps({
+                            "type": "echo",
+                            "data": data,
+                            "timestamp": time.time()
+                        }))
+                except json.JSONDecodeError:
+                    # Handle non-JSON messages
+                    await websocket.send_text(json.dumps({
+                        "type": "echo",
+                        "data": data,
+                        "timestamp": time.time()
+                    }))
+
+            except WebSocketDisconnect:
+                logger.info("WebSocket client disconnected")
+                break
+            except Exception as e:
+                logger.error(f"WebSocket message error: {e}")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "error": str(e),
+                    "timestamp": time.time()
+                }))
+
+    except Exception as e:
+        logger.error(f"WebSocket connection error: {e}")
+    finally:
+        logger.info("WebSocket connection closed")
 
 if __name__ == "__main__":
     import uvicorn
