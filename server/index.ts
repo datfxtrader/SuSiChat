@@ -13,6 +13,7 @@ import {
   clearResearchCaches, 
   shutdownResearchService 
 } from './deerflow-integration';
+import searchMetricsRoutes from './routes/searchMetrics';
 
 const app = express();
 app.use(express.json());
@@ -371,8 +372,9 @@ app.use((req, res, next) => {
 
   app.use('/api/financial-research', financialResearchRoutes);
   // Use enhanced web search as the primary search system
-  app.use('/api/web-search', enhancedWebSearchRoutes);
+  app.use('/api/web-search', webSearchRoutes);
   app.use('/api/enhanced-web-search', enhancedWebSearchRoutes);
+  app.use('/api/search-metrics', searchMetricsRoutes);
 
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {

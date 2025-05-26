@@ -616,8 +616,8 @@ export class OptimizedResearchService extends EventEmitter {
     }
     
     const result = await this.webSearchCircuitBreaker.execute(async () => {
-      const { performWebSearch } = await import('./performWebSearch');
-      return performWebSearch(query);
+      const { webSearchService } = await import('./performWebSearch');
+      return webSearchService.performWebSearch(query, 10);
     });
     
     if (result && !result.error) {

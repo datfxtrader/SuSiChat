@@ -1,13 +1,19 @@
-import axios from 'axios';
-// Remove circular imports and use direct logging
-const log = console.log;
 
-// Environment variables for API keys
+import axios, { AxiosInstance } from 'axios';
+import { LRUCache } from 'lru-cache';
+import PQueue from 'p-queue';
+import pRetry from 'p-retry';
+import CircuitBreaker from 'opossum';
+import crypto from 'crypto';
+import { EventEmitter } from 'events';
+
+// Environment variables
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
 const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
 const SERP_API_KEY = process.env.SERP_API_KEY;
 
+// Interfaces
 export interface SearchResult {
   title: string;
   content?: string;
@@ -15,6 +21,7 @@ export interface SearchResult {
   score?: number;
   publishedDate?: string;
   source: string;
+  relevanceScore?: number;
 }
 
 export interface WebSearchResponse {
@@ -23,655 +30,799 @@ export interface WebSearchResponse {
   braveResults?: any;
   query: string;
   timestamp: string;
+  metadata?: {
+    totalSources: number;
+    sourceBreakdown: Record<string, number>;
+    searchEnginesUsed?: string[];
+    fromCache?: boolean;
+    searchTime?: number;
+    rateLimitingDisabled?: boolean;
+  };
+}
+
+interface SearchEngineConfig {
+  name: string;
+  enabled: boolean;
+  priority: number;
+  maxResults: number;
+  timeout: number;
+  retries: number;
+  circuitBreaker?: CircuitBreaker;
 }
 
 /**
- * Perform a web search with robust error handling and retries
- * RATE LIMITS DISABLED FOR 15 DAYS
+ * Optimized Web Search Service with caching, circuit breakers, and parallel execution
  */
-const SEARCH_TIMEOUT = 30000;
-const MAX_SEARCH_RETRIES = 5;
+export class OptimizedWebSearchService extends EventEmitter {
+  private searchCache: LRUCache<string, WebSearchResponse>;
+  private requestQueue: PQueue;
+  private axiosInstance: AxiosInstance;
+  private searchEngines: Map<string, SearchEngineConfig>;
+  private circuitBreakers: Map<string, CircuitBreaker>;
+  
+  // Performance metrics
+  private metrics = {
+    totalSearches: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    engineSuccess: new Map<string, number>(),
+    engineFailures: new Map<string, number>(),
+    averageSearchTime: 0
+  };
 
-export async function performWebSearch(
-  query: string, 
-  maxResults: number = 5,
-  retries: number = MAX_SEARCH_RETRIES
-): Promise<WebSearchResponse> {
-  console.log(`Performing UNLIMITED web search for: "${query}" (rate limits disabled)`);
-
-  try {
-    // BYPASS rate limiting - try all search engines in parallel
-    const results: SearchResult[] = [];
-    let tavilyResults = null;
-    let braveResults = null;
-    let newsResults = null;
-    let serpResults = null;
-    let duckResults = null;
-
-    const searchPromises = [];
-
-    // 1. Tavily Search (no rate limit)
-    if (TAVILY_API_KEY) {
-      searchPromises.push(
-        searchTavily(query, Math.ceil(maxResults / 2))
-          .then(res => ({ type: 'tavily', results: res }))
-          .catch(err => ({ type: 'tavily', error: err.message }))
-      );
-    }
-
-    // 2. Brave Search (no rate limit)
-    if (BRAVE_API_KEY) {
-      searchPromises.push(
-        searchBrave(query, Math.ceil(maxResults / 2))
-          .then(res => ({ type: 'brave', results: res }))
-          .catch(err => ({ type: 'brave', error: err.message }))
-      );
-    }
-
-    // 3. NewsData Search (no rate limit)
-    if (NEWSDATA_API_KEY) {
-      searchPromises.push(
-        searchNewsData(query, Math.ceil(maxResults / 3))
-          .then(res => ({ type: 'news', results: res }))
-          .catch(err => ({ type: 'news', error: err.message }))
-      );
-    }
-
-    // 4. SERP API (no rate limit)
-    if (SERP_API_KEY) {
-      searchPromises.push(
-        searchSerpApi(query, Math.ceil(maxResults / 3))
-          .then(res => ({ type: 'serp', results: res }))
-          .catch(err => ({ type: 'serp', error: err.message }))
-      );
-    }
-
-    // 5. DuckDuckGo (always available, no rate limit)
-    searchPromises.push(
-      searchDuckDuckGo(query, Math.ceil(maxResults / 3))
-        .then(res => ({ type: 'duck', results: res }))
-        .catch(err => ({ type: 'duck', error: err.message }))
-    );
-
-    // Execute all searches in parallel
-    const searchResults = await Promise.allSettled(searchPromises);
-
-    // Process results
-    searchResults.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value.results) {
-        const searchData = result.value;
-        
-        if (searchData.type === 'tavily' && searchData.results) {
-          tavilyResults = { results: searchData.results };
-          results.push(...searchData.results);
-        } else if (searchData.type === 'brave' && searchData.results) {
-          braveResults = { web: { results: searchData.results } };
-          results.push(...searchData.results);
-        } else if (searchData.type === 'news' && searchData.results) {
-          newsResults = { results: searchData.results };
-          results.push(...searchData.results);
-        } else if (searchData.type === 'serp' && searchData.results) {
-          serpResults = { results: searchData.results };
-          results.push(...searchData.results);
-        } else if (searchData.type === 'duck' && searchData.results) {
-          duckResults = { results: searchData.results };
-          results.push(...searchData.results);
-        }
-      }
-    });
-
-    // Remove duplicates and sort by relevance
-    const uniqueResults = removeDuplicatesAndSort(results, maxResults);
-
-    console.log(`Search completed: ${uniqueResults.length} results from ${searchPromises.length} engines`);
-
-    return {
-      results: uniqueResults,
-      tavilyResults,
-      braveResults,
-      query,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        totalSources: searchPromises.length,
-        sourceBreakdown: {
-          tavily: results.filter(r => r.source === 'Tavily').length,
-          brave: results.filter(r => r.source === 'Brave').length,
-          news: results.filter(r => r.source === 'NewsData').length,
-          serp: results.filter(r => r.source === 'SERP').length,
-          duck: results.filter(r => r.source === 'DuckDuckGo').length
-        },
-        searchEnginesUsed: searchPromises.length,
-        rateLimitingDisabled: true
-      }
-    };
-
-    // Convert to expected format
-    const results: SearchResult[] = searchResult.results.map(result => ({
-      title: result.title,
-      content: result.content,
-      url: result.url,
-      score: result.score,
-      publishedDate: result.publishedDate,
-      source: result.source
-    }));
-
-    return {
-      results,
-      tavilyResults: { results: results.filter(r => r.source === 'Tavily') },
-      braveResults: { web: { results: results.filter(r => r.source === 'Brave') } },
-      query,
-      timestamp: searchResult.timestamp,
-      metadata: {
-        totalSources: searchResult.searchEnginesUsed.length,
-        sourceBreakdown: searchResult.searchEnginesUsed.reduce((acc, source) => {
-          acc[source] = results.filter(r => r.source === source).length;
-          return acc;
-        }, {} as Record<string, number>),
-        braveSuccess: searchResult.searchEnginesUsed.includes('Brave'),
-        tavilySuccess: searchResult.searchEnginesUsed.includes('Tavily'),
-        fallbackUsed: searchResult.searchEnginesUsed.includes('DuckDuckGo'),
-        searchTime: searchResult.performance.searchTime
-      }
-    };
-  } catch (error) {
-    console.error('Intelligent search failed, using legacy fallback:', error);
+  constructor() {
+    super();
     
-    // Fallback to original logic with better rate limiting
-    const results: SearchResult[] = [];
-    let tavilyResults = null;
-    let braveResults = null;
-    let duckduckgoResults = null;
+    // Initialize cache (30 minute TTL)
+    this.searchCache = new LRUCache<string, WebSearchResponse>({
+      max: 1000,
+      ttl: 1000 * 60 * 30,
+      updateAgeOnGet: true
+    });
+    
+    // Initialize request queue with rate limiting
+    this.requestQueue = new PQueue({
+      concurrency: 10,
+      interval: 1000,
+      intervalCap: 20 // 20 requests per second max
+    });
+    
+    // Initialize axios with connection pooling
+    this.axiosInstance = axios.create({
+      timeout: 30000,
+      maxRedirects: 5,
+      validateStatus: (status) => status < 500
+    });
+    
+    // Initialize search engines configuration
+    this.initializeSearchEngines();
+    
+    // Initialize circuit breakers
+    this.initializeCircuitBreakers();
+  }
 
-    const searchPromises = [];
+  /**
+   * Initialize search engine configurations
+   */
+  private initializeSearchEngines() {
+    this.searchEngines = new Map([
+      ['tavily', {
+        name: 'Tavily',
+        enabled: !!TAVILY_API_KEY,
+        priority: 5,
+        maxResults: 5,
+        timeout: 10000,
+        retries: 2
+      }],
+      ['brave', {
+        name: 'Brave',
+        enabled: !!BRAVE_API_KEY,
+        priority: 4,
+        maxResults: 5,
+        timeout: 10000,
+        retries: 2
+      }],
+      ['newsdata', {
+        name: 'NewsData',
+        enabled: !!NEWSDATA_API_KEY,
+        priority: 3,
+        maxResults: 3,
+        timeout: 8000,
+        retries: 1
+      }],
+      ['serp', {
+        name: 'SERP',
+        enabled: !!SERP_API_KEY,
+        priority: 3,
+        maxResults: 3,
+        timeout: 8000,
+        retries: 1
+      }],
+      ['duckduckgo', {
+        name: 'DuckDuckGo',
+        enabled: true, // Always available
+        priority: 2,
+        maxResults: 5,
+        timeout: 5000,
+        retries: 1
+      }]
+    ]);
+  }
 
-  // DuckDuckGo search (free, no rate limits)
-  searchPromises.push(
-    (async () => {
-      try {
-        console.log('Starting DuckDuckGo search...');
-        const duckResponse = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1&skip_disambig=1`);
+  /**
+   * Initialize circuit breakers for each search engine
+   */
+  private initializeCircuitBreakers() {
+    this.circuitBreakers = new Map();
+    
+    const circuitBreakerOptions = {
+      timeout: 30000,
+      errorThresholdPercentage: 50,
+      resetTimeout: 30000,
+      rollingCountTimeout: 10000
+    };
+    
+    for (const [engineId, config] of this.searchEngines) {
+      if (config.enabled) {
+        const breaker = new CircuitBreaker(
+          this.createSearchFunction(engineId),
+          circuitBreakerOptions
+        );
         
-        if (duckResponse.data?.RelatedTopics) {
-          duckduckgoResults = duckResponse.data;
-          const topics = duckResponse.data.RelatedTopics.slice(0, Math.ceil(maxResults / 3));
-          for (const topic of topics) {
-            if (topic.FirstURL && topic.Text) {
-              results.push({
-                title: topic.Text.split(' - ')[0] || 'DuckDuckGo Result',
-                content: topic.Text || '',
-                url: topic.FirstURL || '',
-                score: 0.8,
-                source: 'DuckDuckGo'
-              });
-            }
+        // Event handlers
+        breaker.on('open', () => {
+          console.log(`Circuit breaker opened for ${config.name}`);
+          this.emit('circuitBreakerOpen', engineId);
+        });
+        
+        breaker.on('halfOpen', () => {
+          console.log(`Circuit breaker half-open for ${config.name}`);
+        });
+        
+        this.circuitBreakers.set(engineId, breaker);
+        config.circuitBreaker = breaker;
+      }
+    }
+  }
+
+  /**
+   * Main search function with caching and parallel execution
+   */
+  public async performWebSearch(
+    query: string,
+    maxResults: number = 10,
+    options: { bypassCache?: boolean; priority?: number } = {}
+  ): Promise<WebSearchResponse> {
+    const startTime = Date.now();
+    this.metrics.totalSearches++;
+    
+    // Generate cache key
+    const cacheKey = this.generateCacheKey(query, maxResults);
+    
+    // Check cache first
+    if (!options.bypassCache) {
+      const cached = this.searchCache.get(cacheKey);
+      if (cached) {
+        this.metrics.cacheHits++;
+        this.emit('cacheHit', { query, cached: true });
+        
+        return {
+          ...cached,
+          metadata: {
+            ...cached.metadata,
+            fromCache: true,
+            searchTime: Date.now() - startTime
+          }
+        };
+      }
+    }
+    
+    this.metrics.cacheMisses++;
+    console.log(`Performing optimized web search for: "${query}"`);
+    
+    try {
+      // Execute parallel searches with intelligent distribution
+      const searchResults = await this.executeParallelSearches(query, maxResults);
+      
+      // Process and combine results
+      const combinedResults = this.combineAndRankResults(searchResults, maxResults);
+      
+      // Build response
+      const response: WebSearchResponse = {
+        results: combinedResults.results,
+        tavilyResults: searchResults.get('tavily')?.rawResponse,
+        braveResults: searchResults.get('brave')?.rawResponse,
+        query,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          totalSources: searchResults.size,
+          sourceBreakdown: this.getSourceBreakdown(combinedResults.results),
+          searchEnginesUsed: Array.from(searchResults.keys()),
+          searchTime: Date.now() - startTime,
+          rateLimitingDisabled: false
+        }
+      };
+      
+      // Cache successful response
+      this.searchCache.set(cacheKey, response);
+      
+      // Update metrics
+      this.updateAverageSearchTime(response.metadata.searchTime);
+      
+      return response;
+      
+    } catch (error) {
+      console.error('Search failed:', error);
+      
+      // Try fallback search with DuckDuckGo only
+      const fallbackResults = await this.emergencyFallbackSearch(query, maxResults);
+      
+      return {
+        results: fallbackResults,
+        query,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          totalSources: 1,
+          sourceBreakdown: { 'DuckDuckGo': fallbackResults.length },
+          searchEnginesUsed: ['duckduckgo'],
+          searchTime: Date.now() - startTime,
+          emergencyMode: true
+        }
+      };
+    }
+  }
+
+  /**
+   * Execute searches in parallel with intelligent work distribution
+   */
+  private async executeParallelSearches(
+    query: string,
+    totalMaxResults: number
+  ): Promise<Map<string, { results: SearchResult[], rawResponse?: any }>> {
+    const enabledEngines = Array.from(this.searchEngines.entries())
+      .filter(([_, config]) => config.enabled && config.circuitBreaker)
+      .sort((a, b) => b[1].priority - a[1].priority);
+    
+    if (enabledEngines.length === 0) {
+      throw new Error('No search engines available');
+    }
+    
+    // Calculate results per engine based on priority
+    const totalPriority = enabledEngines.reduce((sum, [_, config]) => sum + config.priority, 0);
+    const resultsDistribution = new Map<string, number>();
+    
+    enabledEngines.forEach(([engineId, config]) => {
+      const engineResults = Math.ceil((config.priority / totalPriority) * totalMaxResults);
+      resultsDistribution.set(engineId, Math.min(engineResults, config.maxResults));
+    });
+    
+    // Execute searches in parallel
+    const searchPromises = enabledEngines.map(([engineId, config]) => 
+      this.requestQueue.add(
+        async () => {
+          const maxResults = resultsDistribution.get(engineId) || config.maxResults;
+          
+          try {
+            const result = await config.circuitBreaker!.fire(query, maxResults);
+            this.recordEngineSuccess(engineId);
+            return { engineId, result };
+          } catch (error) {
+            this.recordEngineFailure(engineId);
+            console.error(`${config.name} search failed:`, error);
+            return { engineId, result: { results: [], error } };
+          }
+        },
+        { priority: config.priority }
+      )
+    );
+    
+    // Wait for all searches with timeout
+    const searchTimeout = 15000; // 15 seconds max for all searches
+    const results = await Promise.race([
+      Promise.allSettled(searchPromises),
+      new Promise<any[]>((_, reject) => 
+        setTimeout(() => reject(new Error('Search timeout')), searchTimeout)
+      )
+    ]);
+    
+    // Process results
+    const searchResults = new Map<string, { results: SearchResult[], rawResponse?: any }>();
+    
+    if (Array.isArray(results)) {
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          const { engineId, result: engineResult } = result.value;
+          if (engineResult && !engineResult.error) {
+            searchResults.set(engineId, engineResult);
           }
         }
-      } catch (error) {
-        console.error('DuckDuckGo search error:', error);
-        duckduckgoResults = { error: 'DuckDuckGo search failed' };
+      });
+    }
+    
+    return searchResults;
+  }
+
+  /**
+   * Create search function for circuit breaker
+   */
+  private createSearchFunction(engineId: string) {
+    return async (query: string, maxResults: number) => {
+      switch (engineId) {
+        case 'tavily':
+          return this.searchTavily(query, maxResults);
+        case 'brave':
+          return this.searchBrave(query, maxResults);
+        case 'newsdata':
+          return this.searchNewsData(query, maxResults);
+        case 'serp':
+          return this.searchSerpApi(query, maxResults);
+        case 'duckduckgo':
+          return this.searchDuckDuckGo(query, maxResults);
+        default:
+          throw new Error(`Unknown search engine: ${engineId}`);
       }
-    })()
-  );
+    };
+  }
 
-  // Smart Brave search with caching and intelligent fallbacks
-  if (BRAVE_API_KEY) {
-    searchPromises.push(
-      (async () => {
-        try {
-          console.log('Starting smart Brave search with caching...');
-          
-          // Generate cache key for this specific query
-          const cacheKey = `brave_search_${query.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-          
-          // Check cache first (5-minute cache)
-          const cachedResult = apiRateManager.getCachedResponse(cacheKey);
-          if (cachedResult) {
-            console.log('Using cached Brave search results');
-            braveResults = cachedResult;
-            for (const result of cachedResult.web?.results || []) {
-              results.push({
-                title: result.title || 'Untitled',
-                content: result.description || '',
-                url: result.url || '',
-                score: 1.0,
-                source: 'Brave (cached)'
-              });
+  /**
+   * Tavily search implementation
+   */
+  private async searchTavily(query: string, maxResults: number): Promise<{ results: SearchResult[], rawResponse: any }> {
+    const response = await pRetry(
+      async () => {
+        const res = await this.axiosInstance.post(
+          'https://api.tavily.com/search',
+          {
+            query,
+            search_depth: 'advanced',
+            include_answer: true,
+            max_results: maxResults,
+            include_raw_content: false,
+            filters: { recency_days: 7 }
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': TAVILY_API_KEY
             }
-            return;
           }
+        );
+        
+        if (!res.data?.results) {
+          throw new Error('Invalid Tavily response');
+        }
+        
+        return res.data;
+      },
+      { retries: 2, minTimeout: 1000 }
+    );
+    
+    const results = response.results.map((item: any) => ({
+      title: item.title || 'Untitled',
+      content: item.content || '',
+      url: item.url || '',
+      score: item.relevance_score || 1.0,
+      publishedDate: item.published_date,
+      source: 'Tavily',
+      relevanceScore: item.relevance_score || 0.5
+    }));
+    
+    return { results, rawResponse: response };
+  }
 
-          // Check if Brave is currently rate limited
-          const delay = apiRateManager.shouldDelay('brave');
-          if (delay > 30000) { // If delay is more than 30 seconds, skip Brave
-            console.log(`Brave rate limited for ${delay}ms, skipping to fallback sources`);
-            braveResults = { error: 'Rate limited - using alternative sources' };
-            return;
-          }
-
-          if (delay > 0) {
-            console.log(`Waiting ${delay}ms for Brave rate limit...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-          
-          // Create precise date range for search freshness
-          const today = new Date();
-          const threeDaysAgo = new Date(today.getTime() - (3 * 24 * 60 * 60 * 1000));
-          const dateRange = `after:${threeDaysAgo.toISOString().split('T')[0]}`;
-          
-          const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+  /**
+   * Brave search implementation
+   */
+  private async searchBrave(query: string, maxResults: number): Promise<{ results: SearchResult[], rawResponse: any }> {
+    // Add date range for freshness
+    const dateRange = this.getDateRange(7); // Last 7 days
+    const enhancedQuery = `${query} ${dateRange}`;
+    
+    const response = await pRetry(
+      async () => {
+        const res = await this.axiosInstance.get(
+          'https://api.search.brave.com/res/v1/web/search',
+          {
             params: {
-              q: `${query} ${dateRange} 2025 current latest`,
+              q: enhancedQuery,
               count: maxResults,
               search_lang: 'en',
-              freshness: 'pd3', // Past 3 days only
-              safesearch: 'moderate',
-              text_decorations: false,
-              spellcheck: true
+              freshness: 'week',
+              safesearch: 'moderate'
             },
             headers: {
               'Accept': 'application/json',
               'X-Subscription-Token': BRAVE_API_KEY
-            },
-            timeout: 10000 // 10 second timeout
-          });
-
-          if (response.data?.web?.results) {
-            braveResults = response.data;
-            
-            // Cache successful results for 5 minutes
-            apiRateManager.cacheResponse(cacheKey, response.data, 5 * 60 * 1000);
-            apiRateManager.recordSuccess('brave');
-            
-            for (const result of response.data.web.results) {
-              results.push({
-                title: result.title || 'Untitled',
-                content: result.description || '',
-                url: result.url || '',
-                score: 1.0,
-                source: 'Brave'
-              });
             }
-            console.log(`Brave search successful: ${response.data.web.results.length} results`);
           }
-        } catch (error: any) {
-          if (error.response?.status === 429) {
-            console.log('Brave search rate limited - recording for intelligent backoff');
-            apiRateManager.recordRateLimit('brave');
-            braveResults = { error: 'Rate limited - enhanced fallback active' };
-          } else {
-            console.error('Brave search error:', error.message);
-            braveResults = { error: 'Brave search failed - using alternatives' };
-          }
+        );
+        
+        if (!res.data?.web?.results) {
+          throw new Error('Invalid Brave response');
         }
-      })()
+        
+        return res.data;
+      },
+      { retries: 2, minTimeout: 1000 }
     );
-  }
-
-  // Tavily search for comprehensive coverage
-  if (TAVILY_API_KEY) {
-    searchPromises.push(
-      (async () => {
-        try {
-          console.log('Starting Tavily search...');
-          const response = await axios.post(
-            'https://api.tavily.com/search',
-            {
-              query,
-              search_depth: 'advanced',
-              include_answer: true,
-              max_results: Math.ceil(maxResults / 2),
-              include_raw_content: false,
-              filters: {
-                recency_days: 90
-              }
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': TAVILY_API_KEY
-              }
-            }
-          );
-
-          if (response.data?.results) {
-            tavilyResults = response.data;
-            for (const result of response.data.results) {
-              results.push({
-                title: result.title || 'Untitled',
-                content: result.content || '',
-                url: result.url || '',
-                score: result.relevance_score || 1.0,
-                publishedDate: result.published_date || '',
-                source: 'Tavily'
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Tavily search error:', error);
-          tavilyResults = { error: 'Tavily search failed' };
-        }
-      })()
-    );
-  }
-
-  // Wait for all searches to complete in parallel
-  await Promise.allSettled(searchPromises);
-  console.log(`Parallel search completed. Found ${results.length} total results.`);
-
-  // Enhanced fallback system when primary sources fail
-  if (results.length < 3) {
-    console.log('Low result count detected - activating enhanced fallback search...');
     
-    // Try additional DuckDuckGo search with different terms
-    try {
-      const fallbackQuery = `${query} news updates market analysis`;
-      const fallbackResponse = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(fallbackQuery)}&format=json&no_html=1&skip_disambig=1`);
-      
-      if (fallbackResponse.data?.RelatedTopics) {
-        for (const topic of fallbackResponse.data.RelatedTopics.slice(0, 3)) {
-          if (topic.FirstURL && topic.Text) {
-            results.push({
-              title: topic.Text.substring(0, 100) + '...',
-              content: topic.Text,
-              url: topic.FirstURL,
-              score: 0.7,
-              source: 'DuckDuckGo Fallback'
-            });
-          }
+    const results = response.web.results.map((item: any) => ({
+      title: item.title || 'Untitled',
+      content: item.description || '',
+      url: item.url || '',
+      score: 1.0,
+      source: 'Brave',
+      relevanceScore: this.calculateRelevance(query, item.title, item.description)
+    }));
+    
+    return { results, rawResponse: response };
+  }
+
+  /**
+   * NewsData search implementation
+   */
+  private async searchNewsData(query: string, maxResults: number): Promise<{ results: SearchResult[], rawResponse: any }> {
+    const response = await this.axiosInstance.get(
+      'https://newsdata.io/api/1/news',
+      {
+        params: {
+          apikey: NEWSDATA_API_KEY,
+          q: query,
+          language: 'en',
+          size: maxResults
         }
       }
-    } catch (error) {
-      console.log('Fallback search failed, but continuing with available results');
+    );
+    
+    if (!response.data?.results) {
+      return { results: [], rawResponse: response.data };
     }
-  }
-
-  // Intelligent result optimization with source diversity
-  const seen = new Set();
-  const sourceCount = new Map();
-  
-  const uniqueResults = results.reduce((acc, result) => {
-    if (!result.url || seen.has(result.url)) return acc;
-    seen.add(result.url);
     
-    // Ensure source diversity (max 3 from same source)
-    const sourceKey = result.source?.split(' ')[0] || 'Unknown';
-    const currentCount = sourceCount.get(sourceKey) || 0;
-    if (currentCount >= 3) return acc;
-    
-    sourceCount.set(sourceKey, currentCount + 1);
-    acc.push(result);
-    return acc;
-  }, [])
-  .sort((a, b) => {
-    // Prioritize by score but boost fresh sources
-    const scoreA = (a.score || 0) + (a.source?.includes('cached') ? -0.1 : 0);
-    const scoreB = (b.score || 0) + (b.source?.includes('cached') ? -0.1 : 0);
-    return scoreB - scoreA;
-  })
-  .slice(0, maxResults);
-
-  // Add metadata about search success and fallbacks used
-  const searchMetadata = {
-    totalSources: Array.from(sourceCount.keys()).length,
-    sourceBreakdown: Object.fromEntries(sourceCount),
-    braveSuccess: !braveResults?.error,
-    tavilySuccess: !tavilyResults?.error,
-    fallbackUsed: results.some(r => r.source?.includes('Fallback'))
-  };
-
-  return {
-    results: uniqueResults,
-    tavilyResults,
-    braveResults,
-    query,
-    timestamp: new Date().toISOString(),
-    metadata: searchMetadata
-  };
-  } catch (error) {
-    console.error('All search engines failed, using emergency fallback:', error);
-    
-    // Emergency fallback - just use DuckDuckGo
-    try {
-      const emergencyResults = await searchDuckDuckGo(query, maxResults);
-      return {
-        results: emergencyResults,
-        tavilyResults: null,
-        braveResults: null,
-        query,
-        timestamp: new Date().toISOString(),
-        metadata: { 
-          totalSources: 1, 
-          sourceBreakdown: { emergency: emergencyResults.length }, 
-          emergencyMode: true,
-          rateLimitingDisabled: true
-        }
-      };
-    } catch (emergencyError) {
-      console.error('Emergency search failed:', emergencyError);
-      return {
-        results: [],
-        tavilyResults: null,
-        braveResults: null,
-        query,
-        timestamp: new Date().toISOString(),
-        metadata: { totalSources: 0, sourceBreakdown: {}, allSearchesFailed: true }
-      };
-    }
-  }
-}
-
-/**
- * Search using NewsData API
- */
-async function searchNewsData(query: string, maxResults: number = 5): Promise<SearchResult[]> {
-  if (!NEWSDATA_API_KEY) return [];
-  
-  try {
-    const response = await axios.get('https://newsdata.io/api/1/news', {
-      params: {
-        apikey: NEWSDATA_API_KEY,
-        q: query,
-        language: 'en',
-        size: maxResults
-      },
-      timeout: SEARCH_TIMEOUT
-    });
-
-    if (response.data?.results) {
-      return response.data.results.map((item: any) => ({
+    const results = response.data.results
+      .filter((item: any) => item.link)
+      .map((item: any) => ({
         title: item.title || 'News Article',
         content: item.description || item.content || '',
-        url: item.link || '',
+        url: item.link,
         score: 1.0,
         source: 'NewsData',
-        publishedDate: item.pubDate
-      })).filter((result: SearchResult) => result.url);
-    }
-  } catch (error) {
-    console.error('NewsData search error:', error);
+        publishedDate: item.pubDate,
+        relevanceScore: this.calculateRelevance(query, item.title, item.description)
+      }));
+    
+    return { results, rawResponse: response.data };
   }
-  
-  return [];
-}
 
-/**
- * Search using SERP API
- */
-async function searchSerpApi(query: string, maxResults: number = 5): Promise<SearchResult[]> {
-  if (!SERP_API_KEY) return [];
-  
-  try {
-    const response = await axios.get('https://serpapi.com/search', {
-      params: {
-        api_key: SERP_API_KEY,
-        q: query,
-        engine: 'google',
-        num: maxResults
-      },
-      timeout: SEARCH_TIMEOUT
-    });
-
-    if (response.data?.organic_results) {
-      return response.data.organic_results.map((item: any) => ({
+  /**
+   * SERP API search implementation
+   */
+  private async searchSerpApi(query: string, maxResults: number): Promise<{ results: SearchResult[], rawResponse: any }> {
+    const response = await this.axiosInstance.get(
+      'https://serpapi.com/search',
+      {
+        params: {
+          api_key: SERP_API_KEY,
+          q: query,
+          engine: 'google',
+          num: maxResults
+        }
+      }
+    );
+    
+    if (!response.data?.organic_results) {
+      return { results: [], rawResponse: response.data };
+    }
+    
+    const results = response.data.organic_results
+      .filter((item: any) => item.link)
+      .map((item: any) => ({
         title: item.title || 'Search Result',
         content: item.snippet || '',
-        url: item.link || '',
+        url: item.link,
         score: 1.0,
-        source: 'SERP'
-      })).filter((result: SearchResult) => result.url);
-    }
-  } catch (error) {
-    console.error('SERP API search error:', error);
+        source: 'SERP',
+        relevanceScore: this.calculateRelevance(query, item.title, item.snippet)
+      }));
+    
+    return { results, rawResponse: response.data };
   }
-  
-  return [];
-}
 
-/**
- * Enhanced DuckDuckGo search
- */
-async function searchDuckDuckGo(query: string, maxResults: number = 5): Promise<SearchResult[]> {
-  try {
-    const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
-      timeout: SEARCH_TIMEOUT
-    });
-
+  /**
+   * DuckDuckGo search implementation
+   */
+  private async searchDuckDuckGo(query: string, maxResults: number): Promise<{ results: SearchResult[], rawResponse: any }> {
+    const response = await this.axiosInstance.get(
+      'https://api.duckduckgo.com/',
+      {
+        params: {
+          q: query,
+          format: 'json',
+          no_html: 1,
+          skip_disambig: 1
+        }
+      }
+    );
+    
     const results: SearchResult[] = [];
     
-    // Process RelatedTopics
-    if (response.data.RelatedTopics) {
-      response.data.RelatedTopics.slice(0, maxResults).forEach((topic: any) => {
-        if (topic.FirstURL && topic.Text) {
-          results.push({
-            title: topic.Text.split(' - ')[0] || 'DuckDuckGo Result',
-            content: topic.Text || '',
-            url: topic.FirstURL || '',
-            score: 0.8,
-            source: 'DuckDuckGo'
-          });
-        }
-      });
-    }
-
-    // Also try instant answer
+    // Process instant answer if available
     if (response.data.Answer && response.data.AbstractURL) {
-      results.unshift({
+      results.push({
         title: 'Direct Answer',
         content: response.data.Answer,
         url: response.data.AbstractURL,
         score: 1.0,
-        source: 'DuckDuckGo'
+        source: 'DuckDuckGo',
+        relevanceScore: 1.0
       });
     }
-
-    return results;
-  } catch (error) {
-    console.error('DuckDuckGo search error:', error);
-    return [];
-  }
-}
-
-/**
- * Enhanced Tavily search (no rate limiting)
- */
-async function searchTavily(query: string, maxResults: number = 5): Promise<SearchResult[]> {
-  if (!TAVILY_API_KEY) return [];
-  
-  try {
-    const response = await axios.post('https://api.tavily.com/search', {
-      query,
-      search_depth: 'advanced',
-      include_answer: true,
-      max_results: maxResults,
-      include_raw_content: false
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': TAVILY_API_KEY
-      },
-      timeout: SEARCH_TIMEOUT
-    });
-
-    if (response.data?.results) {
-      return response.data.results.map((item: any) => ({
-        title: item.title || 'Tavily Result',
-        content: item.content || '',
-        url: item.url || '',
-        score: item.relevance_score || 1.0,
-        source: 'Tavily',
-        publishedDate: item.published_date
-      }));
+    
+    // Process related topics
+    if (response.data.RelatedTopics) {
+      const topics = response.data.RelatedTopics
+        .slice(0, maxResults - results.length)
+        .filter((topic: any) => topic.FirstURL && topic.Text);
+      
+      for (const topic of topics) {
+        results.push({
+          title: topic.Text.split(' - ')[0] || 'DuckDuckGo Result',
+          content: topic.Text || '',
+          url: topic.FirstURL,
+          score: 0.8,
+          source: 'DuckDuckGo',
+          relevanceScore: this.calculateRelevance(query, topic.Text, topic.Text)
+        });
+      }
     }
-  } catch (error) {
-    console.error('Tavily search error (continuing with other engines):', error);
+    
+    return { results, rawResponse: response.data };
   }
-  
-  return [];
-}
 
-/**
- * Enhanced Brave search (no rate limiting)
- */
-async function searchBrave(query: string, maxResults: number = 5): Promise<SearchResult[]> {
-  if (!BRAVE_API_KEY) return [];
-  
-  try {
-    const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
-      params: {
-        q: query,
-        count: maxResults,
-        search_lang: 'en',
-        freshness: 'week',
-        safesearch: 'moderate'
-      },
-      headers: {
-        'Accept': 'application/json',
-        'X-Subscription-Token': BRAVE_API_KEY
-      },
-      timeout: SEARCH_TIMEOUT
-    });
-
-    if (response.data?.web?.results) {
-      return response.data.web.results.map((item: any) => ({
-        title: item.title || 'Brave Result',
-        content: item.description || '',
-        url: item.url || '',
-        score: 1.0,
-        source: 'Brave'
-      }));
+  /**
+   * Combine and rank results from multiple sources
+   */
+  private combineAndRankResults(
+    searchResults: Map<string, { results: SearchResult[], rawResponse?: any }>,
+    maxResults: number
+  ): { results: SearchResult[], deduplicationStats: any } {
+    const allResults: SearchResult[] = [];
+    const urlMap = new Map<string, SearchResult>();
+    const sourceCount = new Map<string, number>();
+    
+    // Combine all results with deduplication
+    for (const [engineId, { results }] of searchResults) {
+      const config = this.searchEngines.get(engineId)!;
+      
+      for (const result of results) {
+        if (!result.url) continue;
+        
+        const existingResult = urlMap.get(result.url);
+        
+        if (!existingResult) {
+          // Boost score based on engine priority
+          result.score = (result.score || 0.5) * (1 + config.priority * 0.1);
+          urlMap.set(result.url, result);
+          
+          // Track source count
+          sourceCount.set(result.source, (sourceCount.get(result.source) || 0) + 1);
+        } else {
+          // Merge content if new result has more information
+          if (result.content && result.content.length > (existingResult.content?.length || 0)) {
+            existingResult.content = result.content;
+          }
+          
+          // Update score (average of multiple sources)
+          existingResult.score = ((existingResult.score || 0) + (result.score || 0)) / 2;
+        }
+      }
     }
-  } catch (error) {
-    console.error('Brave search error (continuing with other engines):', error);
+    
+    // Convert map to array and sort
+    const uniqueResults = Array.from(urlMap.values());
+    
+    // Advanced ranking algorithm
+    uniqueResults.sort((a, b) => {
+      // Primary sort by combined score (engine priority + relevance)
+      const scoreA = (a.score || 0) * (a.relevanceScore || 0.5);
+      const scoreB = (b.score || 0) * (b.relevanceScore || 0.5);
+      
+      if (Math.abs(scoreA - scoreB) > 0.1) {
+        return scoreB - scoreA;
+      }
+      
+      // Secondary sort by source priority
+      const sourcePriorityA = this.getSourcePriority(a.source);
+      const sourcePriorityB = this.getSourcePriority(b.source);
+      
+      return sourcePriorityB - sourcePriorityA;
+    });
+    
+    // Apply source diversity (max 3 from same source)
+    const diverseResults: SearchResult[] = [];
+    const sourceCounts = new Map<string, number>();
+    
+    for (const result of uniqueResults) {
+      const count = sourceCounts.get(result.source) || 0;
+      if (count < 3) {
+        diverseResults.push(result);
+        sourceCounts.set(result.source, count + 1);
+        
+        if (diverseResults.length >= maxResults) {
+          break;
+        }
+      }
+    }
+    
+    return {
+      results: diverseResults,
+      deduplicationStats: {
+        totalResults: allResults.length,
+        uniqueResults: uniqueResults.length,
+        finalResults: diverseResults.length
+      }
+    };
+  }
+
+  /**
+   * Emergency fallback search
+   */
+  private async emergencyFallbackSearch(query: string, maxResults: number): Promise<SearchResult[]> {
+    try {
+      console.log('Using emergency fallback search...');
+      const { results } = await this.searchDuckDuckGo(query, maxResults);
+      return results;
+    } catch (error) {
+      console.error('Emergency fallback failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper methods
+   */
+  
+  private generateCacheKey(query: string, maxResults: number): string {
+    return crypto
+      .createHash('md5')
+      .update(`${query.toLowerCase()}:${maxResults}`)
+      .digest('hex');
   }
   
-  return [];
+  private getDateRange(days: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return `after:${date.toISOString().split('T')[0]}`;
+  }
+  
+  private calculateRelevance(query: string, title: string, content: string): number {
+    const queryTerms = query.toLowerCase().split(/\s+/);
+    const text = `${title} ${content}`.toLowerCase();
+    
+    let matches = 0;
+    let exactMatches = 0;
+    
+    for (const term of queryTerms) {
+      if (text.includes(term)) {
+        matches++;
+        if (text.includes(` ${term} `)) {
+          exactMatches++;
+        }
+      }
+    }
+    
+    const termCoverage = matches / queryTerms.length;
+    const exactBonus = exactMatches / queryTerms.length * 0.5;
+    
+    return Math.min(1.0, termCoverage + exactBonus);
+  }
+  
+  private getSourcePriority(source: string): number {
+    const priorities: Record<string, number> = {
+      'Tavily': 5,
+      'Brave': 4,
+      'NewsData': 3,
+      'SERP': 3,
+      'DuckDuckGo': 2
+    };
+    
+    return priorities[source] || 1;
+  }
+  
+  private getSourceBreakdown(results: SearchResult[]): Record<string, number> {
+    const breakdown: Record<string, number> = {};
+    
+    for (const result of results) {
+      breakdown[result.source] = (breakdown[result.source] || 0) + 1;
+    }
+    
+    return breakdown;
+  }
+  
+  private recordEngineSuccess(engineId: string) {
+    const current = this.metrics.engineSuccess.get(engineId) || 0;
+    this.metrics.engineSuccess.set(engineId, current + 1);
+  }
+  
+  private recordEngineFailure(engineId: string) {
+    const current = this.metrics.engineFailures.get(engineId) || 0;
+    this.metrics.engineFailures.set(engineId, current + 1);
+  }
+  
+  private updateAverageSearchTime(searchTime: number) {
+    const total = this.metrics.averageSearchTime * (this.metrics.totalSearches - 1);
+    this.metrics.averageSearchTime = (total + searchTime) / this.metrics.totalSearches;
+  }
+  
+  /**
+   * Get service metrics
+   */
+  public getMetrics() {
+    const engineStats: Record<string, any> = {};
+    
+    for (const [engineId, config] of this.searchEngines) {
+      const successes = this.metrics.engineSuccess.get(engineId) || 0;
+      const failures = this.metrics.engineFailures.get(engineId) || 0;
+      const total = successes + failures;
+      
+      engineStats[engineId] = {
+        name: config.name,
+        enabled: config.enabled,
+        successes,
+        failures,
+        successRate: total > 0 ? successes / total : 0,
+        circuitBreakerState: config.circuitBreaker?.opened ? 'open' : 'closed'
+      };
+    }
+    
+    return {
+      totalSearches: this.metrics.totalSearches,
+      cacheHitRate: this.metrics.totalSearches > 0 
+        ? this.metrics.cacheHits / this.metrics.totalSearches 
+        : 0,
+      averageSearchTime: this.metrics.averageSearchTime,
+      engineStats,
+      cacheSize: this.searchCache.size,
+      queueSize: this.requestQueue.size
+    };
+  }
+  
+  /**
+   * Clear cache
+   */
+  public clearCache() {
+    this.searchCache.clear();
+    console.log('Search cache cleared');
+  }
+  
+  /**
+   * Shutdown service
+   */
+  public async shutdown() {
+    this.requestQueue.clear();
+    this.searchCache.clear();
+    
+    // Close circuit breakers
+    for (const breaker of this.circuitBreakers.values()) {
+      breaker.shutdown();
+    }
+    
+    console.log('Web search service shutdown complete');
+  }
 }
 
-/**
- * Remove duplicates and sort results
- */
-function removeDuplicatesAndSort(results: SearchResult[], maxResults: number): SearchResult[] {
-  const seen = new Set<string>();
-  const unique = results.filter(result => {
-    if (!result.url || seen.has(result.url)) return false;
-    seen.add(result.url);
-    return true;
-  });
+// Create singleton instance
+const webSearchService = new OptimizedWebSearchService();
 
-  // Sort by score and source priority
-  const sourcePriority: { [key: string]: number } = {
-    'Tavily': 5,
-    'Brave': 4,
-    'NewsData': 3,
-    'SERP': 3,
-    'DuckDuckGo': 2
-  };
-
-  unique.sort((a, b) => {
-    const priorityDiff = (sourcePriority[b.source] || 1) - (sourcePriority[a.source] || 1);
-    if (priorityDiff !== 0) return priorityDiff;
-    return (b.score || 0) - (a.score || 0);
-  });
-
-  return unique.slice(0, maxResults);
+// Export the main function for backward compatibility
+export async function performWebSearch(
+  query: string,
+  maxResults: number = 10
+): Promise<WebSearchResponse> {
+  return webSearchService.performWebSearch(query, maxResults);
 }
+
+// Export the service for advanced usage
+export { webSearchService };
+
+// Make the function available globally for legacy compatibility
+(global as any).performWebSearch = performWebSearch;
