@@ -1,0 +1,581 @@
+// types/yahoo-finance.types.ts
+export interface CryptoPrice {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  marketCap: number;
+  dayHigh: number;
+  dayLow: number;
+  week52High: number;
+  week52Low: number;
+  timestamp: string;
+  cached?: boolean;
+}
+
+export interface MarketContext {
+  marketStatus: 'open' | 'closed' | 'pre-market' | 'after-hours';
+  sentiment: 'bullish' | 'bearish' | 'neutral';
+  correlations: {
+    sp500: number;
+    nasdaq: number;
+    gold: number;
+  };
+  volatilityIndex: number;
+  fearGreedIndex?: number;
+  dominance?: number;
+}
+
+export interface ServiceMetrics {
+  cache: {
+    size: number;
+    maxSize: number;
+    hits: number;
+    misses: number;
+    hitRate: number;
+    evictions: number;
+    memoryUsage: number;
+  };
+  performance: {
+    avgResponseTime: number;
+    p95ResponseTime: number;
+    p99ResponseTime: number;
+    totalRequests: number;
+    requestsPerMinute: number;
+  };
+  reliability: {
+    uptime: number;
+    lastSuccessfulFetch: string;
+    consecutiveFailures: number;
+    circuitBreakerStatus: 'closed' | 'open' | 'half-open';
+    circuitBreakerOpens: number;
+  };
+  errors: {
+    total: number;
+    rate: number;
+    byType: Record<string, number>;
+    lastError?: {
+      type: string;
+      message: string;
+      timestamp: string;
+    };
+  };
+}
+
+export interface BatchCryptoRequest {
+  symbols: string[];
+  options?: {
+    includeExtended?: boolean;
+    includeTechnicals?: boolean;
+  };
+}
+
+export interface BatchCryptoResponse {
+  success: boolean;
+  data?: Record<string, CryptoPrice | { error: string }>;
+  performance: {
+    responseTime: number;
+    symbolCount: number;
+    successCount: number;
+    failureCount: number;
+  };
+  timestamp: string;
+}
+
+// middleware/validation.middleware.ts
+import { body, query, validationResult } from 'express-validator';
+import { Request, Response, NextFunction } from 'express';
+
+export const validateBatchRequest = [
+  body('symbols')
+    .isArray({ min: 1, max: 10 })
+    .withMessage('Symbols must be an array with 1-10 items'),
+  body('symbols.*')
+    .isString()
+    .trim()
+    .matches(/^[A-Z0-9-]+$/)
+    .withMessage('Invalid symbol format'),
+  body('options')
+    .optional()
+    .isObject()
+    .withMessage('Options must be an object')
+];
+
+export const validateSymbol = [
+  query('symbol')
+    .optional()
+    .isString()
+    .trim()
+    .matches(/^[A-Z0-9-]+$/)
+    .withMessage('Invalid symbol format')
+];
+
+export const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation failed',
+      details: errors.array()
+    });
+  }
+  next();
+};
+
+// services/metrics-aggregator.service.ts
+export class MetricsAggregator {
+  private performanceMetrics: number[] = [];
+  private readonly maxMetricsSize = 1000;
+
+  recordResponseTime(responseTime: number): void {
+    this.performanceMetrics.push(responseTime);
+    if (this.performanceMetrics.length > this.maxMetricsSize) {
+      this.performanceMetrics.shift();
+    }
+  }
+
+  getPerformanceStats() {
+    if (this.performanceMetrics.length === 0) {
+      return {
+        avg: 0,
+        p95: 0,
+        p99: 0
+      };
+    }
+
+    const sorted = [...this.performanceMetrics].sort((a, b) => a - b);
+    const avg = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    const p95Index = Math.floor(sorted.length * 0.95);
+    const p99Index = Math.floor(sorted.length * 0.99);
+
+    return {
+      avg: Math.round(avg),
+      p95: sorted[p95Index] || avg,
+      p99: sorted[p99Index] || avg
+    };
+  }
+
+  analyzeHealth(metrics: ServiceMetrics): {
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    issues: string[];
+    score: number;
+  } {
+    const issues: string[] = [];
+    let score = 100;
+
+    // Cache performance
+    if (metrics.cache.hitRate < 0.5) {
+      issues.push('Low cache hit rate');
+      score -= 20;
+    }
+
+    // Response time
+    if (metrics.performance.avgResponseTime > 2000) {
+      issues.push('High average response time');
+      score -= 15;
+    }
+
+    // Circuit breaker
+    if (metrics.reliability.circuitBreakerStatus === 'open') {
+      issues.push('Circuit breaker is open');
+      score -= 30;
+    }
+
+    // Error rate
+    if (metrics.errors.rate > 0.1) {
+      issues.push('High error rate');
+      score -= 25;
+    }
+
+    // Recent failures
+    if (metrics.reliability.consecutiveFailures > 3) {
+      issues.push('Multiple consecutive failures');
+      score -= 20;
+    }
+
+    const status = score >= 80 ? 'healthy' : score >= 50 ? 'degraded' : 'unhealthy';
+
+    return { status, issues, score: Math.max(0, score) };
+  }
+}
+
+// routes/yahoo-finance-metrics.route.ts
+import express, { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
+import { yahooFinanceService } from '../yahoo-finance-integration';
+import { MetricsAggregator } from '../services/metrics-aggregator.service';
+import { 
+  validateBatchRequest, 
+  validateSymbol, 
+  handleValidationErrors 
+} from '../middleware/validation.middleware';
+
+const router = express.Router();
+const metricsAggregator = new MetricsAggregator();
+
+// Constants
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=10',
+  'X-Content-Type-Options': 'nosniff'
+};
+
+// Middleware
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+const addRequestId = (req: Request, res: Response, next: NextFunction) => {
+  req.requestId = `yf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  res.setHeader('X-Request-Id', req.requestId);
+  next();
+};
+
+const recordMetrics = (startTime: number) => (req: Request, res: Response, next: NextFunction) => {
+  const responseTime = Date.now() - startTime;
+  metricsAggregator.recordResponseTime(responseTime);
+  res.locals.responseTime = responseTime;
+  next();
+};
+
+// Rate limiting
+const standardLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: 'Too many requests'
+});
+
+const batchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 20,
+  message: 'Too many batch requests'
+});
+
+// Apply global middleware
+router.use(addRequestId);
+
+/**
+ * GET /api/yahoo-finance/metrics
+ * Returns comprehensive service metrics with analysis
+ */
+router.get('/metrics',
+  standardLimiter,
+  asyncHandler(async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    
+    try {
+      const metrics = await yahooFinanceService.getMetrics();
+      const performanceStats = metricsAggregator.getPerformanceStats();
+      const healthAnalysis = metricsAggregator.analyzeHealth(metrics);
+
+      // Enhance metrics with aggregated data
+      const enhancedMetrics = {
+        ...metrics,
+        performance: {
+          ...metrics.performance,
+          ...performanceStats
+        },
+        health: healthAnalysis
+      };
+
+      res.set(CACHE_HEADERS).json({
+        success: true,
+        metrics: enhancedMetrics,
+        timestamp: new Date().toISOString()
+      });
+
+      recordMetrics(startTime)(req, res, () => {});
+    } catch (error) {
+      console.error(`[${req.requestId}] Metrics error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * GET /api/yahoo-finance/bitcoin/price
+ * Get current Bitcoin price with enhanced data
+ */
+router.get('/bitcoin/price',
+  standardLimiter,
+  validateSymbol,
+  handleValidationErrors,
+  asyncHandler(async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    
+    try {
+      const bitcoinData = await yahooFinanceService.getCurrentBitcoinPrice();
+      
+      if (!bitcoinData) {
+        return res.status(503).json({
+          success: false,
+          error: 'Bitcoin price unavailable',
+          message: 'Service temporarily unable to fetch Bitcoin price',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      res.set(CACHE_HEADERS).json({
+        success: true,
+        data: bitcoinData,
+        performance: {
+          responseTime: Date.now() - startTime,
+          cached: bitcoinData.cached || false,
+          dataAge: bitcoinData.timestamp 
+            ? Date.now() - new Date(bitcoinData.timestamp).getTime()
+            : null
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      recordMetrics(startTime)(req, res, () => {});
+    } catch (error) {
+      console.error(`[${req.requestId}] Bitcoin price error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * GET /api/yahoo-finance/bitcoin/context
+ * Get Bitcoin market context with analysis
+ */
+router.get('/bitcoin/context',
+  standardLimiter,
+  asyncHandler(async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const includeAnalysis = req.query.includeAnalysis === 'true';
+    
+    try {
+      const context = await yahooFinanceService.getBitcoinMarketContext();
+      
+      const response: any = {
+        success: true,
+        context,
+        performance: {
+          responseTime: Date.now() - startTime
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // Add market analysis if requested
+      if (includeAnalysis && context) {
+        response.analysis = {
+          trend: context.sentiment,
+          volatilityLevel: context.volatilityIndex > 30 ? 'high' : 
+                          context.volatilityIndex > 20 ? 'medium' : 'low',
+          correlationStrength: {
+            sp500: Math.abs(context.correlations.sp500) > 0.7 ? 'strong' : 'moderate',
+            gold: Math.abs(context.correlations.gold) > 0.7 ? 'strong' : 'moderate'
+          }
+        };
+      }
+
+      res.set(CACHE_HEADERS).json(response);
+      recordMetrics(startTime)(req, res, () => {});
+    } catch (error) {
+      console.error(`[${req.requestId}] Context error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * POST /api/yahoo-finance/crypto/batch
+ * Batch fetch multiple crypto prices
+ */
+router.post('/crypto/batch',
+  batchLimiter,
+  validateBatchRequest,
+  handleValidationErrors,
+  asyncHandler(async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const { symbols, options }: BatchCryptoRequest = req.body;
+    
+    try {
+      console.log(`[${req.requestId}] Batch request for ${symbols.length} symbols`);
+      
+      // Normalize symbols
+      const normalizedSymbols = symbols.map(s => s.toUpperCase());
+      
+      // Fetch prices with error handling per symbol
+      const results = await yahooFinanceService.getCryptoPrices(normalizedSymbols);
+      
+      // Convert Map to object and track success/failures
+      const resultsObject: Record<string, any> = {};
+      let successCount = 0;
+      let failureCount = 0;
+      
+      results.forEach((value, key) => {
+        if (value && 'price' in value) {
+          successCount++;
+        } else {
+          failureCount++;
+        }
+        resultsObject[key] = value;
+      });
+
+      const response: BatchCryptoResponse = {
+        success: true,
+        data: resultsObject,
+        performance: {
+          responseTime: Date.now() - startTime,
+          symbolCount: symbols.length,
+          successCount,
+          failureCount
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      res.json(response);
+      recordMetrics(startTime)(req, res, () => {});
+    } catch (error) {
+      console.error(`[${req.requestId}] Batch error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * POST /api/yahoo-finance/cache/clear
+ * Clear cache with confirmation
+ */
+router.post('/cache/clear',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { confirm } = req.body;
+    
+    if (!confirm) {
+      return res.status(400).json({
+        success: false,
+        error: 'Confirmation required',
+        message: 'Set confirm: true to clear cache'
+      });
+    }
+    
+    try {
+      const beforeMetrics = await yahooFinanceService.getMetrics();
+      yahooFinanceService.clearCache();
+      
+      console.log(`[${req.requestId}] Cache cleared - ${beforeMetrics.cache.size} items removed`);
+      
+      res.json({
+        success: true,
+        message: 'Cache cleared successfully',
+        itemsCleared: beforeMetrics.cache.size,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error(`[${req.requestId}] Cache clear error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * GET /api/yahoo-finance/health
+ * Enhanced health check with detailed status
+ */
+router.get('/health',
+  asyncHandler(async (req: Request, res: Response) => {
+    const verbose = req.query.verbose === 'true';
+    
+    try {
+      const metrics = await yahooFinanceService.getMetrics();
+      const healthAnalysis = metricsAggregator.analyzeHealth(metrics);
+      
+      const response: any = {
+        status: healthAnalysis.status,
+        score: healthAnalysis.score,
+        timestamp: new Date().toISOString()
+      };
+
+      if (verbose) {
+        response.details = {
+          issues: healthAnalysis.issues,
+          metrics: {
+            cache: {
+              hitRate: metrics.cache.hitRate,
+              size: `${metrics.cache.size}/${metrics.cache.maxSize}`
+            },
+            reliability: {
+              uptime: `${metrics.reliability.uptime.toFixed(2)}%`,
+              circuitBreaker: metrics.reliability.circuitBreakerStatus,
+              lastSuccess: metrics.reliability.lastSuccessfulFetch
+            },
+            performance: {
+              avgResponseTime: `${metrics.performance.avgResponseTime}ms`,
+              requestsPerMinute: metrics.performance.requestsPerMinute
+            }
+          }
+        };
+      }
+
+      const statusCode = healthAnalysis.status === 'healthy' ? 200 : 
+                        healthAnalysis.status === 'degraded' ? 503 : 500;
+      
+      res.status(statusCode).json(response);
+    } catch (error) {
+      console.error(`[${req.requestId}] Health check error:`, error);
+      res.status(500).json({
+        status: 'unhealthy',
+        error: 'Health check failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+  })
+);
+
+/**
+ * GET /api/yahoo-finance/symbols/validate
+ * Validate crypto symbols
+ */
+router.get('/symbols/validate',
+  validateSymbol,
+  handleValidationErrors,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { symbol } = req.query;
+    
+    if (!symbol) {
+      return res.status(400).json({
+        success: false,
+        error: 'Symbol parameter required'
+      });
+    }
+    
+    const validSymbols = ['BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'USDC', 'ADA', 'AVAX', 'DOGE'];
+    const isValid = validSymbols.includes(symbol.toString().toUpperCase());
+    
+    res.json({
+      success: true,
+      symbol: symbol.toString().toUpperCase(),
+      valid: isValid,
+      message: isValid ? 'Valid symbol' : 'Unknown symbol',
+      timestamp: new Date().toISOString()
+    });
+  })
+);
+
+// Error handling middleware
+router.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  const requestId = req.requestId || 'unknown';
+  console.error(`[${requestId}] Unhandled error:`, error);
+  
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Service error',
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// TypeScript augmentation
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
+export default router;

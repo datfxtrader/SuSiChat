@@ -132,7 +132,7 @@ app.use((req, res, next) => {
   app.get('/api/research/user-research-optimized/:userId', async (req: any, res) => {
     try {
       const { userId } = req.params;
-      const { researchCache } = await import('./optimized-research-cache');
+      const { researchCache } } = await import('./optimized-research-cache');
 
       console.log('🔍 API: Getting optimized research for user:', userId);
 
