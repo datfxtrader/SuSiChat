@@ -1609,18 +1609,21 @@ Use the current date and web search information when responding about current ev
 
       // Get response based on selected model
       let aiResponse = '';
-      // Map API model names to display names
-      const modelDisplayNames = {
-        'gemini-1.5-flash': 'Gemini 1.5 Flash',
-        'gemini-1.0-pro': 'Gemini 1.5 Pro',
-        'deepseek-chat': 'DeepSeek',
-        'openrouter/openai/gpt-4o-mini': 'GPT-4o Mini',
-        'openrouter/deepseek/deepseek-r1-distill-llama-70b': 'DeepSeek R1',
-        'bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0': 'Claude 3.7 Sonnet',
-        'auto': 'Auto'
+      // Use standardized model configuration
+      const getModelDisplayName = (modelId: string): string => {
+        const standardModels = {
+          'gemini-1.5-flash': 'Gemini 1.5 Flash',
+          'gemini-1.0-pro': 'Gemini 1.5 Pro', 
+          'deepseek-chat': 'DeepSeek',
+          'openrouter/openai/gpt-4o-mini': 'GPT-4o Mini',
+          'openrouter/deepseek/deepseek-r1-distill-llama-70b': 'DeepSeek R1',
+          'bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0': 'Claude 3.7 Sonnet',
+          'auto': 'Auto'
+        };
+        return standardModels[modelId as keyof typeof standardModels] || modelId;
       };
 
-      let modelUsed = modelDisplayNames[selectedModel as keyof typeof modelDisplayNames] || selectedModel;
+      let modelUsed = getModelDisplayName(selectedModel);
 
       // Log which model we're actually using, for clarity
       console.log(`Using ${modelUsed} (${selectedModel}) to generate response`);

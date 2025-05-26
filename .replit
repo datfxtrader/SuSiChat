@@ -142,6 +142,15 @@ mode = "sequential"
 task = "shell.exec"
 args = "python3 test_family_study_complete.py"
 
+[[workflows.workflow]]
+name = "Test Model Configuration"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_model_config_integration.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000

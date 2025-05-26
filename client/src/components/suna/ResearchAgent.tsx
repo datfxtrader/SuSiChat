@@ -3,6 +3,8 @@ import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { ProgressDebugger } from '../debug/ProgressDebugger';
+import { ModelConfig } from '@/config/models.config';
+import ModelSelector from '@/components/shared/ModelSelector';
 
 // ============================================
 // CONSTANTS
@@ -926,3 +928,46 @@ I wasn't able to complete research on "${query}" at this time. This might be due
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center space-x-4 mb-4">
               <Select value={researchDepth} onValueChange={setResearchDepth} />
+              {/* Model Selector */}
+                    <ModelSelector
+                      value={selectedModel}
+                      onValueChange={setSelectedModel}
+                      category="research"
+                      context="research"
+                      size="sm"
+                      variant="compact"
+                      className="w-32"
+                    />
+            </div>
+            <div className="flex items-center space-x-4">
+              <Textarea
+                ref={textareaRef}
+                placeholder="Enter your research query..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="flex-1 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-200 placeholder:text-zinc-500 focus:ring-0 focus-visible:ring-0 focus-visible:ring-transparent"
+                rows={1}
+                maxRows={4}
+                style={{ height: 'auto', overflowY: 'hidden' }}
+              />
+              <Button onClick={handleSendMessage} disabled={isSending || isResearchInProgress}>
+                {isSending || isResearchInProgress ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    <span>Send</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

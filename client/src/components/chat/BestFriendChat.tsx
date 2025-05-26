@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import UIStandards from '@/config/ui-standards.config';
+import { useSuna, LLMModel } from '@/hooks/useSuna';
+import { ModelConfig } from '@/config/models.config';
+import ModelSelector from '@/components/shared/ModelSelector';
 
 // New component for Belga Cat icon
 const BelgaCatIcon = () => (
@@ -199,6 +202,7 @@ export const BestFriendChat: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { toast } = useToast();
+  const [selectedModel, setSelectedModel] = useState<LLMModel>(ModelConfig.default);
 
   // Refs for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -245,7 +249,8 @@ export const BestFriendChat: React.FC = () => {
           mood,
           context: {
             recentMessages: messages.slice(-5)
-          }
+          },
+          model: selectedModel.id
         })
       });
 
@@ -372,6 +377,10 @@ export const BestFriendChat: React.FC = () => {
         showSettings={true}
         status="online"
       />
+       <ModelSelector
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+        />
 
       {/* Enhanced Messages */}
       <div 

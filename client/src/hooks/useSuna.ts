@@ -19,7 +19,9 @@ type SunaConversation = {
   createdAt: string;
 };
 
-export type LLMModel = 'auto' | 'deepseek-chat' | 'gemini-1.5-flash' | 'openrouter/openai/gpt-4o-mini' | 'openrouter/deepseek/deepseek-r1-distill-llama-70b' | 'bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0';
+import { ModelConfig, type ModelId } from '@/config/models.config';
+
+export type LLMModel = ModelId;
 
 export type SearchPreferences = {
   forceSearch?: boolean;          // Force web search even if not detected automatically
@@ -36,7 +38,9 @@ export function useSuna(initialThreadId?: string) {
   const { user, isAuthenticated } = useAuth();
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [messages, setMessages] = useState<SunaMessage[]>([]);
-  const [currentModel, setCurrentModel] = useState<LLMModel>('auto');
+  const [currentModel, setCurrentModel] = useState<LLMModel>(() => 
+    ModelConfig.getDefaultModel('research').id as LLMModel
+  );
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences>({
     priority: 'relevance',
     maxResults: 5

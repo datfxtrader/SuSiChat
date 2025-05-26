@@ -1,4 +1,6 @@
 
+import { ModelConfig } from './models.config';
+
 export const UIStandards = {
   // ============================================
   // SUSI BRANDING
@@ -8,6 +10,41 @@ export const UIStandards = {
     assistantName: 'SuSi',
     chatName: 'SuSi Chat',
     tagline: 'Your AI Assistant Friend'
+  },
+
+  // ============================================
+  // MODEL INTEGRATION
+  // ============================================
+  models: {
+    getStandardModelSelector: (category?: string) => {
+      const models = category ? ModelConfig.getModelsForCategory(category) : ModelConfig.getAllModels();
+      return models.map(model => ({
+        value: model.id,
+        label: model.displayName,
+        description: model.description,
+        color: model.metadata.color,
+        icon: model.metadata.icon,
+        disabled: false
+      }));
+    },
+
+    getModelTheme: (modelId: string) => {
+      const model = ModelConfig.getModel(modelId);
+      return {
+        primary: model.metadata.color,
+        icon: model.metadata.icon,
+        tier: model.metadata.tier
+      };
+    },
+
+    formatModelBadge: (modelId: string) => {
+      const model = ModelConfig.getModel(modelId);
+      return {
+        text: model.displayName,
+        className: `bg-gradient-to-r ${model.metadata.color} text-white`,
+        icon: model.metadata.icon
+      };
+    }
   },
 
   // ============================================
