@@ -3,6 +3,9 @@ import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { motion } from 'framer-motion';
 import { useTypewriter } from '@/hooks/useTypewriter';
+import { useTypewriterWithSound } from '@/hooks/useTypewriterWithSound';
+import { useRobustTypewriter } from '@/hooks/useRobustTypewriter';
+import { TypewriterErrorBoundary } from './TypewriterErrorBoundary';
 
 interface TypewriterTextProps {
   text: string;
@@ -11,6 +14,9 @@ interface TypewriterTextProps {
   onComplete?: () => void;
   renderMarkdown?: boolean;
   showCursor?: boolean;
+  enableSound?: boolean;
+  robust?: boolean;
+  showProgress?: boolean;
 }
 
 export const TypewriterText: React.FC<TypewriterTextProps> = ({
@@ -19,12 +25,25 @@ export const TypewriterText: React.FC<TypewriterTextProps> = ({
   className = '',
   onComplete,
   renderMarkdown = false,
-  showCursor = true
+  showCursor = true,
+  enableSound = false,
+  robust = false,
+  showProgress = false
 }) => {
-  const { displayedText, isTyping, skipToEnd } = useTypewriter(text, {
+  // Choose appropriate hook based on options
+  const typewriterHook = robust 
+    ? useRobustTypewriter 
+    : enableSound 
+      ? useTypewriterWithSound 
+      : useTypewriter;
+
+  const result = typewriterHook(text, {
     speed,
-    onComplete
+    onComplete,
+    ...(enableSound && { enableSound: true })
   });
+
+  const { displayedText, isTyping, skipToEnd, error, retry, progress } = result;
 
   const content = useMemo(() => {
     if (renderMarkdown) {
@@ -80,18 +99,52 @@ export const TypewriterText: React.FC<TypewriterTextProps> = ({
     return <span className="text-zinc-200">{displayedText}</span>;
   }, [displayedText, renderMarkdown]);
 
+  // Handle errors for robust mode
+  if (robust && error) {
+    return (
+      <div className={`relative ${className}`}>
+        <div className="text-zinc-200">{text}</div>
+        <button
+          onClick={retry}
+          className="mt-2 text-xs text-blue-400 hover:text-blue-300"
+        >
+          Retry Animation
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className={`relative ${className}`}>
-      <div onDoubleClick={skipToEnd} className="cursor-text">
-        {content}
-        {showCursor && isTyping && (
-          <motion.span
-            className="inline-block w-0.5 h-5 bg-zinc-200 ml-0.5"
-            animate={{ opacity: [1, 0] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-          />
+    <TypewriterErrorBoundary fallbackComponent={<div className={className}>{text}</div>}>
+      <div className={`relative ${className}`}>
+        <div onDoubleClick={skipToEnd} className="cursor-text">
+          {content}
+          {showCursor && isTyping && (
+            <motion.span
+              className="inline-block w-0.5 h-5 bg-zinc-200 ml-0.5"
+              animate={{ opacity: [1, 0] }}
+              transition={{ duration: 0.8, repeat: Infinity }}
+            />
+          )}
+        </div>
+        
+        {/* Progress indicator for long texts */}
+        {showProgress && text.length > 1000 && isTyping && progress !== undefined && (
+          <div className="mt-2 w-full bg-gray-700 rounded-full h-1">
+            <div 
+              className="bg-primary h-1 rounded-full transition-all duration-300"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+        )}
+        
+        {/* Skip hint for long content */}
+        {isTyping && text.length > 500 && (
+          <div className="absolute -bottom-6 left-0 text-xs text-gray-500 opacity-0 hover:opacity-100 transition-opacity">
+            Double-click to skip animation
+          </div>
         )}
       </div>
-    </div>
+    </TypewriterErrorBoundary>
   );
 };

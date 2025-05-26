@@ -275,37 +275,8 @@ const ChatBubble = memo<ChatBubbleProps>(({
 ChatBubble.displayName = "ChatBubble";
 
 // Typewriter Component
-interface TypewriterTextProps {
-  text: string;
-  speed: number;
-  renderMarkdown?: boolean;
-  onComplete?: () => void;
-}
 
-const TypewriterText: React.FC<TypewriterTextProps> = ({ text, speed, renderMarkdown = false, onComplete }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setDisplayedText(prevText => prevText + text[currentIndex]);
-        setCurrentIndex(prevIndex => prevIndex + 1);
-      }, speed);
-
-      return () => clearTimeout(timeout);
-    } else if (onComplete) {
-      onComplete();
-    }
-  }, [currentIndex, speed, text, onComplete]);
-
-  return (
-    <div className="text-zinc-200 whitespace-pre-wrap">
-      {displayedText}
-    </div>
-  );
-};
 
 // Export sub-components for flexibility
-export { MessageAvatar, AIAvatar, MessageContent, MessageTimestamp, TypewriterText };
+export { MessageAvatar, AIAvatar, MessageContent, MessageTimestamp };
 export default ChatBubble;

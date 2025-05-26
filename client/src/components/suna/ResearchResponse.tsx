@@ -78,6 +78,9 @@ const ResearchResponse: React.FC<ResearchResponseProps> = ({ content, timestamp,
             speed={TypewriterConfig.responseTypes.research.speed}
             renderMarkdown={true}
             onComplete={handleTypewriterComplete}
+            enableSound={true}
+            robust={true}
+            showProgress={content.length > 2000}
           />
         ) : (
           <div className="space-y-6 text-zinc-200">
