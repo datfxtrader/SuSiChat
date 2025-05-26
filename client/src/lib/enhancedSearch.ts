@@ -94,9 +94,11 @@ interface SearchOptions {
     category?: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://0.0.0.0:3000';
+
 export const enhancedWebSearch = async (query: string, options: SearchOptions = {}): Promise<SearchResult[]> => {
   try {
-    const response = await fetch('/api/enhanced-web-search', {
+    const response = await fetch(`${API_BASE}/api/enhanced-web-search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -19,7 +19,7 @@ export async function apiRequest<T>(
       ...defaultOptions,
       ...options,
     };
-    
+
     const response = await axios(endpoint, mergedOptions);
     return response.data;
   } catch (error) {
@@ -31,3 +31,5 @@ export async function apiRequest<T>(
     throw error;
   }
 }
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://0.0.0.0:3000';

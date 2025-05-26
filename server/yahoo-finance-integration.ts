@@ -1,4 +1,3 @@
-
 /**
  * Optimized Yahoo Finance Integration with Caching, Circuit Breaking, and Rate Limiting
  */
@@ -53,14 +52,14 @@ class OptimizedYahooFinanceService extends EventEmitter {
   private rateLimiter: RateLimiterMemory;
   private metrics: MarketDataMetrics;
   private lastSuccessfulFetch: Date | null = null;
-  
+
   // Fallback data for when all sources fail
   private fallbackData: BitcoinMarketData | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
-    
+
     // Initialize metrics
     this.metrics = {
       apiCalls: 0,
@@ -70,7 +69,7 @@ class OptimizedYahooFinanceService extends EventEmitter {
       rateLimitHits: 0,
       averageResponseTime: 0
     };
-    
+
     // Initialize axios with optimized settings
     this.axiosInstance = axios.create({
       timeout: 10000,
@@ -90,7 +89,7 @@ class OptimizedYahooFinanceService extends EventEmitter {
         maxSockets: 10
       })
     });
-    
+
     // Initialize cache with 5-minute TTL
     this.priceCache = new LRUCache<string, BitcoinMarketData>({
       max: 100,
@@ -98,14 +97,14 @@ class OptimizedYahooFinanceService extends EventEmitter {
       updateAgeOnGet: true,
       updateAgeOnHas: true
     });
-    
+
     // Initialize rate limiter (10 requests per minute to be safe)
     this.rateLimiter = new RateLimiterMemory({
       points: 10,
       duration: 60,
       blockDuration: 60
     });
-    
+
     // Initialize circuit breaker
     this.circuitBreaker = new CircuitBreaker(
       this.fetchFromYahooFinance.bind(this),
@@ -120,18 +119,18 @@ class OptimizedYahooFinanceService extends EventEmitter {
         fallback: this.getFallbackData.bind(this)
       }
     );
-    
+
     // Circuit breaker events
     this.circuitBreaker.on('open', () => {
       this.metrics.circuitBreakerOpens++;
       console.log('⚡ Yahoo Finance circuit breaker opened');
       this.emit('circuitBreakerOpen');
     });
-    
+
     this.circuitBreaker.on('halfOpen', () => {
       console.log('⚡ Yahoo Finance circuit breaker half-open, testing...');
     });
-    
+
     // Background refresh for popular symbols
     this.startBackgroundRefresh();
   }
@@ -142,7 +141,7 @@ class OptimizedYahooFinanceService extends EventEmitter {
   async getCurrentBitcoinPrice(): Promise<BitcoinMarketData | null> {
     const startTime = Date.now();
     const cacheKey = 'BTC-USD';
-    
+
     try {
       // Check cache first
       const cached = this.priceCache.get(cacheKey);
@@ -151,46 +150,46 @@ class OptimizedYahooFinanceService extends EventEmitter {
         this.emit('cacheHit', { symbol: cacheKey });
         return { ...cached, cached: true };
       }
-      
+
       this.metrics.cacheMisses++;
-      
+
       // Check rate limit
       try {
         await this.rateLimiter.consume('yahoo-finance');
       } catch (rateLimitError) {
         this.metrics.rateLimitHits++;
         console.warn('⚠️ Rate limit reached for Yahoo Finance');
-        
+
         // Return stale cache if available
         const staleCache = this.priceCache.get(cacheKey);
         if (staleCache) {
           return { ...staleCache, cached: true };
         }
-        
+
         // Return fallback data
         return this.getFallbackData();
       }
-      
+
       // Use circuit breaker to fetch data
       this.metrics.apiCalls++;
       const data = await this.circuitBreaker.fire();
-      
+
       if (data) {
         // Cache the successful result
         this.priceCache.set(cacheKey, data);
         this.fallbackData = data; // Update fallback data
         this.lastSuccessfulFetch = new Date();
-        
+
         // Update average response time
         const responseTime = Date.now() - startTime;
         this.updateAverageResponseTime(responseTime);
-        
+
         this.emit('priceUpdate', data);
         return data;
       }
-      
+
       return null;
-      
+
     } catch (error) {
       console.error('Error getting Bitcoin price:', error);
       return this.getFallbackData();
@@ -202,17 +201,17 @@ class OptimizedYahooFinanceService extends EventEmitter {
    */
   private async fetchFromYahooFinance(): Promise<BitcoinMarketData | null> {
     console.log('📊 Fetching Bitcoin data from Yahoo Finance...');
-    
+
     const response = await pRetry(
       async () => {
         const res = await this.axiosInstance.get(
           'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD'
         );
-        
+
         if (!res.data?.chart?.result?.[0]) {
           throw new Error('Invalid response format from Yahoo Finance');
         }
-        
+
         return res.data;
       },
       {
@@ -224,20 +223,20 @@ class OptimizedYahooFinanceService extends EventEmitter {
         }
       }
     );
-    
+
     // Parse response
     const result = response.chart.result[0];
     const meta = result.meta;
-    
+
     if (!meta) {
       throw new Error('No metadata in Yahoo Finance response');
     }
-    
+
     const currentPrice = meta.regularMarketPrice || meta.previousClose || 0;
     const previousClose = meta.previousClose || currentPrice;
     const priceChange = currentPrice - previousClose;
     const priceChangePercent = previousClose > 0 ? (priceChange / previousClose) * 100 : 0;
-    
+
     const bitcoinData: BitcoinMarketData = {
       currentPrice: this.roundToTwoDecimals(currentPrice),
       priceChange24h: this.roundToTwoDecimals(priceChange),
@@ -247,9 +246,9 @@ class OptimizedYahooFinanceService extends EventEmitter {
       lastUpdated: new Date().toISOString(),
       source: 'Yahoo Finance'
     };
-    
+
     console.log(`✅ Bitcoin: $${bitcoinData.currentPrice} (${bitcoinData.priceChangePercent24h > 0 ? '+' : ''}${bitcoinData.priceChangePercent24h}%)`);
-    
+
     return bitcoinData;
   }
 
@@ -265,7 +264,7 @@ class OptimizedYahooFinanceService extends EventEmitter {
         source: 'Yahoo Finance (Cached Fallback)'
       };
     }
-    
+
     // Ultimate fallback with approximate data
     console.log('📦 Using static fallback Bitcoin data');
     return {
@@ -284,15 +283,15 @@ class OptimizedYahooFinanceService extends EventEmitter {
    */
   async getBitcoinMarketContext(): Promise<string> {
     const bitcoinData = await this.getCurrentBitcoinPrice();
-    
+
     if (!bitcoinData) {
       return "Unable to retrieve current Bitcoin pricing data.";
     }
-    
+
     const direction = bitcoinData.priceChangePercent24h >= 0 ? '📈' : '📉';
     const changeText = bitcoinData.priceChangePercent24h >= 0 ? 'up' : 'down';
     const cachedIndicator = bitcoinData.cached ? ' (Cached)' : '';
-    
+
     return `
 🪙 **CURRENT BITCOIN MARKET DATA** (${bitcoinData.lastUpdated.split('T')[0]})${cachedIndicator}
 ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
@@ -310,15 +309,15 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
    */
   async enhanceBitcoinQuery(originalQuery: string): Promise<string> {
     const bitcoinData = await this.getCurrentBitcoinPrice();
-    
+
     if (!bitcoinData) {
       return originalQuery;
     }
-    
+
     const currentPrice = bitcoinData.currentPrice;
     const trend = bitcoinData.priceChangePercent24h >= 0 ? 'rising' : 'declining';
     const priceLevel = currentPrice > 60000 ? 'high' : currentPrice > 40000 ? 'moderate' : 'low';
-    
+
     return `${originalQuery} Bitcoin current price $${currentPrice} ${trend} trend ${priceLevel} price level May 2025 analysis forecast market conditions`;
   }
 
@@ -327,10 +326,10 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
    */
   async getCryptoPrices(symbols: string[]): Promise<Map<string, BitcoinMarketData | null>> {
     const results = new Map<string, BitcoinMarketData | null>();
-    
+
     // Check cache first
     const uncachedSymbols: string[] = [];
-    
+
     for (const symbol of symbols) {
       const cached = this.priceCache.get(symbol);
       if (cached) {
@@ -340,15 +339,15 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
         uncachedSymbols.push(symbol);
       }
     }
-    
+
     // Batch fetch uncached symbols
     if (uncachedSymbols.length > 0) {
       const fetchPromises = uncachedSymbols.map(symbol => 
         this.fetchCryptoPrice(symbol).catch(() => null)
       );
-      
+
       const fetchedData = await Promise.all(fetchPromises);
-      
+
       uncachedSymbols.forEach((symbol, index) => {
         const data = fetchedData[index];
         if (data) {
@@ -359,7 +358,7 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
         }
       });
     }
-    
+
     return results;
   }
 
@@ -369,25 +368,25 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
   private async fetchCryptoPrice(symbol: string): Promise<BitcoinMarketData | null> {
     try {
       await this.rateLimiter.consume('yahoo-finance');
-      
+
       const response = await this.axiosInstance.get(
         `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`
       );
-      
+
       if (!response.data?.chart?.result?.[0]) {
         return null;
       }
-      
+
       const result = response.data.chart.result[0];
       const meta = result.meta;
-      
+
       if (!meta) return null;
-      
+
       const currentPrice = meta.regularMarketPrice || meta.previousClose || 0;
       const previousClose = meta.previousClose || currentPrice;
       const priceChange = currentPrice - previousClose;
       const priceChangePercent = previousClose > 0 ? (priceChange / previousClose) * 100 : 0;
-      
+
       return {
         currentPrice: this.roundToTwoDecimals(currentPrice),
         priceChange24h: this.roundToTwoDecimals(priceChange),
@@ -397,7 +396,7 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
         lastUpdated: new Date().toISOString(),
         source: 'Yahoo Finance'
       };
-      
+
     } catch (error) {
       console.error(`Error fetching ${symbol}:`, error);
       return null;
@@ -412,11 +411,11 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
     this.refreshInterval = setInterval(() => {
       const now = new Date();
       const hour = now.getUTCHours();
-      
+
       // More frequent updates during active trading hours (UTC)
       const isActiveHours = hour >= 12 && hour <= 22; // 12 PM - 10 PM UTC
       const refreshInterval = isActiveHours ? 2 : 5; // 2 or 5 minutes
-      
+
       if (now.getMinutes() % refreshInterval === 0) {
         this.getCurrentBitcoinPrice().catch(console.error);
       }
@@ -429,7 +428,7 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
   private roundToTwoDecimals(value: number): number {
     return Math.round(value * 100) / 100;
   }
-  
+
   private updateAverageResponseTime(responseTime: number): void {
     const total = this.metrics.averageResponseTime * (this.metrics.apiCalls - 1);
     this.metrics.averageResponseTime = (total + responseTime) / this.metrics.apiCalls;
@@ -444,7 +443,7 @@ ${direction} **Price**: $${bitcoinData.currentPrice.toLocaleString()}
     lastSuccessfulFetch: string | null;
   } {
     const total = this.metrics.cacheHits + this.metrics.cacheMisses;
-    
+
     return {
       ...this.metrics,
       cacheSize: this.priceCache.size,
@@ -493,7 +492,7 @@ export function enhanceBitcoinQuery(originalQuery: string, bitcoinData?: Bitcoin
     const trend = bitcoinData.priceChangePercent24h >= 0 ? 'rising' : 'declining';
     return `${originalQuery} current price $${currentPrice} ${trend} trend May 2025 analysis forecast`;
   }
-  
+
   // Otherwise use the service method (async, returns Promise)
   return originalQuery; // Simplified for backward compatibility
 }

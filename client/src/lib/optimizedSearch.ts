@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 interface SearchResult {
@@ -40,12 +39,14 @@ interface SearchStatus {
   };
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://0.0.0.0:3000';
+
 class OptimizedSearchClient {
   private baseURL: string;
   private cache = new Map<string, { data: SearchResponse; timestamp: number }>();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  constructor(baseURL: string = '') {
+  constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
   }
 
@@ -87,7 +88,7 @@ class OptimizedSearchClient {
     if (useCache) {
       const cacheKey = this.getCacheKey(query, searchType, maxResults);
       const cached = this.cache.get(cacheKey);
-      
+
       if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
         console.log('Using client-side cache for search:', query);
         return cached.data;
@@ -96,7 +97,7 @@ class OptimizedSearchClient {
 
     try {
       console.log(`Performing optimized search: "${query}" (${searchType})`);
-      
+
       const response = await axios.post(`${this.baseURL}/api/enhanced-web-search/search`, {
         query,
         maxResults,
@@ -128,7 +129,7 @@ class OptimizedSearchClient {
 
     } catch (error) {
       console.error('Search error:', error);
-      
+
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 429) {
           throw new Error('Search rate limit exceeded. Please wait a moment and try again.');
@@ -136,7 +137,7 @@ class OptimizedSearchClient {
           throw new Error('Search request timed out. Please try again.');
         }
       }
-      
+
       throw new Error('Search failed. Please try again.');
     }
   }
@@ -184,10 +185,10 @@ class OptimizedSearchClient {
     if (this.cache.size > 100) {
       const entries = Array.from(this.cache.entries())
         .sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
+
       const toRemove = entries.slice(0, this.cache.size - 100);
       toRemove.forEach(([key]) => this.cache.delete(key));
-      
+
       console.log(`Client cache size limited: removed ${toRemove.length} old entries`);
     }
   }

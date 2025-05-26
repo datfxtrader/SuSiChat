@@ -53,7 +53,7 @@ logger = logging.getLogger("frontend_test")
 
 # Test configuration
 class TestConfig:
-    FRONTEND_URL = "http://0.0.0.0:5000"
+    FRONTEND_URL = "http://0.0.0.0:5173"
     BACKEND_URL = "http://0.0.0.0:9000"
 
     # Browser settings
@@ -941,3 +941,66 @@ class FrontendTester:
 
         except Exception as e:
             logger.error(f"Basic tests failed: {e}")
+
+    def _generate_report(self, duration: float):
+        """Generate test report"""
+        print("\n📊 Test Report")
+        print("=" * 70)
+
+        passed = sum(1 for r in self.test_results if r.status == TestStatus.PASSED)
+        failed = sum(1 for r in self.test_results if r.status == TestStatus.FAILED)
+        skipped = sum(1 for r in self.test_results if r.status == TestStatus.SKIPPED)
+        warning = sum(1 for r in self.test_results if r.status == TestStatus.WARNING)
+
+        print(f"Total Tests: {len(self.test_results)}")
+        print(f"✅ Passed: {passed}")
+        print(f"❌ Failed: {failed}")
+        print(f"⚠️  Warning: {warning}")
+        print(f"🚫 Skipped: {skipped}")
+        print(f"⏱️  Duration: {duration:.2f}s")
+        print("=" * 70)
+
+        for result in self.test_results:
+            status_str = {
+                TestStatus.PASSED: "✅ PASSED",
+                TestStatus.FAILED: "❌ FAILED",
+                TestStatus.SKIPPED: "🚫 SKIPPED",
+                TestStatus.WARNING: "⚠️  WARNING"
+            }[result.status]
+
+            print(f"\n{status_str} - {result.name} ({result.duration:.2f}s)")
+
+            if result.details:
+                print(f"   Details: {json.dumps(result.details, indent=2)}")
+            if result.error:
+                print(f"   Error: {result.error}")
+            if result.warnings:
+                print(f"   Warnings: {', '.join(result.warnings)}")
+            if result.screenshots:
+                print(f"   Screenshots: {', '.join(result.screenshots)}")
+
+        print("\nEnd of Test Report")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Frontend Test Suite")
+    parser.add_argument("--headless", action="store_true", help="Run in headless mode")
+    parser.add_argument("--no-parallel", action="store_false", dest="parallel", help="Disable parallel tests")
+    parser.add_argument("--max-workers", type=int, default=3, help="Maximum number of parallel workers")
+    parser.add_argument("--frontend-url", type=str, help="Frontend URL")
+    parser.add_argument("--backend-url", type=str, help="Backend URL")
+
+    args = parser.parse_args()
+
+    # Override test configuration
+    TestConfig.HEADLESS = not args.headless
+    TestConfig.PARALLEL_TESTS = args.parallel
+    TestConfig.MAX_WORKERS = args.max_workers
+
+    if args.frontend_url:
+        TestConfig.FRONTEND_URL = args.frontend_url
+    if args.backend_url:
+        TestConfig.BACKEND_URL = args.backend_url
+
+    # Run tests
+    tester = FrontendTester()
+    asyncio.run(tester.run_all_tests())
