@@ -786,4 +786,3 @@ class AgentCore:
 
 # Global agent core instance
 agent_core = AgentCore()
-`
