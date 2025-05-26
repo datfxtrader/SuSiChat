@@ -1,0 +1,410 @@
+// types/financial-source.types.ts
+export interface FinancialSource {
+  id: string;
+  title: string;
+  url: string;
+  domain: string;
+  category: SourceCategory;
+  subcategories?: SourceSubcategory[];
+  reliability: number; // 0-1 score
+  features: SourceFeatures;
+  regions?: Region[];
+  updateFrequency?: UpdateFrequency;
+  apiAvailable?: boolean;
+  requiresAuth?: boolean;
+  metadata?: SourceMetadata;
+}
+
+export enum SourceCategory {
+  REALTIME = 'realtime',
+  ANALYSIS = 'analysis',
+  NEWS = 'news',
+  DATA = 'data',
+  CHARTS = 'charts',
+  RESEARCH = 'research'
+}
+
+export enum SourceSubcategory {
+  FOREX = 'forex',
+  STOCKS = 'stocks',
+  CRYPTO = 'crypto',
+  COMMODITIES = 'commodities',
+  BONDS = 'bonds',
+  INDICES = 'indices',
+  ECONOMICS = 'economics'
+}
+
+export interface SourceFeatures {
+  realTimePrices: boolean;
+  historicalData: boolean;
+  technicalAnalysis: boolean;
+  fundamentalAnalysis: boolean;
+  newsArticles: boolean;
+  expertCommentary: boolean;
+  economicCalendar: boolean;
+  chartingTools: boolean;
+}
+
+export enum Region {
+  GLOBAL = 'global',
+  NORTH_AMERICA = 'north_america',
+  EUROPE = 'europe',
+  ASIA = 'asia',
+  LATIN_AMERICA = 'latin_america',
+  MIDDLE_EAST = 'middle_east',
+  AFRICA = 'africa'
+}
+
+export enum UpdateFrequency {
+  REALTIME = 'realtime',
+  MINUTE = 'minute',
+  HOURLY = 'hourly',
+  DAILY = 'daily',
+  WEEKLY = 'weekly'
+}
+
+export interface SourceMetadata {
+  established?: number;
+  parentCompany?: string;
+  languages?: string[];
+  mobileFriendly?: boolean;
+  rateLimit?: {
+    requests: number;
+    window: number; // in ms
+  };
+  specialNotes?: string;
+}
+
+// config/financial-sources.config.ts
+import { 
+  FinancialSource, 
+  SourceCategory, 
+  SourceSubcategory, 
+  Region, 
+  UpdateFrequency 
+} from '../types/financial-source.types';
+
+/**
+ * Comprehensive financial data sources configuration
+ * Sources are ordered by reliability and feature completeness
+ */
+export const FINANCIAL_SOURCES: readonly FinancialSource[] = Object.freeze([
+  {
+    id: 'bloomberg',
+    title: 'Bloomberg Markets',
+    url: 'https://www.bloomberg.com/markets',
+    domain: 'bloomberg.com',
+    category: SourceCategory.NEWS,
+    subcategories: [
+      SourceSubcategory.FOREX,
+      SourceSubcategory.STOCKS,
+      SourceSubcategory.COMMODITIES,
+      SourceSubcategory.BONDS,
+      SourceSubcategory.ECONOMICS
+    ],
+    reliability: 0.95,
+    features: {
+      realTimePrices: true,
+      historicalData: true,
+      technicalAnalysis: true,
+      fundamentalAnalysis: true,
+      newsArticles: true,
+      expertCommentary: true,
+      economicCalendar: true,
+      chartingTools: true
+    },
+    regions: [Region.GLOBAL],
+    updateFrequency: UpdateFrequency.REALTIME,
+    apiAvailable: true,
+    requiresAuth: true,
+    metadata: {
+      established: 1981,
+      parentCompany: 'Bloomberg L.P.',
+      languages: ['en', 'es', 'zh', 'ja', 'de', 'fr'],
+      mobileFriendly: true,
+      rateLimit: {
+        requests: 500,
+        window: 60000 // 1 minute
+      },
+      specialNotes: 'Premium data requires Bloomberg Terminal subscription'
+    }
+  },
+  {
+    id: 'reuters',
+    title: 'Reuters Finance',
+    url: 'https://www.reuters.com/finance/',
+    domain: 'reuters.com',
+    category: SourceCategory.NEWS,
+    subcategories: [
+      SourceSubcategory.FOREX,
+      SourceSubcategory.STOCKS,
+      SourceSubcategory.COMMODITIES,
+      SourceSubcategory.ECONOMICS
+    ],
+    reliability: 0.95,
+    features: {
+      realTimePrices: true,
+      historicalData: true,
+      technicalAnalysis: false,
+      fundamentalAnalysis: true,
+      newsArticles: true,
+      expertCommentary: true,
+      economicCalendar: true,
+      chartingTools: false
+    },
+    regions: [Region.GLOBAL],
+    updateFrequency: UpdateFrequency.REALTIME,
+    apiAvailable: true,
+    requiresAuth: false,
+    metadata: {
+      established: 1851,
+      parentCompany: 'Thomson Reuters',
+      languages: ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'zh', 'ja'],
+      mobileFriendly: true,
+      specialNotes: 'Part of Refinitiv data platform'
+    }
+  },
+  {
+    id: 'investing',
+    title: 'Investing.com',
+    url: 'https://www.investing.com/',
+    domain: 'investing.com',
+    category: SourceCategory.REALTIME,
+    subcategories: [
+      SourceSubcategory.FOREX,
+      SourceSubcategory.STOCKS,
+      SourceSubcategory.CRYPTO,
+      SourceSubcategory.COMMODITIES,
+      SourceSubcategory.INDICES
+    ],
+    reliability: 0.9,
+    features: {
+      realTimePrices: true,
+      historicalData: true,
+      technicalAnalysis: true,
+      fundamentalAnalysis: true,
+      newsArticles: true,
+      expertCommentary: false,
+      economicCalendar: true,
+      chartingTools: true
+    },
+    regions: [Region.GLOBAL],
+    updateFrequency: UpdateFrequency.REALTIME,
+    apiAvailable: false,
+    requiresAuth: false,
+    metadata: {
+      established: 2007,
+      languages: ['en', 'es', 'pt', 'pl', 'fr', 'it', 'de', 'ru', 'tr', 'ar', 'he', 'ja', 'ko', 'zh'],
+      mobileFriendly: true,
+      specialNotes: 'Popular retail investor platform with comprehensive free data'
+    }
+  },
+  {
+    id: 'tradingview',
+    title: 'TradingView',
+    url: 'https://www.tradingview.com/',
+    domain: 'tradingview.com',
+    category: SourceCategory.CHARTS,
+    subcategories: [
+      SourceSubcategory.FOREX,
+      SourceSubcategory.STOCKS,
+      SourceSubcategory.CRYPTO,
+      SourceSubcategory.COMMODITIES,
+      SourceSubcategory.INDICES
+    ],
+    reliability: 0.9,
+    features: {
+      realTimePrices: true,
+      historicalData: true,
+      technicalAnalysis: true,
+      fundamentalAnalysis: false,
+      newsArticles: false,
+      expertCommentary: false,
+      economicCalendar: false,
+      chartingTools: true
+    },
+    regions: [Region.GLOBAL],
+    updateFrequency: UpdateFrequency.REALTIME,
+    apiAvailable: true,
+    requiresAuth: true,
+    metadata: {
+      established: 2011,
+      languages: ['en', 'ru', 'zh', 'ja', 'ko', 'es', 'pt', 'it', 'fr', 'de', 'ar', 'tr'],
+      mobileFriendly: true,
+      rateLimit: {
+        requests: 100,
+        window: 60000
+      },
+      specialNotes: 'Best-in-class charting platform with social features'
+    }
+  },
+  {
+    id: 'fxstreet',
+    title: 'FXStreet',
+    url: 'https://www.fxstreet.com/',
+    domain: 'fxstreet.com',
+    category: SourceCategory.ANALYSIS,
+    subcategories: [SourceSubcategory.FOREX],
+    reliability: 0.85,
+    features: {
+      realTimePrices: true,
+      historicalData: false,
+      technicalAnalysis: true,
+      fundamentalAnalysis: true,
+      newsArticles: true,
+      expertCommentary: true,
+      economicCalendar: true,
+      chartingTools: true
+    },
+    regions: [Region.GLOBAL],
+    updateFrequency: UpdateFrequency.MINUTE,
+    apiAvailable: false,
+    requiresAuth: false,
+    metadata: {
+      established: 2000,
+      languages: ['en', 'es', 'fr', 'it', 'pt', 'ru', 'ar', 'tr', 'zh'],
+      mobileFriendly: true,
+      specialNotes: 'Forex-focused with expert analysis and education'
+    }
+  },
+  {
+    id: 'dailyfx',
+    title: 'DailyFX',
+    url: 'https://www.dailyfx.com/',
+    domain: 'dailyfx.com',
+    category: SourceCategory.ANALYSIS,
+    subcategories: [SourceSubcategory.FOREX, SourceSubcategory.COMMODITIES],
+    reliability: 0.85,
+    features: {
+      realTimePrices: true,
+      historicalData: false,
+      technicalAnalysis: true,
+      fundamentalAnalysis: true,
+      newsArticles: true,
+      expertCommentary: true,
+      economicCalendar: true,
+      chartingTools: false
+    },
+    regions: [Region.GLOBAL],
+    updateFrequency: UpdateFrequency.HOURLY,
+    apiAvailable: false,
+    requiresAuth: false,
+    metadata: {
+      established: 2004,
+      parentCompany: 'IG Group',
+      languages: ['en', 'de', 'fr', 'it', 'es', 'ar', 'zh'],
+      mobileFriendly: true,
+      specialNotes: 'Educational content and trading strategies from IG Group'
+    }
+  }
+]);
+
+// Helper functions for source management
+export class FinancialSourceManager {
+  private static readonly sources = new Map(
+    FINANCIAL_SOURCES.map(source => [source.id, source])
+  );
+
+  /**
+   * Get source by ID
+   */
+  static getById(id: string): FinancialSource | undefined {
+    return this.sources.get(id);
+  }
+
+  /**
+   * Get sources by category
+   */
+  static getByCategory(category: SourceCategory): FinancialSource[] {
+    return FINANCIAL_SOURCES.filter(source => source.category === category);
+  }
+
+  /**
+   * Get sources by subcategory
+   */
+  static getBySubcategory(subcategory: SourceSubcategory): FinancialSource[] {
+    return FINANCIAL_SOURCES.filter(
+      source => source.subcategories?.includes(subcategory)
+    );
+  }
+
+  /**
+   * Get sources by region
+   */
+  static getByRegion(region: Region): FinancialSource[] {
+    return FINANCIAL_SOURCES.filter(
+      source => source.regions?.includes(region) || source.regions?.includes(Region.GLOBAL)
+    );
+  }
+
+  /**
+   * Get sources with specific feature
+   */
+  static getByFeature(feature: keyof SourceFeatures): FinancialSource[] {
+    return FINANCIAL_SOURCES.filter(source => source.features[feature]);
+  }
+
+  /**
+   * Get sources by minimum reliability
+   */
+  static getByReliability(minReliability: number): FinancialSource[] {
+    return FINANCIAL_SOURCES.filter(source => source.reliability >= minReliability);
+  }
+
+  /**
+   * Get sources with API access
+   */
+  static getWithAPI(): FinancialSource[] {
+    return FINANCIAL_SOURCES.filter(source => source.apiAvailable);
+  }
+
+  /**
+   * Get best source for specific use case
+   */
+  static getBestForUseCase(
+    category: SourceCategory,
+    features: Partial<SourceFeatures>,
+    minReliability = 0.8
+  ): FinancialSource | undefined {
+    const candidates = FINANCIAL_SOURCES
+      .filter(source => 
+        source.category === category &&
+        source.reliability >= minReliability &&
+        Object.entries(features).every(([key, value]) => 
+          !value || source.features[key as keyof SourceFeatures] === value
+        )
+      )
+      .sort((a, b) => b.reliability - a.reliability);
+    
+    return candidates[0];
+  }
+
+  /**
+   * Get sources for specific asset type
+   */
+  static getForAssetType(assetType: SourceSubcategory): FinancialSource[] {
+    return this.getBySubcategory(assetType)
+      .sort((a, b) => b.reliability - a.reliability);
+  }
+}
+
+// Export convenience functions
+export const getRealtimeSources = () => 
+  FinancialSourceManager.getByCategory(SourceCategory.REALTIME);
+
+export const getNewsSources = () => 
+  FinancialSourceManager.getByCategory(SourceCategory.NEWS);
+
+export const getAnalysisSources = () => 
+  FinancialSourceManager.getByCategory(SourceCategory.ANALYSIS);
+
+export const getForexSources = () => 
+  FinancialSourceManager.getBySubcategory(SourceSubcategory.FOREX);
+
+export const getCryptoSources = () => 
+  FinancialSourceManager.getBySubcategory(SourceSubcategory.CRYPTO);
+
+export const getMostReliableSources = (limit = 5) => 
+  [...FINANCIAL_SOURCES]
+    .sort((a, b) => b.reliability - a.reliability)
+    .slice(0, limit);
