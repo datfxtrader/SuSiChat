@@ -214,6 +214,8 @@ const MainLayout = memo<MainLayoutProps>(({
   
   const { isOpen: isSidebarOpen, isAnimating, toggle: toggleSidebar, close: closeSidebar } = 
     useSidebarState(sidebarDefaultOpen, isMobile);
+  
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -223,6 +225,11 @@ const MainLayout = memo<MainLayoutProps>(({
         e.preventDefault();
         toggleSidebar();
       }
+      // Toggle sidebar collapse with Cmd/Ctrl + Shift + B
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'B') {
+        e.preventDefault();
+        setSidebarCollapsed(!sidebarCollapsed);
+      }
       // Close sidebar with Escape on mobile
       if (e.key === 'Escape' && isMobile && isSidebarOpen) {
         closeSidebar();
@@ -231,7 +238,7 @@ const MainLayout = memo<MainLayoutProps>(({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar, closeSidebar, isMobile, isSidebarOpen]);
+  }, [toggleSidebar, closeSidebar, isMobile, isSidebarOpen, sidebarCollapsed]);
 
   // Notify parent of sidebar state changes
   useEffect(() => {
@@ -270,12 +277,16 @@ const MainLayout = memo<MainLayoutProps>(({
         className={cn(
           "fixed lg:sticky top-0 h-screen z-40",
           "transition-transform duration-300 ease-in-out",
-          "w-64 lg:w-auto", // Fixed width on mobile
+          "lg:w-auto", // Let sidebar control its own width
           isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
         aria-label="Main navigation"
       >
-        <Sidebar />
+        <Sidebar 
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+          onItemClick={isMobile ? closeSidebar : undefined}
+        />
       </aside>
 
       {/* Main content area */}
