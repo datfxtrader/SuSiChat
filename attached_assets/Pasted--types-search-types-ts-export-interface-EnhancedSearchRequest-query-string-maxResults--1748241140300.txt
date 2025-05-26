@@ -1,0 +1,542 @@
+// types/search.types.ts
+export interface EnhancedSearchRequest {
+  query: string;
+  maxResults?: number;
+  searchType?: 'web' | 'news' | 'all';
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  sources?: string[];
+  filters?: SearchFilters;
+}
+
+export interface SearchFilters {
+  domains?: string[];
+  excludeDomains?: string[];
+  language?: string;
+  country?: string;
+  safeSearch?: 'strict' | 'moderate' | 'off';
+}
+
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+  score: number;
+  source: string;
+  publishedDate?: string;
+  domain?: string;
+  thumbnail?: string;
+  author?: string;
+  relevanceScore?: number;
+}
+
+export interface EnhancedSearchResponse {
+  results: SearchResult[];
+  totalResults: number;
+  searchEnginesUsed: string[];
+  query: string;
+  searchType: string;
+  timestamp: string;
+  processingTime: number;
+  cached?: boolean;
+}
+
+// services/search-engines/base.ts
+import axios, { AxiosInstance } from 'axios';
+
+export abstract class SearchEngine {
+  protected client: AxiosInstance;
+  protected apiKey: string;
+  protected name: string;
+  protected priority: number;
+  protected timeout: number;
+
+  constructor(name: string, apiKey: string, priority: number, timeout = 10000) {
+    this.name = name;
+    this.apiKey = apiKey;
+    this.priority = priority;
+    this.timeout = timeout;
+    
+    this.client = axios.create({
+      timeout: this.timeout,
+      validateStatus: (status) => status < 500
+    });
+  }
+
+  abstract search(query: string, options: SearchOptions): Promise<SearchResult[]>;
+  
+  getName(): string { return this.name; }
+  getPriority(): number { return this.priority; }
+  isAvailable(): boolean { return !!this.apiKey; }
+}
+
+export interface SearchOptions {
+  maxResults: number;
+  freshness?: string;
+  filters?: SearchFilters;
+}
+
+// services/search-engines/newsdata.ts
+class NewsDataEngine extends SearchEngine {
+  constructor(apiKey: string) {
+    super('NewsData', apiKey, 5, 15000);
+  }
+
+  async search(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    if (!this.isAvailable()) return [];
+
+    try {
+      const response = await this.client.get('https://newsdata.io/api/1/news', {
+        params: {
+          apikey: this.apiKey,
+          q: query,
+          language: options.filters?.language || 'en',
+          size: options.maxResults,
+          prioritydomain: 'top',
+          ...(options.filters?.country && { country: options.filters.country })
+        }
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`NewsData API error: ${response.status}`);
+      }
+
+      const articles = response.data.results || [];
+      return articles.map((article: any) => this.mapResult(article));
+    } catch (error) {
+      console.error(`[${this.name}] Search error:`, error);
+      return [];
+    }
+  }
+
+  private mapResult(article: any): SearchResult {
+    return {
+      title: article.title || 'Untitled',
+      url: article.link || '',
+      content: article.description || '',
+      score: 1.0,
+      source: this.name,
+      publishedDate: article.pubDate,
+      domain: this.extractDomain(article.link),
+      thumbnail: article.image_url,
+      author: article.creator?.[0]
+    };
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return 'unknown';
+    }
+  }
+}
+
+// services/search-engines/tavily.ts
+class TavilyEngine extends SearchEngine {
+  constructor(apiKey: string) {
+    super('Tavily', apiKey, 4, 20000);
+  }
+
+  async search(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    if (!this.isAvailable()) return [];
+
+    try {
+      const response = await this.client.post(
+        'https://api.tavily.com/search',
+        {
+          query,
+          search_depth: 'advanced',
+          include_answer: true,
+          max_results: options.maxResults,
+          include_raw_content: false,
+          ...(options.filters?.domains && { include_domains: options.filters.domains }),
+          ...(options.filters?.excludeDomains && { exclude_domains: options.filters.excludeDomains })
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey
+          }
+        }
+      );
+
+      const results = response.data.results || [];
+      return results.map((result: any, index: number) => this.mapResult(result, index));
+    } catch (error) {
+      console.error(`[${this.name}] Search error:`, error);
+      return [];
+    }
+  }
+
+  private mapResult(result: any, index: number): SearchResult {
+    return {
+      title: result.title || 'Untitled',
+      url: result.url || '',
+      content: result.content || '',
+      score: result.relevance_score || (1.0 - index * 0.1),
+      source: this.name,
+      publishedDate: result.published_date,
+      domain: this.extractDomain(result.url),
+      relevanceScore: result.relevance_score
+    };
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return 'unknown';
+    }
+  }
+}
+
+// services/search-engines/brave.ts
+class BraveEngine extends SearchEngine {
+  private readonly freshnessMap: Record<string, string> = {
+    'day': 'pd',
+    'week': 'pw',
+    'month': 'pm',
+    'year': 'py'
+  };
+
+  constructor(apiKey: string) {
+    super('Brave', apiKey, 3, 15000);
+  }
+
+  async search(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    if (!this.isAvailable()) return [];
+
+    try {
+      const response = await this.client.get('https://api.search.brave.com/res/v1/web/search', {
+        params: {
+          q: query,
+          count: options.maxResults,
+          search_lang: options.filters?.language || 'en',
+          freshness: this.freshnessMap[options.freshness || 'week'] || 'pw',
+          safesearch: options.filters?.safeSearch || 'moderate',
+          ...(options.filters?.country && { country: options.filters.country })
+        },
+        headers: {
+          'Accept': 'application/json',
+          'X-Subscription-Token': this.apiKey
+        }
+      });
+
+      const results = response.data.web?.results || [];
+      return results.map((result: any, index: number) => this.mapResult(result, index));
+    } catch (error) {
+      console.error(`[${this.name}] Search error:`, error);
+      return [];
+    }
+  }
+
+  private mapResult(result: any, index: number): SearchResult {
+    return {
+      title: result.title || 'Untitled',
+      url: result.url || '',
+      content: result.description || '',
+      score: 1.0 - (index * 0.1),
+      source: this.name,
+      domain: this.extractDomain(result.url),
+      thumbnail: result.thumbnail?.src
+    };
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return 'unknown';
+    }
+  }
+}
+
+// services/intelligent-search-manager.ts
+import { LRUCache } from 'lru-cache';
+import pLimit from 'p-limit';
+
+export class IntelligentSearchManager {
+  private engines: Map<string, SearchEngine> = new Map();
+  private searchCache: LRUCache<string, EnhancedSearchResponse>;
+  private rateLimiter: any;
+  private concurrencyLimit = pLimit(3);
+
+  constructor() {
+    this.searchCache = new LRUCache<string, EnhancedSearchResponse>({
+      max: 100,
+      ttl: 1000 * 60 * 15 // 15 minutes
+    });
+
+    this.initializeEngines();
+  }
+
+  private initializeEngines() {
+    const engines = [
+      new NewsDataEngine(process.env.NEWSDATA_API_KEY || ''),
+      new TavilyEngine(process.env.TAVILY_API_KEY || ''),
+      new BraveEngine(process.env.BRAVE_API_KEY || '')
+    ];
+
+    engines.forEach(engine => {
+      if (engine.isAvailable()) {
+        this.engines.set(engine.getName(), engine);
+      }
+    });
+  }
+
+  async performIntelligentSearch(
+    query: string,
+    maxResults = 10,
+    searchType: 'web' | 'news' | 'all' = 'all',
+    freshness = 'week',
+    filters?: SearchFilters
+  ): Promise<EnhancedSearchResponse> {
+    const startTime = Date.now();
+    const cacheKey = this.generateCacheKey(query, maxResults, searchType, freshness, filters);
+
+    // Check cache
+    const cached = this.searchCache.get(cacheKey);
+    if (cached) {
+      return { ...cached, cached: true, processingTime: Date.now() - startTime };
+    }
+
+    // Select appropriate engines
+    const selectedEngines = this.selectEngines(searchType, filters?.sources);
+    
+    // Calculate results per engine
+    const resultsPerEngine = Math.ceil(maxResults / selectedEngines.length);
+    
+    // Execute searches in parallel with concurrency limit
+    const searchPromises = selectedEngines.map(engine =>
+      this.concurrencyLimit(() =>
+        engine.search(query, { maxResults: resultsPerEngine, freshness, filters })
+      )
+    );
+
+    const searchResults = await Promise.allSettled(searchPromises);
+    
+    // Collect all results
+    const allResults: SearchResult[] = [];
+    const usedEngines: string[] = [];
+
+    searchResults.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        allResults.push(...result.value);
+        usedEngines.push(selectedEngines[index].getName());
+      }
+    });
+
+    // Process and rank results
+    const processedResults = this.processResults(allResults, maxResults);
+
+    const response: EnhancedSearchResponse = {
+      results: processedResults,
+      totalResults: processedResults.length,
+      searchEnginesUsed: usedEngines,
+      query,
+      searchType,
+      timestamp: new Date().toISOString(),
+      processingTime: Date.now() - startTime
+    };
+
+    // Cache the results
+    this.searchCache.set(cacheKey, response);
+
+    return response;
+  }
+
+  private selectEngines(searchType: string, preferredSources?: string[]): SearchEngine[] {
+    const availableEngines = Array.from(this.engines.values());
+    
+    let filteredEngines = availableEngines;
+    
+    // Filter by search type
+    if (searchType === 'news') {
+      filteredEngines = filteredEngines.filter(e => e.getName() === 'NewsData');
+    } else if (searchType === 'web') {
+      filteredEngines = filteredEngines.filter(e => e.getName() !== 'NewsData');
+    }
+    
+    // Filter by preferred sources
+    if (preferredSources && preferredSources.length > 0) {
+      filteredEngines = filteredEngines.filter(e => 
+        preferredSources.includes(e.getName().toLowerCase())
+      );
+    }
+    
+    // Sort by priority
+    return filteredEngines.sort((a, b) => b.getPriority() - a.getPriority());
+  }
+
+  private processResults(results: SearchResult[], maxResults: number): SearchResult[] {
+    // Remove duplicates
+    const uniqueResults = this.removeDuplicates(results);
+    
+    // Calculate composite scores
+    const scoredResults = this.calculateCompositeScores(uniqueResults);
+    
+    // Sort by composite score
+    scoredResults.sort((a, b) => b.score - a.score);
+    
+    // Return top results
+    return scoredResults.slice(0, maxResults);
+  }
+
+  private removeDuplicates(results: SearchResult[]): SearchResult[] {
+    const seen = new Map<string, SearchResult>();
+    
+    results.forEach(result => {
+      const key = this.normalizeUrl(result.url);
+      if (!seen.has(key) || (seen.get(key)!.score < result.score)) {
+        seen.set(key, result);
+      }
+    });
+    
+    return Array.from(seen.values());
+  }
+
+  private normalizeUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.hostname}${parsed.pathname}`.toLowerCase().replace(/\/$/, '');
+    } catch {
+      return url.toLowerCase();
+    }
+  }
+
+  private calculateCompositeScores(results: SearchResult[]): SearchResult[] {
+    const engineWeights: Record<string, number> = {
+      'NewsData': 1.2,
+      'Tavily': 1.1,
+      'Brave': 1.0
+    };
+    
+    return results.map(result => ({
+      ...result,
+      score: result.score * (engineWeights[result.source] || 1.0) * 
+             (result.relevanceScore || 1.0) *
+             this.getFreshnessBoost(result.publishedDate)
+    }));
+  }
+
+  private getFreshnessBoost(publishedDate?: string): number {
+    if (!publishedDate) return 1.0;
+    
+    const age = Date.now() - new Date(publishedDate).getTime();
+    const dayInMs = 24 * 60 * 60 * 1000;
+    
+    if (age < dayInMs) return 1.3;
+    if (age < 7 * dayInMs) return 1.2;
+    if (age < 30 * dayInMs) return 1.1;
+    return 1.0;
+  }
+
+  private generateCacheKey(
+    query: string,
+    maxResults: number,
+    searchType: string,
+    freshness: string,
+    filters?: SearchFilters
+  ): string {
+    return `${query}:${maxResults}:${searchType}:${freshness}:${JSON.stringify(filters || {})}`;
+  }
+
+  getStatus() {
+    const engines = Array.from(this.engines.values());
+    return {
+      availableEngines: engines.map(e => ({
+        name: e.getName(),
+        priority: e.getPriority(),
+        available: e.isAvailable()
+      })),
+      cacheStats: {
+        size: this.searchCache.size,
+        maxSize: this.searchCache.max
+      },
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+// routes/enhanced-search.router.ts
+import express, { Request, Response, NextFunction } from 'express';
+import { IntelligentSearchManager } from '../services/intelligent-search-manager';
+import { validationResult, body, query } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+
+const router = express.Router();
+const searchManager = new IntelligentSearchManager();
+
+// Rate limiting
+const searchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute
+  message: 'Too many search requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Validation middleware
+const validateSearchRequest = [
+  body('query').isString().trim().isLength({ min: 1, max: 500 }),
+  body('maxResults').optional().isInt({ min: 1, max: 100 }),
+  body('searchType').optional().isIn(['web', 'news', 'all']),
+  body('freshness').optional().isIn(['day', 'week', 'month', 'year']),
+  body('sources').optional().isArray(),
+  body('filters').optional().isObject()
+];
+
+// Error handler
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Enhanced web search endpoint
+router.post('/search', 
+  searchLimiter,
+  validateSearchRequest,
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const {
+      query,
+      maxResults = 10,
+      searchType = 'all',
+      freshness = 'week',
+      sources = [],
+      filters
+    }: EnhancedSearchRequest = req.body;
+
+    console.log(`[Search] Query: "${query}" | Type: ${searchType} | Max: ${maxResults}`);
+
+    const results = await searchManager.performIntelligentSearch(
+      query,
+      maxResults,
+      searchType,
+      freshness,
+      filters
+    );
+
+    res.json(results);
+  })
+);
+
+// Status endpoint
+router.get('/status', asyncHandler(async (req: Request, res: Response) => {
+  const status = searchManager.getStatus();
+  res.json(status);
+}));
+
+// Error handling middleware
+router.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('[Search Error]', error);
+  res.status(500).json({
+    error: 'Search service error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+  });
+});
+
+export default router;
