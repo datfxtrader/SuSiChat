@@ -128,7 +128,7 @@ const Study: React.FC = () => {
 
   const loadLearningProfile = async () => {
     try {
-      const response = await fetch('/api/learning/profile');
+      const response = await fetch('/api/study/profile');
       if (response.ok) {
         const profile = await response.json();
         setLearningProfile(profile);
@@ -146,7 +146,7 @@ const Study: React.FC = () => {
 
   const loadFamilyMembers = async () => {
     try {
-      const response = await fetch('/api/family/members');
+      const response = await fetch('/api/study/members');
       if (response.ok) {
         const members = await response.json();
         setFamilyMembers(members);
@@ -158,7 +158,7 @@ const Study: React.FC = () => {
 
   const loadLearningStreak = async () => {
     try {
-      const response = await fetch('/api/learning/streak');
+      const response = await fetch('/api/study/streak');
       if (response.ok) {
         const data = await response.json();
         setLearningStreak(data.currentStreak || 0);
@@ -203,7 +203,7 @@ const Study: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const endpoint = learningMode.focus === 'homework' ? '/api/study/homework' : '/api/study/enhanced-learning';
+      const endpoint = learningMode.focus === 'homework' ? '/api/homework' : '/api/enhanced-learning';
       
       const response = await fetch(endpoint, {
         method: 'POST',

@@ -35,14 +35,14 @@ app.use((req, res, next) => {
     'https://*.replit.co',
     'https://*.replit.app'
   ];
-  
+
   // Allow any replit domain or localhost
   if (origin && (allowedOrigins.some(allowed => origin.includes(allowed.replace('*', ''))) || origin.includes('replit'))) {
     res.header('Access-Control-Allow-Origin', origin);
   } else {
     res.header('Access-Control-Allow-Origin', '*');
   }
-  
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-id, x-user-email, Cache-Control');
   res.header('Access-Control-Allow-Credentials', 'true');

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, memo, useMemo, useRef } from 'react';
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -70,7 +69,7 @@ const AuthScreen = memo(() => {
               <span className="material-icons text-white text-4xl">assistant</span>
             </div>
           </div>
-          
+
           {/* Content */}
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Welcome to Tongkeeper</h1>
@@ -78,7 +77,7 @@ const AuthScreen = memo(() => {
               Your personal AI assistant for the whole family. Log in to get started.
             </p>
           </div>
-          
+
           {/* Login button */}
           <Button 
             className="w-full h-12 text-base" 
@@ -88,7 +87,7 @@ const AuthScreen = memo(() => {
             <LogIn className="mr-2 h-5 w-5" /> 
             Log In with Google
           </Button>
-          
+
           {/* Footer */}
           <p className="text-xs text-center text-muted-foreground">
             By logging in, you agree to our Terms of Service and Privacy Policy
@@ -142,7 +141,7 @@ const Header = memo<{
           </ol>
         </nav>
       )}
-      
+
       {/* Main header content */}
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
@@ -211,10 +210,10 @@ const MainLayout = memo<MainLayoutProps>(({
   const [location, navigate] = useLocation();
   const isMobile = useIsMobile();
   const mainRef = useRef<HTMLDivElement>(null);
-  
+
   const { isOpen: isSidebarOpen, isAnimating, toggle: toggleSidebar, close: closeSidebar } = 
     useSidebarState(!isMobile || sidebarDefaultOpen, isMobile);
-  
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Keyboard shortcuts
@@ -306,7 +305,7 @@ const MainLayout = memo<MainLayoutProps>(({
             notifications={3}
           />
         )}
-        
+
         {/* Desktop header */}
         {showHeader && !isMobile && (
           <Header
@@ -333,7 +332,7 @@ const MainLayout = memo<MainLayoutProps>(({
             breadcrumbs={showBreadcrumbs ? breadcrumbs : undefined}
           />
         )}
-        
+
         {/* Content */}
         <main 
           id="main-content"
