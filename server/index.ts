@@ -20,6 +20,7 @@ import enhancedSearchRouter from './routes/enhanced-search.router';
 import factCheckRouter from './routes/fact-check';
 import cacheMonitoringRouter from './routes/cache-monitoring';
 import financialFactCheckingRouter from './routes/financial-fact-checking.route';
+import blogRoutes from './routes/blog';
 
 const app = express();
 
