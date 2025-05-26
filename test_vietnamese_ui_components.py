@@ -606,6 +606,26 @@ class VietnameseUITester:
             # Check for consistent spacing and typography
             visual_consistency = await self.page.evaluate("""
                 () => {
+                    const elements = Array.from(document.querySelectorAll('*'));
+                    const spacingClasses = elements.some(el => 
+                        Array.from(el.classList).some(cls => 
+                            cls.includes('p-') || cls.includes('m-') || cls.includes('space-')
+                        )
+                    );
+                    
+                    const consistentTypography = elements.some(el => 
+                        Array.from(el.classList).some(cls => 
+                            cls.includes('text-') || cls.includes('font-')
+                        )
+                    );
+                    
+                    return {
+                        hasConsistentSpacing: spacingClasses,
+                        hasConsistentTypography: consistentTypography
+                    };
+                }
+            """)y = await self.page.evaluate("""
+                () => {
                     const elements = document.querySelectorAll('button, input, h1, h2, h3, p');
                     const margins = [];
                     const paddings = [];

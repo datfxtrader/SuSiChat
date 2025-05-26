@@ -898,7 +898,7 @@ class SunaIntegrationService {
           const startTime = Date.now();
 
           // Generate conversation ID for caching
-          const conversationId = crypto.randomUUID();
+          const conversationId = uuidv4();
 
           // Optimized DeerFlow research call with user context
           const deerflowResult = await researchService.performResearch({

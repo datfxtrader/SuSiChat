@@ -166,8 +166,16 @@ class ToolRegistry:
             if context:
                 safe_globals.update(context)
             
-            # Parse and execute
+            # Parse and execute safely
             tree = ast.parse(code, mode='eval')
+            
+            # Additional safety check for node types
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom, ast.Call)):
+                    if isinstance(node, ast.Call) and hasattr(node.func, 'id'):
+                        if node.func.id not in ['abs', 'len', 'max', 'min', 'sum', 'round']:
+                            raise ValueError(f"Unsafe function call: {node.func.id}")
+            
             result = eval(compile(tree, '<string>', 'eval'), safe_globals)
             
             return {"status": "success", "result": result}

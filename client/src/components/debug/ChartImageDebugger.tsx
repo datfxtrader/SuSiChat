@@ -9,16 +9,16 @@ interface ChartImageDebuggerProps {
 
 const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
   const [analysis, setAnalysis] = useState<any>(null);
-  
+
   useEffect(() => {
     if (content) {
       analyzeContent(content);
     }
   }, [content]);
-  
+
   const analyzeContent = (text: string) => {
     console.log('🔍 Analyzing content for charts and images...');
-    
+
     const analysis = {
       // Image detection
       images: {
@@ -27,7 +27,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
         base64: (text.match(/data:image\/[^)]+/g) || []),
         urls: (text.match(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|svg|webp)/gi) || [])
       },
-      
+
       // Chart detection  
       charts: {
         tradingview: (text.match(/tradingview[^\s]*/gi) || []),
@@ -35,50 +35,50 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
         ascii: (text.match(/```[\s\S]*?```/g) || []).filter(block => 
           block.includes('│') || block.includes('┌') || block.includes('─')
         ),
-        dataBlocks: (text.match(/(?:Chart|Graph|Figure)\s*\d*:?\s*([^\n]+)\n((?:[\w\s]+:\s*[\d.%$€£¥,]+\s*\n?){3,})/gi) || [])
+        dataBlocks: (text.match(/(?:Chart|Graph|Figure)\s*\d*:?\s*([^\n]+)\n((?:[\w\s]+:\s*[\d\s]+:\s*[\d.%$€£¥,]+\s*\n?){3,})/gi) || [])
       },
-      
+
       // Table detection (potential charts)
       tables: {
         markdown: (text.match(/\|[^\n]+\|\s*\n\|[-:\s|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+/g) || []),
         priceData: (text.match(/\|\s*(?:Price|Level|Support|Resistance|Target)[^\n]+\|\s*\n(?:\|[^\n]+\|\s*\n?){2,}/gi) || [])
       },
-      
+
       // Visual indicators
       indicators: {
         arrows: (text.match(/(↑|↓|⬆|⬇|▲|▼)/g) || []),
         percentages: (text.match(/[+-]?\d+\.?\d*%/g) || []),
         currency: (text.match(/[\$€£¥]\d+[,\d]*\.?\d*/g) || [])
       },
-      
+
       // Potential issues
       issues: []
     };
-    
+
     // Identify issues
     if (analysis.images.markdown.length === 0 && analysis.images.html.length === 0) {
       analysis.issues.push('No image markdown found - images may be embedded as text descriptions');
     }
-    
+
     if (analysis.charts.tradingview.length > 0 || analysis.charts.chartUrls.length > 0) {
       analysis.issues.push('Chart URLs found but may not be rendering as embeds');
     }
-    
+
     if (analysis.tables.priceData.length > 0) {
       analysis.issues.push('Price data tables found - could be converted to visual charts');
     }
-    
+
     if (analysis.charts.dataBlocks.length > 0) {
       analysis.issues.push('Structured data found - could be visualized as charts');
     }
-    
+
     console.log('📊 Content analysis complete:', analysis);
     setAnalysis(analysis);
   };
-  
+
   const renderSection = (title: string, icon: React.ReactNode, items: string[], color: string) => {
     if (items.length === 0) return null;
-    
+
     return (
       <div className={`p-4 rounded-lg border ${color} mb-4`}>
         <div className="flex items-center gap-2 mb-3">
@@ -96,7 +96,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
       </div>
     );
   };
-  
+
   if (!analysis) {
     return (
       <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
@@ -107,7 +107,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
       </div>
     );
   }
-  
+
   const totalFindings = 
     analysis.images.markdown.length + 
     analysis.images.html.length + 
@@ -116,7 +116,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
     analysis.charts.chartUrls.length + 
     analysis.charts.dataBlocks.length +
     analysis.tables.priceData.length;
-  
+
   return (
     <div className="max-w-4xl mx-auto p-6 bg-slate-900 text-white rounded-xl border border-slate-700">
       <div className="mb-6">
@@ -130,7 +130,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
           Found {totalFindings} potential visual elements • {analysis.issues.length} issues identified
         </p>
       </div>
-      
+
       {/* Images */}
       {renderSection(
         'Markdown Images', 
@@ -138,14 +138,14 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
         analysis.images.markdown,
         'border-green-500/30 bg-green-500/10'
       )}
-      
+
       {renderSection(
         'Image URLs', 
         <Image className="w-4 h-4 text-blue-400" />, 
         analysis.images.urls,
         'border-blue-500/30 bg-blue-500/10'
       )}
-      
+
       {/* Charts */}
       {renderSection(
         'Chart URLs', 
@@ -153,14 +153,14 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
         analysis.charts.chartUrls,
         'border-purple-500/30 bg-purple-500/10'
       )}
-      
+
       {renderSection(
         'Data Blocks (Potential Charts)', 
         <BarChart3 className="w-4 h-4 text-yellow-400" />, 
         analysis.charts.dataBlocks,
         'border-yellow-500/30 bg-yellow-500/10'
       )}
-      
+
       {/* Tables */}
       {renderSection(
         'Price Data Tables', 
@@ -168,7 +168,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
         analysis.tables.priceData,
         'border-cyan-500/30 bg-cyan-500/10'
       )}
-      
+
       {/* Issues */}
       {analysis.issues.length > 0 && (
         <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/10">
@@ -185,7 +185,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
           </div>
         </div>
       )}
-      
+
       {/* Raw Content Sample */}
       <div className="mt-6 p-4 bg-slate-800 rounded-lg border border-slate-700">
         <h4 className="font-semibold mb-2 text-gray-300">Content Sample (First 500 chars)</h4>
@@ -193,7 +193,7 @@ const ChartImageDebugger: React.FC<ChartImageDebuggerProps> = ({ content }) => {
           {content.substring(0, 500)}...
         </pre>
       </div>
-      
+
       {/* Recommendations */}
       <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <h4 className="font-semibold mb-2 text-blue-400">Recommendations</h4>

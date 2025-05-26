@@ -71,29 +71,29 @@ class Conclusion:
 
 class ReasoningEngine:
     """Advanced reasoning engine with multiple inference methods"""
-    
+
     def __init__(self):
         self.reasoning_history: List[Dict[str, Any]] = []
         self.knowledge_graph: Dict[str, Any] = {}
-        
+
         # Credibility scoring patterns
         self.high_credibility_sources = [
             r"\.edu", r"\.org", r"\.gov", 
             r"nature\.com", r"science\.org", r"pubmed",
             r"reuters\.com", r"bbc\.com", r"guardian\.com"
         ]
-        
+
         self.medium_credibility_sources = [
             r"\.com", r"wikipedia\.org", r"forbes\.com",
             r"bloomberg\.com", r"economist\.com"
         ]
-        
+
         logger.info("ReasoningEngine initialized")
-    
+
     def evaluate_evidence_credibility(self, evidence: Evidence) -> float:
         """Evaluate the credibility of a piece of evidence"""
         base_score = 0.5
-        
+
         # Source credibility
         source_score = 0.3
         for pattern in self.high_credibility_sources:
@@ -105,18 +105,18 @@ class ReasoningEngine:
                 if re.search(pattern, evidence.source, re.IGNORECASE):
                     source_score = 0.6
                     break
-        
+
         # Content quality indicators
         content_score = 0.5
         quality_indicators = [
             r"study", r"research", r"analysis", r"data", 
             r"statistics", r"peer.?reviewed", r"methodology"
         ]
-        
+
         indicator_count = sum(1 for pattern in quality_indicators 
                             if re.search(pattern, evidence.content, re.IGNORECASE))
         content_score = min(0.9, 0.3 + (indicator_count * 0.1))
-        
+
         # Evidence type weighting
         type_weights = {
             EvidenceType.STATISTICAL: 0.9,
@@ -126,56 +126,56 @@ class ReasoningEngine:
             EvidenceType.TESTIMONIAL: 0.4,
             EvidenceType.THEORETICAL: 0.5
         }
-        
+
         type_score = type_weights.get(evidence.type, 0.5)
-        
+
         # Calculate final credibility score
         final_score = (source_score * 0.4 + content_score * 0.3 + type_score * 0.3)
         return min(1.0, max(0.1, final_score))
-    
+
     def classify_evidence_type(self, content: str, source: str) -> EvidenceType:
         """Classify evidence based on content and source patterns"""
         content_lower = content.lower()
         source_lower = source.lower()
-        
+
         # Statistical evidence patterns
         if any(pattern in content_lower for pattern in 
                ["statistics", "data shows", "survey", "poll", "percentage", "study found"]):
             return EvidenceType.STATISTICAL
-        
+
         # Expert opinion patterns
         if any(pattern in content_lower for pattern in 
                ["expert", "professor", "researcher", "according to", "analyst"]):
             return EvidenceType.EXPERT_OPINION
-        
+
         # Empirical evidence patterns
         if any(pattern in content_lower for pattern in 
                ["experiment", "trial", "test", "observation", "measurement"]):
             return EvidenceType.EMPIRICAL
-        
+
         # Historical evidence patterns
         if any(pattern in content_lower for pattern in 
                ["historically", "in the past", "previous", "archive", "record"]):
             return EvidenceType.HISTORICAL
-        
+
         # Theoretical evidence patterns
         if any(pattern in content_lower for pattern in 
                ["theory", "model", "framework", "hypothesis", "suggests"]):
             return EvidenceType.THEORETICAL
-        
+
         return EvidenceType.TESTIMONIAL
-    
+
     def extract_claims(self, content: str) -> List[str]:
         """Extract key claims from content"""
         # Simple claim extraction - can be enhanced with NLP
         sentences = re.split(r'[.!?]+', content)
         claims = []
-        
+
         claim_indicators = [
             r"shows that", r"indicates", r"suggests", r"proves", 
             r"demonstrates", r"reveals", r"found that", r"according to"
         ]
-        
+
         for sentence in sentences:
             sentence = sentence.strip()
             if len(sentence) > 20:  # Filter out very short sentences
@@ -183,20 +183,20 @@ class ReasoningEngine:
                     if re.search(indicator, sentence, re.IGNORECASE):
                         claims.append(sentence)
                         break
-        
+
         return claims[:5]  # Limit to top 5 claims
-    
+
     def process_evidence(self, raw_evidence: List[Dict[str, Any]]) -> List[Evidence]:
         """Process raw evidence into structured Evidence objects"""
         processed_evidence = []
-        
+
         for item in raw_evidence:
             content = item.get("content", "")
             source = item.get("url", item.get("source", ""))
-            
+
             # Classify evidence type
             evidence_type = self.classify_evidence_type(content, source)
-            
+
             # Create evidence object
             evidence = Evidence(
                 content=content,
@@ -208,24 +208,24 @@ class ReasoningEngine:
                 supporting_claims=self.extract_claims(content),
                 contradicting_claims=[]
             )
-            
+
             # Calculate credibility
             evidence.credibility_score = self.evaluate_evidence_credibility(evidence)
-            
+
             processed_evidence.append(evidence)
-        
+
         return processed_evidence
-    
+
     def form_hypotheses(self, query: str, evidence: List[Evidence]) -> List[Hypothesis]:
         """Form hypotheses based on available evidence"""
         hypotheses = []
-        
+
         # Analyze query to understand what we're investigating
         query_lower = query.lower()
-        
+
         # Group evidence by themes
         themes = self._identify_themes(evidence)
-        
+
         for theme, theme_evidence in themes.items():
             if len(theme_evidence) >= 2:  # Need at least 2 pieces of evidence
                 # Generate hypothesis for this theme
@@ -234,13 +234,13 @@ class ReasoningEngine:
                 )
                 if hypothesis:
                     hypotheses.append(hypothesis)
-        
+
         return hypotheses
-    
+
     def _identify_themes(self, evidence: List[Evidence]) -> Dict[str, List[Evidence]]:
         """Group evidence by common themes"""
         themes = {}
-        
+
         # Simple keyword-based theme identification
         theme_keywords = {
             "effectiveness": ["effective", "successful", "works", "impact"],
@@ -250,18 +250,18 @@ class ReasoningEngine:
             "benefits": ["benefit", "advantage", "positive", "improve"],
             "challenges": ["challenge", "problem", "issue", "difficulty", "risk"]
         }
-        
+
         for evidence_item in evidence:
             content_lower = evidence_item.content.lower()
-            
+
             for theme, keywords in theme_keywords.items():
                 if any(keyword in content_lower for keyword in keywords):
                     if theme not in themes:
                         themes[theme] = []
                     themes[theme].append(evidence_item)
-        
+
         return themes
-    
+
     def _generate_hypothesis_for_theme(
         self, 
         query: str, 
@@ -269,13 +269,13 @@ class ReasoningEngine:
         evidence: List[Evidence]
     ) -> Optional[Hypothesis]:
         """Generate a hypothesis for a specific theme"""
-        
+
         if not evidence:
             return None
-        
+
         # Calculate average credibility
         avg_credibility = sum(e.credibility_score for e in evidence) / len(evidence)
-        
+
         # Generate hypothesis statement based on theme
         hypothesis_templates = {
             "effectiveness": f"The approach discussed in '{query}' is effective",
@@ -285,23 +285,23 @@ class ReasoningEngine:
             "benefits": f"'{query}' provides substantial benefits",
             "challenges": f"'{query}' faces significant challenges"
         }
-        
+
         statement = hypothesis_templates.get(theme, f"'{query}' shows interesting patterns")
-        
+
         # Generate reasoning chain
         reasoning_chain = [
             f"Identified {len(evidence)} pieces of evidence related to {theme}",
             f"Average evidence credibility: {avg_credibility:.2f}",
             f"Evidence sources include: {', '.join(set(e.source[:30] + '...' for e in evidence[:3]))}"
         ]
-        
+
         # Generate test criteria
         test_criteria = [
             "Requires additional evidence from high-credibility sources",
             "Should be validated against contradictory evidence",
             "Needs verification from multiple independent sources"
         ]
-        
+
         return Hypothesis(
             statement=statement,
             confidence_level=min(0.8, avg_credibility),
@@ -311,7 +311,7 @@ class ReasoningEngine:
             test_criteria=test_criteria,
             status="proposed"
         )
-    
+
     def perform_logical_inference(
         self, 
         premises: List[str], 
@@ -320,27 +320,27 @@ class ReasoningEngine:
     ) -> List[Conclusion]:
         """Perform logical inference based on premises and evidence"""
         conclusions = []
-        
+
         if reasoning_type == ReasoningType.DEDUCTIVE:
             conclusions.extend(self._deductive_reasoning(premises, evidence))
         elif reasoning_type == ReasoningType.INDUCTIVE:
             conclusions.extend(self._inductive_reasoning(premises, evidence))
         elif reasoning_type == ReasoningType.COMPARATIVE:
             conclusions.extend(self._comparative_reasoning(premises, evidence))
-        
+
         return conclusions
-    
+
     def _deductive_reasoning(self, premises: List[str], evidence: List[Evidence]) -> List[Conclusion]:
         """Perform deductive reasoning"""
         conclusions = []
-        
+
         # Simple deductive pattern: If A and B, then C
         if len(premises) >= 2:
             high_credibility_evidence = [e for e in evidence if e.credibility_score > 0.7]
-            
+
             if len(high_credibility_evidence) >= 2:
                 conclusion_statement = f"Based on the available evidence, {premises[0]} and {premises[1]} lead to logical conclusions"
-                
+
                 conclusion = Conclusion(
                     statement=conclusion_statement,
                     reasoning_type=ReasoningType.DEDUCTIVE,
@@ -351,20 +351,20 @@ class ReasoningEngine:
                     implications=["Further investigation recommended for validation"]
                 )
                 conclusions.append(conclusion)
-        
+
         return conclusions
-    
+
     def _inductive_reasoning(self, premises: List[str], evidence: List[Evidence]) -> List[Conclusion]:
         """Perform inductive reasoning"""
         conclusions = []
-        
+
         # Pattern recognition in evidence
         if len(evidence) >= 3:
             patterns = self._identify_patterns(evidence)
-            
+
             for pattern in patterns:
                 conclusion_statement = f"Pattern analysis suggests: {pattern}"
-                
+
                 conclusion = Conclusion(
                     statement=conclusion_statement,
                     reasoning_type=ReasoningType.INDUCTIVE,
@@ -375,22 +375,22 @@ class ReasoningEngine:
                     implications=["Pattern may not hold for all cases"]
                 )
                 conclusions.append(conclusion)
-        
+
         return conclusions
-    
+
     def _comparative_reasoning(self, premises: List[str], evidence: List[Evidence]) -> List[Conclusion]:
         """Perform comparative reasoning"""
         conclusions = []
-        
-        # Look for comparative evidence
+
+        #        # Look for comparative evidence
         comparative_evidence = [e for e in evidence if any(
             word in e.content.lower() for word in 
             ["better", "worse", "superior", "inferior", "compared", "versus", "vs"]
         )]
-        
+
         if comparative_evidence:
             conclusion_statement = "Comparative analysis reveals significant differences"
-            
+
             conclusion = Conclusion(
                 statement=conclusion_statement,
                 reasoning_type=ReasoningType.COMPARATIVE,
@@ -401,13 +401,13 @@ class ReasoningEngine:
                 implications=["Different contexts may yield different results"]
             )
             conclusions.append(conclusion)
-        
+
         return conclusions
-    
+
     def _identify_patterns(self, evidence: List[Evidence]) -> List[str]:
         """Identify patterns in evidence"""
         patterns = []
-        
+
         # Simple pattern identification
         common_terms = {}
         for ev in evidence:
@@ -415,24 +415,33 @@ class ReasoningEngine:
             for word in words:
                 if len(word) > 4:  # Skip short words
                     common_terms[word] = common_terms.get(word, 0) + 1
-        
+
         # Find frequently mentioned terms
         frequent_terms = [term for term, count in common_terms.items() if count >= 2]
-        
+
         if frequent_terms:
             patterns.append(f"Frequently mentioned concepts: {', '.join(frequent_terms[:5])}")
-        
+
         # Check for trend indicators
         trend_words = ["increase", "decrease", "grow", "decline", "rise", "fall"]
         trend_mentions = [word for word in trend_words if any(
             word in ev.content.lower() for ev in evidence
         )]
-        
+
         if trend_mentions:
-            patterns.append(f"Trend indicators present: {', '.join(trend_mentions)}")
-        
+            patterns.append(f"Trend indicators detected: {', '.join(trend_mentions)}")
+
+        # Check for correlation patterns
+        if len(evidence) > 1:
+            correlation_terms = ["correlate", "relationship", "связь", "related"]
+            correlation_count = sum(1 for ev in evidence 
+                                  for term in correlation_terms 
+                                  if term in ev.content.lower())
+            if correlation_count > 0:
+                patterns.append(f"Correlation patterns found in {correlation_count} sources")
+
         return patterns
-    
+
     def synthesize_reasoning_report(
         self, 
         query: str,
@@ -441,14 +450,14 @@ class ReasoningEngine:
         conclusions: List[Conclusion]
     ) -> Dict[str, Any]:
         """Create a comprehensive reasoning report"""
-        
+
         # Calculate overall confidence
         evidence_confidence = sum(e.credibility_score for e in evidence) / len(evidence) if evidence else 0
         hypothesis_confidence = sum(h.confidence_level for h in hypotheses) / len(hypotheses) if hypotheses else 0
         conclusion_confidence = sum(c.confidence_score for c in conclusions) / len(conclusions) if conclusions else 0
-        
+
         overall_confidence = (evidence_confidence + hypothesis_confidence + conclusion_confidence) / 3
-        
+
         report = {
             "query": query,
             "reasoning_summary": {
@@ -485,7 +494,7 @@ class ReasoningEngine:
                 "recommendation": "Further research recommended" if overall_confidence < 0.6 else "Conclusions well-supported"
             }
         }
-        
+
         return report
 
 # Global reasoning engine instance

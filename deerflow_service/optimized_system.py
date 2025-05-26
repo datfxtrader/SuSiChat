@@ -200,6 +200,25 @@ class OptimizedDeerFlowAgentSystem:
             complexity_score += 3
         
         # Question complexity
+        if question_marks > 0:
+            complexity_score += 1
+        
+        # Complex word detection
+        complex_word_count = sum(1 for word in complex_words if word in query.lower())
+        complexity_score += complex_word_count
+        
+        # Determine complexity level
+        if complexity_score <= 2:
+            return "low"
+        elif complexity_score <= 4:
+            return "medium"
+        else:
+            return "high"
+            complexity_score += 2
+        else:
+            complexity_score += 3
+        
+        # Question complexity
         complexity_score += question_marks
         
         # Complex keywords

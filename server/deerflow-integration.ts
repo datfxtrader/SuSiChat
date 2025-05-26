@@ -5,9 +5,18 @@ import {
   ResearchResult, 
   ResearchParams 
 } from './deerflow-integration-optimized';
+import { llmService } from './llm';
+import { deerflowClient } from './deerflow-client';
 
 // Re-export ResearchDepth for other modules
 export { ResearchDepth };
+
+interface ResearchSource {
+  title: string;
+  url: string;
+  domain: string;
+  content?: string;
+}
 
 /**
  * Service for performing research at different depth levels
