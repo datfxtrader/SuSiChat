@@ -46,6 +46,7 @@ function App() {
       <Route path="/templates" component={TemplatesPage} />
       <Route path="/debug-tab-persistence" component={DebugTabPersistence} />
       <Route path="/trip" component={TripPlanning} />
+      <Route path="/homework" component={() => import('./pages/homework')} />
       <Route path="/vietnamese-chat" component={VietnameseChat} />
       <Route path="/admin" component={Admin} />
 

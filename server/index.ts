@@ -485,6 +485,10 @@ app.use((req, res, next) => {
   const enhancedFinancialResearchRouter = (await import('./routes/financial-research-enhanced.route')).default;
   app.use('/api/financial', enhancedFinancialResearchRouter);
 
+  // Import and use homework help route
+  const homeworkRouter = (await import('./routes/homework')).default;
+  app.use('/api/homework', homeworkRouter);
+
   // Import and use financial terms routes
   const financialTermsRouter = (await import('./routes/financial-terms')).default;
   app.use('/api/financial-terms', financialTermsRouter);
