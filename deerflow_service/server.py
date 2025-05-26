@@ -686,9 +686,6 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
         int(request.research_depth or 3)
     )
 
-    # Return initial response immediately
-    return initial_response
-
 @app.get("/research/{research_id}/status")
 async def get_research_status(research_id: str):
     """Check the status of a specific research request."""
@@ -817,7 +814,8 @@ async def submit_feedback(request: FeedbackRequest):
         return {"error": "Learning system not available"}
 
     try:
-        # Convert string to FeedbackType enum
+        # Convert string to FeedbackType```python
+ enum
         feedback_type_map = {
             "accuracy": FeedbackType.ACCURACY,
             "relevance": FeedbackType.RELEVANCE,
@@ -1023,11 +1021,11 @@ async def list_available_tools():
 if __name__ == "__main__":
     import uvicorn
     import os
-    
+
     # Ensure we bind to the correct port
     port = int(os.environ.get("DEERFLOW_PORT", 9000))
     print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
-    
+
     uvicorn.run(
         app, 
         host="0.0.0.0", 
