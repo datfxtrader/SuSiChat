@@ -1,0 +1,811 @@
+/**
+ * Optimized Template Integration API for DeerFlow Research Service
+ */
+
+import { Request, Response, NextFunction } from 'express';
+import axios, { AxiosInstance, AxiosError } from 'axios';
+
+// Types and Interfaces
+interface TemplateVariable {
+  name: string;
+  description: string;
+  type: 'text' | 'select' | 'number';
+  options?: string[];
+  required: boolean;
+  default?: string | number;
+  validation?: {
+    min?: number;
+    max?: number;
+    pattern?: string;
+  };
+}
+
+interface ResearchTemplate {
+  id: string;
+  name: string;
+  description: string;
+  prompt_template: string;
+  category: string;
+  icon: string;
+  variables: TemplateVariable[];
+  created_by: string;
+  created_at: string;
+  updated_at?: string;
+  usage_count: number;
+  effectiveness_score: number;
+  tags: string[];
+  is_public: boolean;
+  version?: number;
+}
+
+interface TemplateCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  templates: string[];
+  template_count?: number;
+}
+
+interface CachedData<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+// Configuration
+const CONFIG = {
+  DEERFLOW_BASE_URL: process.env.DEERFLOW_SERVICE_URL || 'http://localhost:8000',
+  CACHE_TTL: {
+    CATEGORIES: 30 * 60 * 1000,      // 30 minutes
+    TEMPLATES: 10 * 60 * 1000,       // 10 minutes
+    POPULAR: 5 * 60 * 1000,          // 5 minutes
+    USER_TEMPLATES: 2 * 60 * 1000,   // 2 minutes
+  },
+  TIMEOUT: {
+    DEFAULT: 10000,    // 10 seconds
+    GENERATE: 30000,   // 30 seconds
+  },
+  RETRY: {
+    ATTEMPTS: 3,
+    DELAY: 1000,
+  },
+  RATE_LIMIT: {
+    WINDOW: 60 * 1000,  // 1 minute
+    MAX_REQUESTS: 100,
+  },
+  BATCH_SIZE: 50,
+} as const;
+
+// Error types
+class TemplateServiceError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'TemplateServiceError';
+  }
+}
+
+// Rate limiter
+class RateLimiter {
+  private requests = new Map<string, number[]>();
+  
+  isAllowed(key: string): boolean {
+    const now = Date.now();
+    const requests = this.requests.get(key) || [];
+    
+    // Remove old requests
+    const validRequests = requests.filter(
+      time => now - time < CONFIG.RATE_LIMIT.WINDOW
+    );
+    
+    if (validRequests.length >= CONFIG.RATE_LIMIT.MAX_REQUESTS) {
+      return false;
+    }
+    
+    validRequests.push(now);
+    this.requests.set(key, validRequests);
+    return true;
+  }
+  
+  cleanup(): void {
+    const now = Date.now();
+    for (const [key, requests] of this.requests.entries()) {
+      const validRequests = requests.filter(
+        time => now - time < CONFIG.RATE_LIMIT.WINDOW
+      );
+      if (validRequests.length === 0) {
+        this.requests.delete(key);
+      } else {
+        this.requests.set(key, validRequests);
+      }
+    }
+  }
+}
+
+// Main service class
+class TemplateService {
+  private static instance: TemplateService;
+  private axiosInstance: AxiosInstance;
+  private cache = new Map<string, CachedData<any>>();
+  private rateLimiter = new RateLimiter();
+  private cleanupInterval?: NodeJS.Timeout;
+  private defaultCategories: TemplateCategory[];
+  
+  private constructor() {
+    this.axiosInstance = axios.create({
+      baseURL: CONFIG.DEERFLOW_BASE_URL,
+      timeout: CONFIG.TIMEOUT.DEFAULT,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    // Add request/response interceptors
+    this.setupInterceptors();
+    
+    // Initialize default categories
+    this.defaultCategories = this.initializeDefaultCategories();
+    
+    // Start cleanup interval
+    this.startCleanup();
+  }
+  
+  static getInstance(): TemplateService {
+    if (!TemplateService.instance) {
+      TemplateService.instance = new TemplateService();
+    }
+    return TemplateService.instance;
+  }
+  
+  private setupInterceptors(): void {
+    // Request interceptor for logging
+    this.axiosInstance.interceptors.request.use(
+      (config) => {
+        console.log(`📤 Template API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error('❌ Request error:', error);
+        return Promise.reject(error);
+      }
+    );
+    
+    // Response interceptor for error handling
+    this.axiosInstance.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        if (error.response?.status === 429) {
+          // Handle rate limiting
+          const retryAfter = parseInt(error.response.headers['retry-after'] || '60');
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          return this.axiosInstance.request(error.config!);
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+  
+  private getCacheKey(method: string, ...params: any[]): string {
+    return `${method}:${JSON.stringify(params)}`;
+  }
+  
+  private getFromCache<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    if (Date.now() - cached.timestamp > cached.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return cached.data as T;
+  }
+  
+  private setCache<T>(key: string, data: T, ttl: number): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl,
+    });
+  }
+  
+  private async retryRequest<T>(
+    fn: () => Promise<T>,
+    retries: number = CONFIG.RETRY.ATTEMPTS
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error as Error;
+        
+        // Don't retry on client errors (4xx)
+        if (axios.isAxiosError(error) && error.response?.status && error.response.status < 500) {
+          throw error;
+        }
+        
+        if (i < retries - 1) {
+          await new Promise(resolve => 
+            setTimeout(resolve, CONFIG.RETRY.DELAY * Math.pow(2, i))
+          );
+        }
+      }
+    }
+    
+    throw lastError || new Error('Request failed after retries');
+  }
+  
+  async getTemplateCategories(): Promise<TemplateCategory[]> {
+    const cacheKey = this.getCacheKey('getTemplateCategories');
+    const cached = this.getFromCache<TemplateCategory[]>(cacheKey);
+    if (cached) return cached;
+    
+    try {
+      const categories = await this.retryRequest(async () => {
+        const response = await this.axiosInstance.get('/api/templates/categories');
+        return response.data.categories || [];
+      });
+      
+      this.setCache(cacheKey, categories, CONFIG.CACHE_TTL.CATEGORIES);
+      return categories;
+    } catch (error) {
+      console.error('Error fetching template categories:', error);
+      return this.defaultCategories;
+    }
+  }
+  
+  async getTemplatesByCategory(category: string): Promise<ResearchTemplate[]> {
+    const cacheKey = this.getCacheKey('getTemplatesByCategory', category);
+    const cached = this.getFromCache<ResearchTemplate[]>(cacheKey);
+    if (cached) return cached;
+    
+    try {
+      const templates = await this.retryRequest(async () => {
+        const response = await this.axiosInstance.get(`/api/templates/category/${category}`);
+        return response.data.templates || [];
+      });
+      
+      this.setCache(cacheKey, templates, CONFIG.CACHE_TTL.TEMPLATES);
+      return templates;
+    } catch (error) {
+      console.error('Error fetching templates by category:', error);
+      return [];
+    }
+  }
+  
+  async getUserTemplates(userId: string): Promise<ResearchTemplate[]> {
+    const cacheKey = this.getCacheKey('getUserTemplates', userId);
+    const cached = this.getFromCache<ResearchTemplate[]>(cacheKey);
+    if (cached) return cached;
+    
+    try {
+      const templates = await this.retryRequest(async () => {
+        const response = await this.axiosInstance.get(`/api/templates/user/${userId}`);
+        return response.data.templates || [];
+      });
+      
+      this.setCache(cacheKey, templates, CONFIG.CACHE_TTL.USER_TEMPLATES);
+      return templates;
+    } catch (error) {
+      console.error('Error fetching user templates:', error);
+      return [];
+    }
+  }
+  
+  async createTemplate(templateData: {
+    name: string;
+    description: string;
+    prompt_template: string;
+    category: string;
+    icon: string;
+    tags: string[];
+    user_id: string;
+  }): Promise<{ success: boolean; template?: ResearchTemplate; error?: string; suggestions?: string[] }> {
+    // Validate template data
+    const validation = this.validateTemplate(templateData);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.error,
+        suggestions: validation.suggestions,
+      };
+    }
+    
+    try {
+      const response = await this.retryRequest(async () => {
+        return await this.axiosInstance.post('/api/templates/create', {
+          ...templateData,
+          variables: this.extractVariables(templateData.prompt_template),
+        });
+      });
+      
+      // Clear relevant caches
+      this.clearUserCache(templateData.user_id);
+      this.clearCategoryCache(templateData.category);
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error creating template:', error);
+      return {
+        success: false,
+        error: this.getErrorMessage(error),
+      };
+    }
+  }
+  
+  async generateTemplateFromQuery(userId: string, query: string): Promise<{
+    success: boolean;
+    suggested_template?: any;
+    confidence?: number;
+    message?: string;
+    reason?: string;
+  }> {
+    // Check rate limit
+    if (!this.rateLimiter.isAllowed(`generate:${userId}`)) {
+      return {
+        success: false,
+        message: 'Rate limit exceeded. Please try again later.',
+      };
+    }
+    
+    try {
+      const response = await this.axiosInstance.post(
+        '/api/templates/generate',
+        { user_id: userId, query },
+        { timeout: CONFIG.TIMEOUT.GENERATE }
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error generating template:', error);
+      return {
+        success: false,
+        message: this.getErrorMessage(error),
+      };
+    }
+  }
+  
+  async getPopularTemplates(limit: number = 10): Promise<ResearchTemplate[]> {
+    const cacheKey = this.getCacheKey('getPopularTemplates', limit);
+    const cached = this.getFromCache<ResearchTemplate[]>(cacheKey);
+    if (cached) return cached;
+    
+    try {
+      const templates = await this.retryRequest(async () => {
+        const response = await this.axiosInstance.get(
+          `/api/templates/popular?limit=${Math.min(limit, CONFIG.BATCH_SIZE)}`
+        );
+        return response.data.templates || [];
+      });
+      
+      this.setCache(cacheKey, templates, CONFIG.CACHE_TTL.POPULAR);
+      return templates;
+    } catch (error) {
+      console.error('Error fetching popular templates:', error);
+      return [];
+    }
+  }
+  
+  async searchTemplates(query: string, category?: string): Promise<ResearchTemplate[]> {
+    // Normalize search query
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.length < 2) return [];
+    
+    const cacheKey = this.getCacheKey('searchTemplates', normalizedQuery, category);
+    const cached = this.getFromCache<ResearchTemplate[]>(cacheKey);
+    if (cached) return cached;
+    
+    try {
+      const params = new URLSearchParams({ q: normalizedQuery });
+      if (category) params.append('category', category);
+      
+      const templates = await this.retryRequest(async () => {
+        const response = await this.axiosInstance.get(`/api/templates/search?${params}`);
+        return response.data.templates || [];
+      });
+      
+      this.setCache(cacheKey, templates, CONFIG.CACHE_TTL.TEMPLATES);
+      return templates;
+    } catch (error) {
+      console.error('Error searching templates:', error);
+      return [];
+    }
+  }
+  
+  fillTemplate(template: string, variables: Record<string, string | number>): string {
+    let result = template;
+    
+    // Sort variables by key length (descending) to avoid partial replacements
+    const sortedVars = Object.entries(variables).sort(
+      ([a], [b]) => b.length - a.length
+    );
+    
+    for (const [key, value] of sortedVars) {
+      // Escape special regex characters in key
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\{\\{?\\s*${escapedKey}\\s*\\}?\\}`, 'gi');
+      result = result.replace(regex, String(value));
+    }
+    
+    // Check for unfilled variables
+    const unfilledVars = result.match(/\{\{?\s*\w+\s*\}?\}/g);
+    if (unfilledVars) {
+      console.warn('Unfilled template variables:', unfilledVars);
+    }
+    
+    return result;
+  }
+  
+  private validateTemplate(templateData: any): {
+    valid: boolean;
+    error?: string;
+    suggestions?: string[];
+  } {
+    const suggestions: string[] = [];
+    
+    // Name validation
+    if (!templateData.name || templateData.name.trim().length < 3) {
+      return {
+        valid: false,
+        error: 'Template name must be at least 3 characters long',
+      };
+    }
+    
+    // Description validation
+    if (!templateData.description || templateData.description.trim().length < 10) {
+      suggestions.push('Consider adding a more detailed description');
+    }
+    
+    // Template validation
+    if (!templateData.prompt_template || templateData.prompt_template.trim().length < 20) {
+      return {
+        valid: false,
+        error: 'Template prompt must be at least 20 characters long',
+      };
+    }
+    
+    // Check for variables
+    const variables = this.extractVariables(templateData.prompt_template);
+    if (variables.length === 0) {
+      suggestions.push('Consider adding variables to make your template more flexible (e.g., {company_name})');
+    }
+    
+    return { valid: true, suggestions: suggestions.length > 0 ? suggestions : undefined };
+  }
+  
+  private extractVariables(template: string): TemplateVariable[] {
+    const variablePattern = /\{(\w+)(?::(\w+))?\}/g;
+    const variables = new Map<string, TemplateVariable>();
+    
+    let match;
+    while ((match = variablePattern.exec(template)) !== null) {
+      const [, name, type] = match;
+      if (!variables.has(name)) {
+        variables.set(name, {
+          name,
+          description: `Variable: ${name}`,
+          type: (type as 'text' | 'number' | 'select') || 'text',
+          required: true,
+        });
+      }
+    }
+    
+    return Array.from(variables.values());
+  }
+  
+  private getErrorMessage(error: any): string {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.data?.error) {
+        return error.response.data.error;
+      }
+      if (error.response?.status === 404) {
+        return 'Template service not found';
+      }
+      if (error.response?.status === 503) {
+        return 'Template service temporarily unavailable';
+      }
+    }
+    return 'An unexpected error occurred';
+  }
+  
+  private clearUserCache(userId: string): void {
+    const userCacheKey = this.getCacheKey('getUserTemplates', userId);
+    this.cache.delete(userCacheKey);
+  }
+  
+  private clearCategoryCache(category: string): void {
+    const categoryCacheKey = this.getCacheKey('getTemplatesByCategory', category);
+    this.cache.delete(categoryCacheKey);
+  }
+  
+  private initializeDefaultCategories(): TemplateCategory[] {
+    return [
+      {
+        id: 'financial',
+        name: 'Financial Analysis',
+        description: 'Templates for market analysis, investment research, and financial reporting',
+        icon: 'TrendingUp',
+        templates: [],
+        template_count: 0,
+      },
+      {
+        id: 'competitive',
+        name: 'Competitive Intelligence',
+        description: 'Templates for competitor analysis and market positioning',
+        icon: 'Search',
+        templates: [],
+        template_count: 0,
+      },
+      {
+        id: 'risk',
+        name: 'Risk Assessment',
+        description: 'Templates for risk analysis and opportunity evaluation',
+        icon: 'AlertCircle',
+        templates: [],
+        template_count: 0,
+      },
+      {
+        id: 'industry',
+        name: 'Industry Research',
+        description: 'Templates for sector analysis and industry insights',
+        icon: 'Database',
+        templates: [],
+        template_count: 0,
+      },
+      {
+        id: 'technology',
+        name: 'Technology Analysis',
+        description: 'Templates for tech trends, innovation, and digital transformation',
+        icon: 'Sparkles',
+        templates: [],
+        template_count: 0,
+      },
+      {
+        id: 'custom',
+        name: 'Custom Templates',
+        description: 'User-created personalized research templates',
+        icon: 'Settings',
+        templates: [],
+        template_count: 0,
+      },
+    ];
+  }
+  
+  private startCleanup(): void {
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupCache();
+      this.rateLimiter.cleanup();
+    }, 60 * 1000); // Every minute
+  }
+  
+  private cleanupCache(): void {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [key, cached] of this.cache.entries()) {
+      if (now - cached.timestamp > cached.ttl) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned ${cleaned} expired cache entries`);
+    }
+  }
+  
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+  }
+}
+
+// Singleton instance
+const templateService = TemplateService.getInstance();
+
+// Middleware for authentication
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.user?.id) {
+    return res.status(401).json({ 
+      success: false, 
+      error: 'Authentication required' 
+    });
+  }
+  next();
+}
+
+// Middleware for request validation
+export function validateRequest(schema: any) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const { error } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: error.details[0].message,
+      });
+    }
+    next();
+  };
+}
+
+// API Route Handlers
+export async function getTemplateCategories(req: Request, res: Response) {
+  try {
+    const categories = await templateService.getTemplateCategories();
+    res.json({ success: true, categories });
+  } catch (error) {
+    console.error('Error in getTemplateCategories:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch template categories' 
+    });
+  }
+}
+
+export async function getTemplatesByCategory(req: Request, res: Response) {
+  try {
+    const { category } = req.params;
+    if (!category) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Category parameter is required' 
+      });
+    }
+    
+    const templates = await templateService.getTemplatesByCategory(category);
+    res.json({ success: true, templates });
+  } catch (error) {
+    console.error('Error in getTemplatesByCategory:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch templates' 
+    });
+  }
+}
+
+export async function getUserTemplates(req: Request, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const templates = await templateService.getUserTemplates(userId);
+    res.json({ success: true, templates });
+  } catch (error) {
+    console.error('Error in getUserTemplates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch user templates' 
+    });
+  }
+}
+
+export async function createTemplate(req: Request, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const { name, description, prompt_template, category, icon, tags } = req.body;
+    
+    const result = await templateService.createTemplate({
+      name,
+      description,
+      prompt_template,
+      category: category || 'custom',
+      icon: icon || 'FileText',
+      tags: tags || [],
+      user_id: userId,
+    });
+    
+    const statusCode = result.success ? 201 : 400;
+    res.status(statusCode).json(result);
+  } catch (error) {
+    console.error('Error in createTemplate:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to create template' 
+    });
+  }
+}
+
+export async function generateTemplateFromQuery(req: Request, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const { query } = req.body;
+    
+    if (!query || query.trim().length < 10) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Query must be at least 10 characters long' 
+      });
+    }
+    
+    const result = await templateService.generateTemplateFromQuery(userId, query);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in generateTemplateFromQuery:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to generate template' 
+    });
+  }
+}
+
+export async function searchTemplates(req: Request, res: Response) {
+  try {
+    const { q, category } = req.query;
+    
+    if (!q || String(q).trim().length < 2) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Search query must be at least 2 characters long' 
+      });
+    }
+    
+    const templates = await templateService.searchTemplates(
+      String(q), 
+      category as string
+    );
+    res.json({ success: true, templates });
+  } catch (error) {
+    console.error('Error in searchTemplates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to search templates' 
+    });
+  }
+}
+
+export async function getPopularTemplates(req: Request, res: Response) {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const templates = await templateService.getPopularTemplates(limit);
+    res.json({ success: true, templates });
+  } catch (error) {
+    console.error('Error in getPopularTemplates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch popular templates' 
+    });
+  }
+}
+
+export async function fillTemplate(req: Request, res: Response) {
+  try {
+    const { template, variables } = req.body;
+    
+    if (!template || !variables || typeof variables !== 'object') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Template and variables object are required' 
+      });
+    }
+    
+    const filledTemplate = templateService.fillTemplate(template, variables);
+    res.json({ 
+      success: true, 
+      filled_template: filledTemplate,
+      unfilled_count: (filledTemplate.match(/\{\{?\s*\w+\s*\}?\}/g) || []).length,
+    });
+  } catch (error) {
+    console.error('Error in fillTemplate:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fill template' 
+    });
+  }
+}
+
+// Export service instance and cleanup function
+export { templateService };
+
+// Cleanup on process exit
+process.on('SIGTERM', () => {
+  templateService.destroy();
+});
+
+process.on('SIGINT', () => {
+  templateService.destroy();
+});
