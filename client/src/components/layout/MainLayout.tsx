@@ -301,6 +301,8 @@ const MainLayout = memo<MainLayoutProps>(({
           <MobileNav 
             isSidebarOpen={isSidebarOpen}
             toggleSidebar={toggleSidebar}
+            title={title}
+            notifications={3}
           />
         )}
         
