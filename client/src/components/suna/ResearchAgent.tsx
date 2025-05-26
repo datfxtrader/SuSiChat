@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -115,17 +114,17 @@ const renderContent = (content: string) => {
     if (paragraph.includes('|') && paragraph.split('|').length > 2) {
       const lines = paragraph.split('\n').filter(line => line.trim());
       const tableLines = lines.filter(line => line.includes('|') && line.split('|').length > 2);
-      
+
       if (tableLines.length >= 2) {
         const contentLines = tableLines.filter(line => !line.match(/^\s*\|[\s\-|]+\|\s*$/));
-        
+
         if (contentLines.length >= 2) {
           const [headerLine, ...dataLines] = contentLines;
           const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
           const rows = dataLines.map(line => 
             line.split('|').map(cell => cell.trim()).filter(cell => cell)
           );
-          
+
           return (
             <div key={idx} className="my-6 overflow-x-auto rounded-xl shadow-xl">
               <table className="w-full border-collapse bg-zinc-800/40 overflow-hidden">
@@ -155,13 +154,13 @@ const renderContent = (content: string) => {
         }
       }
     }
-    
+
     // Numbered list rendering
     if (/^\d+\.\s/.test(paragraph.trim())) {
       const lines = paragraph.split('\n').filter(line => line.trim());
       const listItems = [];
       let currentItem = '';
-      
+
       for (const line of lines) {
         if (/^\d+\.\s/.test(line.trim())) {
           if (currentItem) listItems.push(currentItem);
@@ -171,7 +170,7 @@ const renderContent = (content: string) => {
         }
       }
       if (currentItem) listItems.push(currentItem);
-      
+
       return (
         <ol key={idx} className="list-none space-y-4 ml-0">
           {listItems.map((item, i) => {
@@ -179,7 +178,7 @@ const renderContent = (content: string) => {
             if (match) {
               const [, number, text] = match;
               const boldMatch = text.match(/^(.+?):\s*(.+)/);
-              
+
               return (
                 <li key={i} className="flex items-start space-x-4 p-4 bg-zinc-800/30 rounded-lg border-l-4 border-blue-500/60 hover:bg-zinc-800/40 transition-colors">
                   <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 text-white text-sm font-bold rounded-full flex items-center justify-center shadow-md">
@@ -203,7 +202,7 @@ const renderContent = (content: string) => {
         </ol>
       );
     }
-    
+
     // Headers
     if (paragraph.startsWith('# ')) {
       return (
@@ -227,7 +226,7 @@ const renderContent = (content: string) => {
         </h3>
       );
     }
-    
+
     // Bullet points with bold
     if (paragraph.startsWith('- **') || paragraph.match(/^\s*[-*•]\s*\*\*/)) {
       const titleMatch = paragraph.match(/\*\*(.*?)\*\*/);
@@ -242,7 +241,7 @@ const renderContent = (content: string) => {
         </div>
       );
     }
-    
+
     // Regular bullet points
     if (paragraph.match(/^[\s]*[-*•]\s+/)) {
       const bulletText = paragraph.replace(/^[\s\-*•]+/, '').trim();
@@ -255,7 +254,7 @@ const renderContent = (content: string) => {
         </div>
       );
     }
-    
+
     // Regular paragraphs
     return (
       <p key={idx} className="text-zinc-200 leading-relaxed">
@@ -285,7 +284,7 @@ interface ResearchProgressProps {
 
 const ResearchProgress = React.memo<ResearchProgressProps>(({ stage, progress, query, isActive }) => {
   const stageMessage = useMemo(() => STAGE_MESSAGES[Math.min(stage - 1, STAGE_MESSAGES.length - 1)], [stage]);
-  
+
   return (
     <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-6 backdrop-blur-sm">
       <div className="flex items-center space-x-3 mb-4">
@@ -297,13 +296,13 @@ const ResearchProgress = React.memo<ResearchProgressProps>(({ stage, progress, q
           <p className="text-xs text-zinc-400 truncate">{query}</p>
         </div>
       </div>
-      
+
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-xs text-blue-400 font-medium">Stage {stage}/6</span>
           <span className="text-xs text-zinc-400">{Math.round(progress)}%</span>
         </div>
-        
+
         <div className="w-full bg-zinc-800/50 rounded-full h-2 overflow-hidden relative">
           <div 
             className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-1000 ease-out relative"
@@ -312,7 +311,7 @@ const ResearchProgress = React.memo<ResearchProgressProps>(({ stage, progress, q
             <div className="absolute inset-0 bg-white/20 animate-pulse" />
           </div>
         </div>
-        
+
         {isActive && (
           <div className="flex items-center space-x-2 text-xs text-blue-400">
             <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
@@ -450,7 +449,7 @@ const SourceItem = React.memo(({ source, index, timestamp }: {
   timestamp: string; 
 }) => {
   const [copied, setCopied] = useState(false);
-  
+
   const handleCopyUrl = useCallback(() => {
     navigator.clipboard.writeText(source.url);
     setCopied(true);
@@ -495,7 +494,7 @@ const Select = React.memo(({ value, onValueChange }: {
   onValueChange: (value: string) => void; 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   const options = useMemo(() => [
     { value: '1', label: 'Quick (25K)', icon: Zap, color: 'text-yellow-400' },
     { value: '2', label: 'Standard (25K)', icon: Search, color: 'text-blue-400' },

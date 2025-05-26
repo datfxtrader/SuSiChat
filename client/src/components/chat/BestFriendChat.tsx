@@ -4,10 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Smile, Coffee, Music, TrendingUp, Send, Bot, User, Settings, Clock, CheckCircle, Copy, Share2, Bookmark, MessageSquare, Loader2 } from 'lucide-react';
 import { TypewriterText } from '@/components/shared/TypewriterText';
 import { TypewriterConfig } from '@/config/typewriter.config';
+import StandardizedMessage from '@/components/shared/StandardizedMessage';
+import StandardizedTypingIndicator from '@/components/shared/StandardizedTypingIndicator';
+import StandardizedInput from '@/components/shared/StandardizedInput';
+import StandardizedHeader from '@/components/shared/StandardizedHeader';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import UIStandards from '@/config/ui-standards.config';
 
 interface Message {
   id: string;
@@ -398,56 +403,20 @@ export const BestFriendChat: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-purple-50/80 to-pink-50/80 dark:from-slate-900 dark:to-slate-800">
-      {/* Enhanced Header */}
-      <div className="p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-slate-700/50 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">
-              <Bot className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                {userProfile ? getGreeting() : 'Hello Friend! 👋'}
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                <MessageSquare className="w-3 h-3" />
-                I'm here for you {moodEmojis[mood]}
-              </p>
-            </div>
-          </div>
-
-          {/* Enhanced Mood selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Mood:</span>
-            <div className="flex gap-1">
-              {Object.entries(moodEmojis).map(([moodType, emoji]) => (
-                <button
-                  key={moodType}
-                  onClick={() => setMood(moodType)}
-                  className={`
-                    text-xl p-2 rounded-lg transition-all duration-200 hover:scale-110
-                    ${mood === moodType 
-                      ? 'bg-purple-100 dark:bg-purple-900 scale-110 ring-2 ring-purple-300 dark:ring-purple-700' 
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }
-                  `}
-                  title={moodType}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
+      {/* Standardized Header */}
+      <StandardizedHeader
+        theme="chat"
+        assistantName="Best Friend AI"
+        assistantIcon={<Bot className="w-5 h-5" />}
+        userProfile={userProfile}
+        mood={mood}
+        moodEmojis={moodEmojis}
+        onMoodChange={setMood}
+        onSettings={() => console.log('Settings clicked')}
+        showMoodSelector={true}
+        showSettings={true}
+        status="online"
+      />
 
       {/* Enhanced Messages */}
       <div 
@@ -501,72 +470,47 @@ export const BestFriendChat: React.FC = () => {
 
         <AnimatePresence>
           {messages.map((message, index) => (
-            <EnhancedMessage
+            <StandardizedMessage
               key={message.id}
               message={message}
               isLatest={index === messages.length - 1}
+              theme="chat"
               userProfile={userProfile}
+              assistantName="Best Friend AI"
+              assistantIcon={<Bot className="w-3 h-3 text-purple-500" />}
+              showActions={true}
+              enableTypewriter={true}
             />
           ))}
         </AnimatePresence>
 
-        {/* Enhanced Typing indicator */}
+        {/* Standardized Typing indicator */}
         {isTyping && (
-          <EnhancedTypingIndicator userProfile={userProfile} />
+          <StandardizedTypingIndicator 
+            theme="chat"
+            assistantName="Best Friend AI"
+            assistantIcon={<Bot className="w-4 h-4 text-purple-500" />}
+            userProfile={userProfile}
+          />
         )}
         <div ref={messagesEndRef} style={{ height: '1px' }} />
       </div>
 
-      {/* Enhanced Input area */}
-      <div className="p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-t border-slate-200/50 dark:border-slate-700/50">
-        <div className="flex gap-3 items-end">
-          <div className="flex-1 relative">
-            <Input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  sendMessage(inputMessage);
-                }
-              }}
-              placeholder={
-                userProfile?.languages.includes('vi')
-                  ? 'Nhắn gì đó...'
-                  : 'Say something...'
-              }
-              disabled={isTyping}
-              className="flex-1 bg-gray-50/80 dark:bg-slate-700/80 backdrop-blur-sm border-gray-200/60 dark:border-slate-600/60 rounded-xl px-4 py-3 text-base focus:ring-2 focus:ring-purple-500/50 focus:border-purple-300 dark:focus:border-purple-600 transition-all duration-200"
-            />
-            {inputMessage && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              >
-                <Badge variant="secondary" className="text-xs">
-                  {inputMessage.length}
-                </Badge>
-              </motion.div>
-            )}
-          </div>
-          <Button 
-            onClick={() => {
-              sendMessage(inputMessage);
-              setTimeout(() => scrollToBottom(), 50);
-            }}
-            disabled={isTyping || !inputMessage.trim()}
-            size="lg"
-            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isTyping ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </Button>
-        </div>
-      </div>
+      {/* Standardized Input */}
+      <StandardizedInput
+        theme="chat"
+        value={inputMessage}
+        onChange={setInputMessage}
+        onSubmit={(message) => {
+          sendMessage(message);
+          setTimeout(() => scrollToBottom(), 50);
+        }}
+        isLoading={isTyping}
+        userProfile={userProfile}
+        showAttachment={false}
+        showVoice={false}
+        maxLength={2000}
+      />
     </div>
   );
 };
