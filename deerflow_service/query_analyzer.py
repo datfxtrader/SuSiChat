@@ -1,94 +1,138 @@
 
 import re
-import logging
+import spacy
 import time
+import logging
 import numpy as np
-from typing import List, Dict, Any, Set, Pattern
-from collections import defaultdict
 from functools import lru_cache
-from cachetools import TTLCache
+from typing import Pattern, Dict, List, Any, Optional
+from cachetools import LRUCache
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 logger = logging.getLogger("query_analyzer")
 
 class OptimizedQueryAnalyzer:
-    """Optimized query analyzer with compiled patterns, caching, and NLP features"""
+    """Optimized query analyzer with compiled patterns and caching"""
     
     def __init__(self):
-        # Pre-compile all regex patterns for performance
+        # Pre-compile all regex patterns
         self.compiled_patterns = self._compile_patterns()
         
-        # TTL cache for analysis results (5 minute cache)
-        self.analysis_cache = TTLCache(maxsize=1000, ttl=300)
+        # Load spaCy model lazily
+        self._nlp = None
         
-        # Pre-compute domain keyword sets for faster matching
+        # TF-IDF vectorizer for concept extraction
+        self.tfidf = TfidfVectorizer(
+            max_features=100,
+            stop_words='english',
+            ngram_range=(1, 2)
+        )
+        
+        # Cache for analysis results
+        self.analysis_cache = LRUCache(maxsize=1000)
+        
+        # Pre-compute domain keyword sets
+        self.domain_keywords = {
+            "financial": [
+                "stock", "market", "investment", "portfolio", "trading",
+                "financial", "earnings", "revenue", "profit", "valuation",
+                "dividend", "shares", "bond", "fund", "crypto", "bitcoin"
+            ],
+            "scientific": [
+                "research", "study", "experiment", "hypothesis", "data",
+                "analysis", "methodology", "peer-reviewed", "scientific",
+                "journal", "paper", "findings", "results", "conclusion"
+            ],
+            "technical": [
+                "code", "programming", "software", "algorithm", "system",
+                "technology", "development", "api", "framework", "architecture",
+                "database", "server", "cloud", "application", "platform"
+            ],
+            "business": [
+                "company", "business", "industry", "market", "strategy",
+                "competition", "growth", "sales", "customer", "product",
+                "service", "management", "operations", "marketing"
+            ],
+            "medical": [
+                "health", "disease", "treatment", "symptom", "diagnosis",
+                "medicine", "patient", "clinical", "therapy", "medical",
+                "hospital", "drug", "pharmaceutical", "healthcare"
+            ]
+        }
+        
         self.domain_keyword_sets = {
             domain: set(keywords)
             for domain, keywords in self.domain_keywords.items()
         }
         
-        # Performance metrics
-        self.stats = {
-            "cache_hits": 0,
-            "cache_misses": 0,
-            "total_queries": 0,
-            "avg_analysis_time": 0.0
-        }
-        
-        # Intent patterns for classification
+        # Intent patterns
         self.intent_patterns = {
+            "research": {
+                "keywords": ["research", "investigate", "explore", "study", "analyze"],
+                "patterns": [
+                    r"research\s+(?:about|on|into)",
+                    r"investigate\s+(?:the|this|how)",
+                    r"find\s+(?:out|information)",
+                    r"what\s+(?:is|are|do|does)",
+                    r"tell\s+me\s+about"
+                ]
+            },
             "comparison": {
-                "keywords": ["compare", "versus", "vs", "difference", "better", "worse", "contrast"],
-                "patterns": [r"\w+ vs \w+", r"compare \w+ to \w+", r"difference between \w+ and \w+"]
+                "keywords": ["compare", "versus", "vs", "difference", "better"],
+                "patterns": [
+                    r"compare\s+.*\s+(?:to|with|and)",
+                    r".*\s+vs\s+.*",
+                    r"difference\s+between",
+                    r"which\s+is\s+better",
+                    r".*\s+or\s+.*\?"
+                ]
             },
             "analysis": {
-                "keywords": ["analyze", "evaluate", "assess", "examine", "investigate", "study"],
-                "patterns": [r"analyze \w+", r"evaluate the \w+", r"assess \w+"]
-            },
-            "explanation": {
-                "keywords": ["explain", "what is", "how does", "why", "describe", "define"],
-                "patterns": [r"what is \w+", r"explain \w+", r"how does \w+ work"]
+                "keywords": ["analyze", "evaluate", "assess", "review", "examine"],
+                "patterns": [
+                    r"analyze\s+(?:the|this|how)",
+                    r"evaluate\s+(?:the|this)",
+                    r"assess\s+(?:the|this)",
+                    r"how\s+(?:good|bad|effective)"
+                ]
             },
             "prediction": {
-                "keywords": ["predict", "forecast", "future", "will", "trend", "outlook"],
-                "patterns": [r"predict \w+", r"future of \w+", r"\w+ trends"]
+                "keywords": ["predict", "forecast", "future", "trend", "outlook"],
+                "patterns": [
+                    r"predict\s+(?:the|future)",
+                    r"what\s+will\s+happen",
+                    r"future\s+of",
+                    r"trend\s+(?:in|for)",
+                    r"outlook\s+for"
+                ]
             },
-            "research": {
-                "keywords": ["research", "investigate", "find", "search", "explore", "discover"],
-                "patterns": [r"research \w+", r"find information about \w+", r"explore \w+"]
+            "explanation": {
+                "keywords": ["explain", "how", "why", "what", "describe"],
+                "patterns": [
+                    r"explain\s+(?:how|why|what)",
+                    r"how\s+does\s+.*\s+work",
+                    r"why\s+(?:is|does|do)",
+                    r"what\s+causes",
+                    r"describe\s+(?:the|how)"
+                ]
             }
         }
         
-        # Domain classifiers with expanded keywords
-        self.domain_keywords = {
-            "financial": [
-                "stock", "market", "trading", "investment", "currency", "bitcoin", 
-                "forex", "portfolio", "economic", "earnings", "revenue", "profit",
-                "valuation", "dividend", "bonds", "commodity", "inflation", "gdp"
-            ],
-            "scientific": [
-                "research", "study", "experiment", "hypothesis", "theory", "data", 
-                "analysis", "methodology", "peer-reviewed", "scientific", "publication",
-                "journal", "citation", "academic", "laboratory", "clinical"
-            ],
-            "technical": [
-                "code", "programming", "software", "algorithm", "system", "technology", 
-                "development", "api", "framework", "architecture", "database", "server",
-                "cloud", "network", "security", "automation", "machine learning"
-            ],
-            "medical": [
-                "health", "disease", "treatment", "symptom", "diagnosis", "medicine", 
-                "patient", "clinical", "therapy", "medical", "healthcare", "pharmaceutical",
-                "vaccine", "surgery", "hospital", "doctor", "nurse"
-            ],
-            "legal": [
-                "law", "legal", "court", "regulation", "compliance", "contract", 
-                "case", "statute", "litigation", "attorney", "judge", "lawsuit",
-                "constitutional", "criminal", "civil", "patent", "trademark"
-            ]
-        }
+        logger.info("OptimizedQueryAnalyzer initialized")
+    
+    @property
+    def nlp(self):
+        """Lazy load spaCy model"""
+        if self._nlp is None:
+            try:
+                self._nlp = spacy.load("en_core_web_sm", disable=["parser"])
+            except IOError:
+                logger.warning("spaCy model not available, using basic NLP")
+                self._nlp = None
+        return self._nlp
     
     def _compile_patterns(self) -> Dict[str, Dict[str, List[Pattern]]]:
-        """Pre-compile all regex patterns for better performance"""
+        """Pre-compile all regex patterns"""
         compiled = {}
         
         for intent, data in self.intent_patterns.items():
@@ -102,33 +146,30 @@ class OptimizedQueryAnalyzer:
     
     @lru_cache(maxsize=500)
     def analyze_query(self, query: str) -> Dict[str, Any]:
-        """Comprehensive query analysis with caching and optimization"""
-        start_time = time.time()
-        self.stats["total_queries"] += 1
+        """Cached query analysis with optimization"""
         
-        # Check cache first
-        cache_key = hash(query.strip().lower())
+        # Check cache
+        cache_key = hash(query)
         if cache_key in self.analysis_cache:
-            self.stats["cache_hits"] += 1
-            cached_result = self.analysis_cache[cache_key]
-            cached_result["from_cache"] = True
-            return cached_result
+            return self.analysis_cache[cache_key]
         
-        self.stats["cache_misses"] += 1
+        start_time = time.time()
         
-        # Tokenize and prepare
-        words = self._tokenize_optimized(query)
-        entities = self._extract_entities_optimized(query, words)
+        # Process with spaCy if available
+        doc = None
+        if self.nlp:
+            doc = self.nlp(query)
+            words = [token.text.lower() for token in doc if not token.is_stop]
+        else:
+            words = [word.lower() for word in re.findall(r'\w+', query)]
         
-        # Parallel analysis components
+        # Extract features in parallel
+        entities = self._extract_entities_optimized(query, doc)
         intent = self._classify_intent_optimized(query, words)
         domains = self._classify_domains_optimized(query, words)
-        complexity = self._analyze_complexity_optimized(query, words)
-        concepts = self._extract_concepts_optimized(words)
+        complexity = self._analyze_complexity_optimized(query, doc, words)
+        concepts = self._extract_concepts_nlp(query, doc)
         capabilities = self._determine_capabilities(intent, domains, complexity)
-        
-        # Calculate semantic features
-        semantic_features = self._calculate_semantic_features(query, words)
         
         result = {
             "query": query,
@@ -138,61 +179,69 @@ class OptimizedQueryAnalyzer:
             "concepts": concepts,
             "complexity": complexity,
             "capabilities": capabilities,
-            "semantic_features": semantic_features,
             "metadata": {
                 "word_count": len(words),
-                "unique_words": len(set(words)),
                 "has_questions": "?" in query,
-                "sentence_count": len([s for s in query.split('.') if s.strip()]),
+                "sentence_count": len(query.split('.')),
                 "avg_word_length": np.mean([len(word) for word in words]) if words else 0,
-                "analysis_time_ms": (time.time() - start_time) * 1000
-            },
-            "from_cache": False
+                "analysis_time": time.time() - start_time
+            }
         }
         
         # Cache result
         self.analysis_cache[cache_key] = result
         
-        # Update performance stats
-        analysis_time = time.time() - start_time
-        self.stats["avg_analysis_time"] = (
-            (self.stats["avg_analysis_time"] * (self.stats["total_queries"] - 1) + analysis_time) 
-            / self.stats["total_queries"]
-        )
-        
         return result
     
-    def _tokenize_optimized(self, query: str) -> List[str]:
-        """Optimized tokenization with preprocessing"""
-        # Remove extra whitespace and normalize
-        normalized = re.sub(r'\s+', ' ', query.strip())
-        
-        # Split on word boundaries, keeping alphanumeric
-        tokens = re.findall(r'\b\w+\b', normalized.lower())
-        
-        # Filter out very short tokens
-        return [token for token in tokens if len(token) > 2]
-    
-    def _extract_entities_optimized(self, query: str, words: List[str]) -> List[Dict[str, str]]:
-        """Optimized entity extraction using compiled patterns"""
+    def _extract_entities_optimized(self, query: str, doc=None) -> List[Dict[str, str]]:
+        """Extract entities using spaCy and patterns"""
         entities = []
         
-        # Compiled patterns for common entities
-        patterns = {
-            "MONEY": re.compile(r'\$[\d,]+(?:\.\d{2})?|\b\d+(?:\.\d+)?\s*(?:dollars?|USD|cents?)\b', re.IGNORECASE),
-            "PERCENTAGE": re.compile(r'\b\d+(?:\.\d+)?%|\b\d+(?:\.\d+)?\s*percent\b', re.IGNORECASE),
-            "DATE": re.compile(r'\b\d{4}\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s*\d{4}\b', re.IGNORECASE),
-            "NUMBER": re.compile(r'\b\d+(?:\.\d+)?(?:[KMB]|thousand|million|billion)?\b', re.IGNORECASE),
-            "COMPANY": re.compile(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Inc|Corp|Ltd|LLC|Co)\b'),
-            "TICKER": re.compile(r'\b[A-Z]{1,5}\b(?=\s|$|[,.])')
-        }
-        
-        for entity_type, pattern in patterns.items():
-            for match in pattern.finditer(query):
+        # Use spaCy's built-in entity recognition if available
+        if doc and self.nlp:
+            for ent in doc.ents:
                 entities.append({
-                    "text": match.group(0),
-                    "type": entity_type,
+                    "text": ent.text,
+                    "type": ent.label_,
                     "confidence": 0.85,
+                    "start": ent.start_char,
+                    "end": ent.end_char
+                })
+        
+        # Additional pattern-based extraction
+        # Numbers with context
+        for match in re.finditer(r'(\$?\d+(?:\.\d+)?(?:[KMB])?)', query):
+            entities.append({
+                "text": match.group(1),
+                "type": "MONEY" if "$" in match.group(1) else "NUMBER",
+                "confidence": 0.9,
+                "start": match.start(),
+                "end": match.end()
+            })
+        
+        # Stock symbols
+        for match in re.finditer(r'\b[A-Z]{1,5}\b', query):
+            if len(match.group()) <= 5:
+                entities.append({
+                    "text": match.group(),
+                    "type": "STOCK_SYMBOL",
+                    "confidence": 0.7,
+                    "start": match.start(),
+                    "end": match.end()
+                })
+        
+        # Companies (simple heuristic)
+        company_patterns = [
+            r'\b\w+\s+(?:Inc|Corp|Ltd|LLC|Company)\b',
+            r'\b(?:Apple|Google|Microsoft|Amazon|Tesla|Meta)\b'
+        ]
+        
+        for pattern in company_patterns:
+            for match in re.finditer(pattern, query, re.IGNORECASE):
+                entities.append({
+                    "text": match.group(),
+                    "type": "COMPANY",
+                    "confidence": 0.8,
                     "start": match.start(),
                     "end": match.end()
                 })
@@ -200,19 +249,14 @@ class OptimizedQueryAnalyzer:
         return entities
     
     def _classify_intent_optimized(self, query: str, words: List[str]) -> Dict[str, Any]:
-        """Optimized intent classification using compiled patterns"""
+        """Optimized intent classification"""
         query_lower = query.lower()
-        word_set = set(words)
         intent_scores = {}
         
-        # Vectorized scoring using pre-compiled patterns
+        # Vectorized scoring
         for intent, patterns in self.compiled_patterns.items():
-            # Keyword matching using set intersection
-            keyword_score = len(word_set.intersection(set(patterns['keywords'])))
-            
-            # Pattern matching
+            keyword_score = sum(1 for kw in patterns['keywords'] if kw in query_lower)
             pattern_score = sum(2 for pattern in patterns['patterns'] if pattern.search(query_lower))
-            
             intent_scores[intent] = keyword_score + pattern_score
         
         # Normalize scores
@@ -225,64 +269,73 @@ class OptimizedQueryAnalyzer:
         return {
             "primary": primary_intent,
             "confidence": normalized_scores.get(primary_intent, 0.5),
-            "all_intents": normalized_scores,
-            "score_breakdown": intent_scores
+            "all_intents": normalized_scores
         }
     
     def _classify_domains_optimized(self, query: str, words: List[str]) -> List[Dict[str, float]]:
-        """Optimized domain classification using set operations"""
+        """Optimized domain classification using sets"""
         query_words = set(words)
         domain_scores = {}
         
-        # Use pre-computed sets for faster intersection
+        # Set intersection for faster matching
         for domain, keyword_set in self.domain_keyword_sets.items():
             matches = query_words.intersection(keyword_set)
             if matches:
-                # Calculate score based on match ratio and frequency
-                match_ratio = len(matches) / len(keyword_set)
-                frequency_bonus = sum(words.count(match) for match in matches) / len(words)
-                domain_scores[domain] = match_ratio + (frequency_bonus * 0.5)
+                domain_scores[domain] = len(matches) / len(keyword_set)
         
-        # Sort and return top domains
-        sorted_domains = sorted(
-            domain_scores.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
-        
+        # Sort and format results
         return [
-            {"domain": domain, "confidence": min(score, 1.0)}
-            for domain, score in sorted_domains[:3]  # Top 3 domains
+            {"domain": domain, "confidence": score}
+            for domain, score in sorted(
+                domain_scores.items(), 
+                key=lambda x: x[1], 
+                reverse=True
+            )
         ]
     
-    def _analyze_complexity_optimized(self, query: str, words: List[str]) -> Dict[str, Any]:
-        """Enhanced complexity analysis with multiple factors"""
+    def _analyze_complexity_optimized(self, query: str, doc, words: List[str]) -> Dict[str, Any]:
+        """Enhanced complexity analysis using NLP features"""
         
-        # Calculate various complexity factors
-        factors = {
-            "length": min(1.0, len(words) / 20),  # Normalize by 20 words
+        # Basic features
+        features = {
+            "length": len(words) / 15,
             "unique_ratio": len(set(words)) / max(len(words), 1),
-            "avg_word_length": min(1.0, np.mean([len(w) for w in words]) / 8) if words else 0,
-            "question_complexity": min(1.0, query.count("?") / 3),
-            "conjunction_density": min(1.0, sum(1 for word in words if word in ["and", "or", "but", "however", "therefore"]) / 5),
-            "technical_terms": min(1.0, sum(1 for word in words if len(word) > 8) / 10),
-            "nested_concepts": min(1.0, len(re.findall(r'\([^)]+\)', query)) / 3)
+            "avg_word_length": np.mean([len(w) for w in words]) / 10 if words else 0,
+            "question_marks": query.count("?") / 3,
+            "complex_words": sum(1 for w in words if len(w) > 8) / max(len(words), 1)
         }
         
-        # Weighted complexity score
+        # Add spaCy features if available
+        if doc and self.nlp:
+            features.update({
+                "entity_density": len(doc.ents) / max(len(words), 1),
+                "noun_verb_ratio": self._calculate_pos_ratio(doc),
+                "subordinate_clauses": self._count_subordinate_clauses(doc)
+            })
+        
+        # Normalize features
+        normalized_features = {
+            k: min(1.0, v) for k, v in features.items()
+        }
+        
+        # Calculate weighted score
         weights = {
-            "length": 0.20,
+            "length": 0.2,
             "unique_ratio": 0.15,
-            "avg_word_length": 0.10,
-            "question_complexity": 0.15,
-            "conjunction_density": 0.15,
-            "technical_terms": 0.15,
-            "nested_concepts": 0.10
+            "avg_word_length": 0.15,
+            "question_marks": 0.1,
+            "complex_words": 0.1,
+            "entity_density": 0.1,
+            "noun_verb_ratio": 0.1,
+            "subordinate_clauses": 0.1
         }
         
-        complexity_score = sum(factors[k] * weights[k] for k in weights)
+        complexity_score = sum(
+            normalized_features.get(k, 0) * weights[k] 
+            for k in weights
+        )
         
-        # Determine complexity level
+        # Determine level
         if complexity_score < 0.3:
             level = "simple"
         elif complexity_score < 0.6:
@@ -293,130 +346,128 @@ class OptimizedQueryAnalyzer:
         return {
             "level": level,
             "score": complexity_score,
-            "factors": factors,
-            "estimated_processing_time": self._estimate_processing_time(complexity_score),
-            "recommended_agents": self._recommend_agent_count(complexity_score)
+            "features": normalized_features,
+            "estimated_time": self._estimate_processing_time(level),
+            "required_agents": self._estimate_agent_count(level)
         }
     
-    def _extract_concepts_optimized(self, words: List[str]) -> List[str]:
-        """Optimized concept extraction with ranking"""
-        # Stop words for filtering
-        stop_words = {
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-            "of", "with", "by", "is", "are", "was", "were", "be", "been", "have",
-            "has", "had", "do", "does", "did", "will", "would", "could", "should",
-            "this", "that", "these", "those", "they", "them", "their", "there"
+    def _extract_concepts_nlp(self, query: str, doc) -> List[str]:
+        """Extract concepts using NLP techniques"""
+        
+        concepts = []
+        
+        if doc and self.nlp:
+            # Extract noun phrases
+            noun_phrases = []
+            for chunk in doc.noun_chunks:
+                if len(chunk.text) > 3:
+                    noun_phrases.append(chunk.text.lower())
+            
+            # Extract important single words (nouns and verbs)
+            important_pos = {'NOUN', 'PROPN', 'VERB'}
+            important_words = [
+                token.lemma_.lower() 
+                for token in doc 
+                if token.pos_ in important_pos and len(token.text) > 3
+            ]
+            
+            concepts = list(set(noun_phrases + important_words))
+        else:
+            # Fallback: extract meaningful words
+            words = re.findall(r'\b\w{4,}\b', query.lower())
+            concepts = list(set(words))
+        
+        # Rank by importance (frequency in original text)
+        concept_scores = {
+            concept: query.lower().count(concept.lower())
+            for concept in concepts
         }
         
-        # Filter meaningful words
-        meaningful_words = [
-            word for word in words 
-            if len(word) > 3 and word not in stop_words
-        ]
-        
-        # Count frequency and rank by importance
-        word_freq = defaultdict(int)
-        for word in meaningful_words:
-            word_freq[word] += 1
-        
-        # Sort by frequency and importance (length as tiebreaker)
+        # Return top concepts
         sorted_concepts = sorted(
-            word_freq.items(),
-            key=lambda x: (x[1], len(x[0])),
+            concept_scores.items(), 
+            key=lambda x: x[1], 
             reverse=True
         )
         
         return [concept for concept, _ in sorted_concepts[:10]]
     
-    def _calculate_semantic_features(self, query: str, words: List[str]) -> Dict[str, Any]:
-        """Calculate semantic features for enhanced analysis"""
-        return {
-            "lexical_diversity": len(set(words)) / max(len(words), 1),
-            "information_density": len([w for w in words if len(w) > 6]) / max(len(words), 1),
-            "question_words": len([w for w in words if w in ["what", "how", "why", "when", "where", "who"]]),
-            "temporal_references": len(re.findall(r'\b(?:yesterday|today|tomorrow|last|next|current|recent|future)\b', query.lower())),
-            "quantitative_terms": len(re.findall(r'\b(?:many|much|most|few|several|all|some|any)\b', query.lower())),
-            "certainty_indicators": len(re.findall(r'\b(?:definitely|certainly|probably|maybe|possibly|might|could)\b', query.lower()))
+    def _calculate_pos_ratio(self, doc) -> float:
+        """Calculate part-of-speech ratio for complexity"""
+        pos_counts = {}
+        for token in doc:
+            pos_counts[token.pos_] = pos_counts.get(token.pos_, 0) + 1
+        
+        nouns = pos_counts.get('NOUN', 0) + pos_counts.get('PROPN', 0)
+        verbs = pos_counts.get('VERB', 0)
+        
+        if verbs == 0:
+            return 1.0
+        
+        return min(1.0, nouns / verbs / 3)  # Normalize
+    
+    def _count_subordinate_clauses(self, doc) -> float:
+        """Count subordinate clauses as complexity indicator"""
+        subordinators = {'because', 'although', 'while', 'if', 'when', 'since', 'unless'}
+        count = sum(1 for token in doc if token.text.lower() in subordinators)
+        return min(1.0, count / 3)  # Normalize to 0-1
+    
+    def _estimate_processing_time(self, complexity_level: str) -> int:
+        """Estimate processing time in seconds"""
+        time_estimates = {
+            "simple": 30,
+            "moderate": 90,
+            "complex": 180
         }
+        return time_estimates.get(complexity_level, 60)
+    
+    def _estimate_agent_count(self, complexity_level: str) -> int:
+        """Estimate required number of agents"""
+        agent_estimates = {
+            "simple": 1,
+            "moderate": 2,
+            "complex": 3
+        }
+        return agent_estimates.get(complexity_level, 1)
     
     def _determine_capabilities(
         self, 
-        intent: Dict[str, Any],
-        domains: List[Dict[str, float]],
+        intent: Dict[str, Any], 
+        domains: List[Dict[str, float]], 
         complexity: Dict[str, Any]
     ) -> List[str]:
-        """Determine required capabilities based on analysis"""
-        capabilities = ["web_search", "synthesis"]  # Base capabilities
+        """Determine required capabilities"""
+        capabilities = []
         
-        # Add intent-based capabilities
+        # Based on intent
         intent_capabilities = {
-            "comparison": ["comparison_engine", "structured_analysis"],
-            "analysis": ["data_analysis", "reasoning_engine", "statistical_analysis"],
-            "prediction": ["trend_analysis", "forecasting", "time_series_analysis"],
-            "explanation": ["knowledge_base", "educational_content"],
-            "research": ["deep_search", "source_validation", "information_synthesis"]
+            "research": ["web_search", "data_analysis"],
+            "comparison": ["web_search", "data_analysis", "synthesis"],
+            "analysis": ["data_analysis", "reasoning", "synthesis"],
+            "prediction": ["data_analysis", "modeling", "reasoning"],
+            "explanation": ["knowledge_base", "reasoning", "synthesis"]
         }
         
-        primary_intent = intent["primary"]
-        if primary_intent in intent_capabilities:
-            capabilities.extend(intent_capabilities[primary_intent])
+        primary_intent = intent.get("primary", "explanation")
+        capabilities.extend(intent_capabilities.get(primary_intent, []))
         
-        # Add domain-based capabilities
+        # Based on domains
         if domains:
-            top_domain = domains[0]
-            if top_domain["confidence"] > 0.3:
-                domain_capabilities = {
-                    "financial": ["market_data", "financial_analysis", "economic_indicators"],
-                    "scientific": ["academic_search", "paper_analysis", "research_validation"],
-                    "technical": ["code_analysis", "technical_docs", "system_architecture"],
-                    "medical": ["medical_knowledge", "clinical_data", "health_information"],
-                    "legal": ["legal_database", "case_law", "regulatory_compliance"]
-                }
-                
-                domain = top_domain["domain"]
-                if domain in domain_capabilities:
-                    capabilities.extend(domain_capabilities[domain])
+            primary_domain = domains[0]["domain"]
+            domain_capabilities = {
+                "financial": ["financial_data", "market_analysis"],
+                "technical": ["code_analysis", "technical_research"],
+                "scientific": ["academic_search", "peer_review"],
+                "medical": ["medical_research", "clinical_data"],
+                "business": ["market_research", "competitive_analysis"]
+            }
+            capabilities.extend(domain_capabilities.get(primary_domain, []))
         
-        # Add complexity-based capabilities
-        if complexity["level"] in ["moderate", "complex"]:
-            capabilities.extend(["deep_reasoning", "multi_step_analysis"])
-        
+        # Based on complexity
         if complexity["level"] == "complex":
-            capabilities.extend(["expert_coordination", "advanced_synthesis"])
+            capabilities.extend(["multi_agent", "coordination", "synthesis"])
         
         return list(set(capabilities))  # Remove duplicates
-    
-    def _estimate_processing_time(self, complexity_score: float) -> int:
-        """Estimate processing time in seconds based on complexity"""
-        base_time = 30  # 30 seconds base
-        return int(base_time * (1 + complexity_score * 2))
-    
-    def _recommend_agent_count(self, complexity_score: float) -> int:
-        """Recommend number of agents based on complexity"""
-        if complexity_score < 0.3:
-            return 1
-        elif complexity_score < 0.6:
-            return 2
-        else:
-            return 3
-    
-    def get_analysis_stats(self) -> Dict[str, Any]:
-        """Get performance statistics"""
-        cache_hit_rate = (
-            self.stats["cache_hits"] / max(self.stats["total_queries"], 1)
-        )
-        
-        return {
-            **self.stats,
-            "cache_hit_rate": cache_hit_rate,
-            "cache_size": len(self.analysis_cache),
-            "domain_count": len(self.domain_keywords)
-        }
-    
-    def clear_cache(self):
-        """Clear analysis cache"""
-        self.analysis_cache.clear()
-        logger.info("Query analysis cache cleared")
 
 # Global optimized analyzer instance
-optimized_query_analyzer = OptimizedQueryAnalyzer()
+query_analyzer = OptimizedQueryAnalyzer()

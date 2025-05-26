@@ -1,20 +1,26 @@
-"""
-Template Creation Agent for DeerFlow Research Service
 
-This agent specializes in creating, managing, and optimizing research templates
-based on user preferences, query patterns, and research effectiveness.
-"""
-
-import json
 import asyncio
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
-from datetime import datetime
+import aioredis
+import pickle
+import re
 import uuid
+import time
+import logging
+import numpy as np
+from typing import Dict, List, Any, Optional, Set
+from dataclasses import dataclass, asdict, field
+from datetime import datetime
+from functools import lru_cache
+from collections import defaultdict
+from cachetools import TTLCache, LRUCache
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+logger = logging.getLogger("template_agent")
 
 @dataclass
-class ResearchTemplate:
-    """Represents a research template"""
+class OptimizedResearchTemplate:
+    """Enhanced template with versioning and metadata"""
     id: str
     name: str
     description: str
@@ -26,186 +32,181 @@ class ResearchTemplate:
     created_at: str
     usage_count: int = 0
     effectiveness_score: float = 0.0
-    tags: List[str] = None
+    tags: List[str] = field(default_factory=list)
     is_public: bool = False
-    
-    def __post_init__(self):
-        if self.tags is None:
-            self.tags = []
+    version: int = 1
+    parent_id: Optional[str] = None  # For version tracking
+    embeddings: Optional[np.ndarray] = None  # For similarity search
 
-@dataclass
-class TemplateCategory:
-    """Represents a template category"""
-    id: str
-    name: str
-    description: str
-    icon: str
-    templates: List[str]  # Template IDs
-
-class TemplateAgent:
-    """AI Agent specialized in creating and managing research templates"""
+class OptimizedTemplateAgent:
+    """Optimized template agent with persistence and advanced search"""
     
-    def __init__(self):
-        self.templates: Dict[str, ResearchTemplate] = {}
-        self.categories: Dict[str, TemplateCategory] = {}
-        self.user_preferences: Dict[str, Dict] = {}
-        self.usage_analytics: Dict[str, List] = {}
+    def __init__(self, redis_url: str = "redis://localhost:6379"):
+        # Redis for persistence
+        self.redis_url = redis_url
+        self.redis_client = None
         
-        # Initialize default categories
-        self._initialize_default_categories()
-        self._load_default_templates()
-    
-    def _initialize_default_categories(self):
-        """Initialize default template categories"""
-        default_categories = [
-            {
-                "id": "financial",
-                "name": "Financial Analysis",
-                "description": "Templates for market analysis, investment research, and financial reporting",
-                "icon": "TrendingUp",
-                "templates": []
-            },
-            {
-                "id": "competitive",
-                "name": "Competitive Intelligence",
-                "description": "Templates for competitor analysis and market positioning",
-                "icon": "Search",
-                "templates": []
-            },
-            {
-                "id": "risk",
-                "name": "Risk Assessment",
-                "description": "Templates for risk analysis and opportunity evaluation",
-                "icon": "AlertCircle",
-                "templates": []
-            },
-            {
-                "id": "industry",
-                "name": "Industry Research",
-                "description": "Templates for sector analysis and industry insights",
-                "icon": "Database",
-                "templates": []
-            },
-            {
-                "id": "technology",
-                "name": "Technology Analysis",
-                "description": "Templates for tech trends, innovation, and digital transformation",
-                "icon": "Sparkles",
-                "templates": []
-            },
-            {
-                "id": "custom",
-                "name": "Custom Templates",
-                "description": "User-created personalized research templates",
-                "icon": "Settings",
-                "templates": []
-            }
-        ]
+        # In-memory cache with TTL
+        self.template_cache = TTLCache(maxsize=1000, ttl=300)
+        self.search_cache = LRUCache(maxsize=500)
         
-        for cat_data in default_categories:
-            category = TemplateCategory(**cat_data)
-            self.categories[category.id] = category
-    
-    def _load_default_templates(self):
-        """Load default research templates"""
-        default_templates = [
-            {
-                "name": "Market Trend Analysis",
-                "description": "Comprehensive analysis of market trends and patterns",
-                "prompt_template": "Analyze current market trends for {subject} including price movements, volume patterns, technical indicators, and provide insights on potential future direction based on May 2025 data.",
-                "category": "financial",
-                "icon": "TrendingUp",
-                "variables": ["subject"],
-                "tags": ["market", "trends", "analysis", "technical"]
-            },
-            {
-                "name": "Company Financial Deep Dive",
-                "description": "Detailed financial analysis and performance evaluation",
-                "prompt_template": "Generate a comprehensive financial analysis of {company} covering revenue growth, profitability metrics, balance sheet strength, cash flow analysis, and competitive positioning in {industry} sector for 2025.",
-                "category": "financial",
-                "icon": "Database",
-                "variables": ["company", "industry"],
-                "tags": ["financial", "company", "performance", "metrics"]
-            },
-            {
-                "name": "Competitor Landscape Mapping",
-                "description": "Comprehensive competitive analysis and market positioning",
-                "prompt_template": "Research and analyze the competitive landscape for {company} in the {market} market, including direct competitors, market share analysis, competitive advantages, pricing strategies, and market positioning as of May 2025.",
-                "category": "competitive",
-                "icon": "Search",
-                "variables": ["company", "market"],
-                "tags": ["competition", "market-share", "positioning", "strategy"]
-            },
-            {
-                "name": "Investment Risk Assessment",
-                "description": "Thorough risk evaluation for investment decisions",
-                "prompt_template": "Conduct a comprehensive risk assessment for investing in {investment_target}, analyzing market risks, financial risks, regulatory risks, competitive risks, and provide risk mitigation strategies with current 2025 market conditions.",
-                "category": "risk",
-                "icon": "AlertCircle",
-                "variables": ["investment_target"],
-                "tags": ["risk", "investment", "assessment", "mitigation"]
-            },
-            {
-                "name": "Industry Disruption Analysis",
-                "description": "Analysis of emerging trends and disruption patterns",
-                "prompt_template": "Analyze disruption trends and emerging technologies in the {industry} industry, identifying key innovation drivers, market shifts, new entrants, and potential impact on established players in 2025.",
-                "category": "industry",
-                "icon": "Sparkles",
-                "variables": ["industry"],
-                "tags": ["disruption", "innovation", "trends", "technology"]
-            },
-            {
-                "name": "Technology Adoption Analysis",
-                "description": "Analysis of technology trends and adoption patterns",
-                "prompt_template": "Research the adoption trends and market impact of {technology} including current implementation rates, industry applications, growth projections, key players, and barriers to adoption in 2025.",
-                "category": "technology",
-                "icon": "Database",
-                "variables": ["technology"],
-                "tags": ["technology", "adoption", "trends", "implementation"]
-            }
-        ]
+        # Templates storage
+        self.templates: Dict[str, OptimizedResearchTemplate] = {}
         
-        for template_data in default_templates:
-            template = self._create_template_from_data(template_data, "system")
-            self.templates[template.id] = template
-            
-            # Add to category
-            if template.category in self.categories:
-                self.categories[template.category].templates.append(template.id)
-    
-    def _create_template_from_data(self, template_data: Dict, created_by: str) -> ResearchTemplate:
-        """Create a template from data dictionary"""
-        template_id = str(uuid.uuid4())
-        return ResearchTemplate(
-            id=template_id,
-            name=template_data["name"],
-            description=template_data["description"],
-            prompt_template=template_data["prompt_template"],
-            category=template_data["category"],
-            icon=template_data["icon"],
-            variables=template_data["variables"],
-            created_by=created_by,
-            created_at=datetime.now().isoformat(),
-            tags=template_data.get("tags", [])
+        # TF-IDF for advanced search
+        self.tfidf_vectorizer = TfidfVectorizer(
+            max_features=1000,
+            stop_words='english',
+            ngram_range=(1, 3)
         )
+        self.template_embeddings = {}
+        
+        # Compiled regex patterns for variable extraction
+        self.variable_pattern = re.compile(r'\{([^}]+)\}')
+        
+        # Analytics tracking
+        self.usage_analytics = defaultdict(list)
+        
+        # Async lock for thread safety
+        self.lock = asyncio.Lock()
+        
+        # Background tasks
+        self.background_tasks = set()
+        
+        # Default templates
+        self.default_templates = [
+            {
+                "name": "Financial Analysis",
+                "description": "Comprehensive financial analysis and research",
+                "prompt_template": "Analyze the financial performance of {company} focusing on {metrics}. Provide insights on {analysis_period} performance.",
+                "category": "financial",
+                "icon": "TrendingUp",
+                "tags": ["finance", "analysis", "stocks"]
+            },
+            {
+                "name": "Market Research",
+                "description": "In-depth market research and competitive analysis",
+                "prompt_template": "Research the {industry} market, focusing on {focus_areas}. Analyze competitors and market trends for {time_frame}.",
+                "category": "business",
+                "icon": "BarChart",
+                "tags": ["market", "research", "competition"]
+            },
+            {
+                "name": "Technical Analysis",
+                "description": "Technical documentation and code analysis",
+                "prompt_template": "Analyze {technology} implementation for {use_case}. Focus on {technical_aspects} and provide recommendations.",
+                "category": "technical",
+                "icon": "Code",
+                "tags": ["technical", "code", "analysis"]
+            }
+        ]
+        
+        logger.info("OptimizedTemplateAgent initialized")
+    
+    async def initialize(self):
+        """Async initialization with Redis connection"""
+        try:
+            self.redis_client = await aioredis.create_redis_pool(self.redis_url)
+            logger.info("Connected to Redis for template persistence")
+        except Exception as e:
+            logger.warning(f"Redis connection failed: {e}. Using memory-only storage.")
+            self.redis_client = None
+        
+        # Load templates from Redis or initialize defaults
+        await self._load_templates_from_redis()
+        
+        # Initialize search index
+        await self._build_search_index()
+        
+        # Start background tasks
+        self._start_background_tasks()
+        
+        logger.info("OptimizedTemplateAgent initialized with persistence")
+    
+    async def _load_templates_from_redis(self):
+        """Load all templates from Redis"""
+        if not self.redis_client:
+            await self._load_default_templates_async()
+            return
+        
+        try:
+            template_keys = await self.redis_client.keys('template:*')
+            
+            if template_keys:
+                # Batch load templates
+                templates_data = await self.redis_client.mget(*template_keys)
+                
+                for data in templates_data:
+                    if data:
+                        template = pickle.loads(data)
+                        self.templates[template.id] = template
+                        self.template_cache[template.id] = template
+                        
+                logger.info(f"Loaded {len(self.templates)} templates from Redis")
+            else:
+                # First run - load defaults
+                await self._load_default_templates_async()
+        except Exception as e:
+            logger.error(f"Error loading templates from Redis: {e}")
+            await self._load_default_templates_async()
+    
+    async def _load_default_templates_async(self):
+        """Load default templates"""
+        for template_data in self.default_templates:
+            await self.create_custom_template(
+                user_id="system",
+                name=template_data["name"],
+                description=template_data["description"],
+                prompt_template=template_data["prompt_template"],
+                category=template_data["category"],
+                icon=template_data["icon"],
+                tags=template_data["tags"]
+            )
+        
+        logger.info(f"Loaded {len(self.default_templates)} default templates")
+    
+    async def _save_template_to_redis(self, template: OptimizedResearchTemplate):
+        """Save template to Redis with atomic operation"""
+        if not self.redis_client:
+            return
+        
+        key = f"template:{template.id}"
+        
+        async with self.lock:
+            try:
+                # Save to Redis
+                await self.redis_client.set(key, pickle.dumps(template))
+                
+                # Update cache
+                self.template_cache[template.id] = template
+                
+                # Update search index
+                await self._update_search_index(template)
+                
+            except Exception as e:
+                logger.error(f"Error saving template to Redis: {e}")
     
     async def create_custom_template(
-        self, 
+        self,
         user_id: str,
         name: str,
         description: str,
         prompt_template: str,
         category: str = "custom",
         icon: str = "FileText",
-        tags: List[str] = None
+        tags: List[str] = None,
+        parent_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Create a new custom template"""
+        """Create template with validation and persistence"""
         
-        # Extract variables from prompt template
-        variables = self._extract_variables(prompt_template)
+        # Extract variables efficiently
+        variables = self._extract_variables_optimized(prompt_template)
         
-        # Validate template
-        validation_result = await self._validate_template(prompt_template, variables)
+        # Async validation
+        validation_result = await self._validate_template_async(
+            prompt_template, variables
+        )
+        
         if not validation_result["valid"]:
             return {
                 "success": False,
@@ -213,23 +214,37 @@ class TemplateAgent:
                 "suggestions": validation_result.get("suggestions", [])
             }
         
-        # Create template
-        template_data = {
-            "name": name,
-            "description": description,
-            "prompt_template": prompt_template,
-            "category": category,
-            "icon": icon,
-            "variables": variables,
-            "tags": tags or []
-        }
+        # Create optimized template
+        template = OptimizedResearchTemplate(
+            id=str(uuid.uuid4()),
+            name=name,
+            description=description,
+            prompt_template=prompt_template,
+            category=category,
+            icon=icon,
+            variables=variables,
+            created_by=user_id,
+            created_at=datetime.now().isoformat(),
+            tags=tags or [],
+            parent_id=parent_id,
+            version=1 if not parent_id else await self._get_next_version(parent_id)
+        )
         
-        template = self._create_template_from_data(template_data, user_id)
+        # Generate embeddings for search
+        template.embeddings = await self._generate_embeddings(template)
+        
+        # Add to memory
         self.templates[template.id] = template
         
-        # Add to category
-        if category in self.categories:
-            self.categories[category].templates.append(template.id)
+        # Save to Redis and update indices
+        await self._save_template_to_redis(template)
+        
+        # Track creation event
+        await self._track_event('template_created', {
+            'template_id': template.id,
+            'user_id': user_id,
+            'category': category
+        })
         
         return {
             "success": True,
@@ -237,265 +252,357 @@ class TemplateAgent:
             "message": f"Template '{name}' created successfully!"
         }
     
-    def _extract_variables(self, prompt_template: str) -> List[str]:
-        """Extract variable placeholders from template"""
-        import re
-        variables = re.findall(r'\{([^}]+)\}', prompt_template)
-        return list(set(variables))  # Remove duplicates
+    @lru_cache(maxsize=1000)
+    def _extract_variables_optimized(self, prompt_template: str) -> List[str]:
+        """Cached variable extraction"""
+        return list(set(self.variable_pattern.findall(prompt_template)))
     
-    async def _validate_template(self, prompt_template: str, variables: List[str]) -> Dict[str, Any]:
-        """Validate template structure and effectiveness"""
+    async def _validate_template_async(
+        self,
+        prompt_template: str,
+        variables: List[str]
+    ) -> Dict[str, Any]:
+        """Async template validation with analysis"""
+        
+        validation_tasks = [
+            self._validate_structure(prompt_template, variables),
+            self._validate_research_quality(prompt_template),
+            self._validate_variable_usage(prompt_template, variables),
+            self._check_similarity_to_existing(prompt_template)
+        ]
+        
+        results = await asyncio.gather(*validation_tasks)
         
         issues = []
         suggestions = []
         
-        # Basic validation
-        if len(prompt_template) < 20:
-            issues.append("Template is too short for effective research")
-        
-        if not variables:
-            suggestions.append("Consider adding variables with {variable_name} syntax for flexibility")
-        
-        # Check for research-oriented language
-        research_keywords = [
-            "analyze", "research", "investigate", "evaluate", "assess",
-            "examine", "study", "review", "compare", "forecast"
-        ]
-        
-        if not any(keyword in prompt_template.lower() for keyword in research_keywords):
-            suggestions.append("Consider adding research-oriented action words like 'analyze', 'investigate', or 'evaluate'")
-        
-        # Check for specificity indicators
-        specificity_keywords = [
-            "comprehensive", "detailed", "thorough", "in-depth",
-            "current", "latest", "2025", "trends", "data"
-        ]
-        
-        if not any(keyword in prompt_template.lower() for keyword in specificity_keywords):
-            suggestions.append("Consider adding specificity words like 'comprehensive', 'current', or 'detailed'")
+        for result in results:
+            if result.get("issues"):
+                issues.extend(result["issues"])
+            if result.get("suggestions"):
+                suggestions.extend(result["suggestions"])
         
         return {
             "valid": len(issues) == 0,
             "error": issues[0] if issues else None,
-            "suggestions": suggestions
+            "suggestions": suggestions,
+            "quality_score": sum(r.get("score", 0) for r in results) / len(results)
         }
     
-    async def suggest_template_improvements(self, template_id: str) -> Dict[str, Any]:
-        """AI-powered suggestions for template improvement"""
-        
-        if template_id not in self.templates:
-            return {"error": "Template not found"}
-        
-        template = self.templates[template_id]
-        
-        # Analyze usage patterns
-        usage_data = self.usage_analytics.get(template_id, [])
-        
+    async def _validate_structure(self, prompt_template: str, variables: List[str]) -> Dict[str, Any]:
+        """Validate template structure"""
+        issues = []
         suggestions = []
+        score = 0.8
         
-        # Low usage analysis
-        if template.usage_count < 5:
-            suggestions.append({
-                "type": "engagement",
-                "suggestion": "Consider making the template more specific or adding trending keywords",
-                "reason": "Low usage might indicate the template is too generic"
-            })
+        # Check minimum length
+        if len(prompt_template) < 20:
+            issues.append("Template is too short")
+            score -= 0.3
         
-        # Effectiveness analysis
-        if template.effectiveness_score < 0.7:
-            suggestions.append({
-                "type": "effectiveness",
-                "suggestion": "Try adding more context or specific research directions",
-                "reason": "Template could generate more actionable results"
-            })
+        # Check for variables
+        if not variables:
+            suggestions.append("Consider adding variables with {variable_name} syntax")
+            score -= 0.2
         
-        # Variable optimization
-        if len(template.variables) == 1:
-            suggestions.append({
-                "type": "flexibility",
-                "suggestion": "Consider adding more variables for greater customization",
-                "reason": "More variables allow for more targeted research"
-            })
+        # Check for research-oriented language
+        research_keywords = ["analyze", "research", "investigate", "examine", "explore"]
+        if not any(keyword in prompt_template.lower() for keyword in research_keywords):
+            suggestions.append("Consider adding research-oriented keywords")
+            score -= 0.1
         
-        return {
-            "template_id": template_id,
-            "current_performance": {
-                "usage_count": template.usage_count,
-                "effectiveness_score": template.effectiveness_score
-            },
-            "suggestions": suggestions
-        }
+        return {"issues": issues, "suggestions": suggestions, "score": max(0, score)}
     
-    async def generate_template_from_query(self, user_id: str, query: str) -> Dict[str, Any]:
-        """AI-powered template generation from successful queries"""
+    async def _validate_research_quality(self, prompt_template: str) -> Dict[str, Any]:
+        """Validate research quality aspects"""
+        suggestions = []
+        score = 0.8
         
-        # Analyze the query to extract patterns
-        template_analysis = await self._analyze_query_for_template(query)
+        # Check for specificity
+        if len(prompt_template.split()) < 10:
+            suggestions.append("Consider making the template more specific")
+            score -= 0.2
         
-        if not template_analysis["suitable"]:
-            return {
-                "success": False,
-                "message": "Query doesn't appear suitable for template creation",
-                "reason": template_analysis["reason"]
-            }
+        # Check for actionable instructions
+        action_words = ["provide", "analyze", "compare", "evaluate", "assess"]
+        if not any(word in prompt_template.lower() for word in action_words):
+            suggestions.append("Add clear action words like 'analyze', 'compare', 'evaluate'")
+            score -= 0.1
         
-        # Generate template
-        suggested_template = {
-            "name": template_analysis["suggested_name"],
-            "description": template_analysis["description"],
-            "prompt_template": template_analysis["template"],
-            "category": template_analysis["category"],
-            "icon": template_analysis["icon"],
-            "variables": template_analysis["variables"],
-            "tags": template_analysis["tags"]
-        }
-        
-        return {
-            "success": True,
-            "suggested_template": suggested_template,
-            "confidence": template_analysis["confidence"],
-            "message": "Template generated successfully from your query!"
-        }
+        return {"suggestions": suggestions, "score": max(0, score)}
     
-    async def _analyze_query_for_template(self, query: str) -> Dict[str, Any]:
-        """Analyze query to determine if it's suitable for template creation"""
+    async def _validate_variable_usage(self, prompt_template: str, variables: List[str]) -> Dict[str, Any]:
+        """Validate variable usage"""
+        suggestions = []
+        score = 0.9
         
-        # Simple pattern recognition (in production, this would use more sophisticated NLP)
-        query_lower = query.lower()
+        # Check for unused variables
+        for var in variables:
+            if prompt_template.count(f"{{{var}}}") > 1:
+                suggestions.append(f"Variable '{var}' is used multiple times")
         
-        # Check if query has template potential
-        has_specific_entities = any(word in query_lower for word in [
-            "tesla", "apple", "bitcoin", "nvidia", "microsoft", "amazon"
-        ])
-        
-        has_action_words = any(word in query_lower for word in [
-            "analyze", "research", "investigate", "evaluate", "assess", "compare"
-        ])
-        
-        if not has_action_words:
-            return {
-                "suitable": False,
-                "reason": "Query lacks research action words"
-            }
-        
-        # Extract potential variables
-        variables = []
-        template = query
-        
-        if has_specific_entities:
-            # Replace specific entities with variables
-            entities = {
-                "tesla": "company",
-                "apple": "company", 
-                "bitcoin": "cryptocurrency",
-                "nvidia": "company",
-                "microsoft": "company",
-                "amazon": "company"
-            }
-            
-            for entity, var_type in entities.items():
-                if entity in query_lower:
-                    template = template.replace(entity, f"{{{var_type}}}")
-                    template = template.replace(entity.title(), f"{{{var_type}}}")
-                    if var_type not in variables:
-                        variables.append(var_type)
-        
-        # Determine category
-        category = "custom"
-        if any(word in query_lower for word in ["market", "price", "financial", "investment"]):
-            category = "financial"
-        elif any(word in query_lower for word in ["competitor", "competition", "market share"]):
-            category = "competitive"
-        elif any(word in query_lower for word in ["risk", "assessment", "evaluation"]):
-            category = "risk"
-        elif any(word in query_lower for word in ["industry", "sector", "trends"]):
-            category = "industry"
-        elif any(word in query_lower for word in ["technology", "innovation", "tech"]):
-            category = "technology"
-        
-        return {
-            "suitable": True,
-            "suggested_name": f"Custom {category.title()} Analysis",
-            "description": f"Generated from successful research query",
-            "template": template,
-            "category": category,
-            "icon": "FileText",
-            "variables": variables,
-            "tags": ["custom", "ai-generated"],
-            "confidence": 0.8
-        }
+        return {"suggestions": suggestions, "score": score}
     
-    def get_templates_by_category(self, category: str) -> List[Dict]:
-        """Get all templates in a specific category"""
-        if category not in self.categories:
-            return []
+    async def _check_similarity_to_existing(self, prompt_template: str) -> Dict[str, Any]:
+        """Check similarity to existing templates"""
+        suggestions = []
+        score = 0.9
         
-        template_ids = self.categories[category].templates
-        return [asdict(self.templates[tid]) for tid in template_ids if tid in self.templates]
-    
-    def get_user_templates(self, user_id: str) -> List[Dict]:
-        """Get all templates created by a specific user"""
-        user_templates = [
-            asdict(template) for template in self.templates.values()
-            if template.created_by == user_id
-        ]
-        return sorted(user_templates, key=lambda x: x["created_at"], reverse=True)
-    
-    def get_popular_templates(self, limit: int = 10) -> List[Dict]:
-        """Get most popular templates by usage"""
-        popular = sorted(
-            self.templates.values(),
-            key=lambda x: x.usage_count,
-            reverse=True
-        )[:limit]
-        return [asdict(template) for template in popular]
-    
-    def track_template_usage(self, template_id: str, effectiveness_score: float = None):
-        """Track template usage and effectiveness"""
-        if template_id in self.templates:
-            self.templates[template_id].usage_count += 1
-            
-            if effectiveness_score is not None:
-                # Update effectiveness score (running average)
-                current = self.templates[template_id].effectiveness_score
-                count = self.templates[template_id].usage_count
-                new_score = ((current * (count - 1)) + effectiveness_score) / count
-                self.templates[template_id].effectiveness_score = new_score
-    
-    def search_templates(self, query: str, category: str = None) -> List[Dict]:
-        """Search templates by name, description, or tags"""
-        query_lower = query.lower()
-        results = []
-        
+        # Simple similarity check
         for template in self.templates.values():
+            if len(template.prompt_template) > 0:
+                similarity = self._calculate_text_similarity(
+                    prompt_template, template.prompt_template
+                )
+                if similarity > 0.8:
+                    suggestions.append(f"Very similar to existing template: '{template.name}'")
+                    score -= 0.3
+                    break
+        
+        return {"suggestions": suggestions, "score": max(0, score)}
+    
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate text similarity using simple word overlap"""
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+        
+        return len(intersection) / len(union)
+    
+    async def _get_next_version(self, parent_id: str) -> int:
+        """Get next version number for template"""
+        max_version = 0
+        for template in self.templates.values():
+            if template.parent_id == parent_id:
+                max_version = max(max_version, template.version)
+        return max_version + 1
+    
+    async def search_templates_advanced(
+        self,
+        query: str,
+        category: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        user_id: Optional[str] = None,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """Advanced search with semantic similarity"""
+        
+        # Check cache
+        cache_key = f"{query}:{category}:{tags}:{user_id}"
+        if cache_key in self.search_cache:
+            return self.search_cache[cache_key]
+        
+        # Generate query embedding
+        query_embedding = await self._generate_text_embedding(query)
+        
+        # Calculate similarities
+        similarities = []
+        
+        for template_id, template in self.templates.items():
+            # Apply filters
             if category and template.category != category:
                 continue
-                
-            # Search in name, description, and tags
-            searchable_text = (
-                template.name.lower() + " " +
-                template.description.lower() + " " +
-                " ".join(template.tags).lower()
-            )
+            if tags and not set(tags).intersection(set(template.tags)):
+                continue
+            if user_id and template.created_by != user_id and not template.is_public:
+                continue
             
-            if query_lower in searchable_text:
-                results.append(asdict(template))
+            # Calculate similarity
+            if template.embeddings is not None:
+                similarity = cosine_similarity(
+                    query_embedding.reshape(1, -1),
+                    template.embeddings.reshape(1, -1)
+                )[0][0]
+                
+                similarities.append((template_id, similarity))
+        
+        # Sort by similarity
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        
+        # Get top results
+        results = []
+        for template_id, similarity in similarities[:limit]:
+            template = self.templates[template_id]
+            result = asdict(template)
+            result['similarity_score'] = similarity
+            results.append(result)
+        
+        # Cache results
+        self.search_cache[cache_key] = results
         
         return results
     
-    def export_templates(self, user_id: str = None) -> Dict[str, Any]:
-        """Export templates for backup or sharing"""
-        if user_id:
-            templates_to_export = self.get_user_templates(user_id)
-        else:
-            templates_to_export = [asdict(t) for t in self.templates.values()]
+    async def _generate_embeddings(
+        self,
+        template: OptimizedResearchTemplate
+    ) -> np.ndarray:
+        """Generate embeddings for template"""
         
-        return {
-            "export_date": datetime.now().isoformat(),
-            "template_count": len(templates_to_export),
-            "templates": templates_to_export,
-            "categories": [asdict(cat) for cat in self.categories.values()]
-        }
+        # Combine text fields
+        text = f"{template.name} {template.description} {' '.join(template.tags)}"
+        
+        return await self._generate_text_embedding(text)
+    
+    async def _generate_text_embedding(self, text: str) -> np.ndarray:
+        """Generate text embedding using TF-IDF"""
+        
+        try:
+            embedding = self.tfidf_vectorizer.transform([text]).toarray()[0]
+        except:
+            # Fit vectorizer if not fitted
+            all_texts = [
+                f"{t.name} {t.description} {' '.join(t.tags)}"
+                for t in self.templates.values()
+            ]
+            if all_texts:
+                self.tfidf_vectorizer.fit(all_texts)
+                embedding = self.tfidf_vectorizer.transform([text]).toarray()[0]
+            else:
+                # Return zero embedding if no templates
+                embedding = np.zeros(1000)
+        
+        return embedding
+    
+    async def _build_search_index(self):
+        """Build search index for existing templates"""
+        if not self.templates:
+            return
+        
+        try:
+            all_texts = [
+                f"{t.name} {t.description} {' '.join(t.tags)}"
+                for t in self.templates.values()
+            ]
+            
+            self.tfidf_vectorizer.fit(all_texts)
+            
+            # Generate embeddings for all templates
+            for template in self.templates.values():
+                template.embeddings = await self._generate_embeddings(template)
+                
+            logger.info("Search index built successfully")
+        except Exception as e:
+            logger.error(f"Error building search index: {e}")
+    
+    async def _update_search_index(self, template: OptimizedResearchTemplate):
+        """Update search index with new template"""
+        try:
+            # Regenerate embeddings for the new template
+            template.embeddings = await self._generate_embeddings(template)
+        except Exception as e:
+            logger.error(f"Error updating search index: {e}")
+    
+    async def _track_event(self, event_type: str, data: Dict[str, Any]):
+        """Track analytics events"""
+        self.usage_analytics[event_type].append({
+            **data,
+            'timestamp': time.time()
+        })
+    
+    def _start_background_tasks(self):
+        """Start background maintenance tasks"""
+        
+        # Periodic cache cleanup
+        task = asyncio.create_task(self._periodic_cache_cleanup())
+        self.background_tasks.add(task)
+        
+        # Periodic Redis sync
+        if self.redis_client:
+            task = asyncio.create_task(self._periodic_redis_sync())
+            self.background_tasks.add(task)
+        
+        # Analytics aggregation
+        task = asyncio.create_task(self._periodic_analytics_aggregation())
+        self.background_tasks.add(task)
+    
+    async def _periodic_cache_cleanup(self):
+        """Clean up expired cache entries"""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Every 5 minutes
+                
+                # Clear search cache
+                self.search_cache.clear()
+                
+                logger.debug("Cache cleanup completed")
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Cache cleanup error: {e}")
+    
+    async def _periodic_redis_sync(self):
+        """Periodic sync with Redis"""
+        while True:
+            try:
+                await asyncio.sleep(600)  # Every 10 minutes
+                
+                # Sync usage counts and effectiveness scores
+                for template in self.templates.values():
+                    await self._save_template_to_redis(template)
+                
+                logger.debug("Redis sync completed")
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Redis sync error: {e}")
+    
+    async def _periodic_analytics_aggregation(self):
+        """Aggregate analytics data"""
+        while True:
+            try:
+                await asyncio.sleep(3600)  # Every hour
+                
+                # Aggregate usage analytics
+                total_created = len(self.usage_analytics.get('template_created', []))
+                logger.info(f"Analytics: {total_created} templates created")
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Analytics aggregation error: {e}")
+    
+    def get_template(self, template_id: str) -> Optional[OptimizedResearchTemplate]:
+        """Get template by ID"""
+        return self.templates.get(template_id)
+    
+    def get_all_templates(self) -> List[Dict[str, Any]]:
+        """Get all templates"""
+        return [asdict(template) for template in self.templates.values()]
+    
+    def track_template_usage(self, template_id: str, effectiveness: float):
+        """Track template usage and effectiveness"""
+        if template_id in self.templates:
+            template = self.templates[template_id]
+            template.usage_count += 1
+            
+            # Update effectiveness score (exponential moving average)
+            alpha = 0.1
+            template.effectiveness_score = (
+                alpha * effectiveness + 
+                (1 - alpha) * template.effectiveness_score
+            )
+    
+    async def shutdown(self):
+        """Graceful shutdown"""
+        # Cancel background tasks
+        for task in self.background_tasks:
+            task.cancel()
+        
+        await asyncio.gather(*self.background_tasks, return_exceptions=True)
+        
+        # Close Redis connection
+        if self.redis_client:
+            self.redis_client.close()
+            await self.redis_client.wait_closed()
+        
+        logger.info("TemplateAgent shutdown complete")
 
-# Global template agent instance
-template_agent = TemplateAgent()
+# Global optimized instance
+template_agent = OptimizedTemplateAgent()
