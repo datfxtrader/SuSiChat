@@ -65,33 +65,33 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {config.environment}")
     logger.info(f"Debug mode: {config.debug}")
     logger.info(f"API keys configured: {bool(config.api.deepseek_api_key)}")
-    
+
     # Initialize error recovery handlers
     await setup_error_handlers()
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down DeerFlow research service...")
-    
+
     # Generate final metrics report
     final_metrics = metrics.get_metrics_summary()
     logger.info(f"Final metrics: {final_metrics}")
 
 async def setup_error_handlers():
     """Setup error recovery handlers"""
-    
+
     async def api_key_recovery(error_info):
         """Recovery handler for API key errors"""
         logger.warning("API key error detected, switching to fallback services")
         return {"fallback": True, "message": "Using fallback services"}
-    
+
     async def rate_limit_recovery(error_info):
         """Recovery handler for rate limit errors"""
         logger.warning("Rate limit detected, implementing backoff")
         await asyncio.sleep(60)  # Wait 1 minute
         return {"retry_after": 60}
-    
+
     error_handler.register_recovery_handler("APIKeyError", api_key_recovery)
     error_handler.register_recovery_handler("RateLimitError", rate_limit_recovery)
 
@@ -694,7 +694,7 @@ Format your report in Markdown, but make it readable and professional."""
 @app.get("/health")
 async def health_check():
     """Comprehensive health check endpoint."""
-    
+
     try:
         # Basic health indicators
         health_data = {
@@ -704,7 +704,7 @@ async def health_check():
             "uptime": time.time(),
             "version": "1.0.0"
         }
-        
+
         # Check API key availability
         api_status = {
             "deepseek": bool(config.api.deepseek_api_key),
@@ -713,21 +713,21 @@ async def health_check():
             "brave": bool(config.api.brave_api_key)
         }
         health_data["api_keys"] = api_status
-        
+
         # Get system metrics
         system_health = metrics.get_system_health()
         health_data.update(system_health)
-        
+
         # Get error summary
         error_summary = error_handler.get_error_summary()
         health_data["error_summary"] = error_summary
-        
+
         # Determine overall status
         if system_health.get("overall_health") == "critical" or error_summary.get("recent_errors", 0) > 10:
             health_data["status"] = "degraded"
-        
+
         return health_data
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {
@@ -739,7 +739,7 @@ async def health_check():
 @app.get("/metrics")
 async def get_metrics():
     """Get detailed system metrics."""
-    
+
     try:
         metrics_data = {
             "system_metrics": metrics.get_metrics_summary(),
@@ -757,9 +757,9 @@ async def get_metrics():
                 }
             }
         }
-        
+
         return metrics_data
-        
+
     except Exception as e:
         logger.error(f"Metrics collection failed: {e}")
         raise HTTPException(status_code=500, detail=f"Metrics collection failed: {str(e)}")
@@ -767,7 +767,7 @@ async def get_metrics():
 @app.get("/config")
 async def get_configuration():
     """Get current system configuration (sanitized)."""
-    
+
     try:
         # Return sanitized configuration (no secrets)
         sanitized_config = {
@@ -789,9 +789,9 @@ async def get_configuration():
                 "backend": config.cache.backend
             }
         }
-        
+
         return sanitized_config
-        
+
     except Exception as e:
         logger.error(f"Configuration retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=f"Configuration retrieval failed: {str(e)}")
@@ -815,7 +815,7 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
 
     # Create initial response
     initial_response = ResearchResponse(
-        status={"status": "processing", "message": "Research started"},
+        status={"status": "processing", "message": "Research started"},```python
         service_process_log=["Research initialized", "Processing request..."]
     )
 
