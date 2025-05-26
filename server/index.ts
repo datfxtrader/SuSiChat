@@ -493,8 +493,6 @@ app.use((req, res, next) => {
   const searchEnginesRouter = (await import('./routes/search-engines')).default;
   app.use('/api/search-engines', searchEnginesRouter);
 
-  app.use('/api/enhanced-search', enhancedSearchRouter);
-
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {
     try {
@@ -523,10 +521,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 3000
+  // Production server on port 5000 for preview
   // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "3000");
+  const port = parseInt(process.env.PORT || "5000");
 
   // Check if port is already in use
   const { createServer } = await import('net');
