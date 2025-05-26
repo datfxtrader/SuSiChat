@@ -1166,7 +1166,7 @@ Be data-driven and include specific numbers from the market data.
   ): Promise<ResearchResult | null> {
     try {
       const response = await this.axiosInstance.post(
-        'http://localhost:5000/api/forex/analyze',
+        'http://localhost:3000/api/forex/analyze',
         { currencyPair, timeframe: 'daily' },
         { signal }
       );
