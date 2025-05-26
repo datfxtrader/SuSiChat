@@ -90,6 +90,40 @@ mode = "sequential"
 task = "shell.exec"
 args = "node test-apis.js"
 
+[[workflows.workflow]]
+name = "Test Vietnamese Chatbot"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "chmod +x run_vietnamese_chatbot_tests.sh"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "./run_vietnamese_chatbot_tests.sh"
+
+[[workflows.workflow]]
+name = "Test All Systems"
+author = 36382494
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_vietnamese_chatbot_comprehensive.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_vietnamese_ui_components.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_comprehensive.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_complete_app.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
