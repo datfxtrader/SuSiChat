@@ -1,0 +1,956 @@
+## 7. Query Analyzer (query_analyzer.py) Optimizations
+
+### High-Performance Query Analysis with NLP:
+
+```python
+import re
+import spacy
+from functools import lru_cache
+from typing import Pattern
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+class OptimizedQueryAnalyzer:
+    """Optimized query analyzer with compiled patterns and caching"""
+    
+    def __init__(self):
+        # Pre-compile all regex patterns
+        self.compiled_patterns = self._compile_patterns()
+        
+        # Load spaCy model lazily
+        self._nlp = None
+        
+        # TF-IDF vectorizer for concept extraction
+        self.tfidf = TfidfVectorizer(
+            max_features=100,
+            stop_words='english',
+            ngram_range=(1, 2)
+        )
+        
+        # Cache for analysis results
+        self.analysis_cache = LRUCache(maxsize=1000)
+        
+        # Pre-compute domain keyword sets
+        self.domain_keyword_sets = {
+            domain: set(keywords)
+            for domain, keywords in self.domain_keywords.items()
+        }
+    
+    @property
+    def nlp(self):
+        """Lazy load spaCy model"""
+        if self._nlp is None:
+            self._nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+        return self._nlp
+    
+    def _compile_patterns(self) -> Dict[str, Dict[str, List[Pattern]]]:
+        """Pre-compile all regex patterns"""
+        compiled = {}
+        
+        for intent, data in self.intent_patterns.items():
+            compiled[intent] = {
+                'keywords': data['keywords'],
+                'patterns': [re.compile(pattern, re.IGNORECASE) 
+                           for pattern in data['patterns']]
+            }
+        
+        return compiled
+    
+    @lru_cache(maxsize=500)
+    def analyze_query(self, query: str) -> Dict[str, Any]:
+        """Cached query analysis with optimization"""
+        
+        # Check cache
+        cache_key = hash(query)
+        if cache_key in self.analysis_cache:
+            return self.analysis_cache[cache_key]
+        
+        # Parallel analysis tasks
+        doc = self.nlp(query)  # SpaCy processing
+        
+        # Extract features in parallel
+        words = [token.text.lower() for token in doc if not token.is_stop]
+        entities = self._extract_entities_optimized(doc)
+        intent = self._classify_intent_optimized(query, words)
+        domains = self._classify_domains_optimized(query, words)
+        complexity = self._analyze_complexity_optimized(doc, words)
+        concepts = self._extract_concepts_nlp(doc)
+        capabilities = self._determine_capabilities(intent, domains, complexity)
+        
+        result = {
+            "query": query,
+            "intent": intent,
+            "domains": domains,
+            "entities": entities,
+            "concepts": concepts,
+            "complexity": complexity,
+            "capabilities": capabilities,
+            "metadata": {
+                "word_count": len(words),
+                "has_questions": "?" in query,
+                "sentence_count": len(list(doc.sents)),
+                "avg_word_length": np.mean([len(token.text) for token in doc])
+            }
+        }
+        
+        # Cache result
+        self.analysis_cache[cache_key] = result
+        
+        return result
+    
+    def _extract_entities_optimized(self, doc) -> List[Dict[str, str]]:
+        """Extract entities using spaCy"""
+        entities = []
+        
+        # Use spaCy's built-in entity recognition
+        for ent in doc.ents:
+            entities.append({
+                "text": ent.text,
+                "type": ent.label_,
+                "confidence": 0.85,
+                "start": ent.start_char,
+                "end": ent.end_char
+            })
+        
+        # Additional pattern-based extraction
+        # Numbers with context
+        for match in re.finditer(r'(\$?\d+(?:\.\d+)?(?:[KMB])?)', doc.text):
+            entities.append({
+                "text": match.group(1),
+                "type": "MONEY" if "$" in match.group(1) else "NUMBER",
+                "confidence": 0.9,
+                "start": match.start(),
+                "end": match.end()
+            })
+        
+        return entities
+    
+    def _classify_intent_optimized(self, query: str, words: List[str]) -> Dict[str, Any]:
+        """Optimized intent classification"""
+        query_lower = query.lower()
+        intent_scores = {}
+        
+        # Vectorized scoring
+        for intent, patterns in self.compiled_patterns.items():
+            keyword_score = sum(1 for kw in patterns['keywords'] if kw in query_lower)
+            pattern_score = sum(2 for pattern in patterns['patterns'] if pattern.search(query_lower))
+            intent_scores[intent] = keyword_score + pattern_score
+        
+        # Normalize scores
+        total_score = sum(intent_scores.values()) or 1
+        normalized_scores = {k: v/total_score for k, v in intent_scores.items()}
+        
+        # Get primary intent
+        primary_intent = max(normalized_scores, key=normalized_scores.get, default="explanation")
+        
+        return {
+            "primary": primary_intent,
+            "confidence": normalized_scores.get(primary_intent, 0.5),
+            "all_intents": normalized_scores
+        }
+    
+    def _classify_domains_optimized(self, query: str, words: List[str]) -> List[Dict[str, float]]:
+        """Optimized domain classification using sets"""
+        query_words = set(words)
+        domain_scores = {}
+        
+        # Set intersection for faster matching
+        for domain, keyword_set in self.domain_keyword_sets.items():
+            matches = query_words.intersection(keyword_set)
+            if matches:
+                domain_scores[domain] = len(matches) / len(keyword_set)
+        
+        # Sort and format results
+        return [
+            {"domain": domain, "confidence": score}
+            for domain, score in sorted(
+                domain_scores.items(), 
+                key=lambda x: x[1], 
+                reverse=True
+            )
+        ]
+    
+    def _analyze_complexity_optimized(self, doc, words: List[str]) -> Dict[str, Any]:
+        """Enhanced complexity analysis using NLP features"""
+        
+        # Linguistic features
+        features = {
+            "length": len(words) / 15,
+            "unique_ratio": len(set(words)) / max(len(words), 1),
+            "avg_word_length": np.mean([len(w) for w in words]) / 10,
+            "entity_density": len(doc.ents) / max(len(words), 1),
+            "noun_verb_ratio": self._calculate_pos_ratio(doc),
+            "subordinate_clauses": self._count_subordinate_clauses(doc)
+        }
+        
+        # Normalize features
+        normalized_features = {
+            k: min(1.0, v) for k, v in features.items()
+        }
+        
+        # Calculate weighted score
+        weights = {
+            "length": 0.2,
+            "unique_ratio": 0.15,
+            "avg_word_length": 0.15,
+            "entity_density": 0.2,
+            "noun_verb_ratio": 0.15,
+            "subordinate_clauses": 0.15
+        }
+        
+        complexity_score = sum(
+            normalized_features[k] * weights[k] 
+            for k in weights
+        )
+        
+        # Determine level
+        if complexity_score < 0.3:
+            level = "simple"
+        elif complexity_score < 0.6:
+            level = "moderate"
+        else:
+            level = "complex"
+        
+        return {
+            "level": level,
+            "score": complexity_score,
+            "features": normalized_features,
+            "linguistic_complexity": self._calculate_linguistic_complexity(doc)
+        }
+    
+    def _extract_concepts_nlp(self, doc) -> List[str]:
+        """Extract concepts using NLP techniques"""
+        
+        # Extract noun phrases
+        noun_phrases = []
+        for chunk in doc.noun_chunks:
+            if len(chunk.text) > 3:
+                noun_phrases.append(chunk.text.lower())
+        
+        # Extract important single words (nouns and verbs)
+        important_pos = {'NOUN', 'PROPN', 'VERB'}
+        important_words = [
+            token.lemma_.lower() 
+            for token in doc 
+            if token.pos_ in important_pos and len(token.text) > 3
+        ]
+        
+        # Combine and deduplicate
+        all_concepts = list(set(noun_phrases + important_words))
+        
+        # Rank by importance (frequency in original text)
+        concept_scores = {
+            concept: doc.text.lower().count(concept.lower())
+            for concept in all_concepts
+        }
+        
+        # Return top concepts
+        sorted_concepts = sorted(
+            concept_scores.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )
+        
+        return [concept for concept, _ in sorted_concepts[:10]]
+    
+    def _calculate_pos_ratio(self, doc) -> float:
+        """Calculate part-of-speech ratio for complexity"""
+        pos_counts = {}
+        for token in doc:
+            pos_counts[token.pos_] = pos_counts.get(token.pos_, 0) + 1
+        
+        nouns = pos_counts.get('NOUN', 0) + pos_counts.get('PROPN', 0)
+        verbs = pos_counts.get('VERB', 0)
+        
+        if verbs == 0:
+            return 1.0
+        
+        return min(1.0, nouns / verbs / 3)  # Normalize
+    
+    def _count_subordinate_clauses(self, doc) -> float:
+        """Count subordinate clauses as complexity indicator"""
+        subordinators = {'because', 'although', 'while', 'if', 'when', 'since', 'unless'}
+        count = sum(1 for token in doc if token.text.lower() in subordinators)
+        return min(1.0, count / 3)  # Normalize to 0-1
+    
+    def _calculate_linguistic_complexity(self, doc) -> Dict[str, float]:
+        """Calculate detailed linguistic complexity metrics"""
+        return {
+            "lexical_diversity": len(set(token.text.lower() for token in doc)) / len(doc),
+            "average_dependency_distance": self._avg_dependency_distance(doc),
+            "syntactic_complexity": self._syntactic_complexity(doc)
+        }
+
+# Global optimized analyzer instance
+optimized_query_analyzer = OptimizedQueryAnalyzer()
+```## 6. Optimized System (optimized_system.py) Enhancements
+
+### Critical Performance and Reliability Improvements:
+
+```python
+import asyncio
+from asyncio import Semaphore
+import aiohttp
+from cachetools import TTLCache
+from circuitbreaker import circuit
+import backoff
+
+class EnhancedOptimizedDeerFlowSystem:
+    """Production-ready optimized DeerFlow system"""
+    
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        
+        # Connection pooling
+        self.connector = aiohttp.TCPConnector(
+            limit=100,
+            limit_per_host=30,
+            ttl_dns_cache=300
+        )
+        
+        # Session management
+        self.session = aiohttp.ClientSession(
+            connector=self.connector,
+            timeout=aiohttp.ClientTimeout(total=30)
+        )
+        
+        # Rate limiting
+        self.semaphore = Semaphore(10)  # Max 10 concurrent operations
+        
+        # Circuit breaker for external services
+        self.circuit_breaker = circuit(
+            failure_threshold=5,
+            recovery_timeout=60,
+            expected_exception=Exception
+        )
+        
+        # Enhanced caching
+        self.query_cache = TTLCache(maxsize=1000, ttl=300)
+        self.result_cache = TTLCache(maxsize=500, ttl=600)
+        
+        # Lazy loading for heavy components
+        self._tool_registry = None
+        self._memory_manager = None
+        self._orchestrator = None
+        
+        # Performance monitoring
+        self.performance_stats = {
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'circuit_breaker_opens': 0
+        }
+    
+    @property
+    def tool_registry(self):
+        """Lazy load tool registry"""
+        if self._tool_registry is None:
+            self._tool_registry = self.container.resolve(EnhancedToolRegistry)
+        return self._tool_registry
+    
+    @property
+    def memory_manager(self):
+        """Lazy load memory manager"""
+        if self._memory_manager is None:
+            self._memory_manager = self.container.resolve(PersistentMemoryManager)
+        return self._memory_manager
+    
+    async def process_research_request(
+        self,
+        query: str,
+        user_id: str,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Enhanced request processing with caching and circuit breaker"""
+        
+        # Check cache first
+        cache_key = f"{user_id}:{query}:{hash(str(options))}"
+        if cache_key in self.query_cache:
+            self.performance_stats['cache_hits'] += 1
+            cached_result = self.query_cache[cache_key]
+            cached_result['from_cache'] = True
+            return cached_result
+        
+        self.performance_stats['cache_misses'] += 1
+        
+        # Rate limiting
+        async with self.semaphore:
+            try:
+                result = await self._process_with_circuit_breaker(
+                    query, user_id, options
+                )
+                
+                # Cache successful results
+                if result.get('status') == 'success':
+                    self.query_cache[cache_key] = result
+                
+                return result
+                
+            except Exception as e:
+                logger.error(f"Request processing failed: {e}")
+                return self._create_error_response(str(e), query)
+    
+    @circuit_breaker
+    @backoff.on_exception(
+        backoff.expo,
+        Exception,
+        max_tries=3,
+        max_time=30
+    )
+    async def _process_with_circuit_breaker(
+        self,
+        query: str,
+        user_id: str,
+        options: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Process with circuit breaker and retry logic"""
+        
+        if not self.initialized:
+            await self.initialize()
+        
+        # Enhanced complexity analysis with caching
+        complexity = await self._analyze_complexity_enhanced(query)
+        
+        # Parallel team creation and resource allocation
+        team_task = self.orchestrator.create_agent_team(query, complexity)
+        resources_task = self._allocate_resources(complexity)
+        
+        team, resources = await asyncio.gather(team_task, resources_task)
+        
+        # Execute with resource constraints
+        result = await self.orchestrator.execute_coordinated_task(
+            query, team, resources
+        )
+        
+        return result
+    
+    async def _analyze_complexity_enhanced(self, query: str) -> Dict[str, Any]:
+        """Enhanced complexity analysis with NLP features"""
+        
+        # Basic analysis
+        basic_complexity = self._analyze_complexity(query)
+        
+        # Additional NLP-based analysis
+        nlp_features = await self._extract_nlp_features(query)
+        
+        # Combine analyses
+        return {
+            'level': basic_complexity,
+            'score': self._calculate_complexity_score(query, nlp_features),
+            'features': nlp_features,
+            'estimated_time': self._estimate_processing_time(basic_complexity),
+            'required_agents': self._estimate_agent_count(basic_complexity)
+        }
+    
+    async def _allocate_resources(self, complexity: Dict[str, Any]) -> Dict[str, Any]:
+        """Dynamically allocate resources based on complexity"""
+        
+        resources = {
+            'memory_limit': '512MB',
+            'cpu_shares': 1024,
+            'timeout': 300,
+            'max_retries': 3
+        }
+        
+        if complexity['level'] == 'complex':
+            resources.update({
+                'memory_limit': '2GB',
+                'cpu_shares': 2048,
+                'timeout': 600,
+                'max_retries': 5
+            })
+        elif complexity['level'] == 'moderate':
+            resources.update({
+                'memory_limit': '1GB',
+                'cpu_shares': 1536,
+                'timeout': 450
+            })
+        
+        return resources
+    
+    async def graceful_shutdown(self):
+        """Enhanced shutdown with proper cleanup"""
+        logger.info("Starting graceful shutdown")
+        
+        try:
+            # Cancel pending tasks
+            pending_tasks = [
+                task for task in asyncio.all_tasks()
+                if not task.done() and task != asyncio.current_task()
+            ]
+            
+            if pending_tasks:
+                logger.info(f"Cancelling {len(pending_tasks)} pending tasks")
+                for task in pending_tasks:
+                    task.cancel()
+                
+                # Wait for cancellation
+                await asyncio.gather(*pending_tasks, return_exceptions=True)
+            
+            # Close connections
+            await self.session.close()
+            await self.connector.close()
+            
+            # Save state
+            await self._save_system_state()
+            
+            logger.info("Graceful shutdown completed")
+            
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+    
+    async def _save_system_state(self):
+        """Save system state for recovery"""
+        state = {
+            'metrics': self.metrics,
+            'performance_stats': self.performance_stats,
+            'timestamp': time.time()
+        }
+        
+        state_file = Path('system_state.json')
+        async with aiofiles.open(state_file, 'w') as f:
+            await f.write(json.dumps(state, indent=2))
+```# DeerFlow Agent System Optimization Guide
+
+## 🎯 Agent Architecture Overview
+
+Based on your system structure, here's a comprehensive optimization guide for each agent module.
+
+## Critical Issues Found in Current Implementation
+
+### 1. **Optimization Coordinator Issues:**
+- Heavy synchronous operations in async methods
+- No actual implementation in task methods (placeholders)
+- Missing error recovery mechanisms
+- No progress persistence
+
+### 2. **Optimized System Issues:**
+- Circular dependency risks
+- Memory leaks in orchestrator
+- No connection pooling for external services
+- Missing retry mechanisms
+
+### 3. **Query Analyzer Issues:**
+- Regex patterns compiled on every call
+- No caching of analysis results
+- Inefficient tokenization
+- Missing NLP optimizations
+
+## 1. Agent Core (agent_core.py) Optimizations
+
+### Current Issues to Address:
+- Potential memory leaks from long-running agent instances
+- Inefficient message passing between agents
+- Lack of proper lifecycle management
+
+### Optimized Implementation:
+
+```python
+import asyncio
+import weakref
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, field
+from collections import deque
+import uuid
+
+@dataclass
+class AgentMessage:
+    """Optimized message structure for inter-agent communication"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    sender: str = ""
+    recipient: str = ""
+    content: Dict[str, Any] = field(default_factory=dict)
+    priority: int = 0
+    timestamp: float = field(default_factory=time.time)
+    
+    def __lt__(self, other):
+        return self.priority > other.priority  # Higher priority first
+
+class BaseAgent(ABC):
+    """Optimized base agent with lifecycle management"""
+    
+    def __init__(self, agent_id: str, config: Dict[str, Any]):
+        self.agent_id = agent_id
+        self.config = config
+        self.state = "initialized"
+        self.message_queue = asyncio.PriorityQueue(maxsize=1000)
+        self.processed_messages = deque(maxlen=100)  # Keep last 100
+        self._running = False
+        self._tasks: List[asyncio.Task] = []
+        
+        # Weak references to prevent circular dependencies
+        self._connections: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
+        
+    async def start(self):
+        """Start agent processing"""
+        if self._running:
+            return
+            
+        self._running = True
+        self.state = "running"
+        
+        # Start message processing
+        self._tasks.append(
+            asyncio.create_task(self._process_messages())
+        )
+        
+        # Start periodic health check
+        self._tasks.append(
+            asyncio.create_task(self._health_check_loop())
+        )
+        
+        await self.on_start()
+    
+    async def stop(self):
+        """Gracefully stop agent"""
+        self._running = False
+        self.state = "stopping"
+        
+        # Cancel all tasks
+        for task in self._tasks:
+            task.cancel()
+        
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
+        
+        await self.on_stop()
+        self.state = "stopped"
+    
+    async def _process_messages(self):
+        """Process incoming messages with error handling"""
+        while self._running:
+            try:
+                # Wait for message with timeout
+                message = await asyncio.wait_for(
+                    self.message_queue.get(), 
+                    timeout=1.0
+                )
+                
+                # Process message
+                await self.handle_message(message)
+                
+                # Track processed messages
+                self.processed_messages.append(message.id)
+                
+            except asyncio.TimeoutError:
+                continue
+            except Exception as e:
+                logger.error(f"Agent {self.agent_id} message processing error: {e}")
+    
+    async def _health_check_loop(self):
+        """Periodic health monitoring"""
+        while self._running:
+            try:
+                await asyncio.sleep(30)  # Check every 30 seconds
+                health = await self.get_health_status()
+                
+                if health["status"] != "healthy":
+                    await self.attempt_recovery()
+                    
+            except Exception as e:
+                logger.error(f"Health check failed for {self.agent_id}: {e}")
+    
+    @abstractmethod
+    async def handle_message(self, message: AgentMessage):
+        """Handle incoming message"""
+        pass
+    
+    @abstractmethod
+    async def on_start(self):
+        """Called when agent starts"""
+        pass
+    
+    @abstractmethod
+    async def on_stop(self):
+        """Called when agent stops"""
+        pass
+    
+    async def send_message(self, recipient: str, content: Dict[str, Any], priority: int = 0):
+        """Send message to another agent"""
+        if recipient in self._connections:
+            message = AgentMessage(
+                sender=self.agent_id,
+                recipient=recipient,
+                content=content,
+                priority=priority
+            )
+            
+            target_agent = self._connections[recipient]
+            if target_agent and target_agent.state == "running":
+                await target_agent.message_queue.put(message)
+```
+
+## 2. Domain Agents (domain_agents.py) Optimizations
+
+### Specialized Domain Agent Pattern:
+
+```python
+from enum import Enum
+from typing import Set
+
+class DomainExpertise(Enum):
+    FINANCIAL = "financial"
+    SCIENTIFIC = "scientific"
+    TECHNICAL = "technical"
+    MEDICAL = "medical"
+    LEGAL = "legal"
+
+class DomainAgent(BaseAgent):
+    """Optimized domain-specific agent with expertise management"""
+    
+    def __init__(self, agent_id: str, domain: DomainExpertise, config: Dict[str, Any]):
+        super().__init__(agent_id, config)
+        self.domain = domain
+        self.expertise_areas: Set[str] = set()
+        self.confidence_threshold = config.get("confidence_threshold", 0.7)
+        
+        # Domain-specific tool registry
+        self.domain_tools: Dict[str, Any] = {}
+        
+        # Knowledge cache
+        self.knowledge_cache = LRUCache(maxsize=1000)
+        
+    async def evaluate_query_fit(self, query: str) -> float:
+        """Evaluate how well this agent can handle the query"""
+        # Use domain-specific keywords and patterns
+        domain_keywords = self._get_domain_keywords()
+        query_lower = query.lower()
+        
+        keyword_matches = sum(1 for kw in domain_keywords if kw in query_lower)
+        confidence = keyword_matches / max(len(domain_keywords), 1)
+        
+        # Apply expertise boost
+        for expertise in self.expertise_areas:
+            if expertise.lower() in query_lower:
+                confidence *= 1.2
+        
+        return min(confidence, 1.0)
+    
+    def _get_domain_keywords(self) -> List[str]:
+        """Get domain-specific keywords"""
+        domain_keywords = {
+            DomainExpertise.FINANCIAL: [
+                "stock", "market", "investment", "portfolio", "trading",
+                "financial", "earnings", "revenue", "profit", "valuation"
+            ],
+            DomainExpertise.SCIENTIFIC: [
+                "research", "study", "experiment", "hypothesis", "data",
+                "analysis", "methodology", "peer-reviewed", "scientific"
+            ],
+            DomainExpertise.TECHNICAL: [
+                "code", "programming", "software", "algorithm", "system",
+                "technology", "development", "api", "framework", "architecture"
+            ],
+            DomainExpertise.MEDICAL: [
+                "health", "disease", "treatment", "symptom", "diagnosis",
+                "medicine", "patient", "clinical", "therapy", "medical"
+            ],
+            DomainExpertise.LEGAL: [
+                "law", "legal", "court", "regulation", "compliance",
+                "contract", "case", "statute", "litigation", "attorney"
+            ]
+        }
+        
+        return domain_keywords.get(self.domain, [])
+    
+    async def process_domain_query(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Process query with domain expertise"""
+        # Check cache first
+        cache_key = f"{self.domain.value}:{query}"
+        cached_result = self.knowledge_cache.get(cache_key)
+        
+        if cached_result and self._is_cache_valid(cached_result):
+            return cached_result
+        
+        # Process with domain-specific approach
+        result = await self._execute_domain_strategy(query, context)
+        
+        # Cache result
+        self.knowledge_cache.put(cache_key, result)
+        
+        return result
+```
+
+## 3. Enhanced Agents (enhanced_agents.py) Optimizations
+
+### Multi-Agent Coordination Optimization:
+
+```python
+import asyncio
+from asyncio import PriorityQueue
+from typing import List, Set
+
+class EnhancedMultiAgentCoordinator:
+    """Optimized coordinator with intelligent task distribution"""
+    
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.agents: Dict[str, BaseAgent] = {}
+        self.task_queue = PriorityQueue()
+        self.agent_load: Dict[str, int] = {}
+        
+        # Performance tracking
+        self.agent_performance: Dict[str, AgentPerformance] = {}
+        
+        # Agent pools for different task types
+        self.agent_pools: Dict[str, List[str]] = {
+            "research": [],
+            "analysis": [],
+            "synthesis": [],
+            "verification": []
+        }
+    
+    async def distribute_task(self, task: Task) -> Dict[str, Any]:
+        """Intelligently distribute task to best agent"""
+        # Analyze task requirements
+        requirements = await self._analyze_task_requirements(task)
+        
+        # Find best agents
+        candidate_agents = await self._find_suitable_agents(requirements)
+        
+        if not candidate_agents:
+            return {"error": "No suitable agents available"}
+        
+        # Select optimal agent based on load and performance
+        selected_agent = await self._select_optimal_agent(candidate_agents, task)
+        
+        # Assign task with monitoring
+        return await self._assign_task_with_monitoring(selected_agent, task)
+    
+    async def _select_optimal_agent(
+        self, 
+        candidates: List[str], 
+        task: Task
+    ) -> str:
+        """Select best agent using multiple criteria"""
+        scores = {}
+        
+        for agent_id in candidates:
+            agent = self.agents[agent_id]
+            
+            # Calculate composite score
+            load_score = 1.0 - (self.agent_load.get(agent_id, 0) / 10)
+            perf_score = self.agent_performance.get(agent_id, AgentPerformance()).success_rate
+            fit_score = await agent.evaluate_query_fit(task.query)
+            
+            # Weighted combination
+            scores[agent_id] = (
+                load_score * 0.3 +
+                perf_score * 0.4 +
+                fit_score * 0.3
+            )
+        
+        # Return agent with highest score
+        return max(scores, key=scores.get)
+    
+    async def create_collaborative_team(
+        self, 
+        query: str, 
+        max_agents: int = 3
+    ) -> List[BaseAgent]:
+        """Create optimal team for collaborative tasks"""
+        # Analyze query complexity
+        complexity = await self._analyze_query_complexity(query)
+        
+        # Determine required expertise
+        required_domains = await self._identify_required_domains(query)
+        
+        team = []
+        
+        # Add domain experts
+        for domain in required_domains[:max_agents]:
+            expert = await self._get_domain_expert(domain)
+            if expert:
+                team.append(expert)
+        
+        # Add coordinator if complex
+        if complexity > 0.7 and len(team) < max_agents:
+            coordinator = await self._get_coordinator_agent()
+            if coordinator:
+                team.append(coordinator)
+        
+        return team
+```
+
+## 4. Financial Fact Checker (financial_fact_checker.py) Optimizations
+
+### High-Performance Financial Verification:
+
+```python
+import aiohttp
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+class FinancialFactChecker(BaseAgent):
+    """Optimized financial fact checking with real-time data"""
+    
+    def __init__(self, agent_id: str, config: Dict[str, Any]):
+        super().__init__(agent_id, config)
+        self.data_sources = config.get("data_sources", {})
+        self.cache_ttl = config.get("cache_ttl", 300)  # 5 minutes
+        
+        # Specialized caches
+        self.price_cache = TTLCache(ttl=60)  # 1 minute for prices
+        self.fundamental_cache = TTLCache(ttl=3600)  # 1 hour for fundamentals
+        self.news_cache = TTLCache(ttl=300)  # 5 minutes for news
+        
+        # Rate limiting
+        self.rate_limiter = RateLimiter(
+            max_requests=100,
+            time_window=60  # per minute
+        )
+    
+    async def verify_financial_claim(
+        self, 
+        claim: str, 
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verify financial claim with multiple data sources"""
+        
+        # Extract entities and metrics
+        entities = await self._extract_financial_entities(claim)
+        metrics = await self._identify_metrics(claim)
+        
+        # Parallel data fetching
+        verification_tasks = []
+        
+        for entity in entities:
+            for metric in metrics:
+                task = self._verify_single_metric(entity, metric)
+                verification_tasks.append(task)
+        
+        # Execute all verifications in parallel
+        results = await asyncio.gather(*verification_tasks, return_exceptions=True)
+        
+        # Aggregate results
+        verification_result = self._aggregate_verification_results(results)
+        
+        return {
+            "claim": claim,
+            "verification_status": verification_result["status"],
+            "confidence": verification_result["confidence"],
+            "evidence": verification_result["evidence"],
+            "sources": verification_result["sources"],
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    async def _verify_single_metric(
+        self, 
+        entity: str, 
+        metric: str
+    ) -> Dict[str, Any]:
+        """Verify single financial metric with caching"""
+        
+        cache_key = f"{entity}:{metric}"
+        
+        # Check appropriate cache
+        cached = self._get_from_cache(metric, cache_key)
+        if cached:
+            return cached
+        
+        # Rate limit check
+        await self.rate_limiter.acquire()
+        
+        try:
+            # Fetch from multiple sources for cross-verification
+            source
