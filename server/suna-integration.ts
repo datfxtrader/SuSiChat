@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { researchService, ResearchDepth } from './deerflow-integration';
 import { crashSafeStorage } from './crash-safe-storage';
 
-import LRU from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import { getCurrentBitcoinPrice, getBitcoinMarketContext, enhanceBitcoinQuery } from './yahoo-finance-integration';
 import rateLimit from 'express-rate-limit';
 import { validate } from 'class-validator';
@@ -16,7 +16,7 @@ const CACHE_TTL = 5 * 60 * 1000;
 const MAX_CACHE_SIZE = 50;
 
 // LRU cache for web search results
-const searchCache = new LRU({
+const searchCache = new LRUCache({
   max: 100,
   ttl: 1000 * 60 * 5, // 5 minutes
   updateAgeOnGet: true
