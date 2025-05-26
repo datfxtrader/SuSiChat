@@ -34,14 +34,14 @@ export interface DeerFlowResearchResponse {
 }
 
 const DEERFLOW_CONFIG = {
-  SERVICE_URL: 'http://0.0.0.0:9000',
-  TIMEOUT_SHORT: 10000,      // 10 seconds
-  TIMEOUT_MEDIUM: 30000,     // 30 seconds
-  TIMEOUT_LONG: 600000,      // 10 minutes
-  RETRY_ATTEMPTS: 3,
+  SERVICE_URL: process.env.DEERFLOW_SERVICE_URL || 'http://localhost:9000',
+  FALLBACK_PORTS: [9000, 9001, 9002, 9003, 9004],
   RETRY_DELAY: 2000,
-  SERVICE_START_TIMEOUT: 30000,
-} as const;
+  MAX_RETRIES: 3,
+  TIMEOUT_SHORT: 10000,
+  TIMEOUT_LONG: 30000,
+  TIMEOUT_EXTENDED: 60000
+};
 
 export class DeerFlowClient {
   private static instance: DeerFlowClient;
@@ -50,11 +50,37 @@ export class DeerFlowClient {
   private lastStatusCheck = 0;
   private readonly statusCheckInterval = 60000; // 1 minute
 
-  private constructor() {
+  constructor() {
     this.axiosInstance = axios.create({
       baseURL: DEERFLOW_CONFIG.SERVICE_URL,
       validateStatus: (status) => status >= 200 && status < 500,
     });
+  }
+
+  private async findActiveService(): Promise<string | null> {
+    // Try default URL first
+    try {
+      const response = await axios.get(`${DEERFLOW_CONFIG.SERVICE_URL}/health`, { timeout: 3000 });
+      if (response.status === 200) return DEERFLOW_CONFIG.SERVICE_URL;
+    } catch (error) {
+      // Continue to try other ports
+    }
+
+    // Try fallback ports
+    for (const port of DEERFLOW_CONFIG.FALLBACK_PORTS) {
+      const url = `http://localhost:${port}`;
+      try {
+        const response = await axios.get(`${url}/health`, { timeout: 2000 });
+        if (response.status === 200) {
+          this.axiosInstance.defaults.baseURL = url;
+          console.log(`✅ Found DeerFlow service at ${url}`);
+          return url;
+        }
+      } catch (error) {
+        continue;
+      }
+    }
+    return null;
   }
 
   static getInstance(): DeerFlowClient {

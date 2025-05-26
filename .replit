@@ -39,7 +39,7 @@ mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python deerflow_service/server.py"
+args = "pkill -f \"python.*deerflow_service/server.py\" || true; sleep 2; python deerflow_service/server.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"

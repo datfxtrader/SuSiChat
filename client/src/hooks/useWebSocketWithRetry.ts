@@ -46,13 +46,28 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
   }, [heartbeatInterval]);
 
   const connect = useCallback(() => {
+    if (retryCount >= maxRetries) {
+      setConnectionState('error');
+      onError?.(new Error('Max reconnection attempts reached'));
+      return;
+    }
+
     try {
       clearTimers();
+      setConnectionState('connecting');
 
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+          console.warn('WebSocket connection timeout');
+        }
+      }, 10000); // 10 second connection timeout
+
       ws.onopen = () => {
+        clearTimeout(connectionTimeout);
         setConnectionState('connected');
         setRetryCount(0);
         setupHeartbeat();
@@ -72,34 +87,30 @@ export const useWebSocketWithRetry = (url: string, options: WebSocketOptions = {
           }
         } catch (err) {
           console.error('Message parse error:', err);
-          onError?.(new Error(`Failed to parse message: ${err}`));
+          // Don't close connection for parse errors
         }
       };
 
       ws.onerror = (error) => {
+        clearTimeout(connectionTimeout);
         console.error('WebSocket error:', error);
-        // Don't reject immediately, let the close handler manage reconnection
-        if (ws.readyState === WebSocket.CONNECTING) {
-          //reject(error); // Removed reject as per instruction
-        }
         setConnectionState('error');
-        onError?.(new Error('WebSocket connection error'));
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        clearTimeout(connectionTimeout);
         setConnectionState('disconnected');
         clearTimers();
 
-        // Attempt reconnection
-        if (retryCount < maxRetries) {
-          const delay = retryDelay * Math.pow(2, retryCount); // Exponential backoff
+        // Only attempt reconnection if not manually closed and under retry limit
+        if (event.code !== 1000 && retryCount < maxRetries) {
+          const delay = Math.min(retryDelay * Math.pow(1.5, retryCount), 10000); // Cap at 10 seconds
 
           retryTimeoutRef.current = setTimeout(() => {
             setRetryCount(prev => prev + 1);
-            setConnectionState('connecting');
             connect();
           }, delay);
-        } else {
+        } else if (retryCount >= maxRetries) {
           setConnectionState('error');
           onError?.(new Error('Max reconnection attempts reached'));
         }

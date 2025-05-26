@@ -8,49 +8,71 @@ import { spawn, ChildProcess } from 'child_process';
 import axios from 'axios';
 
 // Configuration
-const DEERFLOW_PORT = 9000;
-const DEERFLOW_URL = `http://localhost:${DEERFLOW_PORT}`;
+const DEERFLOW_PORTS = [9000, 9001, 9002, 9003, 9004]; // Try multiple ports
+const DEERFLOW_HOST = 'localhost';
+
+let activeDeerFlowUrl: string | null = null;
+
+/**
+ * Find the active DeerFlow service URL
+ */
+async function findActiveDeerFlowService(): Promise<string | null> {
+  if (activeDeerFlowUrl) {
+    try {
+      const response = await axios.get(`${activeDeerFlowUrl}/health`, { timeout: 3000 });
+      if (response.status === 200) return activeDeerFlowUrl;
+    } catch (error) {
+      activeDeerFlowUrl = null;
+    }
+  }
+
+  for (const port of DEERFLOW_PORTS) {
+    const url = `http://${DEERFLOW_HOST}:${port}`;
+    try {
+      const response = await axios.get(`${url}/health`, { timeout: 2000 });
+      if (response.status === 200) {
+        activeDeerFlowUrl = url;
+        return url;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if the DeerFlow service is running
+ */
+export async function checkDeerFlowService(): Promise<boolean> {
+  const url = await findActiveDeerFlowService();
+  return url !== null;
+}
+
 const MAX_STARTUP_RETRIES = 5;
 const RETRY_INTERVAL_MS = 2000;
 
 // Global state
 let deerflowProcess: ChildProcess | null = null;
 
-/**
- * Check if the DeerFlow service is healthy and running
- */
-export async function checkDeerFlowService(): Promise<boolean> {
-  try {
-    console.log(`Checking DeerFlow health at ${DEERFLOW_URL}/health`);
-    const response = await axios.get(`${DEERFLOW_URL}/health`, { 
-      timeout: 3000,
-      validateStatus: () => true // Accept any status code to better diagnose issues
-    });
-    
-    console.log('DeerFlow health check response:', response.status, response.data);
-    return response.status === 200 && response.data?.status === 'ok';
-  } catch (error) {
-    console.log('DeerFlow health check failed:', error);
-    return false;
-  }
-}
+
 
 /**
  * Start the DeerFlow Python service if it's not already running
  */
 export async function startDeerFlowService(): Promise<boolean> {
   console.log('Attempting to start DeerFlow service...');
-  
+
   // Check if already running
   if (await checkDeerFlowService()) {
     console.log('DeerFlow service is already running');
     return true;
   }
-  
+
   // Start the process if it's not already started
   if (!deerflowProcess) {
     console.log('Spawning new DeerFlow process...');
-    
+
     try {
       // Spawn the comprehensive DeerFlow agent system for full capabilities
       deerflowProcess = spawn('python', ['./deerflow_service/server.py'], {
@@ -65,22 +87,22 @@ export async function startDeerFlowService(): Promise<boolean> {
         },
         stdio: ['ignore', 'pipe', 'pipe']
       });
-      
+
       // Handle process output
       deerflowProcess.stdout?.on('data', (data: Buffer) => {
         console.log(`DeerFlow stdout: ${data.toString().trim()}`);
       });
-      
+
       deerflowProcess.stderr?.on('data', (data: Buffer) => {
         console.error(`DeerFlow stderr: ${data.toString().trim()}`);
       });
-      
+
       // Handle process exit
       deerflowProcess.on('exit', (code) => {
         console.log(`DeerFlow process exited with code ${code}`);
         deerflowProcess = null;
       });
-      
+
       // Check if service starts properly
       for (let i = 0; i < MAX_STARTUP_RETRIES; i++) {
         await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL_MS));
@@ -90,7 +112,7 @@ export async function startDeerFlowService(): Promise<boolean> {
         }
         console.log(`Waiting for DeerFlow service to start (attempt ${i + 1}/${MAX_STARTUP_RETRIES})...`);
       }
-      
+
       // If we reach here, service failed to start
       console.error('Failed to start DeerFlow service after multiple attempts');
       stopDeerFlowService();
@@ -101,7 +123,7 @@ export async function startDeerFlowService(): Promise<boolean> {
       return false;
     }
   }
-  
+
   return false;
 }
 
@@ -119,6 +141,6 @@ export function stopDeerFlowService(): void {
 /**
  * Get the URL to the DeerFlow service
  */
-export function getDeerFlowServiceUrl(): string {
-  return DEERFLOW_URL;
+export function getDeerFlowServiceUrl(): string | null {
+  return activeDeerFlowUrl;
 }

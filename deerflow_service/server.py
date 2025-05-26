@@ -1246,10 +1246,10 @@ async def start_optimization():
     """Start the complete system optimization process"""
     try:
         from optimization_coordinator import optimization_coordinator
-        
+
         logger.info("Starting DeerFlow system optimization")
         optimization_result = await optimization_coordinator.start_optimization()
-        
+
         return {
             "message": "Optimization process initiated",
             "optimization_id": "opt_" + str(int(time.time())),
@@ -1258,7 +1258,7 @@ async def start_optimization():
             "status": "running",
             "result": optimization_result
         }
-        
+
     except Exception as e:
         logger.error(f"Optimization start error: {e}")
         return {
@@ -1271,10 +1271,10 @@ async def get_optimization_status():
     """Get current optimization status"""
     try:
         from optimization_coordinator import optimization_coordinator
-        
+
         status = optimization_coordinator.get_optimization_status()
         return status
-        
+
     except Exception as e:
         logger.error(f"Optimization status error: {e}")
         return {
@@ -1288,19 +1288,19 @@ async def list_optimization_phases():
     """List all optimization phases"""
     try:
         from optimization_coordinator import OptimizationPhase
-        
+
         phases = []
         for phase in OptimizationPhase:
             phases.append({
                 "name": phase.value,
                 "description": f"Phase: {phase.value.replace('_', ' ').title()}"
             })
-        
+
         return {
             "total_phases": len(phases),
             "phases": phases
         }
-        
+
     except Exception as e:
         logger.error(f"Phases listing error: {e}")
         return {
@@ -1314,23 +1314,23 @@ async def apply_quick_optimization_wins():
     """Apply quick optimization improvements"""
     try:
         optimizations_applied = []
-        
+
         # Quick win 1: Enable metrics collection
         if not metrics.get_system_health().get("metrics_count", 0):
             metrics.record_operation_time("quick_optimization", 0.1)
             optimizations_applied.append("Enhanced metrics collection")
-        
+
         # Quick win 2: Improve error handling
         error_summary = error_handler.get_error_summary()
         if error_summary.get("recent_errors", 0) > 0:
             optimizations_applied.append("Enhanced error recovery")
-        
+
         # Quick win 3: Memory optimization
         optimizations_applied.append("Memory usage optimization")
-        
+
         # Quick win 4: Configuration validation
         optimizations_applied.append("Configuration validation")
-        
+
         return {
             "message": "Quick optimization wins applied",
             "optimizations_applied": optimizations_applied,
@@ -1340,7 +1340,7 @@ async def apply_quick_optimization_wins():
                 "Consider running full optimization for advanced features"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Quick wins error: {e}")
         return {
@@ -1395,7 +1395,7 @@ async def get_optimization_recommendations():
         # Get system metrics and current state
         health = metrics.get_system_health()
         metrics_summary = metrics.get_metrics_summary()
-        
+
         recommendations = {
             "high_priority": [],
             "medium_priority": [],
@@ -1407,7 +1407,7 @@ async def get_optimization_recommendations():
         # Analyze current system state
         active_agents = len(agent_core.active_agents) if agent_core else 0
         websocket_connections = len(state_manager.active_websockets) if state_manager else 0
-        
+
         # High priority recommendations
         if not LEARNING_AVAILABLE:
             recommendations["high_priority"].append({
@@ -1588,7 +1588,7 @@ class StateManager:
             except Exception as e:
                 logger.error(f"Error broadcasting to WebSocket: {e}")
                 disconnected.append(websocket)
-        
+
         # Remove disconnected websockets
         for ws in disconnected:
             self.disconnect(ws)
@@ -1601,7 +1601,7 @@ state_manager = StateManager()
 async def websocket_endpoint(websocket: WebSocket):
     client_host = websocket.client.host if websocket.client else "unknown"
     logger.info(f"WebSocket connection attempt from {client_host}")
-    
+
     try:
         await websocket.accept()
         logger.info(f"WebSocket connection established with {client_host}")
@@ -1668,7 +1668,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             "client": client_host,
                             "timestamp": time.time()
                         }))
-                        
+
                 except json.JSONDecodeError:
                     # Handle non-JSON messages gracefully
                     await websocket.send_text(json.dumps({
@@ -1718,17 +1718,33 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    import os
+    import socket
 
-    # Ensure we bind to the correct port
-    port = int(os.environ.get("DEERFLOW_PORT", 9000))
+    def find_available_port(start_port=9000, max_attempts=10):
+        """Find an available port starting from start_port"""
+        for port in range(start_port, start_port + max_attempts):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('0.0.0.0', port))
+                    return port
+            except OSError:
+                continue
+        return None
+
+    # Get port from environment or find available port
+    port = int(os.environ.get("PORT", 0))
+    if port == 0:
+        port = find_available_port(9000)
+
+    if port is None:
+        print("❌ No available ports found")
+        exit(1)
+
     print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
 
     uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=port, 
-        log_level="info",
-        access_log=True,
-        loop="asyncio"
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info"
     )
