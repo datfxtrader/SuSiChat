@@ -1,0 +1,459 @@
+// ============================================
+// DATABASE SCHEMA (Drizzle ORM)
+// ============================================
+// server/db/schema/blog.ts
+
+import { pgTable, text, timestamp, integer, boolean, jsonb, uuid, pgEnum, real } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+
+// Enums
+export const readingLevelEnum = pgEnum('reading_level', ['beginner', 'intermediate', 'advanced']);
+export const languageLevelEnum = pgEnum('language_level', ['beginner', 'intermediate', 'advanced']);
+
+// User Interests Table
+export const userInterests = pgTable('user_interests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  categoryId: text('category_id').notNull(),
+  subcategories: jsonb('subcategories').$type<string[]>().default([]),
+  weight: integer('weight').notNull().default(5), // 1-10
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// User Language Preferences
+export const userLanguages = pgTable('user_languages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  languageCode: text('language_code').notNull(),
+  languageName: text('language_name').notNull(),
+  level: languageLevelEnum('level').notNull(),
+  isPrimary: boolean('is_primary').default(false),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Blog Posts Table
+export const blogPosts = pgTable('blog_posts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  summary: text('summary').notNull(),
+  category: text('category').notNull(),
+  tags: jsonb('tags').$type<string[]>().default([]),
+  sourceUrls: jsonb('source_urls').$type<string[]>().default([]),
+  language: text('language').notNull().default('en'),
+  readingLevel: readingLevelEnum('reading_level').notNull(),
+  estimatedReadTime: integer('estimated_read_time').notNull(),
+  vocabularyHighlights: jsonb('vocabulary_highlights').$type<VocabularyItem[]>(),
+  grammarPoints: jsonb('grammar_points').$type<string[]>(),
+  publishedAt: timestamp('published_at').defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+  isPersonalized: boolean('is_personalized').default(false),
+  isTrending: boolean('is_trending').default(false),
+  factChecked: boolean('fact_checked').default(false),
+  factCheckScore: real('fact_check_score'),
+  generationMetadata: jsonb('generation_metadata').$type<GenerationMetadata>(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// User Blog Interactions
+export const userBlogInteractions = pgTable('user_blog_interactions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  postId: uuid('post_id').notNull().references(() => blogPosts.id),
+  interactionType: text('interaction_type').notNull(), // 'view', 'click', 'share', 'fact_check', 'dislike'
+  timeSpent: integer('time_spent'), // seconds
+  vocabularyLearned: jsonb('vocabulary_learned').$type<string[]>(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Vocabulary Learning Progress
+export const vocabularyProgress = pgTable('vocabulary_progress', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  word: text('word').notNull(),
+  language: text('language').notNull(),
+  timesEncountered: integer('times_encountered').default(1),
+  timesCorrect: integer('times_correct').default(0),
+  lastSeen: timestamp('last_seen').defaultNow(),
+  mastered: boolean('mastered').default(false)
+});
+
+// Types
+interface VocabularyItem {
+  word: string;
+  definition: string;
+  translation?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  example?: string;
+}
+
+interface GenerationMetadata {
+  model: string;
+  promptTemplate: string;
+  sources: string[];
+  generatedAt: string;
+  userContext: {
+    interests: string[];
+    recentQueries: string[];
+    language: string;
+    level: string;
+  };
+}
+
+// ============================================
+// API ROUTES
+// ============================================
+// server/routes/blog.ts
+
+import { Router } from 'express';
+import { z } from 'zod';
+import { db } from '../db';
+import { and, eq, gte, or, sql } from 'drizzle-orm';
+import { authenticate } from '../middleware/auth';
+
+const router = Router();
+
+// Get personalized blog feed
+router.get('/api/blog/personalized', authenticate, async (req, res) => {
+  try {
+    const { language = 'en', category = 'all', personalizedOnly = false } = req.query;
+    const userId = req.user.id;
+
+    // Get user preferences
+    const userPrefs = await db.select().from(userInterests).where(eq(userInterests.userId, userId));
+    const userLangs = await db.select().from(userLanguages).where(eq(userLanguages.userId, userId));
+
+    // Build query
+    let query = db.select().from(blogPosts);
+    const conditions = [
+      gte(blogPosts.expiresAt, new Date()),
+      eq(blogPosts.language, language as string)
+    ];
+
+    if (category !== 'all') {
+      conditions.push(eq(blogPosts.category, category as string));
+    }
+
+    if (personalizedOnly === 'true') {
+      conditions.push(eq(blogPosts.isPersonalized, true));
+    }
+
+    // Get posts
+    const posts = await query.where(and(...conditions))
+      .orderBy(sql`
+        CASE 
+          WHEN is_personalized = true THEN 1
+          WHEN is_trending = true THEN 2
+          ELSE 3
+        END,
+        published_at DESC
+      `)
+      .limit(20);
+
+    res.json({ posts });
+  } catch (error) {
+    console.error('Error fetching personalized blog:', error);
+    res.status(500).json({ error: 'Failed to fetch blog posts' });
+  }
+});
+
+// Track blog interaction
+router.post('/api/blog/:postId/interact', authenticate, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { interactionType, timeSpent, vocabularyLearned } = req.body;
+
+    await db.insert(userBlogInteractions).values({
+      userId: req.user.id,
+      postId,
+      interactionType,
+      timeSpent,
+      vocabularyLearned
+    });
+
+    // Update user interests based on interaction
+    if (interactionType === 'view' && timeSpent > 30) {
+      // Logic to update interest weights
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to track interaction' });
+  }
+});
+
+// Fact check article
+router.post('/api/blog/:postId/validate', authenticate, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    
+    // Call DeerFlow validation service
+    const validationResponse = await fetch('http://localhost:9000/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        postId,
+        content: req.body.content 
+      })
+    });
+
+    const result = await validationResponse.json();
+    
+    // Update fact check score
+    await db.update(blogPosts)
+      .set({ 
+        factChecked: true,
+        factCheckScore: result.score 
+      })
+      .where(eq(blogPosts.id, postId));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to validate post' });
+  }
+});
+
+// Update user interests
+router.put('/api/user/interests', authenticate, async (req, res) => {
+  try {
+    const { interests } = req.body;
+    const userId = req.user.id;
+
+    // Delete existing interests
+    await db.delete(userInterests).where(eq(userInterests.userId, userId));
+
+    // Insert new interests
+    if (interests.length > 0) {
+      await db.insert(userInterests).values(
+        interests.map((interest: any) => ({
+          userId,
+          categoryId: interest.categoryId,
+          subcategories: interest.subcategories,
+          weight: interest.weight
+        }))
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update interests' });
+  }
+});
+
+// ============================================
+// CONTENT GENERATION SERVICE
+// ============================================
+// server/services/blogGeneration.ts
+
+import { Configuration, OpenAIApi } from 'openai';
+import { db } from '../db';
+import { blogPosts, userInterests, userLanguages } from '../db/schema/blog';
+import { eq } from 'drizzle-orm';
+
+export class BlogGenerationService {
+  private openai: OpenAIApi;
+  
+  constructor() {
+    const configuration = new Configuration({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    this.openai = new OpenAIApi(configuration);
+  }
+
+  async generatePersonalizedContent(userId: string) {
+    // Get user preferences
+    const interests = await db.select().from(userInterests).where(eq(userInterests.userId, userId));
+    const languages = await db.select().from(userLanguages).where(eq(userLanguages.userId, userId));
+    
+    // Get recent research queries from ResearchAgent
+    const recentQueries = await this.getRecentResearchQueries(userId);
+    
+    // Search for trending topics
+    const trendingTopics = await this.searchTrendingTopics(interests);
+    
+    // Generate content for each language and interest combination
+    for (const language of languages) {
+      for (const interest of interests) {
+        const content = await this.generateArticle({
+          interest,
+          language,
+          recentQueries,
+          trendingTopics,
+          userLevel: language.level
+        });
+        
+        if (content) {
+          await this.saveGeneratedContent(content, userId);
+        }
+      }
+    }
+  }
+
+  private async generateArticle(params: any) {
+    const { interest, language, recentQueries, trendingTopics, userLevel } = params;
+    
+    // Search for relevant news
+    const searchResults = await this.searchRelevantContent(interest, language.languageCode);
+    
+    // Generate article using LLM
+    const prompt = `
+      Generate a concise, engaging article based on the following:
+      - Topic: ${interest.categoryId} - ${interest.subcategories.join(', ')}
+      - Language: ${language.languageName}
+      - Reading Level: ${userLevel}
+      - Style: Casual-educational, conversational
+      - Recent user interests: ${recentQueries.join(', ')}
+      
+      Sources to summarize:
+      ${searchResults.map((s: any) => `- ${s.title}: ${s.summary}`).join('\n')}
+      
+      Requirements:
+      1. Write a 300-400 word summary
+      2. Include 5-10 vocabulary words appropriate for ${userLevel} level
+      3. Highlight key facts and insights
+      4. Make it engaging and easy to read
+      5. Include a catchy title
+      
+      Format as JSON with: title, content, summary, vocabularyHighlights, tags
+    `;
+    
+    const response = await this.openai.createChatCompletion({
+      model: "gpt-4",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+    });
+    
+    return JSON.parse(response.data.choices[0].message.content);
+  }
+
+  private async searchRelevantContent(interest: any, language: string) {
+    // Call web search API or service
+    const searchQuery = `${interest.categoryId} ${interest.subcategories.join(' ')} news ${new Date().toISOString().split('T')[0]}`;
+    
+    // This would integrate with your existing web search functionality
+    const response = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: searchQuery, language })
+    });
+    
+    return response.json();
+  }
+
+  private async saveGeneratedContent(content: any, userId: string) {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days default
+    
+    await db.insert(blogPosts).values({
+      ...content,
+      isPersonalized: true,
+      factChecked: false,
+      expiresAt,
+      generationMetadata: {
+        model: 'gpt-4',
+        generatedAt: new Date().toISOString(),
+        userContext: { userId }
+      }
+    });
+  }
+}
+
+// ============================================
+// CRON JOB FOR CONTENT GENERATION
+// ============================================
+// server/jobs/blogGeneration.ts
+
+import cron from 'node-cron';
+import { BlogGenerationService } from '../services/blogGeneration';
+import { db } from '../db';
+
+export function initializeBlogGenerationJob() {
+  const blogService = new BlogGenerationService();
+  
+  // Run every 12 hours by default
+  cron.schedule('0 */12 * * *', async () => {
+    console.log('Starting blog content generation...');
+    
+    try {
+      // Get all active users
+      const users = await db.query.users.findMany({ 
+        where: eq(users.active, true) 
+      });
+      
+      // Generate content for each user
+      for (const user of users) {
+        await blogService.generatePersonalizedContent(user.id);
+      }
+      
+      // Clean up expired posts
+      await db.delete(blogPosts).where(
+        lt(blogPosts.expiresAt, new Date())
+      );
+      
+      console.log('Blog content generation completed');
+    } catch (error) {
+      console.error('Blog generation job failed:', error);
+    }
+  });
+}
+
+// ============================================
+// REACT HOOKS
+// ============================================
+// client/src/hooks/useBlog.ts
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../lib/api';
+
+export function usePersonalizedBlog(filters: any) {
+  return useQuery({
+    queryKey: ['personalizedBlog', filters],
+    queryFn: async () => {
+      const response = await api.get('/blog/personalized', { params: filters });
+      return response.data;
+    },
+    staleTime: 12 * 60 * 60 * 1000, // 12 hours
+  });
+}
+
+export function useTrackInteraction() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ postId, interactionType, timeSpent, vocabularyLearned }: any) => {
+      return api.post(`/blog/${postId}/interact`, {
+        interactionType,
+        timeSpent,
+        vocabularyLearned
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personalizedBlog'] });
+    }
+  });
+}
+
+export function useValidatePost() {
+  return useMutation({
+    mutationFn: async ({ postId, content }: any) => {
+      const response = await api.post(`/blog/${postId}/validate`, { content });
+      return response.data;
+    }
+  });
+}
+
+export function useUpdateInterests() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (interests: any[]) => {
+      return api.put('/user/interests', { interests });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['personalizedBlog'] });
+    }
+  });
+}
