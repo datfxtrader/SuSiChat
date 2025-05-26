@@ -1,9 +1,33 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Bot, Send, Sparkles, Database, Search, FileText, Settings, Zap, Loader2, MessageSquare, User, TrendingUp, AlertCircle, Copy, Share2, Bookmark, Plus, Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { ProgressDebugger } from '../debug/ProgressDebugger';
 
+// Constants
+const RESEARCH_TIMEOUT = 120000; // 2 minutes
+const PROGRESS_INTERVAL = 1800;
+const COMPLETION_DELAY = 3000;
+
+const PREDEFINED_PROMPTS = [
+  {
+    title: "Market Analysis",
+    description: "Deep dive into market trends",
+    prompt: "Analyze current market trends",
+    icon: TrendingUp,
+    gradient: "from-emerald-500 to-teal-600"
+  },
+  {
+    title: "Financial Data",
+    description: "Comprehensive metrics analysis",
+    prompt: "Generate financial analysis",
+    icon: Database,
+    gradient: "from-blue-500 to-indigo-600"
+  }
+];
+
+// Utility functions
 const formatRelativeTime = (timestamp: string) => {
   const now = new Date();
   const messageTime = new Date(timestamp);
@@ -15,29 +39,50 @@ const formatRelativeTime = (timestamp: string) => {
   return `${Math.floor(diffInMinutes / 1440)}d ago`;
 };
 
-// Simple UI components
-const Select = ({ value, onValueChange, children }: { value: string; onValueChange: (value: string) => void; children?: React.ReactNode }) => {
+// Memoized Components
+const Select = React.memo(({ value, onValueChange, children }: { 
+  value: string; 
+  onValueChange: (value: string) => void; 
+  children?: React.ReactNode 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
+  
+  const options = useMemo(() => [
+    { value: '1', label: 'Quick (25K)' },
+    { value: '2', label: 'Standard (25K)' },
+    { value: '3', label: 'Deep (25K)' }
+  ], []);
+
+  const selectedLabel = useMemo(() => 
+    options.find(opt => opt.value === value)?.label || value
+  , [value, options]);
+
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="px-4 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 flex items-center space-x-2"
       >
-        <span>{value === '3' ? 'Deep (25K)' : value === '2' ? 'Standard (25K)' : value === '1' ? 'Quick (25K)' : value}</span>
+        <span>{selectedLabel}</span>
       </button>
       {isOpen && (
         <div className="absolute top-full mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10">
-          <div onClick={() => { onValueChange('1'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Quick (25K)</div>
-          <div onClick={() => { onValueChange('2'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Standard (25K)</div>
-          <div onClick={() => { onValueChange('3'); setIsOpen(false); }} className="px-4 py-2 hover:bg-zinc-700 cursor-pointer">Deep (25K)</div>
+          {options.map(option => (
+            <div 
+              key={option.value}
+              onClick={() => { onValueChange(option.value); setIsOpen(false); }} 
+              className="px-4 py-2 hover:bg-zinc-700 cursor-pointer"
+            >
+              {option.label}
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
-};
+});
 
-const ResearchProgress = ({ stage, progress, query, isActive }: {
+const ResearchProgress = React.memo(({ stage, progress, query, isActive }: {
   stage: number;
   progress: number;
   query: string;
@@ -75,21 +120,69 @@ const ResearchProgress = ({ stage, progress, query, isActive }: {
       )}
     </div>
   </div>
-);
+));
 
-// Enhanced Research Response Component
-const ResearchResponse = ({ content, timestamp, sources }: {
+// Extract paragraph rendering logic
+const renderParagraph = (paragraph: string, idx: number) => {
+  if (paragraph.startsWith('# ')) {
+    return (
+      <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
+        <TrendingUp className="w-6 h-6 mr-3 text-blue-400" />
+        {paragraph.replace('# ', '')}
+      </h1>
+    );
+  } else if (paragraph.startsWith('## ')) {
+    return (
+      <h2 key={idx} className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center">
+        <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3" />
+        {paragraph.replace('## ', '')}
+      </h2>
+    );
+  } else if (paragraph.startsWith('### ')) {
+    return (
+      <h3 key={idx} className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center">
+        <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
+        {paragraph.replace('### ', '')}
+      </h3>
+    );
+  } else if (paragraph.startsWith('- **')) {
+    const titleMatch = paragraph.match(/\*\*(.*?)\*\*/);
+    return (
+      <div key={idx} className="ml-4 mb-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
+        <div className="font-medium text-zinc-100 mb-1">
+          {titleMatch?.[1] || ''}
+        </div>
+        <div className="text-zinc-300 text-sm leading-relaxed">
+          {paragraph.replace(/- \*\*(.*?)\*\*:\s*/, '')}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <p key={idx} className="text-zinc-200 leading-relaxed">
+      {paragraph.split('**').map((part, i) => 
+        i % 2 === 1 ? 
+          <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
+          part
+      )}
+    </p>
+  );
+};
+
+const ResearchResponse = React.memo(({ content, timestamp, sources }: {
   content: string;
   timestamp: string;
   sources?: Array<{ title: string; url: string; domain: string; }>;
 }) => {
   const [copySuccess, setCopySuccess] = useState('');
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(content);
     setCopySuccess('Copied!');
     setTimeout(() => setCopySuccess(''), 2000);
-  };
+  }, [content]);
+
+  const paragraphs = useMemo(() => content.split('\n\n'), [content]);
 
   return (
     <div className="group bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700/60 transition-all duration-200 shadow-lg">
@@ -120,50 +213,7 @@ const ResearchResponse = ({ content, timestamp, sources }: {
 
       <div className="prose prose-invert max-w-none">
         <div className="space-y-6 text-zinc-200">
-          {content.split('\n\n').map((paragraph, idx) => {
-            if (paragraph.startsWith('# ')) {
-              return (
-                <h1 key={idx} className="text-2xl font-bold text-zinc-100 mb-4 pb-3 border-b border-zinc-700/50 flex items-center">
-                  <TrendingUp className="w-6 h-6 mr-3 text-blue-400" />
-                  {paragraph.replace('# ', '')}
-                </h1>
-              );
-            } else if (paragraph.startsWith('## ')) {
-              return (
-                <h2 key={idx} className="text-xl font-semibold text-zinc-100 mb-3 mt-8 flex items-center">
-                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3" />
-                  {paragraph.replace('## ', '')}
-                </h2>
-              );
-            } else if (paragraph.startsWith('### ')) {
-              return (
-                <h3 key={idx} className="text-lg font-medium text-zinc-100 mb-2 mt-6 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
-                  {paragraph.replace('### ', '')}
-                </h3>
-              );
-            } else if (paragraph.startsWith('- **')) {
-              return (
-                <div key={idx} className="ml-4 mb-3 p-3 bg-zinc-800/30 rounded-lg border-l-2 border-blue-500/50">
-                  <div className="font-medium text-zinc-100 mb-1">
-                    {paragraph.match(/\*\*(.*?)\*\*/)?.[1] || ''}
-                  </div>
-                  <div className="text-zinc-300 text-sm leading-relaxed">
-                    {paragraph.replace(/- \*\*(.*?)\*\*:\s*/, '')}
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <p key={idx} className="text-zinc-200 leading-relaxed">
-                {paragraph.split('**').map((part, i) => 
-                  i % 2 === 1 ? 
-                    <strong key={i} className="font-semibold text-zinc-100 bg-zinc-800/40 px-1 rounded">{part}</strong> : 
-                    part
-                )}
-              </p>
-            );
-          })}
+          {paragraphs.map(renderParagraph)}
         </div>
       </div>
 
@@ -181,44 +231,58 @@ const ResearchResponse = ({ content, timestamp, sources }: {
           </div>
           <div className="space-y-3">
             {sources.map((source, idx) => (
-              <div key={idx} className="group/source p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <h5 className="text-sm font-medium text-zinc-100 mb-1">
-                      [{idx + 1}] {source.title}
-                    </h5>
-                    <a 
-                      href={source.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors break-all"
-                    >
-                      {source.url}
-                    </a>
-                    <div className="flex items-center space-x-3 mt-2">
-                      <span className="text-xs text-zinc-500">{source.domain}</span>
-                      <span className="text-xs text-zinc-500 flex items-center">
-                        <span className="text-zinc-600">•</span>
-                        <span className="ml-2">{formatRelativeTime(timestamp)}</span>
-                      </span>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={() => navigator.clipboard.writeText(source.url)}
-                    className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity bg-transparent border-none text-zinc-400 hover:text-zinc-200"
-                  >
-                    <Copy className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
+              <SourceItem key={idx} source={source} index={idx} timestamp={timestamp} />
             ))}
           </div>
         </div>
       )}
     </div>
   );
-};
+});
+
+const SourceItem = React.memo(({ source, index, timestamp }: { 
+  source: { title: string; url: string; domain: string; }; 
+  index: number; 
+  timestamp: string; 
+}) => {
+  const handleCopyUrl = useCallback(() => {
+    navigator.clipboard.writeText(source.url);
+  }, [source.url]);
+
+  return (
+    <div className="group/source p-4 bg-zinc-800/40 rounded-xl border border-zinc-700/40 hover:border-zinc-600/60 hover:bg-zinc-700/50 transition-all duration-200">
+      <div className="flex items-start space-x-3">
+        <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <h5 className="text-sm font-medium text-zinc-100 mb-1">
+            [{index + 1}] {source.title}
+          </h5>
+          <a 
+            href={source.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs text-blue-400 hover:text-blue-300 transition-colors break-all"
+          >
+            {source.url}
+          </a>
+          <div className="flex items-center space-x-3 mt-2">
+            <span className="text-xs text-zinc-500">{source.domain}</span>
+            <span className="text-xs text-zinc-500 flex items-center">
+              <span className="text-zinc-600">•</span>
+              <span className="ml-2">{formatRelativeTime(timestamp)}</span>
+            </span>
+          </div>
+        </div>
+        <Button 
+          onClick={handleCopyUrl}
+          className="h-8 w-8 p-0 opacity-0 group-hover/source:opacity-100 transition-opacity bg-transparent border-none text-zinc-400 hover:text-zinc-200"
+        >
+          <Copy className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  );
+});
 
 interface Message {
   id: string;
@@ -255,50 +319,126 @@ export const ResearchAgent = () => {
     }
   }, [message]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
-      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
-    };
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
+    if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
   }, []);
 
-  // Ensure progress is reset on mount and handle reconnection
+  // Cleanup on unmount
   useEffect(() => {
-    // Reset state on mount
+    return cleanup;
+  }, [cleanup]);
+
+  // Check for stuck research state
+  const checkStuckState = useCallback(() => {
+    const now = Date.now();
+    const savedTimestamp = localStorage.getItem('research_timestamp');
+
+    if (savedTimestamp) {
+      const timeDiff = now - parseInt(savedTimestamp);
+      if (timeDiff > RESEARCH_TIMEOUT) {
+        console.log('🧹 Cleaning up stuck research state');
+        localStorage.removeItem('research_state');
+        localStorage.removeItem('research_progress');
+        localStorage.removeItem('research_query');
+        localStorage.removeItem('research_timestamp');
+        setIsResearchInProgress(false);
+        setResearchProgress(0);
+        setCurrentResearchQuery('');
+      }
+    }
+  }, []);
+
+  // Initialize and check stuck state
+  useEffect(() => {
     setIsResearchInProgress(false);
     setResearchProgress(0);
     setResearchStage(1);
     setIsSending(false);
-
-    // Check for any stuck research state and clean it up
-    const checkStuckState = () => {
-      const now = Date.now();
-      const savedTimestamp = localStorage.getItem('research_timestamp');
-
-      if (savedTimestamp) {
-        const timeDiff = now - parseInt(savedTimestamp);
-        // If research has been "running" for more than 2 minutes, clear it
-        if (timeDiff > 120000) {
-          console.log('🧹 Cleaning up stuck research state');
-          localStorage.removeItem('research_state');
-          localStorage.removeItem('research_progress');
-          localStorage.removeItem('research_query');
-          localStorage.removeItem('research_timestamp');
-          setIsResearchInProgress(false);
-          setResearchProgress(0);
-          setCurrentResearchQuery('');
-        }
-      }
-    };
-
     checkStuckState();
+  }, [checkStuckState]);
+
+  // Calculate progress stage based on progress
+  const calculateStage = useCallback((progress: number) => {
+    if (progress >= 85) return 6;
+    if (progress >= 70) return 5;
+    if (progress >= 50) return 4;
+    if (progress >= 30) return 3;
+    if (progress >= 15) return 2;
+    return 1;
   }, []);
 
+  // Handle progress simulation
+  const startProgressSimulation = useCallback(() => {
+    progressIntervalRef.current = setInterval(() => {
+      setResearchProgress(prev => {
+        const baseIncrement = prev < 30 ? Math.random() * 1.2 : 
+                             prev < 60 ? Math.random() * 0.8 : 
+                             prev < 85 ? Math.random() * 0.5 : 
+                             Math.random() * 0.2;
 
+        const newProgress = Math.min(prev + baseIncrement, 95);
+        setResearchStage(calculateStage(newProgress));
+        return newProgress;
+      });
+    }, PROGRESS_INTERVAL);
+  }, [calculateStage]);
 
-  const handleSendMessage = async () => {
+  // Reset research state
+  const resetResearchState = useCallback(() => {
+    cleanup();
+    setIsResearchInProgress(false);
+    setResearchProgress(0);
+    setResearchStage(1);
+    setIsSending(false);
+    setCurrentResearchQuery('');
+  }, [cleanup]);
+
+  // Create error message
+  const createErrorMessage = useCallback((query: string, error: any): Message => ({
+    id: Date.now().toString(),
+    role: 'assistant' as const,
+    content: `# Research Error
+
+I encountered an issue while researching "${query}":
+
+**Error:** ${error.message}
+
+**What you can try:**
+1. Check that the backend service is running
+2. Verify your internet connection
+3. Try a simpler or more specific query
+4. Wait a moment and try again
+
+The research service logs show it's working, so this might be a temporary connection issue.`,
+    timestamp: new Date().toISOString(),
+    sources: []
+  }), []);
+
+  // Create fallback message
+  const createFallbackMessage = useCallback((query: string): Message => ({
+    id: Date.now().toString(),
+    role: 'assistant' as const,
+    content: `# Research Service Unavailable
+
+I wasn't able to complete research on "${query}" at this time. This might be due to:
+
+- **Backend service issues** - The research service may be starting up
+- **Network connectivity problems** - Connection to research APIs failed  
+- **Query processing errors** - Try rephrasing your question
+
+**Troubleshooting:**
+1. Wait a moment and try again
+2. Check that the backend service is running
+3. Try a simpler, more specific query
+4. Refresh the page if issues persist`,
+    timestamp: new Date().toISOString(),
+    sources: []
+  }), []);
+
+  const handleSendMessage = useCallback(async () => {
     if (!message.trim() || isSending || isResearchInProgress) return;
 
     console.log('🚀 Starting research:', message);
@@ -312,10 +452,7 @@ export const ResearchAgent = () => {
     };
     setMessages(prev => [...prev, userMessage]);
 
-    // Store the query before clearing message
     const queryText = message;
-
-    // Clear message input immediately
     setMessage('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -324,45 +461,16 @@ export const ResearchAgent = () => {
     // Set research state
     setIsSending(true);
     setIsResearchInProgress(true);
-    setResearchProgress(5); // Start with some progress
+    setResearchProgress(5);
     setResearchStage(1);
     setCurrentResearchQuery(queryText);
 
-    // Clear any existing intervals/timeouts
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-    if (progressTimeoutRef.current) {
-      clearTimeout(progressTimeoutRef.current);
-    }
+    cleanup();
+    startProgressSimulation();
 
-    // Start the actual research request immediately
     try {
       console.log('📡 Sending research request to backend...');
       setIsSending(false);
-
-      // Start progress simulation with proper completion handling
-      progressIntervalRef.current = setInterval(() => {
-          setResearchProgress(prev => {
-            // Dynamic progress that allows natural completion
-            const baseIncrement = prev < 30 ? Math.random() * 1.2 : 
-                                 prev < 60 ? Math.random() * 0.8 : 
-                                 prev < 85 ? Math.random() * 0.5 : 
-                                 Math.random() * 0.2;
-
-            const newProgress = Math.min(prev + baseIncrement, 95);
-
-            // Update stages based on progress
-            if (newProgress >= 85) setResearchStage(6);
-            else if (newProgress >= 70) setResearchStage(5);
-            else if (newProgress >= 50) setResearchStage(4);
-            else if (newProgress >= 30) setResearchStage(3);
-            else if (newProgress >= 15) setResearchStage(2);
-            else setResearchStage(1);
-
-            return newProgress;
-          });
-        }, 1800); // Optimized interval
 
       const response = await fetch('/api/suna-research', {
         method: 'POST',
@@ -384,9 +492,6 @@ export const ResearchAgent = () => {
 
       console.log('✅ Research API call completed! Report length:', data.report?.length || 0);
 
-      // Don't complete yet - let the useEffect handle completion when message is added
-      // Just add the message and let the completion logic trigger naturally
-
       if (data.report && data.report.trim()) {
         console.log('✅ Adding research report to messages');
         const completedMessage: Message = {
@@ -398,138 +503,35 @@ export const ResearchAgent = () => {
         };
 
         setMessages(prev => [...prev, completedMessage]);
-        console.log('📝 Research message added to chat - completion will be handled by useEffect');
       } else {
         console.log('⚠️ Empty or missing report, adding fallback message');
-
-        // Clear progress for failed research
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-          progressIntervalRef.current = null;
-        }
-
-        setIsResearchInProgress(false);
-        setResearchProgress(0);
-        setResearchStage(1);
-        setIsSending(false);
-        setCurrentResearchQuery('');
-
-        const fallbackMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant' as const,
-          content: `# Research Service Unavailable
-
-I wasn't able to complete research on "${queryText}" at this time. This might be due to:
-
-- **Backend service issues** - The research service may be starting up
-- **Network connectivity problems** - Connection to research APIs failed  
-- **Query processing errors** - Try rephrasing your question
-
-**Troubleshooting:**
-1. Wait a moment and try again
-2. Check that the backend service is running
-3. Try a simpler, more specific query
-4. Refresh the page if issues persist`,
-          timestamp: new Date().toISOString(),
-          sources: []
-        };
-
-        setMessages(prev => [...prev, fallbackMessage]);
+        resetResearchState();
+        setMessages(prev => [...prev, createFallbackMessage(queryText)]);
       }
 
     } catch (error) {
       console.error('❌ Research failed:', error);
-
-      // Clear progress
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-
-      // Add error message
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant' as const,
-        content: `# Research Error
-
-I encountered an issue while researching "${queryText}":
-
-**Error:** ${error.message}
-
-**What you can try:**
-1. Check that the backend service is running
-2. Verify your internet connection
-3. Try a simpler or more specific query
-4. Wait a moment and try again
-
-The research service logs show it's working, so this might be a temporary connection issue.`,
-        timestamp: new Date().toISOString(),
-        sources: []
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
-
-      // Reset state
-      setIsResearchInProgress(false);
-      setResearchProgress(0);
-      setResearchStage(1);
-      setIsSending(false);
-      setCurrentResearchQuery('');
+      resetResearchState();
+      setMessages(prev => [...prev, createErrorMessage(queryText, error)]);
     }
-  };
+  }, [message, isSending, isResearchInProgress, researchDepth, selectedModel, cleanup, startProgressSimulation, resetResearchState, createErrorMessage, createFallbackMessage]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const handleNewResearch = () => {
+  const handleNewResearch = useCallback(() => {
     console.log('🔄 Starting new research session');
-
-    // Clear all intervals and timeouts first
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-    if (completionTimeoutRef.current) {
-      clearTimeout(completionTimeoutRef.current);
-      completionTimeoutRef.current = null;
-    }
-    if (progressTimeoutRef.current) {
-      clearTimeout(progressTimeoutRef.current);
-      progressTimeoutRef.current = null;
-    }
-
-    // Then reset all state
+    cleanup();
     setMessages([]);
-    setIsResearchInProgress(false);
-    setResearchProgress(0);
-    setResearchStage(1);
-    setIsSending(false);
+    resetResearchState();
     setMessage('');
-    setCurrentResearchQuery('');
-  };
+  }, [cleanup, resetResearchState]);
 
-  const predefinedPrompts = [
-    {
-      title: "Market Analysis",
-      description: "Deep dive into market trends",
-      prompt: "Analyze current market trends",
-      icon: TrendingUp,
-      gradient: "from-emerald-500 to-teal-600"
-    },
-    {
-      title: "Financial Data",
-      description: "Comprehensive metrics analysis",
-      prompt: "Generate financial analysis",
-      icon: Database,
-      gradient: "from-blue-500 to-indigo-600"
-    }
-  ];
-
-  // Handle research completion properly - only complete when we have a real research response
+  // Handle research completion
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const hasNewAssistantMessage = lastMessage?.role === 'assistant';
@@ -537,31 +539,27 @@ The research service logs show it's working, so this might be a temporary connec
     const isActualResearchReport = hasResearchContent && 
       (lastMessage?.content.includes('# ') || lastMessage?.content.includes('## ') || lastMessage?.sources);
 
-    // Only complete research when we have a REAL research report
     if (isResearchInProgress && hasNewAssistantMessage && isActualResearchReport && !isSending) {
       console.log(`✅ Research completed - found research report (${lastMessage.content.length} chars)`);
 
-      // Clear progress interval first
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
 
-      // Set progress to 100% immediately
       setResearchProgress(100);
       setResearchStage(6);
 
-      // Wait a bit longer to let typewriter animation start, then complete
       setTimeout(() => {
-        setIsResearchInProgress(false);
-        setCurrentResearchQuery('');
-        setResearchProgress(0);
-        setResearchStage(1);
-      }, 3000); // Increased delay to allow typewriter to start
-    } else if (isResearchInProgress && hasNewAssistantMessage && !isActualResearchReport) {
-      console.log(`⚠️ Got assistant message but not a research report (${lastMessage?.content?.length || 0} chars) - continuing...`);
+        resetResearchState();
+      }, COMPLETION_DELAY);
     }
-  }, [messages, isResearchInProgress, isSending]);
+  }, [messages, isResearchInProgress, isSending, resetResearchState]);
+
+  // Memoize predefined prompt handler
+  const handlePromptSelect = useCallback((prompt: string) => {
+    setMessage(prompt);
+  }, []);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
@@ -591,10 +589,10 @@ The research service logs show it's working, so this might be a temporary connec
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                  {predefinedPrompts.map((card, idx) => (
+                  {PREDEFINED_PROMPTS.map((card, idx) => (
                     <div
                       key={idx}
-                      onClick={() => setMessage(card.prompt)}
+                      onClick={() => handlePromptSelect(card.prompt)}
                       className="group p-6 bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 rounded-2xl hover:bg-zinc-800/70 hover:border-zinc-700/70 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] hover:shadow-2xl"
                     >
                       <div className={`w-12 h-12 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center mb-4 shadow-lg`}>
@@ -614,40 +612,33 @@ The research service logs show it's working, so this might be a temporary connec
             </div>
           )}
 
-          {messages.map((msg, index) => {
-            const isLatestMessage = index === messages.length - 1;
-            const shouldShowTypewriter = isLatestMessage && msg.role === 'assistant' && !isResearchInProgress;
-
-            return (
-              <div key={msg.id} className="mb-4">
-                <div className="flex items-start space-x-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'
-                  }`}>
-                    {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
-                  </div>
-                  <div className="flex-1">
-                    {msg.role === 'user' ? (
-                      <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
-                        <div className="prose prose-invert max-w-none">
-                          {msg.content}
-                        </div>
+          {messages.map((msg, index) => (
+            <div key={msg.id} className="mb-4">
+              <div className="flex items-start space-x-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'
+                }`}>
+                  {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
+                </div>
+                <div className="flex-1">
+                  {msg.role === 'user' ? (
+                    <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/50 p-6 rounded-xl">
+                      <div className="prose prose-invert max-w-none">
+                        {msg.content}
                       </div>
-                    ) : (
-                      <ResearchResponse 
-                        content={msg.content}
-                        timestamp={msg.timestamp}
-                        sources={msg.sources}
-                        isLatest={shouldShowTypewriter}
-                      />
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <ResearchResponse 
+                      content={msg.content}
+                      timestamp={msg.timestamp}
+                      sources={msg.sources}
+                    />
+                  )}
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
 
-          {/* Show research progress in main chat area instead of duplicating */}
           {isResearchInProgress && (
             <div className="mb-4">
               <div className="flex items-start space-x-3">
@@ -665,8 +656,6 @@ The research service logs show it's working, so this might be a temporary connec
               </div>
             </div>
           )}
-
-          {/* Research progress is now only shown in the main chat area */}
         </div>
 
         <div className="border-t border-zinc-800/60 bg-zinc-900/80 backdrop-blur-xl p-4">
@@ -702,7 +691,6 @@ The research service logs show it's working, so this might be a temporary connec
         </div>
       </div>
 
-      {/* Progress Debugger - only shows in development */}
       <ProgressDebugger
         isResearchInProgress={isResearchInProgress}
         researchProgress={researchProgress}
