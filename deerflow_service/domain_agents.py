@@ -64,8 +64,7 @@ class BaseDomainAgent:
 
     def is_relevant(self, query: str) -> float:
         """Enhanced relevance calculation with weighted scoring"""
-        async with self.performance_monitor.measure("relevance_calculation"):
-            return self.relevance_scorer.calculate_relevance(query, self._keyword_categories)
+        return self.relevance_scorer.calculate_relevance(query, self._keyword_categories)
 
     async def analyze_query(self, query: str) -> Dict[str, Any]:
         """Enhanced query analysis with caching and error handling"""
