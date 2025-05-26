@@ -1,0 +1,575 @@
+// types/financial.types.ts
+export interface FinancialResearchRequest {
+  query: string;
+  depth?: number;
+  options?: {
+    includeCharts?: boolean;
+    timeframe?: 'short' | 'medium' | 'long';
+    analysisType?: 'technical' | 'fundamental' | 'both';
+  };
+}
+
+export interface FinancialSource {
+  title: string;
+  url: string;
+  domain: string;
+  category: 'realtime' | 'analysis' | 'news';
+  reliability: number;
+}
+
+export interface FinancialReport {
+  report: string;
+  sources: FinancialSource[];
+  depth: number;
+  processingTime: number;
+  metadata: {
+    generatedAt: string;
+    model: string;
+    cached: boolean;
+    confidence?: number;
+  };
+}
+
+// config/financial-sources.config.ts
+export const FINANCIAL_SOURCES: FinancialSource[] = [
+  {
+    title: "Investing.com",
+    url: "https://www.investing.com/currencies/",
+    domain: "investing.com",
+    category: "realtime",
+    reliability: 0.9
+  },
+  {
+    title: "FXStreet",
+    url: "https://www.fxstreet.com/",
+    domain: "fxstreet.com",
+    category: "analysis",
+    reliability: 0.85
+  },
+  {
+    title: "DailyFX",
+    url: "https://www.dailyfx.com/",
+    domain: "dailyfx.com",
+    category: "analysis",
+    reliability: 0.85
+  },
+  {
+    title: "Bloomberg Markets",
+    url: "https://www.bloomberg.com/markets",
+    domain: "bloomberg.com",
+    category: "news",
+    reliability: 0.95
+  },
+  {
+    title: "Reuters Finance",
+    url: "https://www.reuters.com/finance/",
+    domain: "reuters.com",
+    category: "news",
+    reliability: 0.95
+  },
+  {
+    title: "TradingView",
+    url: "https://www.tradingview.com/",
+    domain: "tradingview.com",
+    category: "realtime",
+    reliability: 0.9
+  }
+];
+
+// services/deepseek.service.ts
+import axios, { AxiosInstance } from 'axios';
+import pRetry from 'p-retry';
+import pTimeout from 'p-timeout';
+
+export class DeepSeekService {
+  private client: AxiosInstance;
+  private readonly timeout = 25000;
+  private readonly maxRetries = 2;
+
+  constructor(private apiKey: string) {
+    this.client = axios.create({
+      baseURL: 'https://api.deepseek.com/v1',
+      timeout: this.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+  }
+
+  async generateAnalysis(
+    query: string, 
+    depth: number,
+    options?: any
+  ): Promise<string> {
+    const systemPrompt = this.buildSystemPrompt(options);
+    const userPrompt = this.buildUserPrompt(query, depth, options);
+
+    try {
+      const response = await pTimeout(
+        pRetry(
+          () => this.makeRequest(systemPrompt, userPrompt, depth),
+          {
+            retries: this.maxRetries,
+            onFailedAttempt: (error) => {
+              console.log(`DeepSeek attempt ${error.attemptNumber} failed:`, error.message);
+            }
+          }
+        ),
+        this.timeout,
+        'DeepSeek API request timed out'
+      );
+
+      return response;
+    } catch (error) {
+      console.error('DeepSeek API error:', error);
+      throw new Error('Failed to generate analysis');
+    }
+  }
+
+  private async makeRequest(
+    systemPrompt: string, 
+    userPrompt: string,
+    depth: number
+  ): Promise<string> {
+    const response = await this.client.post('/chat/completions', {
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.5,
+      max_tokens: this.getMaxTokens(depth),
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1
+    });
+
+    if (!response.data?.choices?.[0]?.message?.content) {
+      throw new Error('Invalid API response format');
+    }
+
+    return response.data.choices[0].message.content;
+  }
+
+  private buildSystemPrompt(options?: any): string {
+    const basePrompt = 'You are an expert financial analyst with over 15 years of experience in forex, commodities, and equity markets.';
+    
+    if (options?.analysisType === 'technical') {
+      return `${basePrompt} Focus on technical analysis, chart patterns, indicators, and price action.`;
+    } else if (options?.analysisType === 'fundamental') {
+      return `${basePrompt} Focus on fundamental analysis, economic indicators, and macroeconomic factors.`;
+    }
+    
+    return `${basePrompt} Provide comprehensive analysis combining both technical and fundamental perspectives.`;
+  }
+
+  private buildUserPrompt(query: string, depth: number, options?: any): string {
+    const sections = this.getSectionsForDepth(depth);
+    const timeframe = options?.timeframe || 'medium';
+    const date = new Date().toISOString().split('T')[0];
+
+    return `Create a ${this.getDepthDescription(depth)} financial analysis for "${query}".
+
+Include the following sections:
+${sections.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+Requirements:
+- Current date: ${date}
+- Focus on ${timeframe}-term perspective
+- Use clear markdown formatting with ## for section headers
+- Include specific price levels, percentages, and numerical data
+- Provide actionable insights and specific levels to watch
+- Be precise and data-driven in your analysis
+${options?.includeCharts ? '- Mention relevant chart patterns and formations' : ''}`;
+  }
+
+  private getSectionsForDepth(depth: number): string[] {
+    const depthSections: Record<number, string[]> = {
+      1: [
+        'Executive Summary',
+        'Current Market Status',
+        'Key Takeaways'
+      ],
+      2: [
+        'Executive Summary',
+        'Current Market Status',
+        'Technical Overview',
+        'Key Levels to Watch',
+        'Market Outlook'
+      ],
+      3: [
+        'Executive Summary',
+        'Current Market Status with Price Action',
+        'Technical Analysis with Indicators',
+        'Fundamental Factors',
+        'Market Sentiment',
+        'Trading Recommendations',
+        'Risk Factors'
+      ],
+      4: [
+        'Executive Summary',
+        'Detailed Market Status',
+        'Comprehensive Technical Analysis',
+        'Fundamental Analysis',
+        'Correlation Analysis',
+        'Market Sentiment & Positioning',
+        'Trading Strategy',
+        'Risk Management',
+        'Alternative Scenarios'
+      ],
+      5: [
+        'Executive Summary',
+        'In-Depth Market Analysis',
+        'Advanced Technical Analysis',
+        'Comprehensive Fundamental Analysis',
+        'Intermarket Analysis',
+        'Sentiment & Positioning Data',
+        'Multiple Trading Strategies',
+        'Risk/Reward Analysis',
+        'Scenario Planning',
+        'Long-term Outlook'
+      ]
+    };
+
+    return depthSections[depth] || depthSections[3];
+  }
+
+  private getDepthDescription(depth: number): string {
+    const descriptions: Record<number, string> = {
+      1: 'concise',
+      2: 'standard',
+      3: 'comprehensive',
+      4: 'detailed',
+      5: 'expert-level'
+    };
+    return descriptions[depth] || 'comprehensive';
+  }
+
+  private getMaxTokens(depth: number): number {
+    const tokenMap: Record<number, number> = {
+      1: 1000,
+      2: 2000,
+      3: 3000,
+      4: 4000,
+      5: 5000
+    };
+    return tokenMap[depth] || 3000;
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+}
+
+// services/financial-research.service.ts
+import { LRUCache } from 'lru-cache';
+import crypto from 'crypto';
+import { DeepSeekService } from './deepseek.service';
+import { FinancialReport, FinancialSource } from '../types/financial.types';
+import { FINANCIAL_SOURCES } from '../config/financial-sources.config';
+
+export class FinancialResearchService {
+  private cache: LRUCache<string, FinancialReport>;
+  private deepseek: DeepSeekService;
+
+  constructor(apiKey: string) {
+    this.deepseek = new DeepSeekService(apiKey);
+    this.cache = new LRUCache<string, FinancialReport>({
+      max: 100,
+      ttl: 15 * 60 * 1000, // 15 minutes
+      updateAgeOnGet: true
+    });
+  }
+
+  async generateReport(
+    query: string,
+    depth: number = 3,
+    options?: any
+  ): Promise<FinancialReport> {
+    const startTime = Date.now();
+    const cacheKey = this.getCacheKey(query, depth, options);
+
+    // Check cache
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return {
+        ...cached,
+        metadata: {
+          ...cached.metadata,
+          cached: true
+        }
+      };
+    }
+
+    try {
+      // Generate analysis
+      const report = await this.deepseek.generateAnalysis(query, depth, options);
+      
+      // Select relevant sources
+      const sources = this.selectRelevantSources(query);
+
+      const result: FinancialReport = {
+        report,
+        sources,
+        depth,
+        processingTime: Date.now() - startTime,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          model: 'deepseek-chat',
+          cached: false,
+          confidence: this.calculateConfidence(report)
+        }
+      };
+
+      // Cache the result
+      this.cache.set(cacheKey, result);
+      return result;
+
+    } catch (error) {
+      console.error('Report generation failed:', error);
+      
+      // Return fallback report
+      return {
+        report: this.generateFallbackReport(query),
+        sources: FINANCIAL_SOURCES.slice(0, 3),
+        depth,
+        processingTime: Date.now() - startTime,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          model: 'fallback',
+          cached: false
+        }
+      };
+    }
+  }
+
+  private selectRelevantSources(query: string): FinancialSource[] {
+    const lowerQuery = query.toLowerCase();
+    let sources = [...FINANCIAL_SOURCES];
+
+    // Prioritize sources based on query
+    if (lowerQuery.includes('forex') || lowerQuery.includes('currency')) {
+      sources.sort((a, b) => {
+        const aRelevance = a.domain.includes('fx') ? 1 : 0;
+        const bRelevance = b.domain.includes('fx') ? 1 : 0;
+        return bRelevance - aRelevance;
+      });
+    }
+
+    // Sort by reliability
+    sources.sort((a, b) => b.reliability - a.reliability);
+
+    return sources.slice(0, 5);
+  }
+
+  private calculateConfidence(report: string): number {
+    // Simple confidence calculation based on content
+    const hasNumbers = /\d+\.?\d*/.test(report);
+    const hasSections = /##\s+\w+/.test(report);
+    const length = report.length;
+
+    let confidence = 0.5;
+    if (hasNumbers) confidence += 0.2;
+    if (hasSections) confidence += 0.2;
+    if (length > 1000) confidence += 0.1;
+
+    return Math.min(confidence, 1);
+  }
+
+  private generateFallbackReport(query: string): string {
+    return `# ${query} Analysis
+
+## Notice
+I apologize, but I'm currently unable to provide a detailed analysis due to technical difficulties. 
+
+## Quick Overview
+- The ${query} market requires careful analysis of multiple factors
+- Consider checking recent price action and key support/resistance levels
+- Monitor relevant economic indicators and news events
+- Always use proper risk management in your trading decisions
+
+## Recommended Actions
+1. Visit the financial sources provided for real-time data
+2. Consult with financial professionals for personalized advice
+3. Try again later for a comprehensive analysis
+
+*This is a fallback response. Please try again for detailed analysis.*`;
+  }
+
+  private getCacheKey(query: string, depth: number, options?: any): string {
+    const data = `${query}:${depth}:${JSON.stringify(options || {})}`;
+    return crypto.createHash('md5').update(data).digest('hex');
+  }
+
+  isConfigured(): boolean {
+    return this.deepseek.isConfigured();
+  }
+
+  getCacheStats() {
+    return {
+      size: this.cache.size,
+      maxSize: this.cache.max,
+      ttl: this.cache.ttl
+    };
+  }
+
+  clearCache() {
+    this.cache.clear();
+  }
+}
+
+// routes/financial-research.route.ts
+import express, { Request, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+import { FinancialResearchService } from '../services/financial-research.service';
+import { FinancialResearchRequest } from '../types/financial.types';
+
+const router = express.Router();
+
+// Initialize service
+const apiKey = process.env.DEEPSEEK_API_KEY || '';
+const researchService = new FinancialResearchService(apiKey);
+
+// Middleware
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Rate limiting
+const researchLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 15, // 15 requests per 5 minutes
+  message: 'Too many research requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Request validation
+const validateResearchRequest = [
+  body('query')
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 200 })
+    .withMessage('Query must be between 2 and 200 characters'),
+  body('depth')
+    .optional()
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Depth must be between 1 and 5'),
+  body('options')
+    .optional()
+    .isObject()
+    .withMessage('Options must be an object')
+];
+
+// Logging middleware
+const logRequest = (req: Request, res: Response, next: NextFunction) => {
+  const requestId = `fin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  req.requestId = requestId;
+  console.log(`[${requestId}] Financial research: ${req.body.query} | Depth: ${req.body.depth || 3}`);
+  res.setHeader('X-Request-Id', requestId);
+  next();
+};
+
+/**
+ * POST /api/financial/research
+ * Generate financial research report
+ */
+router.post('/',
+  researchLimiter,
+  logRequest,
+  validateResearchRequest,
+  asyncHandler(async (req: Request, res: Response) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: errors.array()
+      });
+    }
+
+    const { query, depth = 3, options }: FinancialResearchRequest = req.body;
+
+    // Check service configuration
+    if (!researchService.isConfigured()) {
+      console.warn(`[${req.requestId}] Service not configured`);
+      return res.status(503).json({
+        error: 'Service unavailable',
+        message: 'Financial research service is not properly configured',
+        sources: [],
+        depth,
+        processingTime: 0
+      });
+    }
+
+    try {
+      // Generate report
+      const report = await researchService.generateReport(query, depth, options);
+      
+      console.log(`[${req.requestId}] Report generated in ${report.processingTime}ms`);
+      res.json(report);
+      
+    } catch (error) {
+      console.error(`[${req.requestId}] Research error:`, error);
+      throw error;
+    }
+  })
+);
+
+/**
+ * GET /api/financial/research/status
+ * Service status and health check
+ */
+router.get('/status', (req: Request, res: Response) => {
+  const status = {
+    service: 'financial-research',
+    configured: researchService.isConfigured(),
+    cache: researchService.getCacheStats(),
+    timestamp: new Date().toISOString()
+  };
+
+  res.json(status);
+});
+
+/**
+ * POST /api/financial/research/cache/clear
+ * Clear the research cache
+ */
+router.post('/cache/clear',
+  asyncHandler(async (req: Request, res: Response) => {
+    researchService.clearCache();
+    res.json({
+      success: true,
+      message: 'Cache cleared successfully',
+      timestamp: new Date().toISOString()
+    });
+  })
+);
+
+// Error handling middleware
+router.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  const requestId = req.requestId || 'unknown';
+  console.error(`[${requestId}] Unhandled error:`, error);
+
+  res.status(500).json({
+    error: 'Internal server error',
+    message: 'Failed to process financial research request',
+    report: 'An error occurred while researching this financial topic.',
+    sources: [],
+    depth: req.body?.depth || 3,
+    processingTime: 0,
+    requestId
+  });
+});
+
+// TypeScript augmentation
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
+export default router;
