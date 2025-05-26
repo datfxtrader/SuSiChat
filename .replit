@@ -54,6 +54,15 @@ mode = "sequential"
 task = "shell.exec"
 args = "python test_optimized_system_comprehensive.py"
 
+[[workflows.workflow]]
+name = "Test Comprehensive"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_comprehensive.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
