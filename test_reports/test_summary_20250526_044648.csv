@@ -1,0 +1,11 @@
+Test Name,Category,Status,Duration,Success Rate,Warnings,Error
+"Backend Health","Core","PASSED",0.005,1.000,0,""
+"WebSocket","Integration","PASSED",0.014,1.000,0,""
+"Error Handling","Resilience","PASSED",0.048,0.750,0,""
+"API Endpoints","Core","PASSED",0.050,1.000,0,""
+"Agent System","Features","FAILED",0.037,0.000,0,"No task ID returned"
+"Performance","Metrics","PASSED",0.065,1.000,0,""
+"Frontend Integration","Integration","FAILED",0.076,0.000,1,""
+"Learning System","Advanced","PASSED",0.029,1.000,0,""
+"Research Capabilities","Features","PASSED",0.032,1.000,0,""
+"Data Persistence","Storage","FAILED",2.016,0.000,0,""

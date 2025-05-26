@@ -1,0 +1,340 @@
+import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
+
+// Constants for better maintainability
+const CONTENT_PATHS = [
+  "./client/index.html",
+  "./client/src/**/*.{js,jsx,ts,tsx}"
+] as const;
+
+// CSS custom property helper
+const cssVar = (name: string) => `hsl(var(--${name}))`;
+const cssVarRaw = (name: string) => `var(--${name})`;
+
+// Color system configuration
+const createColorScale = (name: string) => ({
+  DEFAULT: cssVar(name),
+  foreground: cssVar(`${name}-foreground`),
+});
+
+const createExtendedColorScale = (name: string) => ({
+  ...createColorScale(name),
+  50: cssVar(`${name}-50`),
+  100: cssVar(`${name}-100`),
+  200: cssVar(`${name}-200`),
+  300: cssVar(`${name}-300`),
+  400: cssVar(`${name}-400`),
+  500: cssVar(`${name}-500`),
+  600: cssVar(`${name}-600`),
+  700: cssVar(`${name}-700`),
+  800: cssVar(`${name}-800`),
+  900: cssVar(`${name}-900`),
+  950: cssVar(`${name}-950`),
+});
+
+// Animation configurations
+const animations = {
+  keyframes: {
+    "accordion-down": {
+      from: { height: "0" },
+      to: { height: cssVarRaw("radix-accordion-content-height") },
+    },
+    "accordion-up": {
+      from: { height: cssVarRaw("radix-accordion-content-height") },
+      to: { height: "0" },
+    },
+    "fade-in": {
+      from: { opacity: "0" },
+      to: { opacity: "1" },
+    },
+    "fade-out": {
+      from: { opacity: "1" },
+      to: { opacity: "0" },
+    },
+    "slide-in-from-top": {
+      from: { transform: "translateY(-100%)" },
+      to: { transform: "translateY(0)" },
+    },
+    "slide-in-from-bottom": {
+      from: { transform: "translateY(100%)" },
+      to: { transform: "translateY(0)" },
+    },
+    "slide-in-from-left": {
+      from: { transform: "translateX(-100%)" },
+      to: { transform: "translateX(0)" },
+    },
+    "slide-in-from-right": {
+      from: { transform: "translateX(100%)" },
+      to: { transform: "translateX(0)" },
+    },
+    "zoom-in": {
+      from: { transform: "scale(0.95)", opacity: "0" },
+      to: { transform: "scale(1)", opacity: "1" },
+    },
+    "zoom-out": {
+      from: { transform: "scale(1)", opacity: "1" },
+      to: { transform: "scale(0.95)", opacity: "0" },
+    },
+    shimmer: {
+      from: { backgroundPosition: "0 0" },
+      to: { backgroundPosition: "-200% 0" },
+    },
+    pulse: {
+      "0%, 100%": { opacity: "1" },
+      "50%": { opacity: "0.5" },
+    },
+  },
+  animation: {
+    "accordion-down": "accordion-down 0.2s ease-out",
+    "accordion-up": "accordion-up 0.2s ease-out",
+    "fade-in": "fade-in 0.2s ease-out",
+    "fade-out": "fade-out 0.2s ease-out",
+    "slide-in-from-top": "slide-in-from-top 0.3s ease-out",
+    "slide-in-from-bottom": "slide-in-from-bottom 0.3s ease-out",
+    "slide-in-from-left": "slide-in-from-left 0.3s ease-out",
+    "slide-in-from-right": "slide-in-from-right 0.3s ease-out",
+    "zoom-in": "zoom-in 0.2s ease-out",
+    "zoom-out": "zoom-out 0.2s ease-out",
+    shimmer: "shimmer 2s linear infinite",
+    pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+  },
+};
+
+// Spacing scale extension
+const spacingScale = {
+  "13": "3.25rem",
+  "15": "3.75rem",
+  "17": "4.25rem",
+  "18": "4.5rem",
+  "19": "4.75rem",
+  "21": "5.25rem",
+  "22": "5.5rem",
+} as const;
+
+// Typography variants
+const typographyVariants = {
+  ".text-gradient": {
+    backgroundClip: "text",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+  },
+  ".text-balance": {
+    textWrap: "balance",
+  },
+  ".text-pretty": {
+    textWrap: "pretty",
+  },
+} as const;
+
+// Custom utilities
+const customUtilities = {
+  ".no-scrollbar": {
+    "-ms-overflow-style": "none",
+    "scrollbar-width": "none",
+    "&::-webkit-scrollbar": {
+      display: "none",
+    },
+  },
+  ".scrollbar-thin": {
+    "scrollbar-width": "thin",
+    "&::-webkit-scrollbar": {
+      width: "8px",
+      height: "8px",
+    },
+  },
+  ".glass": {
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+  },
+  ".glass-sm": {
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
+  },
+  ".glass-lg": {
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+  },
+} as const;
+
+const config: Config = {
+  darkMode: ["class"],
+  content: CONTENT_PATHS,
+  theme: {
+    extend: {
+      // Border radius with CSS variables
+      borderRadius: {
+        lg: cssVarRaw("radius"),
+        md: `calc(${cssVarRaw("radius")} - 2px)`,
+        sm: `calc(${cssVarRaw("radius")} - 4px)`,
+        xs: `calc(${cssVarRaw("radius")} - 6px)`,
+        "2xl": `calc(${cssVarRaw("radius")} + 4px)`,
+        "3xl": `calc(${cssVarRaw("radius")} + 8px)`,
+      },
+      
+      // Comprehensive color system
+      colors: {
+        // Base colors
+        background: cssVar("background"),
+        foreground: cssVar("foreground"),
+        border: cssVar("border"),
+        input: cssVar("input"),
+        ring: cssVar("ring"),
+        
+        // Component colors
+        card: createColorScale("card"),
+        popover: createColorScale("popover"),
+        primary: createColorScale("primary"),
+        secondary: createColorScale("secondary"),
+        muted: createColorScale("muted"),
+        accent: createColorScale("accent"),
+        destructive: createColorScale("destructive"),
+        
+        // Extended color scales
+        success: createColorScale("success"),
+        warning: createColorScale("warning"),
+        info: createColorScale("info"),
+        
+        // Chart colors
+        chart: Object.fromEntries(
+          Array.from({ length: 10 }, (_, i) => [
+            String(i + 1),
+            cssVar(`chart-${i + 1}`)
+          ])
+        ),
+        
+        // Sidebar colors
+        sidebar: {
+          DEFAULT: cssVar("sidebar-background"),
+          foreground: cssVar("sidebar-foreground"),
+          primary: cssVar("sidebar-primary"),
+          "primary-foreground": cssVar("sidebar-primary-foreground"),
+          accent: cssVar("sidebar-accent"),
+          "accent-foreground": cssVar("sidebar-accent-foreground"),
+          border: cssVar("sidebar-border"),
+          ring: cssVar("sidebar-ring"),
+          muted: cssVar("sidebar-muted"),
+          "muted-foreground": cssVar("sidebar-muted-foreground"),
+        },
+      },
+      
+      // Animations
+      keyframes: animations.keyframes,
+      animation: animations.animation,
+      
+      // Spacing extensions
+      spacing: spacingScale,
+      
+      // Typography extensions
+      fontSize: {
+        "2xs": ["0.625rem", { lineHeight: "0.875rem" }],
+        "3xl": ["1.875rem", { lineHeight: "2.25rem" }],
+        "4xl": ["2.25rem", { lineHeight: "2.75rem" }],
+        "5xl": ["3rem", { lineHeight: "3.5rem" }],
+        "6xl": ["3.75rem", { lineHeight: "4.25rem" }],
+        "7xl": ["4.5rem", { lineHeight: "5rem" }],
+        "8xl": ["6rem", { lineHeight: "6.5rem" }],
+        "9xl": ["8rem", { lineHeight: "8.5rem" }],
+      },
+      
+      // Font families
+      fontFamily: {
+        sans: ["Inter var", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
+      },
+      
+      // Box shadows
+      boxShadow: {
+        "inner-sm": "inset 0 1px 1px 0 rgb(0 0 0 / 0.05)",
+        "inner-md": "inset 0 2px 4px 0 rgb(0 0 0 / 0.06)",
+        "inner-lg": "inset 0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        glow: "0 0 20px rgb(0 0 0 / 0.1)",
+        "glow-sm": "0 0 10px rgb(0 0 0 / 0.1)",
+        "glow-lg": "0 0 30px rgb(0 0 0 / 0.1)",
+      },
+      
+      // Transitions
+      transitionDuration: {
+        "400": "400ms",
+        "600": "600ms",
+        "800": "800ms",
+        "900": "900ms",
+      },
+      
+      // Z-index scale
+      zIndex: {
+        "60": "60",
+        "70": "70",
+        "80": "80",
+        "90": "90",
+        "100": "100",
+      },
+      
+      // Container queries
+      containers: {
+        xs: "20rem",
+        sm: "24rem",
+        md: "28rem",
+        lg: "32rem",
+        xl: "36rem",
+        "2xl": "42rem",
+        "3xl": "48rem",
+        "4xl": "56rem",
+        "5xl": "64rem",
+        "6xl": "72rem",
+        "7xl": "80rem",
+      },
+    },
+  },
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
+    require("@tailwindcss/container-queries"),
+    
+    // Custom plugin for additional utilities
+    plugin(function({ addUtilities, addComponents, theme }) {
+      // Add custom utilities
+      addUtilities(customUtilities);
+      
+      // Add typography variants
+      addComponents(typographyVariants);
+      
+      // Add CSS variable utilities
+      addUtilities({
+        ".bg-grid": {
+          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(0 0 0 / 0.04)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e")`,
+        },
+        ".bg-grid-dark": {
+          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(255 255 255 / 0.04)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e")`,
+        },
+        ".bg-dot": {
+          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='16' height='16' fill='none'%3e%3ccircle fill='rgb(0 0 0 / 0.04)' cx='10' cy='10' r='1.625'/%3e%3c/svg%3e")`,
+        },
+        ".bg-dot-dark": {
+          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='16' height='16' fill='none'%3e%3ccircle fill='rgb(255 255 255 / 0.04)' cx='10' cy='10' r='1.625'/%3e%3c/svg%3e")`,
+        },
+      });
+      
+      // Add dynamic color utilities
+      const colors = theme("colors");
+      const colorUtilities = Object.entries(colors).reduce((acc, [key, value]) => {
+        if (typeof value === "string") {
+          acc[`.text-${key}-glow`] = {
+            textShadow: `0 0 20px ${value}`,
+          };
+        }
+        return acc;
+      }, {} as Record<string, any>);
+      
+      addUtilities(colorUtilities);
+    }),
+  ],
+  // Performance optimizations
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
+  experimental: {
+    optimizeUniversalDefaults: true,
+  },
+} satisfies Config;
+
+export default config;

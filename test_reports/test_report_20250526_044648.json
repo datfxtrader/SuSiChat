@@ -1,0 +1,365 @@
+{
+  "timestamp": "2025-05-26T04:46:48.809445",
+  "duration": 2.162205457687378,
+  "summary": {
+    "total_tests": 10,
+    "by_status": {
+      "PASSED": 7,
+      "FAILED": 3
+    },
+    "by_category": {
+      "Core": 2,
+      "Integration": 2,
+      "Resilience": 1,
+      "Features": 2,
+      "Metrics": 1,
+      "Advanced": 1,
+      "Storage": 1
+    }
+  },
+  "results": [
+    {
+      "name": "Backend Health",
+      "category": "Core",
+      "status": "TestStatus.PASSED",
+      "duration": 0.005143642425537109,
+      "success_rate": 1.0,
+      "details": {
+        "success": true,
+        "health_status": "ok",
+        "environment": "development",
+        "config_available": true,
+        "metrics_available": true,
+        "response_times": {
+          "health": 0.002516508102416992,
+          "config": 0.0009989738464355469,
+          "metrics": 0.00092315673828125
+        },
+        "warnings": [],
+        "performance_metrics": {
+          "min": 0.00092315673828125,
+          "max": 0.002516508102416992,
+          "avg": 0.0014795462290445964,
+          "median": 0.0009989738464355469,
+          "p95": 0.002516508102416992,
+          "p99": 0.002516508102416992
+        }
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.6702409
+    },
+    {
+      "name": "WebSocket",
+      "category": "Integration",
+      "status": "TestStatus.PASSED",
+      "duration": 0.014324426651000977,
+      "success_rate": 1.0,
+      "details": {
+        "success": true,
+        "websocket_available": true,
+        "websocket_functional": false
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.6863933
+    },
+    {
+      "name": "Error Handling",
+      "category": "Resilience",
+      "status": "TestStatus.PASSED",
+      "duration": 0.048210859298706055,
+      "success_rate": 0.75,
+      "details": {
+        "success": true,
+        "success_rate": 0.75,
+        "scenarios_tested": 4,
+        "scenarios_passed": 3,
+        "scenario_results": [
+          {
+            "name": "Invalid endpoint",
+            "expected": 404,
+            "actual": 404,
+            "passed": true
+          },
+          {
+            "name": "Malformed JSON",
+            "expected": [
+              400,
+              422
+            ],
+            "actual": 422,
+            "passed": true
+          },
+          {
+            "name": "Missing required fields",
+            "expected": [
+              400,
+              422
+            ],
+            "actual": 422,
+            "passed": true
+          },
+          {
+            "name": "Large payload",
+            "expected": [
+              200,
+              400,
+              413
+            ],
+            "actual": 422,
+            "passed": false
+          }
+        ]
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.7196088
+    },
+    {
+      "name": "API Endpoints",
+      "category": "Core",
+      "status": "TestStatus.PASSED",
+      "duration": 0.05049562454223633,
+      "success_rate": 1.0,
+      "details": {
+        "success": true,
+        "success_rate": 1.0,
+        "total_endpoints": 9,
+        "successful_endpoints": 9,
+        "endpoint_results": {
+          "/": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.004258155822753906,
+            "description": "Root"
+          },
+          "/health": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.006948947906494141,
+            "description": "Health"
+          },
+          "/config": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.002797842025756836,
+            "description": "Config"
+          },
+          "/metrics": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.0083465576171875,
+            "description": "Metrics"
+          },
+          "/deerflow/capabilities": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.002203226089477539,
+            "description": "Capabilities"
+          },
+          "/deerflow/tools": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.012828826904296875,
+            "description": "Tools"
+          },
+          "/agent/tasks": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.007307529449462891,
+            "description": "Tasks"
+          },
+          "/optimize/validate": {
+            "method": "POST",
+            "status": 200,
+            "success": true,
+            "response_time": 0.003903627395629883,
+            "description": "Validate"
+          },
+          "/optimize/recommendations": {
+            "method": "GET",
+            "status": 200,
+            "success": true,
+            "response_time": 0.0008754730224609375,
+            "description": "Recommendations"
+          }
+        },
+        "performance_metrics": {
+          "min": 0.0008754730224609375,
+          "max": 0.012828826904296875,
+          "avg": 0.005496687359280056,
+          "median": 0.004258155822753906,
+          "p95": 0.012828826904296875,
+          "p99": 0.012828826904296875
+        }
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.721248
+    },
+    {
+      "name": "Agent System",
+      "category": "Features",
+      "status": "TestStatus.FAILED",
+      "duration": 0.03730440139770508,
+      "success_rate": 0.0,
+      "details": {
+        "success": false,
+        "error": "No task ID returned"
+      },
+      "error": "No task ID returned",
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.7590826
+    },
+    {
+      "name": "Performance",
+      "category": "Metrics",
+      "status": "TestStatus.PASSED",
+      "duration": 0.06547832489013672,
+      "success_rate": 1.0,
+      "details": {
+        "success": true,
+        "performance_stats": {
+          "total_requests": 30,
+          "successful_requests": 30,
+          "success_rate": 1.0,
+          "total_time": 0.047438621520996094,
+          "throughput": 632.3961160364272,
+          "response_times": {
+            "min": 0.021537303924560547,
+            "max": 0.04060101509094238,
+            "avg": 0.033337608973185225,
+            "p95": 0.04000725746154785
+          }
+        },
+        "warnings": [],
+        "client_metrics": {
+          "min": 0.005881309509277344,
+          "max": 0.04060101509094238,
+          "avg": 0.03245192189370432,
+          "median": 0.03307795524597168,
+          "p95": 0.03995327949523926,
+          "p99": 0.04060101509094238
+        }
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.7882125
+    },
+    {
+      "name": "Frontend Integration",
+      "category": "Integration",
+      "status": "TestStatus.FAILED",
+      "duration": 0.07559585571289062,
+      "success_rate": 0.0,
+      "details": {
+        "success": false,
+        "integration_points": {
+          "cors_configured": false,
+          "api_versioning": true,
+          "static_files": true,
+          "frontend_accessible": false
+        },
+        "warnings": [
+          "Frontend not accessible"
+        ]
+      },
+      "error": null,
+      "warnings": [
+        "Frontend not accessible"
+      ],
+      "metrics": {},
+      "timestamp": 1748234806.7989175
+    },
+    {
+      "name": "Learning System",
+      "category": "Advanced",
+      "status": "TestStatus.PASSED",
+      "duration": 0.02873849868774414,
+      "success_rate": 1.0,
+      "details": {
+        "success": true,
+        "optimization_ready": true,
+        "readiness_score": 0.7,
+        "recommendations_available": true,
+        "recommendation_count": 1,
+        "learning_system_active": true,
+        "warnings": []
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.7987192
+    },
+    {
+      "name": "Research Capabilities",
+      "category": "Features",
+      "status": "TestStatus.PASSED",
+      "duration": 0.03159022331237793,
+      "success_rate": 1.0,
+      "details": {
+        "success": true,
+        "research_initiated": true,
+        "response_structure": [
+          "status",
+          "report",
+          "visualization_path",
+          "timestamp",
+          "sources",
+          "service_process_log"
+        ],
+        "search_capabilities": {
+          "web_search": true,
+          "financial_search": true,
+          "news_search": true
+        },
+        "initiation_time": 0.02029728889465332
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234806.8007653
+    },
+    {
+      "name": "Data Persistence",
+      "category": "Storage",
+      "status": "TestStatus.FAILED",
+      "duration": 2.015540838241577,
+      "success_rate": 0.0,
+      "details": {
+        "success": false,
+        "task_created": false,
+        "task_retrievable": false,
+        "task_in_listing": false,
+        "persistence_verified": false
+      },
+      "error": null,
+      "warnings": [],
+      "metrics": {},
+      "timestamp": 1748234808.806586
+    }
+  ],
+  "configuration": {
+    "backend_url": "http://0.0.0.0:9000",
+    "frontend_url": "http://0.0.0.0:5000",
+    "timeouts": {
+      "short": 5,
+      "medium": 15,
+      "long": 30
+    }
+  }
+}
