@@ -1,95 +1,73 @@
-
-import React, { useEffect, useRef, useState } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { ArrowDown } from 'lucide-react';
+import React, { useEffect, useRef, ReactNode, useCallback } from 'react';
 
 interface AutoScrollContainerProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
-  scrollTrigger?: any; // Dependency to trigger scroll
+  shouldScroll?: boolean;
+  scrollBehavior?: 'smooth' | 'auto';
+  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
 export const AutoScrollContainer: React.FC<AutoScrollContainerProps> = ({
   children,
   className = '',
-  scrollTrigger
+  shouldScroll = true,
+  scrollBehavior = 'smooth',
+  onScroll
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ container: containerRef });
-  const [isUserScrolling, setIsUserScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const isUserScrollingRef = useRef(false);
+
+  const scrollToBottom = useCallback(() => {
+    if (shouldScroll && containerRef.current && !isUserScrollingRef.current) {
+      const container = containerRef.current;
+
+      if (scrollBehavior === 'smooth') {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  }, [shouldScroll, scrollBehavior]);
+
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
+
+    // Update user scrolling state
+    isUserScrollingRef.current = !isNearBottom;
+
+    // Call external scroll handler if provided
+    if (onScroll) {
+      onScroll(event);
+    }
+  }, [onScroll]);
 
   useEffect(() => {
-    if (!containerRef.current || isUserScrolling) return;
+    // Debounce scroll to bottom to avoid excessive scrolling
+    const timer = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timer);
+  }, [children, scrollToBottom]);
 
-    const container = containerRef.current;
-    const shouldScroll = container.scrollHeight > container.clientHeight;
-
-    if (shouldScroll) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, [scrollTrigger, isUserScrolling]);
-
-  const handleScroll = () => {
-    setIsUserScrolling(true);
-    
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-
-    scrollTimeoutRef.current = setTimeout(() => {
-      const container = containerRef.current;
-      if (container) {
-        const isAtBottom = 
-          container.scrollHeight - container.scrollTop <= 
-          container.clientHeight + 50; // 50px threshold
-        
-        if (isAtBottom) {
-          setIsUserScrolling(false);
-        }
-      }
-    }, 1000);
-  };
-
-  const scrollToBottom = () => {
-    containerRef.current?.scrollTo({
-      top: containerRef.current.scrollHeight,
-      behavior: 'smooth'
-    });
-    setIsUserScrolling(false);
-  };
-
-  const opacity = useTransform(scrollYProgress, [0.8, 1], [1, 0]);
+  // Reset user scrolling state when new content arrives
+  useEffect(() => {
+    isUserScrollingRef.current = false;
+  }, [children]);
 
   return (
-    <div className="relative">
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className={`overflow-y-auto scroll-smooth ${className}`}
-      >
-        {children}
-      </div>
-      
-      {/* Scroll to bottom indicator */}
-      <motion.div
-        style={{ opacity }}
-        className="absolute bottom-4 right-4 z-10"
-      >
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={scrollToBottom}
-          className="shadow-lg"
-        >
-          <ArrowDown className="w-4 h-4 mr-1" />
-          Scroll to bottom
-        </Button>
-      </motion.div>
+    <div 
+      ref={containerRef} 
+      className={className}
+      onScroll={handleScroll}
+      style={{ 
+        overflowY: 'auto',
+        scrollBehavior: scrollBehavior === 'smooth' ? 'smooth' : 'auto'
+      }}
+    >
+      {children}
     </div>
   );
 };

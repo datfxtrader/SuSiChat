@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Smile, Coffee, Music, TrendingUp, Send } from 'lucide-react';
 import { TypewriterText } from '@/components/shared/TypewriterText';
@@ -36,6 +35,11 @@ export const BestFriendChat: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { toast } = useToast();
+
+  // Refs for auto-scrolling
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const isAutoScrollEnabledRef = useRef(true);
 
   useEffect(() => {
     loadUserProfile();
@@ -82,7 +86,7 @@ export const BestFriendChat: React.FC = () => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -116,13 +120,13 @@ export const BestFriendChat: React.FC = () => {
   const getGreeting = () => {
     const hour = new Date().getHours();
     const name = userProfile?.name || 'Friend';
-    
+
     if (userProfile?.languages.includes('vi')) {
       if (hour < 12) return `Chào buổi sáng ${name}! ☀️`;
       if (hour < 18) return `Chào ${name}! Chiều nay thế nào? 😊`;
       return `Chào ${name}! Tối nay vui không? 🌙`;
     }
-    
+
     if (hour < 12) return `Good morning ${name}! ☀️`;
     if (hour < 18) return `Hey ${name}! How's your afternoon? 😊`;
     return `Evening ${name}! How's it going? 🌙`;
@@ -139,7 +143,7 @@ export const BestFriendChat: React.FC = () => {
 
   const getSuggestedTopics = (): SuggestedTopic[] => {
     const isVietnamese = userProfile?.languages.includes('vi');
-    
+
     return [
       {
         label: isVietnamese ? '☕ Uống cà phê không?' : '☕ Coffee chat?',
@@ -164,6 +168,30 @@ export const BestFriendChat: React.FC = () => {
     ];
   };
 
+    // Smooth auto-scroll function
+    const scrollToBottom = useCallback((behavior: 'smooth' | 'auto' = 'smooth') => {
+      if (isAutoScrollEnabledRef.current && messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ 
+          behavior,
+          block: 'end',
+          inline: 'nearest'
+        });
+      }
+    }, []);
+  
+    // Auto-scroll when messages change
+    useEffect(() => {
+      const timer = setTimeout(() => scrollToBottom(), 100);
+      return () => clearTimeout(timer);
+    }, [messages, scrollToBottom]);
+  
+    // Detect manual scrolling to disable auto-scroll temporarily
+    const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
+      isAutoScrollEnabledRef.current = isNearBottom;
+    }, []);
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-purple-50 to-pink-50 dark:from-slate-900 dark:to-slate-800">
       {/* Header */}
@@ -177,7 +205,7 @@ export const BestFriendChat: React.FC = () => {
               I'm here for you {moodEmojis[mood]}
             </p>
           </div>
-          
+
           {/* Mood selector */}
           <div className="flex gap-2">
             {Object.entries(moodEmojis).map(([moodType, emoji]) => (
@@ -201,7 +229,7 @@ export const BestFriendChat: React.FC = () => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto p-4 space-y-4" onScrollCapture={handleScroll}>
         {messages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -214,7 +242,7 @@ export const BestFriendChat: React.FC = () => {
                 : 'We can talk about anything you want! 💬'
               }
             </p>
-            
+
             {/* Topic suggestions */}
             {showSuggestions && (
               <div className="flex flex-wrap justify-center gap-2">
@@ -264,7 +292,7 @@ export const BestFriendChat: React.FC = () => {
                 ) : (
                   <div className="whitespace-pre-wrap">{message.content}</div>
                 )}
-                
+
                 {/* Show detected language if code-switching */}
                 {message.languages && message.languages.length > 1 && (
                   <div className="flex gap-1 mt-2 opacity-60">
@@ -311,6 +339,7 @@ export const BestFriendChat: React.FC = () => {
             </span>
           </motion.div>
         )}
+        <div ref={messagesEndRef} style={{ height: '1px' }} />
       </div>
 
       {/* Input area */}
@@ -319,7 +348,12 @@ export const BestFriendChat: React.FC = () => {
           <Input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && !isTyping && sendMessage(inputMessage)}
+             onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendMessage(inputMessage);
+                  }
+                }}
             placeholder={
               userProfile?.languages.includes('vi')
                 ? 'Nhắn gì đó...'
@@ -329,7 +363,11 @@ export const BestFriendChat: React.FC = () => {
             className="flex-1 bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600"
           />
           <Button 
-            onClick={() => sendMessage(inputMessage)}
+            onClick={() => {
+              sendMessage(inputMessage);
+              // Small delay to ensure auto-scroll works properly
+              setTimeout(() => scrollToBottom(), 50);
+            }}
             disabled={isTyping || !inputMessage.trim()}
             size="sm"
           >
