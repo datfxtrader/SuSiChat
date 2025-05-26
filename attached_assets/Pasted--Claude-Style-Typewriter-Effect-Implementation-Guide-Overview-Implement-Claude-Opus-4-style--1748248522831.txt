@@ -1,0 +1,699 @@
+# Claude-Style Typewriter Effect Implementation Guide
+
+## Overview
+Implement Claude Opus 4-style typewriter animation for AI responses in both Chat and Research interfaces using React + TypeScript with Framer Motion.
+
+## Core Implementation
+
+### 1. Create the Typewriter Hook
+**File**: `client/src/hooks/useTypewriter.ts`
+
+```typescript
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+interface UseTypewriterOptions {
+  speed?: number;
+  delay?: number;
+  onComplete?: () => void;
+  skipAnimation?: boolean;
+}
+
+export const useTypewriter = (
+  text: string,
+  options: UseTypewriterOptions = {}
+) => {
+  const {
+    speed = 30, // ms per character (Claude-like speed)
+    delay = 0,
+    onComplete,
+    skipAnimation = false
+  } = options;
+
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const skipToEnd = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setDisplayedText(text);
+    setIsTyping(false);
+    setIsComplete(true);
+    onComplete?.();
+  }, [text, onComplete]);
+
+  useEffect(() => {
+    if (skipAnimation) {
+      skipToEnd();
+      return;
+    }
+
+    setDisplayedText('');
+    setIsTyping(false);
+    setIsComplete(false);
+
+    timeoutRef.current = setTimeout(() => {
+      let currentIndex = 0;
+      setIsTyping(true);
+
+      intervalRef.current = setInterval(() => {
+        if (currentIndex < text.length) {
+          setDisplayedText(text.slice(0, currentIndex + 1));
+          currentIndex++;
+        } else {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setIsTyping(false);
+          setIsComplete(true);
+          onComplete?.();
+        }
+      }, speed);
+    }, delay);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [text, speed, delay, onComplete, skipAnimation, skipToEnd]);
+
+  return {
+    displayedText,
+    isTyping,
+    isComplete,
+    skipToEnd
+  };
+};
+```
+
+### 2. Create Typewriter Component for Markdown Support
+**File**: `client/src/components/shared/TypewriterText.tsx`
+
+```tsx
+import React, { useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { motion } from 'framer-motion';
+import { useTypewriter } from '@/hooks/useTypewriter';
+
+interface TypewriterTextProps {
+  text: string;
+  speed?: number;
+  className?: string;
+  onComplete?: () => void;
+  renderMarkdown?: boolean;
+  showCursor?: boolean;
+}
+
+export const TypewriterText: React.FC<TypewriterTextProps> = ({
+  text,
+  speed = 30,
+  className = '',
+  onComplete,
+  renderMarkdown = false,
+  showCursor = true
+}) => {
+  const { displayedText, isTyping, skipToEnd } = useTypewriter(text, {
+    speed,
+    onComplete
+  });
+
+  const content = useMemo(() => {
+    if (renderMarkdown) {
+      return (
+        <ReactMarkdown
+          className="prose prose-sm max-w-none"
+          components={{
+            // Custom components to handle links, code blocks, etc.
+            a: ({ children, href }) => (
+              <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {children}
+              </a>
+            ),
+            code: ({ inline, children }) => (
+              inline ? 
+                <code className="px-1 py-0.5 bg-gray-100 rounded text-sm">{children}</code> :
+                <pre className="bg-gray-100 p-3 rounded-lg overflow-x-auto">
+                  <code>{children}</code>
+                </pre>
+            )
+          }}
+        >
+          {displayedText}
+        </ReactMarkdown>
+      );
+    }
+    return displayedText;
+  }, [displayedText, renderMarkdown]);
+
+  return (
+    <div className={`relative ${className}`}>
+      <div onDoubleClick={skipToEnd} className="cursor-text">
+        {content}
+        {showCursor && isTyping && (
+          <motion.span
+            className="inline-block w-0.5 h-5 bg-gray-800 ml-0.5"
+            animate={{ opacity: [1, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+```
+
+### 3. Enhanced Chat Bubble with Typewriter
+**File**: Update `client/src/components/chat/ChatBubble.tsx`
+
+```tsx
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TypewriterText } from '@/components/shared/TypewriterText';
+import { Button } from '@/components/ui/button';
+import { Copy, Check } from 'lucide-react';
+
+interface ChatBubbleProps {
+  message: {
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+  };
+  isLatest?: boolean;
+}
+
+export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, isLatest = false }) => {
+  const [isCopied, setIsCopied] = useState(false);
+  const isAssistant = message.role === 'assistant';
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(message.content);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`flex ${isAssistant ? 'justify-start' : 'justify-end'} mb-4`}
+    >
+      <div
+        className={`
+          relative max-w-[70%] px-4 py-3 rounded-2xl
+          ${isAssistant 
+            ? 'bg-gray-100 text-gray-900' 
+            : 'bg-blue-600 text-white'
+          }
+        `}
+      >
+        {isAssistant && isLatest ? (
+          <TypewriterText
+            text={message.content}
+            speed={25}
+            renderMarkdown={true}
+            className="text-sm"
+            onComplete={() => {
+              // Auto-scroll to bottom when complete
+              const chatContainer = document.getElementById('chat-messages');
+              chatContainer?.scrollTo({
+                top: chatContainer.scrollHeight,
+                behavior: 'smooth'
+              });
+            }}
+          />
+        ) : (
+          <div className="text-sm whitespace-pre-wrap">
+            {message.content}
+          </div>
+        )}
+
+        {isAssistant && (
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute -bottom-8 left-0 flex gap-2"
+            >
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCopy}
+                className="h-7 px-2 text-xs"
+              >
+                {isCopied ? (
+                  <Check className="w-3 h-3" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </Button>
+            </motion.div>
+          </AnimatePresence>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+```
+
+### 4. Enhanced Research Response with Typewriter
+**File**: Update `client/src/components/suna/ResearchResponse.tsx`
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TypewriterText } from '@/components/shared/TypewriterText';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Zap, Copy, Share, Bookmark } from 'lucide-react';
+
+interface ResearchResponseProps {
+  response: {
+    content: string;
+    sources?: Array<{ title: string; url: string }>;
+    isComplete: boolean;
+  };
+  isLatest?: boolean;
+}
+
+export const ResearchResponse: React.FC<ResearchResponseProps> = ({ 
+  response, 
+  isLatest = false 
+}) => {
+  const [showActions, setShowActions] = useState(false);
+  const [typewriterComplete, setTypewriterComplete] = useState(false);
+
+  // Show actions after typewriter completes or if not latest
+  useEffect(() => {
+    if (!isLatest || typewriterComplete) {
+      setShowActions(true);
+    }
+  }, [isLatest, typewriterComplete]);
+
+  return (
+    <Card className="p-6 mb-4 border-l-4 border-l-purple-500">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="p-2 bg-purple-100 rounded-lg">
+          <Zap className="w-4 h-4 text-purple-600" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900">Research Analysis</h3>
+          <p className="text-xs text-gray-500">Deep research with sources</p>
+        </div>
+      </div>
+
+      <div className="prose prose-sm max-w-none">
+        {isLatest && !response.isComplete ? (
+          <TypewriterText
+            text={response.content}
+            speed={20} // Slightly faster for research
+            renderMarkdown={true}
+            showCursor={true}
+            onComplete={() => setTypewriterComplete(true)}
+          />
+        ) : (
+          <ReactMarkdown>{response.content}</ReactMarkdown>
+        )}
+      </div>
+
+      {response.sources && response.sources.length > 0 && (
+        <AnimatePresence>
+          {showActions && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mt-4 pt-4 border-t"
+            >
+              <h4 className="text-sm font-medium mb-2">Sources</h4>
+              <div className="space-y-2">
+                {response.sources.map((source, idx) => (
+                  <a
+                    key={idx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-sm text-blue-600 hover:underline"
+                  >
+                    {source.title}
+                  </a>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
+      <AnimatePresence>
+        {showActions && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex gap-2 mt-4"
+          >
+            <Button size="sm" variant="ghost">
+              <Copy className="w-3 h-3 mr-1" /> Copy
+            </Button>
+            <Button size="sm" variant="ghost">
+              <Share className="w-3 h-3 mr-1" /> Share
+            </Button>
+            <Button size="sm" variant="ghost">
+              <Bookmark className="w-3 h-3 mr-1" /> Save
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+};
+```
+
+### 5. Global Typewriter Settings
+**File**: `client/src/config/typewriter.config.ts`
+
+```typescript
+export const TypewriterConfig = {
+  // Speed presets (ms per character)
+  speeds: {
+    slow: 50,
+    normal: 30,    // Claude-like speed
+    fast: 20,
+    research: 15,  // Faster for longer content
+    code: 10       // Very fast for code blocks
+  },
+
+  // Feature flags
+  features: {
+    enableSkipOnDoubleClick: true,
+    enableSkipButton: true,
+    showCursor: true,
+    preserveMarkdownFormatting: true,
+    smoothScrolling: true
+  },
+
+  // Response type configurations
+  responseTypes: {
+    chat: {
+      speed: 30,
+      showCursor: true,
+      enableMarkdown: true
+    },
+    research: {
+      speed: 20,
+      showCursor: true,
+      enableMarkdown: true,
+      showProgressBar: true
+    },
+    error: {
+      speed: 0, // Instant for errors
+      showCursor: false,
+      enableMarkdown: false
+    }
+  }
+};
+```
+
+### 6. Performance Optimization Hook
+**File**: `client/src/hooks/useOptimizedTypewriter.ts`
+
+```typescript
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+export const useOptimizedTypewriter = (text: string, speed: number = 30) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const rafRef = useRef<number>();
+  const startTimeRef = useRef<number>();
+  const currentIndexRef = useRef(0);
+
+  const animate = useCallback((timestamp: number) => {
+    if (!startTimeRef.current) {
+      startTimeRef.current = timestamp;
+    }
+
+    const elapsed = timestamp - startTimeRef.current;
+    const targetIndex = Math.floor(elapsed / speed);
+
+    if (targetIndex > currentIndexRef.current && currentIndexRef.current < text.length) {
+      currentIndexRef.current = Math.min(targetIndex, text.length);
+      setDisplayedText(text.slice(0, currentIndexRef.current));
+
+      if (currentIndexRef.current < text.length) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsTyping(false);
+      }
+    } else if (currentIndexRef.current < text.length) {
+      rafRef.current = requestAnimationFrame(animate);
+    }
+  }, [text, speed]);
+
+  useEffect(() => {
+    currentIndexRef.current = 0;
+    startTimeRef.current = undefined;
+    setDisplayedText('');
+    setIsTyping(true);
+
+    rafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [text, animate]);
+
+  const skipToEnd = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+    }
+    setDisplayedText(text);
+    setIsTyping(false);
+  }, [text]);
+
+  return { displayedText, isTyping, skipToEnd };
+};
+```
+
+### 7. Auto-Scroll Manager
+**File**: `client/src/components/shared/AutoScrollContainer.tsx`
+
+```tsx
+import React, { useEffect, useRef } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+
+interface AutoScrollContainerProps {
+  children: React.ReactNode;
+  className?: string;
+  scrollTrigger?: any; // Dependency to trigger scroll
+}
+
+export const AutoScrollContainer: React.FC<AutoScrollContainerProps> = ({
+  children,
+  className = '',
+  scrollTrigger
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ container: containerRef });
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (!containerRef.current || isUserScrolling) return;
+
+    const container = containerRef.current;
+    const shouldScroll = container.scrollHeight > container.clientHeight;
+
+    if (shouldScroll) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [scrollTrigger, isUserScrolling]);
+
+  const handleScroll = () => {
+    setIsUserScrolling(true);
+    
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = containerRef.current;
+      if (container) {
+        const isAtBottom = 
+          container.scrollHeight - container.scrollTop <= 
+          container.clientHeight + 50; // 50px threshold
+        
+        if (isAtBottom) {
+          setIsUserScrolling(false);
+        }
+      }
+    }, 1000);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className={`overflow-y-auto scroll-smooth ${className}`}
+    >
+      {children}
+      
+      {/* Scroll to bottom indicator */}
+      <motion.div
+        className="sticky bottom-4 right-4 float-right"
+        style={{
+          opacity: useTransform(scrollYProgress, [0.9, 1], [1, 0])
+        }}
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            containerRef.current?.scrollTo({
+              top: containerRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+            setIsUserScrolling(false);
+          }}
+        >
+          ↓ Scroll to bottom
+        </Button>
+      </motion.div>
+    </div>
+  );
+};
+```
+
+### 8. Integration with Existing Chat Component
+**File**: Update `client/src/components/chat/ChatMessages.tsx`
+
+```tsx
+import React from 'react';
+import { AutoScrollContainer } from '@/components/shared/AutoScrollContainer';
+import { ChatBubble } from './ChatBubble';
+
+export const ChatMessages: React.FC<{ messages: Message[] }> = ({ messages }) => {
+  const latestMessageId = messages[messages.length - 1]?.id;
+
+  return (
+    <AutoScrollContainer 
+      className="flex-1 p-4" 
+      scrollTrigger={messages.length}
+    >
+      <div className="space-y-4">
+        {messages.map((message) => (
+          <ChatBubble
+            key={message.id}
+            message={message}
+            isLatest={message.id === latestMessageId && message.role === 'assistant'}
+          />
+        ))}
+      </div>
+    </AutoScrollContainer>
+  );
+};
+```
+
+### 9. Testing Implementation
+**File**: `client/src/components/shared/__tests__/TypewriterText.test.tsx`
+
+```tsx
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { TypewriterText } from '../TypewriterText';
+
+describe('TypewriterText', () => {
+  it('should animate text character by character', async () => {
+    const text = 'Hello, world!';
+    render(<TypewriterText text={text} speed={10} />);
+
+    // Initially should be empty or first character
+    expect(screen.getByText(/^H?$/)).toBeInTheDocument();
+
+    // Wait for animation to complete
+    await waitFor(() => {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }, { timeout: text.length * 10 + 100 });
+  });
+
+  it('should skip to end on double click', async () => {
+    const text = 'Long text that takes time to type';
+    const { container } = render(<TypewriterText text={text} speed={50} />);
+
+    // Double click to skip
+    await userEvent.dblClick(container.firstChild!);
+
+    // Should immediately show full text
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
+});
+```
+
+## Implementation Checklist for Replit Agent
+
+1. **Core Components**
+   - [ ] Create `useTypewriter` hook
+   - [ ] Create `TypewriterText` component
+   - [ ] Create `useOptimizedTypewriter` for performance
+   - [ ] Create `AutoScrollContainer` component
+
+2. **Integration**
+   - [ ] Update `ChatBubble` component
+   - [ ] Update `ResearchResponse` component
+   - [ ] Update `ChatMessages` with auto-scroll
+   - [ ] Add typewriter config file
+
+3. **Features**
+   - [ ] Character-by-character animation
+   - [ ] Markdown support during animation
+   - [ ] Skip on double-click
+   - [ ] Animated cursor
+   - [ ] Auto-scroll to bottom
+   - [ ] Preserve scroll position when user scrolls up
+
+4. **Performance**
+   - [ ] Use requestAnimationFrame for smooth animation
+   - [ ] Implement proper cleanup in useEffect
+   - [ ] Optimize for long texts
+   - [ ] Prevent memory leaks
+
+5. **Accessibility**
+   - [ ] Add aria-live regions
+   - [ ] Respect prefers-reduced-motion
+   - [ ] Keyboard shortcuts for skip
+
+6. **Testing**
+   - [ ] Unit tests for hooks
+   - [ ] Component tests for TypewriterText
+   - [ ] Integration tests for chat flow
+   - [ ] Performance tests for long texts
+
+## Additional Notes
+
+1. **Tailwind Classes for Cursor**:
+   ```css
+   /* Add to your global CSS */
+   @keyframes blink {
+     0%, 50% { opacity: 1; }
+     51%, 100% { opacity: 0; }
+   }
+   
+   .typing-cursor {
+     animation: blink 1s infinite;
+   }
+   ```
+
+2. **WebSocket Integration**:
+   - Ensure typewriter starts only after WebSocket message is complete
+   - Handle streaming responses by updating the text prop
+
+3. **State Persistence**:
+   - Save whether user prefers animations on/off
+   - Remember scroll position across tab switches
