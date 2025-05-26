@@ -6,6 +6,9 @@ import {
   ResearchParams 
 } from './deerflow-integration-optimized';
 
+// Re-export ResearchDepth for other modules
+export { ResearchDepth };
+
 /**
  * Service for performing research at different depth levels
  */
