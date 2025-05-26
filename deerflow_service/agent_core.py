@@ -633,12 +633,10 @@ class AgentCore:
 
             self.active_agents[task_id] = task_state
 
-            # Start background task for research
-            # Use await to ensure the task is properly created and its ID is returned
-            task_id = await asyncio.create_task(self._execute_research_task(task_state))
+            # Start background task for research - don't await, just create
+            asyncio.create_task(self._execute_research_task(task_state))
 
             logger.info(f"Created research task: {task_id}")
-
 
             return task_id
 
@@ -719,22 +717,43 @@ class AgentCore:
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a specific task"""
         if task_id not in self.active_agents:
+            # Try to load from persistent storage
+            try:
+                import os
+                import json
+                filename = f"state_storage/{task_id}.json"
+                if os.path.exists(filename):
+                    with open(filename, 'r') as f:
+                        stored_state = json.load(f)
+                    return {
+                        "task_id": task_id,
+                        "status": stored_state.get("status", "unknown"),
+                        "progress": 1.0 if stored_state.get("status") == "TaskStatus.COMPLETED" else 0.5,
+                        "query": stored_state.get("metadata", {}).get("query", ""),
+                        "created_at": stored_state.get("start_time"),
+                        "started_at": stored_state.get("start_time"),
+                        "completed_at": stored_state.get("start_time"),
+                        "result": stored_state.get("execution_plan"),
+                        "error": None,
+                        "metadata": stored_state.get("metadata", {})
+                    }
+            except Exception as e:
+                logger.error(f"Error loading task from storage: {e}")
             return None
 
-        agent_data = self.active_agents[task_id]
-        task = agent_data["task"]
+        task_state = self.active_agents[task_id]
 
         return {
             "task_id": task_id,
-            "status": agent_data["status"],
-            "progress": agent_data["progress"],
-            "query": task.query,
-            "created_at": task.created_at,
-            "started_at": task.started_at,
-            "completed_at": task.completed_at,
-            "result": task.result,
-            "error": agent_data.get("error"),
-            "metadata": agent_data["metadata"]
+            "status": task_state.status.value if hasattr(task_state.status, 'value') else str(task_state.status),
+            "progress": task_state.progress,
+            "query": task_state.query,
+            "created_at": task_state.created_at,
+            "started_at": task_state.created_at,
+            "completed_at": task_state.completed_at,
+            "result": task_state.results,
+            "error": task_state.errors[-1] if task_state.errors else None,
+            "metadata": {"query": task_state.query, "preferences": task_state.preferences}
         }
 
     def cleanup_completed_tasks(self, max_age_hours: int = 24):

@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from 'cors';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import financialResearchRoutes from './routes/financial-research';
@@ -24,37 +25,20 @@ import blogRoutes from './routes/blog';
 
 const app = express();
 
-// Add comprehensive CORS support for frontend integration
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173', 
-    'http://0.0.0.0:3000',
-    'http://0.0.0.0:5173',
+// Comprehensive CORS configuration
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000', 
+    'http://localhost:5000',
     'https://*.replit.dev',
-    'https://*.replit.co',
-    'https://*.replit.app'
-  ];
-
-  // Allow any replit domain or localhost
-  if (origin && (allowedOrigins.some(allowed => origin.includes(allowed.replace('*', ''))) || origin.includes('replit'))) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    res.header('Access-Control-Allow-Origin', '*');
-  }
-
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-id, x-user-email, Cache-Control');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
+    'https://*.repl.co'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

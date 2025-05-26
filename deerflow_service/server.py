@@ -4,7 +4,7 @@ DeerFlow Research Service
 This service provides a FastAPI server to handle deep research requests using DeerFlow.
 Enhanced with intelligent agent capabilities for advanced planning and reasoning.
 """
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
@@ -18,7 +18,6 @@ import logging
 import time
 import datetime
 import aiohttp
-from fastapi import WebSocket
 from fastapi.responses import HTMLResponse
 
 # Import optimization components
@@ -799,6 +798,7 @@ async def health_check():
 
         # Get error summary
         error_summary = error_handler.get_error_summary()
+        ```python
         health_data["error_summary"] = error_summary
 
         # Determine overall status
@@ -1741,168 +1741,4 @@ class StateManager:
             logger.info(f"WebSocket disconnected, remaining connections: {len(self.active_websockets)}")
 
     async def broadcast(self, message: str):
-        """Broadcast message to all connected WebSockets"""
-        disconnected = []
-        for websocket in self.active_websockets[:]:  # Copy list to avoid modification during iteration
-            try:
-                if websocket.client_state == WebSocketState.CONNECTED:
-                    await websocket.send_text(message)
-                else:
-                    disconnected.append(websocket)
-            except Exception as e:
-                logger.error(f"Error broadcasting to WebSocket: {e}")
-                disconnected.append(websocket)
-
-        # Remove disconnected websockets
-        for ws in disconnected:
-            self.disconnect(ws)
-
-# Initialize state manager
-state_manager = StateManager()
-
-# WebSocket endpoint for real-time updates
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    client_host = websocket.client.host if websocket.client else "unknown"
-    logger.info(f"WebSocket connection attempt from {client_host}")
-
-    try:
-        await websocket.accept()
-        logger.info(f"WebSocket connection established with {client_host}")
-
-        # Add to active connections with error handling
-        try:
-            await state_manager.connect(websocket)
-        except Exception as e:
-            logger.error(f"Failed to register WebSocket connection: {e}")
-            await websocket.close(code=1011, reason="Connection registration failed")
-            return
-
-        # Send initial connection confirmation
-        try:
-            await websocket.send_text(json.dumps({
-                "type": "connection",
-                "status": "connected",
-                "timestamp": time.time(),
-                "server": "DeerFlow Research Service"
-            }))
-        except Exception as e:
-            logger.error(f"Failed to send initial confirmation: {e}")
-
-        # Main message loop with improved error handling
-        while websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                # Use timeout to prevent hanging
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-                logger.debug(f"WebSocket received from {client_host}: {data[:100]}...")
-
-                # Parse and handle different message types
-                try:
-                    message = json.loads(data)
-                    message_type = message.get("type", "echo")
-
-                    if message_type == "ping":
-                        await websocket.send_text(json.dumps({
-                            "type": "pong",
-                            "timestamp": time.time(),
-                            "server_status": "healthy"
-                        }))
-                    elif message_type == "task_status":
-                        task_id = message.get("task_id")
-                        if task_id:
-                            task_state = state_manager.get_task_state(task_id)
-                            await websocket.send_text(json.dumps({
-                                "type": "task_update",
-                                "task_id": task_id,
-                                "data": task_state or {"status": "not_found"},
-                                "timestamp": time.time()
-                            }))
-                    elif message_type == "health_check":
-                        await websocket.send_text(json.dumps({
-                            "type": "health_response",
-                            "status": "healthy",
-                            "active_connections": len(state_manager.active_websockets),
-                            "timestamp": time.time()
-                        }))
-                    else:
-                        # Echo message with metadata
-                        await websocket.send_text(json.dumps({
-                            "type": "echo",
-                            "data": data,
-                            "client": client_host,
-                            "timestamp": time.time()
-                        }))
-
-                except json.JSONDecodeError:
-                    # Handle non-JSON messages gracefully
-                    await websocket.send_text(json.dumps({
-                        "type": "echo",
-                        "data": data,
-                        "note": "Non-JSON message received",
-                        "timestamp": time.time()
-                    }))
-
-            except asyncio.TimeoutError:
-                # Send keepalive ping
-                try:
-                    await websocket.send_text(json.dumps({
-                        "type": "keepalive",
-                        "timestamp": time.time()
-                    }))
-                except:
-                    break
-            except WebSocketDisconnect:
-                logger.info(f"WebSocket client {client_host} disconnected normally")
-                break
-            except ConnectionClosed:
-                logger.info(f"WebSocket connection with {client_host} closed by client")
-                break
-            except Exception as e:
-                logger.error(f"WebSocket message error with {client_host}: {e}")
-                try:
-                    await websocket.send_text(json.dumps({
-                        "type": "error",
-                        "error": str(e),
-                        "timestamp": time.time()
-                    }))
-                except:
-                    # Connection might be closed, break the loop
-                    break
-
-    except Exception as e:
-        logger.error(f"WebSocket connection error with {client_host}: {e}")
-        try:
-            await websocket.close(code=1011, reason=f"Server error: {str(e)}")
-        except:
-            pass
-    finally:
-        # Clean up connection
-        state_manager.disconnect(websocket)
-        logger.info(f"WebSocket connection with {client_host} cleaned up")
-
-if __name__ == "__main__":
-    import uvicorn
-    import socket
-
-    def find_available_port(start_port=9000, max_attempts=10):
-        """Find an available port starting from start_port"""
-        for port in range(start_port, start_port + max_attempts):
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.bind(('0.0.0.0', port))
-                    return port
-            except OSError:
-                continue
-        return None
-
-    # Get port from environment or use default 9000
-    port = int(os.environ.get("PORT", 9000))
-
-    print(f"🚀 Starting DeerFlow service on 0.0.0.0:{port}")
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        log_level="info"
-    )
+        """Broadcast message to all connected

@@ -160,6 +160,15 @@ mode = "sequential"
 task = "shell.exec"
 args = "python test_optimized_comprehensive.py"
 
+[[workflows.workflow]]
+name = "Start SuSi Chat Service"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd suna-repo/backend && python api.py"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
