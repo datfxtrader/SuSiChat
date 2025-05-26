@@ -1,0 +1,781 @@
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Send, BookOpen, Calculator, Microscope, Globe, Palette, Music, Users, 
+  Lightbulb, MessageCircle, Star, Clock, HelpCircle, Trophy, Languages,
+  CheckCircle, AlertCircle, Brain, Heart, Zap, Target, X
+} from 'lucide-react';
+
+// Type definitions
+interface StudyMessage {
+  id: string;
+  content: string;
+  isUser: boolean;
+  timestamp: Date;
+  subject?: string;
+  difficulty?: string;
+  learningMode?: LearningMode;
+  corrections?: Correction[];
+  learningInsights?: string;
+  suggestedFollowUp?: string;
+  culturalNotes?: string[];
+}
+
+interface Correction {
+  original: string;
+  corrected: string;
+  explanation: string;
+  type: 'grammar' | 'vocabulary' | 'pronunciation';
+}
+
+interface LearningMode {
+  type: 'study' | 'practice' | 'immersive' | 'family';
+  targetLanguage: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  focus: 'grammar' | 'vocabulary' | 'conversation' | 'culture' | 'homework';
+}
+
+interface LearningProfile {
+  nativeLanguages: string[];
+  learningLanguages: string[];
+  culturalBackground: string;
+  learningStyle: string;
+  currentLevel: Record<string, string>;
+  interests: string[];
+  dailyGoalMinutes: number;
+}
+
+interface SessionInsights {
+  accuracy: number;
+  newConcepts: number;
+  timeSpent: number;
+  comprehensionScore: number;
+}
+
+// Utility function to combine class names
+const cn = (...classes: (string | boolean | undefined)[]) => {
+  return classes.filter(Boolean).join(' ');
+};
+
+// Simple toast notification component
+const Toast = ({ message, type = 'info', onClose }: { message: string; type?: 'info' | 'error' | 'success'; onClose: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === 'error' 
+    ? 'bg-red-900/80 border-red-700' 
+    : type === 'success' 
+    ? 'bg-green-900/80 border-green-700' 
+    : 'bg-blue-900/80 border-blue-700';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className={`fixed top-4 right-4 p-4 rounded-lg border ${bgColor} backdrop-blur-sm shadow-xl z-50 max-w-sm`}
+    >
+      <div className="flex items-start justify-between">
+        <p className="text-sm text-zinc-100">{message}</p>
+        <button onClick={onClose} className="ml-4 text-zinc-400 hover:text-zinc-200 transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
+// Constants
+const SUBJECTS = [
+  { id: 'math', name: 'Mathematics', icon: Calculator, color: 'from-blue-600 to-blue-500', darkColor: 'from-blue-500 to-blue-600' },
+  { id: 'science', name: 'Science', icon: Microscope, color: 'from-green-600 to-green-500', darkColor: 'from-green-500 to-green-600' },
+  { id: 'english', name: 'English', icon: BookOpen, color: 'from-purple-600 to-purple-500', darkColor: 'from-purple-500 to-purple-600' },
+  { id: 'history', name: 'History', icon: Globe, color: 'from-orange-600 to-orange-500', darkColor: 'from-orange-500 to-orange-600' },
+  { id: 'vietnamese', name: 'Vietnamese', icon: Languages, color: 'from-red-600 to-red-500', darkColor: 'from-red-500 to-red-600' },
+  { id: 'polish', name: 'Polish', icon: Languages, color: 'from-pink-600 to-pink-500', darkColor: 'from-pink-500 to-pink-600' },
+  { id: 'art', name: 'Art', icon: Palette, color: 'from-yellow-600 to-yellow-500', darkColor: 'from-amber-500 to-amber-600' },
+  { id: 'music', name: 'Music', icon: Music, color: 'from-indigo-600 to-indigo-500', darkColor: 'from-indigo-500 to-indigo-600' },
+  { id: 'other', name: 'Other', icon: Users, color: 'from-gray-600 to-gray-500', darkColor: 'from-gray-500 to-gray-600' }
+];
+
+const DIFFICULTY_LEVELS = [
+  { id: 'elementary', name: 'Elementary (K-5)', color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' },
+  { id: 'middle', name: 'Middle School (6-8)', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' },
+  { id: 'high', name: 'High School (9-12)', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' },
+  { id: 'college', name: 'College/University', color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' }
+];
+
+const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'vi', name: 'Vietnamese', flag: '🇻🇳' },
+  { code: 'pl', name: 'Polish', flag: '🇵🇱' },
+  { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'fr', name: 'French', flag: '🇫🇷' }
+];
+
+const QUICK_PHRASES = {
+  vi: [
+    { text: "Xin chào!", translation: "Hello!" },
+    { text: "Cảm ơn bạn", translation: "Thank you" },
+    { text: "Hôm nay thế nào?", translation: "How's today?" }
+  ],
+  pl: [
+    { text: "Dzień dobry!", translation: "Good day!" },
+    { text: "Dziękuję", translation: "Thank you" },
+    { text: "Jak się masz?", translation: "How are you?" }
+  ],
+  zh: [
+    { text: "你好!", translation: "Hello!" },
+    { text: "谢谢", translation: "Thank you" },
+    { text: "今天怎么样?", translation: "How's today?" }
+  ]
+};
+
+// Memoized components
+const StudyTips = memo(() => (
+  <div className="bg-zinc-950 border-b border-zinc-800/60 p-4">
+    <div className="max-w-4xl mx-auto">
+      <div className="flex items-center space-x-2 mb-3">
+        <Lightbulb className="w-5 h-5 text-yellow-500" />
+        <h2 className="text-lg font-semibold text-zinc-50">Study Tips</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="flex items-start space-x-3">
+          <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+            <BookOpen className="w-4 h-4 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-zinc-200">Be Specific</h3>
+            <p className="text-sm text-zinc-400">Include details about what you're studying</p>
+          </div>
+        </div>
+        <div className="flex items-start space-x-3">
+          <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+            <Heart className="w-4 h-4 text-green-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-zinc-200">Show Your Work</h3>
+            <p className="text-sm text-zinc-400">Share what you've tried for better guidance</p>
+          </div>
+        </div>
+        <div className="flex items-start space-x-3">
+          <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+            <Languages className="w-4 h-4 text-purple-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-zinc-200">Practice Languages</h3>
+            <p className="text-sm text-zinc-400">Switch to practice mode for language learning</p>
+          </div>
+        </div>
+        <div className="flex items-start space-x-3">
+          <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
+            <Users className="w-4 h-4 text-orange-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-zinc-200">Family Mode</h3>
+            <p className="text-sm text-zinc-400">Study together with family members</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+));
+
+const SubjectCard = memo(({ subject, onClick }: { subject: typeof SUBJECTS[0], onClick: () => void }) => {
+  const IconComponent = subject.icon;
+  return (
+    <div 
+      className="relative bg-zinc-900/80 backdrop-blur-sm border border-zinc-800/60 rounded-xl hover:border-zinc-700/60 transition-all duration-300 cursor-pointer group overflow-hidden"
+      onClick={onClick}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-300" 
+           style={{backgroundImage: `linear-gradient(to bottom right, ${subject.darkColor})`}} />
+      <div className="relative p-4 text-center">
+        <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${subject.darkColor} flex items-center justify-center mx-auto mb-2 transform group-hover:scale-110 transition-transform duration-300`}>
+          <IconComponent className="w-6 h-6 text-white" />
+        </div>
+        <h4 className="font-medium text-sm text-zinc-200 group-hover:text-zinc-50 transition-colors">{subject.name}</h4>
+      </div>
+    </div>
+  );
+});
+
+const MessageBubble = memo(({ message, getSubjectInfo, getDifficultyInfo, onFollowUp }: {
+  message: StudyMessage;
+  getSubjectInfo: (id: string) => typeof SUBJECTS[0] | undefined;
+  getDifficultyInfo: (id: string) => typeof DIFFICULTY_LEVELS[0] | undefined;
+  onFollowUp: (text: string) => void;
+}) => (
+  <motion.div 
+    initial={{ opacity: 0, x: message.isUser ? 20 : -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    className={cn("flex", message.isUser ? "justify-end" : "justify-start")}
+  >
+    <div className={cn(
+      "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl backdrop-blur-sm",
+      message.isUser 
+        ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-purple-500/20" 
+        : "bg-zinc-900/80 border border-zinc-800/60 text-zinc-200"
+    )}>
+      {!message.isUser && (
+        <div className="flex items-center space-x-2 mb-2 flex-wrap">
+          {message.subject && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-zinc-800/60 text-zinc-300 border border-zinc-700/50">
+              {getSubjectInfo(message.subject)?.name}
+            </span>
+          )}
+          {message.difficulty && (
+            <span className={cn("inline-flex items-center px-2 py-1 rounded-full text-xs", getDifficultyInfo(message.difficulty)?.color)}>
+              {getDifficultyInfo(message.difficulty)?.name}
+            </span>
+          )}
+          {message.learningMode?.type !== 'study' && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs border border-zinc-700/50 text-zinc-400">
+              {message.learningMode?.type}
+            </span>
+          )}
+        </div>
+      )}
+      
+      <div className="whitespace-pre-wrap break-words">{message.content}</div>
+      
+      {message.learningInsights && (
+        <div className="mt-2 pt-2 border-t border-zinc-700/50">
+          <div className="flex items-center gap-2 text-xs opacity-80">
+            <Zap className="w-3 h-3" />
+            {message.learningInsights}
+          </div>
+        </div>
+      )}
+      
+      {message.culturalNotes && message.culturalNotes.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-zinc-700/50">
+          <div className="text-xs opacity-80">
+            <Globe className="w-3 h-3 inline mr-1" />
+            Cultural context: {message.culturalNotes[0]}
+          </div>
+        </div>
+      )}
+      
+      {message.suggestedFollowUp && (
+        <button
+          onClick={() => onFollowUp(message.suggestedFollowUp!)}
+          className="mt-2 text-xs underline opacity-70 hover:opacity-100 text-left transition-opacity"
+        >
+          Try: "{message.suggestedFollowUp}"
+        </button>
+      )}
+      
+      <p className={cn(
+        "text-xs mt-2",
+        message.isUser ? "text-white/70" : "text-zinc-500"
+      )}>
+        {message.timestamp.toLocaleTimeString()}
+      </p>
+    </div>
+  </motion.div>
+));
+
+const Study: React.FC = () => {
+  const [messages, setMessages] = useState<StudyMessage[]>([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showCorrections, setShowCorrections] = useState(true);
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'info' | 'error' | 'success' }>>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionStartTime = useRef<number>(Date.now());
+  
+  // Mock user for demo
+  const user = { id: 'demo-user', name: 'Demo User' };
+  
+  // Learning state
+  const [learningProfile, setLearningProfile] = useState<LearningProfile | null>(null);
+  const [learningMode, setLearningMode] = useState<LearningMode>({
+    type: 'study',
+    targetLanguage: 'en',
+    difficulty: 'beginner',
+    focus: 'homework'
+  });
+  const [corrections, setCorrections] = useState<Correction[]>([]);
+  const [learningStreak, setLearningStreak] = useState(0);
+  const [sessionInsights, setSessionInsights] = useState<SessionInsights | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+
+  // Toast management
+  const showToast = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Memoized values
+  const subjectMap = useMemo(() => new Map(SUBJECTS.map(s => [s.id, s])), []);
+  const difficultyMap = useMemo(() => new Map(DIFFICULTY_LEVELS.map(d => [d.id, d])), []);
+  const quickPhrases = useMemo(() => QUICK_PHRASES[learningMode.targetLanguage] || [], [learningMode.targetLanguage]);
+  
+  const getSubjectInfo = useCallback((id: string) => subjectMap.get(id), [subjectMap]);
+  const getDifficultyInfo = useCallback((id: string) => difficultyMap.get(id), [difficultyMap]);
+
+  const placeholder = useMemo(() => {
+    if (learningMode.focus === 'homework') {
+      return "Ask your homework question here... Be specific about what you need help with!";
+    }
+    if (learningMode.type === 'practice') {
+      const lang = LANGUAGES.find(l => l.code === learningMode.targetLanguage);
+      return `Practice ${lang?.name || learningMode.targetLanguage}...`;
+    }
+    return "What would you like to study today?";
+  }, [learningMode]);
+
+  // Auto-scroll optimization
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timer);
+  }, [messages, scrollToBottom]);
+
+  // Simulate API calls for demo
+  const simulateAPIResponse = async (message: string) => {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+    
+    // Generate mock response based on learning mode
+    const responses = {
+      homework: `I'll help you with your ${selectedSubject || 'homework'} question. ${message} is a great topic! Let me break this down for you...`,
+      practice: `Great practice! In ${learningMode.targetLanguage}, we can work on "${message}". Here's how to improve...`,
+      conversation: `Let's have a conversation about "${message}". This is a wonderful topic to practice!`,
+      default: `I understand you're asking about "${message}". Let me help you understand this better...`
+    };
+    
+    const response = responses[learningMode.focus] || responses.default;
+    
+    // Generate mock corrections for language practice
+    const mockCorrections = learningMode.type === 'practice' ? [
+      {
+        original: message.slice(0, 20),
+        corrected: message.slice(0, 20) + ' (corrected)',
+        explanation: 'This is a common mistake. Here\'s the correct form.',
+        type: 'grammar' as const
+      }
+    ] : [];
+    
+    return {
+      success: true,
+      response,
+      corrections: mockCorrections,
+      learningInsights: 'You\'re making great progress!',
+      suggestedFollowUp: 'Can you explain more about this concept?',
+      culturalNotes: learningMode.focus === 'culture' ? ['This relates to traditional customs in the region.'] : [],
+      sessionInsights: {
+        accuracy: 85,
+        newConcepts: 3,
+        timeSpent: Math.floor((Date.now() - sessionStartTime.current) / 60000),
+        comprehensionScore: 4
+      }
+    };
+  };
+
+  const handleSendMessage = useCallback(async () => {
+    if (!currentMessage.trim()) {
+      showToast("Please enter your question or study topic.", 'error');
+      return;
+    }
+
+    if (learningMode.focus === 'homework' && (!selectedSubject || !selectedDifficulty)) {
+      showToast("Please select subject and grade level for homework help.", 'error');
+      return;
+    }
+
+    const userMessage: StudyMessage = {
+      id: Date.now().toString(),
+      content: currentMessage,
+      isUser: true,
+      timestamp: new Date(),
+      subject: selectedSubject,
+      difficulty: selectedDifficulty,
+      learningMode
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setCurrentMessage('');
+    setIsLoading(true);
+
+    try {
+      // Simulate API call
+      const data = await simulateAPIResponse(currentMessage);
+
+      if (data.success) {
+        // Handle corrections
+        if (data.corrections?.length > 0) {
+          setCorrections(prev => [...prev, ...data.corrections].slice(-10));
+          
+          if (data.corrections[0]) {
+            showToast(data.corrections[0].explanation, 'info');
+          }
+        }
+
+        if (data.sessionInsights) {
+          setSessionInsights(data.sessionInsights);
+        }
+
+        const aiMessage: StudyMessage = {
+          id: (Date.now() + 1).toString(),
+          content: data.response,
+          isUser: false,
+          timestamp: new Date(),
+          subject: selectedSubject,
+          difficulty: selectedDifficulty,
+          learningMode,
+          corrections: data.corrections,
+          learningInsights: data.learningInsights,
+          suggestedFollowUp: data.suggestedFollowUp,
+          culturalNotes: data.culturalNotes
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+
+        if (learningMode.type === 'practice' || learningMode.type === 'immersive') {
+          setLearningStreak(prev => prev + 1);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast("Failed to get study help. Please try again.", 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentMessage, selectedSubject, selectedDifficulty, learningMode, showToast]);
+
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }, [handleSendMessage]);
+
+  const handleSubjectSelect = useCallback((subjectId: string) => {
+    setSelectedSubject(subjectId);
+    setCurrentMessage(`I need help with ${subjectMap.get(subjectId)?.name}`);
+  }, [subjectMap]);
+
+  // Learning mode selector
+  const renderLearningModeSelector = useMemo(() => (
+    <div className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-sm rounded-xl p-4 mb-4 border border-purple-800/30">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold flex items-center gap-2 text-zinc-50">
+          <Brain className="w-5 h-5 text-purple-400" />
+          Study Mode
+        </h3>
+        <div className="flex gap-2 flex-wrap">
+          {(['study', 'practice', 'immersive', 'family'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setLearningMode(prev => ({ ...prev, type: mode }))}
+              className={cn(
+                "px-3 py-1 rounded-full text-sm transition-all duration-200",
+                learningMode.type === mode
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+                  : 'bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 hover:text-zinc-100'
+              )}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <select
+          value={learningMode.focus}
+          onChange={(e) => setLearningMode(prev => ({ ...prev, focus: e.target.value as any }))}
+          className="px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700/50 text-zinc-200 focus:border-purple-500/50 focus:outline-none transition-colors"
+        >
+          <option value="homework">Homework Help</option>
+          <option value="conversation">Conversation</option>
+          <option value="grammar">Grammar</option>
+          <option value="vocabulary">Vocabulary</option>
+          <option value="culture">Culture</option>
+        </select>
+
+        <select
+          value={learningMode.targetLanguage}
+          onChange={(e) => setLearningMode(prev => ({ ...prev, targetLanguage: e.target.value }))}
+          className="px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700/50 text-zinc-200 focus:border-purple-500/50 focus:outline-none transition-colors"
+        >
+          {LANGUAGES.map(lang => (
+            <option key={lang.code} value={lang.code}>
+              {lang.flag} {lang.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={learningMode.difficulty}
+          onChange={(e) => setLearningMode(prev => ({ ...prev, difficulty: e.target.value as any }))}
+          className="px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700/50 text-zinc-200 focus:border-purple-500/50 focus:outline-none transition-colors"
+        >
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </div>
+
+      {learningStreak > 0 && (
+        <div className="flex items-center gap-2 text-sm text-purple-400 mt-2">
+          <Trophy className="w-4 h-4" />
+          {learningStreak} day learning streak!
+        </div>
+      )}
+    </div>
+  ), [learningMode, learningStreak]);
+
+  // Corrections panel
+  const renderCorrectionsPanel = useMemo(() => corrections.length > 0 && showCorrections && (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="fixed left-4 top-20 w-80 bg-zinc-900/95 backdrop-blur-sm rounded-xl shadow-2xl shadow-black/50 p-4 max-h-96 overflow-y-auto z-50 border border-zinc-800/60"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold flex items-center gap-2 text-zinc-50">
+          <BookOpen className="w-4 h-4 text-blue-400" />
+          Learning Notes ({corrections.length})
+        </h4>
+        <button
+          onClick={() => setShowCorrections(false)}
+          className="p-1 hover:bg-zinc-800/60 rounded-lg transition-colors"
+        >
+          <X className="w-4 h-4 text-zinc-400" />
+        </button>
+      </div>
+      <div className="space-y-3">
+        {corrections.slice(-5).map((correction, idx) => (
+          <div key={idx} className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg">
+            <div className="text-sm">
+              <span className="line-through text-red-400">{correction.original}</span>
+              <span className="text-green-400 ml-2">→ {correction.corrected}</span>
+            </div>
+            <p className="text-xs text-zinc-400 mt-1">
+              {correction.explanation}
+            </p>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  ), [corrections, showCorrections]);
+
+  // Session insights
+  const renderSessionInsights = useMemo(() => sessionInsights && (
+    <div className="mt-4 p-4 bg-gradient-to-r from-green-900/20 to-blue-900/20 backdrop-blur-sm rounded-xl border border-green-800/30">
+      <h4 className="font-semibold mb-2 flex items-center gap-2 text-zinc-50">
+        <Target className="w-4 h-4 text-green-400" />
+        Session Progress
+      </h4>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div>
+          <span className="text-zinc-400">Accuracy:</span>
+          <span className="ml-2 font-medium text-zinc-200">{sessionInsights.accuracy}%</span>
+        </div>
+        <div>
+          <span className="text-zinc-400">New concepts:</span>
+          <span className="ml-2 font-medium text-zinc-200">{sessionInsights.newConcepts || 0}</span>
+        </div>
+        <div>
+          <span className="text-zinc-400">Time focused:</span>
+          <span className="ml-2 font-medium text-zinc-200">{sessionInsights.timeSpent || 0}min</span>
+        </div>
+        <div>
+          <span className="text-zinc-400">Understanding:</span>
+          <span className="ml-2 font-medium text-zinc-200">{sessionInsights.comprehensionScore || 0}/5</span>
+        </div>
+      </div>
+    </div>
+  ), [sessionInsights]);
+
+  return (
+    <div className="min-h-screen bg-zinc-950">
+      {/* Header */}
+      <div className="bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-4">
+            <h1 className="text-2xl font-bold text-zinc-50">Study Assistant</h1>
+            <p className="text-sm text-zinc-400">Personalized learning help with AI tutoring</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Toasts */}
+      <AnimatePresence>
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </AnimatePresence>
+
+      <div className="flex-1 flex flex-col h-full">
+        <StudyTips />
+
+        <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+          {renderLearningModeSelector}
+          {renderCorrectionsPanel}
+          
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.length === 0 ? (
+              <div className="text-center py-12">
+                <Brain className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-zinc-50 mb-2">
+                  Ready to Help with Your Studies!
+                </h3>
+                <p className="text-zinc-400 mb-6">
+                  Choose your study mode and ask your questions below.
+                </p>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                  {SUBJECTS.slice(0, 6).map((subject) => (
+                    <SubjectCard 
+                      key={subject.id} 
+                      subject={subject} 
+                      onClick={() => handleSubjectSelect(subject.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <AnimatePresence mode="popLayout">
+                {messages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    getSubjectInfo={getSubjectInfo}
+                    getDifficultyInfo={getDifficultyInfo}
+                    onFollowUp={setCurrentMessage}
+                  />
+                ))}
+              </AnimatePresence>
+            )}
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-zinc-900/80 backdrop-blur-sm border border-zinc-800/60 rounded-xl px-4 py-2">
+                  <div className="flex items-center space-x-2">
+                    {[0, 1, 2].map(i => (
+                      <div 
+                        key={i}
+                        className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" 
+                        style={{ animationDelay: `${i * 0.1}s` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {renderSessionInsights}
+          
+          {/* Input Area */}
+          <div className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm p-4">
+            <div className="space-y-4">
+              {/* Subject and Difficulty Selectors */}
+              {learningMode.focus === 'homework' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Subject
+                    </label>
+                    <select 
+                      value={selectedSubject} 
+                      onChange={(e) => setSelectedSubject(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-zinc-200 focus:border-purple-500/50 focus:outline-none transition-colors"
+                    >
+                      <option value="">Choose subject</option>
+                      {SUBJECTS.map((subject) => (
+                        <option key={subject.id} value={subject.id}>
+                          {subject.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Grade Level
+                    </label>
+                    <select 
+                      value={selectedDifficulty} 
+                      onChange={(e) => setSelectedDifficulty(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-zinc-200 focus:border-purple-500/50 focus:outline-none transition-colors"
+                    >
+                      <option value="">Choose grade level</option>
+                      {DIFFICULTY_LEVELS.map((level) => (
+                        <option key={level.id} value={level.id}>
+                          {level.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick phrases */}
+              {learningMode.type === 'practice' && learningMode.targetLanguage !== 'en' && quickPhrases.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {quickPhrases.map((phrase, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentMessage(phrase.text)}
+                      className="px-3 py-1 bg-purple-900/30 rounded-full text-sm whitespace-nowrap hover:bg-purple-800/40 transition-colors text-purple-300 hover:text-purple-200"
+                      title={phrase.translation}
+                    >
+                      {phrase.text}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Message Input */}
+              <div className="flex space-x-2">
+                <textarea
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={placeholder}
+                  className="flex-1 min-h-[60px] max-h-32 px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg resize-none text-zinc-200 placeholder-zinc-500 focus:border-purple-500/50 focus:outline-none transition-colors"
+                  disabled={isLoading}
+                />
+                <button 
+                  onClick={handleSendMessage}
+                  disabled={isLoading || !currentMessage.trim()}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Study;
