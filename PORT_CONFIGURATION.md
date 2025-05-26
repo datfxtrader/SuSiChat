@@ -1,13 +1,22 @@
 
-# Port Configuration Guide
+# Enhanced Port Configuration Guide
 
-This document outlines the port allocation for the DeerFlow application to prevent conflicts.
+This document outlines the port allocation for the advanced DeerFlow application with monitoring and security.
 
-## Port Allocation
+## Primary Port Allocation
 
 - **Port 3000**: Main Express.js backend server (API and static files)
 - **Port 5173**: Vite development server (frontend in development)
 - **Port 9000**: DeerFlow research service (Python FastAPI)
+
+## System Health & Monitoring Endpoints
+
+- **GET /api/system/health** - Overall system health status
+- **GET /api/system/database/health** - Database connectivity and performance
+- **GET /api/system/research/health** - Research service health
+- **GET /api/system/metrics** - Performance metrics and analytics
+- **GET /api/system/security** - Security audit and threat overview
+- **GET /api/system/report** - Comprehensive system report
 
 ## Important Notes
 

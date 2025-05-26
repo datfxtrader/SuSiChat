@@ -2,6 +2,10 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from 'cors';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { enhancedDbManager } from './enhanced-db-connection-manager';
+import { monitoringSystem } from './advanced-monitoring-system';
+import { securityMiddleware } from './security-enhanced-middleware';
+import systemHealthRoutes from './routes/system-health';
 import financialResearchRoutes from './routes/financial-research';
 import webSearchRoutes from './routes/webSearch';
 import enhancedWebSearchRoutes from './routes/enhanced-web-search';
@@ -43,6 +47,14 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Apply security middleware
+app.use(...securityMiddleware.getSecurityMiddleware());
+
+// Apply rate limiting
+app.use('/api/auth', securityMiddleware.getAuthRateLimiter());
+app.use('/api/research', securityMiddleware.getResearchRateLimiter());
+app.use('/api', securityMiddleware.getApiRateLimiter());
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -56,6 +68,10 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
+    
+    // Record request for monitoring
+    monitoringSystem.recordRequest(path);
+    
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
@@ -74,10 +90,25 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize crash-safe storage system
-  const { crashSafeStorage } = await import('./crash-safe-storage');
-  await crashSafeStorage.initialize();
-  console.log('🛡️ Crash-safe research storage initialized');
+  // Initialize enhanced database and monitoring systems
+  console.log('🚀 Initializing enhanced systems...');
+  
+  try {
+    // Initialize database optimizations
+    await enhancedDbManager.createOptimizedIndexes();
+    console.log('✅ Database optimizations applied');
+    
+    // Start monitoring
+    console.log('✅ Advanced monitoring system started');
+    
+    // Initialize crash-safe storage system
+    const { crashSafeStorage } = await import('./crash-safe-storage');
+    await crashSafeStorage.initialize();
+    console.log('✅ Crash-safe research storage initialized');
+    
+  } catch (error) {
+    console.error('❌ System initialization error:', error);
+  }
 
   // CRASH-SAFE: Store research results
   app.post('/api/research/store-safe', async (req: any, res) => {
@@ -515,6 +546,9 @@ app.use((req, res, next) => {
   const searchEnginesRouter = (await import('./routes/search-engines')).default;
   app.use('/api/search-engines', searchEnginesRouter);
 
+  // System health and monitoring routes
+  app.use('/api/system', systemHealthRoutes);
+  
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {
     try {
@@ -612,17 +646,28 @@ app.use((req, res, next) => {
     }
   });
 
-  // Graceful shutdown
+  // Enhanced graceful shutdown
   process.on('SIGTERM', async () => {
     console.log('🛑 SIGTERM signal received: closing HTTP server');
     try {
+      // Shutdown monitoring system
+      monitoringSystem.shutdown();
+      console.log('✅ Monitoring system shutdown complete');
+      
+      // Shutdown enhanced database manager
+      await enhancedDbManager.shutdown();
+      console.log('✅ Database manager shutdown complete');
+      
+      // Shutdown research cache
       const { researchCache } = await import('./optimized-research-cache');
       await researchCache.shutdown();
       console.log('✅ Optimized cache shutdown complete');
+      
+      await shutdownResearchService();
     } catch (error) {
-      console.error('❌ Cache shutdown error:', error);
+      console.error('❌ Shutdown error:', error);
     }
-    await shutdownResearchService();
+    
     server.close(() => {
       console.log('🔒 HTTP server closed');
       process.exit(0);
