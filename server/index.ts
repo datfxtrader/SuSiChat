@@ -494,6 +494,10 @@ app.use((req, res, next) => {
   const financialTermsRouter = (await import('./routes/financial-terms')).default;
   app.use('/api/financial-terms', financialTermsRouter);
 
+  // Search engine management routes
+  import searchEnginesRouter from './routes/search-engines';
+  app.use('/api/search-engines', searchEnginesRouter);
+
   app.use('/api/enhanced-search', enhancedSearchRouter);
 
   // Search system status endpoint
