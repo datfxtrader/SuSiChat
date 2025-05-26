@@ -25,9 +25,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount financial research routes
   app.use('/api/financial-research', financialResearchRoutes);
   
-  // Mount web search routes
-  app.use('/api/web-search', webSearchRoutes);
-  
   // Template management routes
   app.get('/api/templates/categories', isAuthenticated, templateRoutes.getTemplateCategories);
   app.get('/api/templates/category/:category', isAuthenticated, templateRoutes.getTemplatesByCategory);

@@ -466,8 +466,7 @@ app.use((req, res, next) => {
   });
 
   app.use('/api/financial-research', financialResearchRoutes);
-  // Use enhanced web search as the primary search system
-  app.use('/api/web-search', webSearchRoutes);
+  // Use enhanced web search as the primary search system  
   app.use('/api/enhanced-web-search', enhancedWebSearchRoutes);
   app.use('/api/search-metrics', searchMetricsRoutes);
 
@@ -482,11 +481,7 @@ app.use((req, res, next) => {
   app.use('/api/cache', cacheMonitoringRouter);
   app.use('/api/financial-facts', financialFactCheckingRouter);
 
-  // Import and use the new financial research route
-  const financialResearchRouter = (await import('./routes/financial-research.route')).default;
-  app.use('/api/financial-research', financialResearchRouter);
-
-  // Import and use the enhanced financial research route
+  // Import and use the enhanced financial research route (consolidated)
   const enhancedFinancialResearchRouter = (await import('./routes/financial-research-enhanced.route')).default;
   app.use('/api/financial', enhancedFinancialResearchRouter);
 
