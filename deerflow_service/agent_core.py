@@ -579,6 +579,8 @@ class AgentCore:
     
     def __init__(self):
         self.registry = agent_registry
+        self.active_agents = {}  # Track active research tasks
+        self.task_results = {}   # Store task results
         self.metrics = {
             "total_agents": 0,
             "active_agents": 0,
@@ -595,6 +597,138 @@ class AgentCore:
         """Shutdown agent core"""
         await self.registry.stop_all_agents()
         logger.info("Agent core shutdown complete")
+    
+    async def create_research_task(self, query: str, preferences: Dict[str, Any] = None) -> str:
+        """Create a new research task"""
+        import uuid
+        task_id = str(uuid.uuid4())
+        
+        # Create task object
+        task = Task(
+            task_id=task_id,
+            query=query,
+            task_type="research",
+            status=TaskStatus.PENDING,
+            context=preferences or {}
+        )
+        
+        # Store in active agents
+        self.active_agents[task_id] = {
+            "task": task,
+            "status": "pending",
+            "progress": 0,
+            "created_at": time.time(),
+            "metadata": {
+                "query": query,
+                "preferences": preferences or {},
+                "created_at": time.time()
+            }
+        }
+        
+        logger.info(f"Created research task {task_id}: {query}")
+        
+        # Start task processing in background
+        asyncio.create_task(self._process_research_task(task_id))
+        
+        return task_id
+    
+    async def _process_research_task(self, task_id: str):
+        """Process a research task in the background"""
+        try:
+            if task_id not in self.active_agents:
+                logger.error(f"Task {task_id} not found in active agents")
+                return
+            
+            agent_data = self.active_agents[task_id]
+            task = agent_data["task"]
+            
+            # Update status to running
+            agent_data["status"] = "running"
+            agent_data["progress"] = 10
+            task.status = TaskStatus.RUNNING
+            task.started_at = time.time()
+            
+            logger.info(f"Starting research task {task_id}")
+            
+            # Simulate research processing (replace with actual research logic)
+            import asyncio
+            await asyncio.sleep(2)  # Simulate work
+            agent_data["progress"] = 50
+            
+            await asyncio.sleep(3)  # More work
+            agent_data["progress"] = 80
+            
+            # Complete the task
+            agent_data["status"] = "completed"
+            agent_data["progress"] = 100
+            task.status = TaskStatus.COMPLETED
+            task.completed_at = time.time()
+            
+            # Store result
+            result = {
+                "query": task.query,
+                "summary": f"Research completed for: {task.query}",
+                "findings": [
+                    "Key finding 1 from research",
+                    "Key finding 2 from research",
+                    "Key finding 3 from research"
+                ],
+                "sources": [
+                    {"title": "Example Source 1", "url": "https://example.com/1"},
+                    {"title": "Example Source 2", "url": "https://example.com/2"}
+                ],
+                "completed_at": task.completed_at
+            }
+            
+            task.result = result
+            self.task_results[task_id] = result
+            
+            logger.info(f"Completed research task {task_id}")
+            
+        except Exception as e:
+            logger.error(f"Error processing research task {task_id}: {e}")
+            if task_id in self.active_agents:
+                self.active_agents[task_id]["status"] = "failed"
+                self.active_agents[task_id]["error"] = str(e)
+    
+    def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get status of a specific task"""
+        if task_id not in self.active_agents:
+            return None
+        
+        agent_data = self.active_agents[task_id]
+        task = agent_data["task"]
+        
+        return {
+            "task_id": task_id,
+            "status": agent_data["status"],
+            "progress": agent_data["progress"],
+            "query": task.query,
+            "created_at": task.created_at,
+            "started_at": task.started_at,
+            "completed_at": task.completed_at,
+            "result": task.result,
+            "error": agent_data.get("error"),
+            "metadata": agent_data["metadata"]
+        }
+    
+    def cleanup_completed_tasks(self, max_age_hours: int = 24):
+        """Clean up completed tasks older than specified hours"""
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+        
+        tasks_to_remove = []
+        for task_id, agent_data in self.active_agents.items():
+            task_age = current_time - agent_data["created_at"]
+            if (agent_data["status"] in ["completed", "failed"] and 
+                task_age > max_age_seconds):
+                tasks_to_remove.append(task_id)
+        
+        for task_id in tasks_to_remove:
+            del self.active_agents[task_id]
+            self.task_results.pop(task_id, None)
+        
+        logger.info(f"Cleaned up {len(tasks_to_remove)} old tasks")
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get overall system status"""
