@@ -486,6 +486,10 @@ app.use((req, res, next) => {
   const financialResearchRouter = (await import('./routes/financial-research.route')).default;
   app.use('/api/financial-research', financialResearchRouter);
 
+  // Import and use the enhanced financial research route
+  const enhancedFinancialResearchRouter = (await import('./routes/financial-research-enhanced.route')).default;
+  app.use('/api/financial', enhancedFinancialResearchRouter);
+
   app.use('/api/enhanced-search', enhancedSearchRouter);
 
   // Search system status endpoint
