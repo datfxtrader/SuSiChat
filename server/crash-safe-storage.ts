@@ -1,23 +1,21 @@
-// Complete crash prevention system for server/suna-integration.ts
-// This bypasses PostgreSQL entirely for research operations
 
 import fs from 'fs/promises';
 import path from 'path';
+import { createReadStream, createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import zlib from 'zlib';
 
-// File-based storage paths
-const RESEARCH_BACKUP_DIR = path.join(process.cwd(), 'research-backups');
-const RESEARCH_INDEX_FILE = path.join(RESEARCH_BACKUP_DIR, 'research-index.json');
+// Configuration
+const CONFIG = {
+  BACKUP_DIR: path.join(process.cwd(), 'research-backups'),
+  INDEX_FILE: 'research-index.json',
+  COMPRESSION: true,
+  MAX_AGE_DAYS: 7,
+  CLEANUP_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
+  MAX_INDEX_SIZE: 10000, // Maximum entries in index
+} as const;
 
-// Ensure backup directory exists
-async function ensureBackupDirectory() {
-  try {
-    await fs.mkdir(RESEARCH_BACKUP_DIR, { recursive: true });
-  } catch (error) {
-    console.log('📁 Backup directory already exists or created');
-  }
-}
-
-// Research result interface
+// Research interfaces
 interface ResearchBackup {
   conversationId: string;
   userId: string;
@@ -26,209 +24,277 @@ interface ResearchBackup {
   timestamp: string;
   completed: boolean;
   filename: string;
+  compressed?: boolean;
+  size?: number;
 }
 
-// Load research index
-async function loadResearchIndex(): Promise<ResearchBackup[]> {
-  try {
-    await ensureBackupDirectory();
-    const indexData = await fs.readFile(RESEARCH_INDEX_FILE, 'utf8');
-    return JSON.parse(indexData);
-  } catch (error) {
-    console.log('📋 Creating new research index');
-    return [];
-  }
+interface StorageResult {
+  success: boolean;
+  filename?: string;
+  error?: string;
 }
 
-// Save research index
-async function saveResearchIndex(index: ResearchBackup[]) {
-  try {
-    await ensureBackupDirectory();
-    await fs.writeFile(RESEARCH_INDEX_FILE, JSON.stringify(index, null, 2));
-    console.log('✅ Research index saved successfully');
-  } catch (error) {
-    console.error('❌ Failed to save research index:', error);
-  }
+interface RetrievalResult {
+  success: boolean;
+  results?: any;
+  source?: string;
+  error?: string;
 }
 
-// CRASH-SAFE RESEARCH STORAGE
-export async function storeResearchResultsCrashSafe(
-  conversationId: string,
-  userId: string,
-  query: string,
-  results: any
-): Promise<{ success: boolean; filename?: string }> {
-  try {
-    console.log('💾 CRASH-SAFE: Storing research results...');
-    
-    // Create unique filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `research-${conversationId}-${timestamp}.json`;
-    const filepath = path.join(RESEARCH_BACKUP_DIR, filename);
-    
-    // Store individual result file
-    const resultData = {
-      conversationId,
-      userId,
-      query,
-      results,
-      timestamp: new Date().toISOString(),
-      completed: true,
-      metadata: {
-        storageType: 'crash-safe-file',
-        serverVersion: '1.0.0',
-        backupLocation: filepath
-      }
-    };
-    
-    await fs.writeFile(filepath, JSON.stringify(resultData, null, 2));
-    console.log('✅ CRASH-SAFE: Individual result file saved:', filename);
-    
-    // Update research index
-    const index = await loadResearchIndex();
-    const existingIndex = index.findIndex(item => item.conversationId === conversationId);
-    
-    const indexEntry: ResearchBackup = {
-      conversationId,
-      userId,
-      query,
-      results,
-      timestamp: new Date().toISOString(),
-      completed: true,
-      filename
-    };
-    
-    if (existingIndex >= 0) {
-      index[existingIndex] = indexEntry;
-    } else {
-      index.push(indexEntry);
+export class CrashSafeStorage {
+  private static instance: CrashSafeStorage;
+  private indexCache: ResearchBackup[] | null = null;
+  private indexLock = false;
+  private cleanupTimer?: NodeJS.Timeout;
+  
+  private constructor() {}
+  
+  static getInstance(): CrashSafeStorage {
+    if (!CrashSafeStorage.instance) {
+      CrashSafeStorage.instance = new CrashSafeStorage();
     }
-    
-    await saveResearchIndex(index);
-    console.log('✅ CRASH-SAFE: Research index updated');
-    
-    // NEVER attempt database storage - completely bypass PostgreSQL
-    console.log('🛡️ CRASH-SAFE: PostgreSQL bypassed entirely');
-    
-    return { success: true, filename };
-    
-  } catch (error) {
-    console.error('❌ CRASH-SAFE storage failed:', error);
-    return { success: false };
+    return CrashSafeStorage.instance;
   }
-}
-
-// CRASH-SAFE RESEARCH RETRIEVAL
-export async function getResearchResultsCrashSafe(
-  conversationId: string
-): Promise<{ success: boolean; results?: any; source?: string }> {
-  try {
-    console.log('🔍 CRASH-SAFE: Retrieving research results for:', conversationId);
-    
-    // Load from research index first
-    const index = await loadResearchIndex();
-    const researchEntry = index.find(item => item.conversationId === conversationId);
-    
-    if (researchEntry) {
-      console.log('✅ CRASH-SAFE: Found research in index');
-      return {
-        success: true,
-        results: researchEntry.results,
-        source: 'crash-safe-index'
-      };
-    }
-    
-    // Fallback: scan backup directory
-    const backupFiles = await fs.readdir(RESEARCH_BACKUP_DIR);
-    const matchingFile = backupFiles.find(file => 
-      file.startsWith(`research-${conversationId}-`) && file.endsWith('.json')
-    );
-    
-    if (matchingFile) {
-      const filepath = path.join(RESEARCH_BACKUP_DIR, matchingFile);
-      const fileData = await fs.readFile(filepath, 'utf8');
-      const resultData = JSON.parse(fileData);
+  
+  async initialize(): Promise<void> {
+    try {
+      await fs.mkdir(CONFIG.BACKUP_DIR, { recursive: true });
+      await this.loadIndex(); // Pre-load index into cache
       
-      console.log('✅ CRASH-SAFE: Found research in backup file');
-      return {
-        success: true,
-        results: resultData.results,
-        source: 'crash-safe-file'
+      // Schedule cleanup
+      this.cleanupTimer = setInterval(() => {
+        this.cleanup().catch(console.error);
+      }, CONFIG.CLEANUP_INTERVAL);
+      
+      console.log('🛡️ Crash-safe storage initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize crash-safe storage:', error);
+    }
+  }
+  
+  async store(
+    conversationId: string,
+    userId: string,
+    query: string,
+    results: any
+  ): Promise<StorageResult> {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const baseFilename = `research-${conversationId}-${timestamp}`;
+      const filename = CONFIG.COMPRESSION ? `${baseFilename}.json.gz` : `${baseFilename}.json`;
+      const filepath = path.join(CONFIG.BACKUP_DIR, filename);
+      
+      const resultData = {
+        conversationId,
+        userId,
+        query,
+        results,
+        timestamp: new Date().toISOString(),
+        completed: true,
+        metadata: {
+          storageType: 'crash-safe-file',
+          compressed: CONFIG.COMPRESSION,
+          backupLocation: filepath
+        }
+      };
+      
+      // Write file (compressed or not)
+      if (CONFIG.COMPRESSION) {
+        await this.writeCompressed(filepath, resultData);
+      } else {
+        await fs.writeFile(filepath, JSON.stringify(resultData, null, 2));
+      }
+      
+      // Get file size
+      const stats = await fs.stat(filepath);
+      
+      // Update index
+      const indexEntry: ResearchBackup = {
+        conversationId,
+        userId,
+        query: query.substring(0, 100), // Truncate for index
+        results: null, // Don't store results in index
+        timestamp: new Date().toISOString(),
+        completed: true,
+        filename,
+        compressed: CONFIG.COMPRESSION,
+        size: stats.size
+      };
+      
+      await this.updateIndex(indexEntry);
+      
+      return { success: true, filename };
+    } catch (error) {
+      console.error('❌ Storage failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       };
     }
-    
-    console.log('❌ CRASH-SAFE: No research results found');
-    return { success: false };
-    
-  } catch (error) {
-    console.error('❌ CRASH-SAFE retrieval failed:', error);
-    return { success: false };
   }
-}
-
-// Get all research for a user (crash-safe)
-export async function getUserResearchCrashSafe(userId: string): Promise<ResearchBackup[]> {
-  try {
-    const index = await loadResearchIndex();
-    return index.filter(item => item.userId === userId);
-  } catch (error) {
-    console.error('❌ Failed to get user research:', error);
-    return [];
+  
+  async retrieve(conversationId: string): Promise<RetrievalResult> {
+    try {
+      // Check cache first
+      const index = await this.loadIndex();
+      const entry = index.find(item => item.conversationId === conversationId);
+      
+      if (entry) {
+        const filepath = path.join(CONFIG.BACKUP_DIR, entry.filename);
+        
+        // Read file (handle compression)
+        const data = entry.compressed 
+          ? await this.readCompressed(filepath)
+          : JSON.parse(await fs.readFile(filepath, 'utf8'));
+        
+        return {
+          success: true,
+          results: data.results,
+          source: 'crash-safe-file'
+        };
+      }
+      
+      return { success: false, error: 'Not found' };
+    } catch (error) {
+      console.error('❌ Retrieval failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
   }
-}
-
-// Cleanup old research files (prevent disk space issues)
-export async function cleanupOldResearch(maxAgeDays: number = 7) {
-  try {
-    const index = await loadResearchIndex();
-    const cutoffDate = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
+  
+  async getUserResearch(userId: string): Promise<ResearchBackup[]> {
+    try {
+      const index = await this.loadIndex();
+      return index.filter(item => item.userId === userId);
+    } catch (error) {
+      console.error('❌ Failed to get user research:', error);
+      return [];
+    }
+  }
+  
+  private async loadIndex(): Promise<ResearchBackup[]> {
+    // Return cached index if available and not locked
+    if (this.indexCache && !this.indexLock) {
+      return this.indexCache;
+    }
     
-    const validEntries = [];
-    
-    for (const entry of index) {
-      if (new Date(entry.timestamp).getTime() > cutoffDate) {
-        validEntries.push(entry);
+    try {
+      const indexPath = path.join(CONFIG.BACKUP_DIR, CONFIG.INDEX_FILE);
+      const indexData = await fs.readFile(indexPath, 'utf8');
+      const index = JSON.parse(indexData);
+      
+      // Update cache
+      this.indexCache = index;
+      return index;
+    } catch (error) {
+      // Index doesn't exist, create new one
+      this.indexCache = [];
+      return [];
+    }
+  }
+  
+  private async updateIndex(entry: ResearchBackup): Promise<void> {
+    this.indexLock = true;
+    try {
+      const index = await this.loadIndex();
+      
+      // Check if entry exists
+      const existingIndex = index.findIndex(
+        item => item.conversationId === entry.conversationId
+      );
+      
+      if (existingIndex >= 0) {
+        index[existingIndex] = entry;
       } else {
-        // Delete old file
-        try {
-          const filepath = path.join(RESEARCH_BACKUP_DIR, entry.filename);
-          await fs.unlink(filepath);
-          console.log('🧹 Cleaned up old research file:', entry.filename);
-        } catch (error) {
-          console.log('⚠️ Could not delete old file:', entry.filename);
+        index.push(entry);
+      }
+      
+      // Maintain index size limit
+      if (index.length > CONFIG.MAX_INDEX_SIZE) {
+        index.splice(0, index.length - CONFIG.MAX_INDEX_SIZE);
+      }
+      
+      // Save index
+      const indexPath = path.join(CONFIG.BACKUP_DIR, CONFIG.INDEX_FILE);
+      await fs.writeFile(indexPath, JSON.stringify(index, null, 2));
+      
+      // Update cache
+      this.indexCache = index;
+    } finally {
+      this.indexLock = false;
+    }
+  }
+  
+  private async writeCompressed(filepath: string, data: any): Promise<void> {
+    const gzip = zlib.createGzip({ level: 9 });
+    const jsonBuffer = Buffer.from(JSON.stringify(data));
+    const source = createReadStream(jsonBuffer);
+    const destination = createWriteStream(filepath);
+    await pipeline(source, gzip, destination);
+  }
+  
+  private async readCompressed(filepath: string): Promise<any> {
+    const gunzip = zlib.createGunzip();
+    const source = createReadStream(filepath);
+    const chunks: Buffer[] = [];
+    
+    await pipeline(
+      source,
+      gunzip,
+      async function* (source) {
+        for await (const chunk of source) {
+          chunks.push(chunk);
+          yield chunk;
         }
       }
+    );
+    
+    return JSON.parse(Buffer.concat(chunks).toString());
+  }
+  
+  async cleanup(maxAgeDays: number = CONFIG.MAX_AGE_DAYS): Promise<void> {
+    try {
+      const index = await this.loadIndex();
+      const cutoffDate = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
+      
+      const validEntries: ResearchBackup[] = [];
+      const deletePromises: Promise<void>[] = [];
+      
+      for (const entry of index) {
+        if (new Date(entry.timestamp).getTime() > cutoffDate) {
+          validEntries.push(entry);
+        } else {
+          const filepath = path.join(CONFIG.BACKUP_DIR, entry.filename);
+          deletePromises.push(
+            fs.unlink(filepath).catch(err => 
+              console.log(`⚠️ Could not delete: ${entry.filename}`)
+            )
+          );
+        }
+      }
+      
+      // Delete old files in parallel
+      await Promise.all(deletePromises);
+      
+      // Update index
+      this.indexCache = validEntries;
+      const indexPath = path.join(CONFIG.BACKUP_DIR, CONFIG.INDEX_FILE);
+      await fs.writeFile(indexPath, JSON.stringify(validEntries, null, 2));
+      
+      console.log(`🧹 Cleanup: kept ${validEntries.length}, removed ${index.length - validEntries.length}`);
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
     }
-    
-    await saveResearchIndex(validEntries);
-    console.log(`🧹 Cleanup complete: kept ${validEntries.length}, removed ${index.length - validEntries.length}`);
-    
-  } catch (error) {
-    console.error('❌ Cleanup failed:', error);
+  }
+  
+  destroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
   }
 }
 
-// Initialize crash-safe system
-export async function initializeCrashSafeStorage() {
-  try {
-    await ensureBackupDirectory();
-    console.log('🛡️ CRASH-SAFE storage system initialized');
-    
-    // Schedule daily cleanup
-    setInterval(() => {
-      cleanupOldResearch(7); // Keep 7 days of research
-    }, 24 * 60 * 60 * 1000); // Run daily
-    
-  } catch (error) {
-    console.error('❌ Failed to initialize crash-safe storage:', error);
-  }
-}
-
-// Export the crash-safe functions to replace existing database calls
-export const CrashSafeResearch = {
-  store: storeResearchResultsCrashSafe,
-  retrieve: getResearchResultsCrashSafe,
-  getUserResearch: getUserResearchCrashSafe,
-  cleanup: cleanupOldResearch,
-  initialize: initializeCrashSafeStorage
-};
+// Export singleton instance
+export const crashSafeStorage = CrashSafeStorage.getInstance();

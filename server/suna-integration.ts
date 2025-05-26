@@ -50,7 +50,7 @@ function loadResultsFromBackup() {
     if (existsSync(RESULTS_BACKUP_FILE)) {
       const backupData = JSON.parse(readFileSync(RESULTS_BACKUP_FILE, 'utf8'));
       console.log('🔄 Loading research results from backup:', Object.keys(backupData).length, 'results');
-      
+
       for (const [conversationId, data] of Object.entries(backupData)) {
         researchResultsMemoryCache.set(conversationId, data as any);
         console.log(`💾 Restored research result: ${conversationId} for user ${(data as any).userId}`);
@@ -87,18 +87,18 @@ export async function completeResearchSafely(
   researchResults: any
 ) {
   console.log('🎯 CRASH-SAFE: Completing research safely...');
-  
+
   try {
     // STEP 1: Store results using crash-safe system (NO PostgreSQL)
     console.log('💾 CRASH-SAFE: Storing results without database...');
-    
+
     const storeResult = await CrashSafeResearch.store(
       conversationId,
       userId,
       query,
       researchResults
     );
-    
+
     if (storeResult.success) {
       console.log('✅ CRASH-SAFE: Results stored successfully!');
       console.log('📁 CRASH-SAFE: Backup file:', storeResult.filename);
@@ -106,7 +106,7 @@ export async function completeResearchSafely(
       console.error('❌ CRASH-SAFE: Failed to store results');
       throw new Error('Crash-safe storage failed');
     }
-    
+
     // STEP 2: Create response message (safe formatting)
     const responseMessage = {
       id: `research-${Date.now()}`,
@@ -120,9 +120,9 @@ export async function completeResearchSafely(
         completed: true
       }
     };
-    
+
     console.log('✅ CRASH-SAFE: Response message prepared');
-    
+
     // STEP 3: Return success (NO database operations)
     return {
       success: true,
@@ -131,10 +131,10 @@ export async function completeResearchSafely(
       conversationId,
       timestamp: new Date().toISOString()
     };
-    
+
   } catch (error) {
     console.error('❌ CRASH-SAFE: Research completion failed:', error);
-    
+
     // Even if something fails, don't crash the server
     return {
       success: false,
@@ -155,15 +155,15 @@ function formatResearchResults(results: any): string {
     if (typeof results === 'string') {
       return results;
     }
-    
+
     if (results && typeof results === 'object') {
       // Extract content safely
       const content = results.content || results.analysis || results.text || '';
       return content || 'Research completed successfully.';
     }
-    
+
     return 'Research analysis completed.';
-    
+
   } catch (error) {
     console.error('❌ Error formatting results:', error);
     return 'Research completed - formatting error occurred.';
@@ -198,7 +198,7 @@ export async function storeResearchResultsSafely(
   conversationData?: any
 ) {
   console.log('💾 Storing research results safely in memory...');
-  
+
   researchResultsMemoryCache.set(conversationId, {
     results,
     timestamp: new Date().toISOString(),
@@ -206,7 +206,7 @@ export async function storeResearchResultsSafely(
     userId,
     conversationData: conversationData || {}
   });
-  
+
   console.log('✅ Results cached in memory successfully');
   return {
     success: true,
@@ -223,14 +223,14 @@ export async function saveCompletedResearchToHistory(
   results: any
 ) {
   console.log('💾 Saving completed research to conversation history...');
-  
+
   try {
     // Store in memory cache
     await storeResearchResultsSafely(conversationId, results, query, userId);
-    
+
     // Also store in crash-safe system
     const safeStorage = await CrashSafeResearch.store(conversationId, userId, query, results);
-    
+
     if (safeStorage.success) {
       console.log('✅ Research saved to both memory and crash-safe storage');
       return true;
@@ -247,7 +247,7 @@ export async function saveCompletedResearchToHistory(
 // Get all conversations for user from memory cache
 export function getUserConversationsFromMemory(userId: string) {
   const userConversations: any[] = [];
-  
+
   researchResultsMemoryCache.forEach((data, conversationId) => {
     if (data.userId === userId) {
       userConversations.push({
@@ -260,7 +260,7 @@ export function getUserConversationsFromMemory(userId: string) {
       });
     }
   });
-  
+
   console.log(`💾 Found ${userConversations.length} conversations in memory for user ${userId}`);
   console.log(`📱 Returning ${userConversations.length} conversations from memory for user ${userId}`);
   return userConversations.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -378,7 +378,7 @@ async function performBraveSearch(query: string) {
 
     // Enhanced rate limiting with intelligent spacing to prevent 429 errors
     await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds for reliability
-    
+
     const response = await axios.get(
       BRAVE_SEARCH_URL,
       {
@@ -896,7 +896,7 @@ class SunaIntegrationService {
           // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
           const modelId = 'gemini-1.5-flash';
           const startTime = Date.now();
-          
+
           // Generate conversation ID for caching
           const conversationId = crypto.randomUUID();
 
@@ -939,10 +939,11 @@ class SunaIntegrationService {
       }
 
       // Enhanced web search activation - prioritize financial and current data queries
+```text
       const isFinancialQuery = ['bitcoin', 'btc', 'crypto', 'price', 'forecast', 'market', 'trading', 'usd', 'factors', 'trend'].some(keyword => 
         data.query.toLowerCase().includes(keyword)
       );
-      
+
       // Force search for financial queries and current information needs
       const shouldSearch = !disableSearch &&
         ((TAVILY_API_KEY || BRAVE_API_KEY) &&
@@ -1005,7 +1006,7 @@ class SunaIntegrationService {
           try {
             const { ultimateWebSearch } = await import('./ultimateWebSearch');
             const ultimateResults = await ultimateWebSearch(finalQuery, 15);
-            
+
             // Convert to expected format
             webSearchResults = {
               results: ultimateResults.results,
@@ -1019,7 +1020,7 @@ class SunaIntegrationService {
                 rateLimitingDisabled: true
               }
             };
-            
+
             console.log(`✅ Ultimate search complete: ${ultimateResults.totalResults} results from ${ultimateResults.searchEnginesUsed.length} engines`);
           } catch (error) {
             console.error('Ultimate search failed, falling back to regular search:', error);
@@ -1236,23 +1237,23 @@ ${numberContradictions.join('\n')}
             // Add current price context and validate data freshness
             let priceContext = '';
             let dataFreshnessWarning = '';
-            
+
             // Enhanced date range filtering and macro data validation
             const currentDate = new Date();
             const threeDaysAgo = new Date(currentDate.getTime() - (3 * 24 * 60 * 60 * 1000));
-            
+
             // Enhanced source credibility and relevance filtering
             const credibleResults = sortedResults.filter((result: any) => {
               const content = (result.content || '').toLowerCase();
               const title = (result.title || '').toLowerCase();
               const text = content + ' ' + title;
               const url = (result.url || '').toLowerCase();
-              
+
               // Strict date filtering - reject old years
               if (text.includes('2023') || text.includes('2022') || text.includes('2021')) {
                 return false;
               }
-              
+
               // Check for outdated macro data indicators
               const hasOutdatedMacroData = 
                 text.includes('q4 2024') || 
@@ -1260,11 +1261,11 @@ ${numberContradictions.join('\n')}
                 text.includes('december 2024') || 
                 text.includes('november 2024') ||
                 text.includes('october 2024');
-              
+
               if (hasOutdatedMacroData) {
                 return false; // Reject articles with outdated macro references
               }
-              
+
               // Enhanced credibility scoring based on source domain
               const trustedDomains = [
                 'reuters.com', 'bloomberg.com', 'wsj.com', 'ft.com', 'cnbc.com',
@@ -1272,9 +1273,9 @@ ${numberContradictions.join('\n')}
                 'kitco.com', 'goldprice.org', 'bullionvault.com', 'federalreserve.gov',
                 'imf.org', 'worldbank.org', 'bis.org', 'oecd.org'
               ];
-              
+
               const isFromTrustedSource = trustedDomains.some(domain => url.includes(domain));
-              
+
               // PRIORITY: Must have current timeframe indicators for May 2025
               const hasCurrentIndicators = 
                 text.includes('may 2025') || 
@@ -1289,7 +1290,7 @@ ${numberContradictions.join('\n')}
                 /\$1[0-5][0-9],?[0-9]{3}/.test(text) || // Accept realistic 2025 prices up to $150k
                 /[8-9][0-9]k/.test(text) || // Accept shorthand like "95k"
                 /1[0-5][0-9]k/.test(text); // Accept shorthand like "120k"
-              
+
               // Quality content indicators
               const hasQualityIndicators = 
                 text.includes('analysis') ||
@@ -1298,23 +1299,23 @@ ${numberContradictions.join('\n')}
                 text.includes('report') ||
                 text.includes('data') ||
                 text.includes('research');
-              
+
               // Must have current indicators AND (trusted source OR quality content)
               return hasCurrentIndicators && (isFromTrustedSource || hasQualityIndicators);
             });
-            
+
             if (credibleResults.length < sortedResults.length) {
               dataFreshnessWarning = `\n🏆 PREMIUM SOURCE FILTERING: Selected ${credibleResults.length} high-credibility sources from ${sortedResults.length} total results.\n🔍 Filtered out: Outdated macro data, non-credible sources, stale content\n⏰ Date Range: ${threeDaysAgo.toLocaleDateString()} to ${currentDate.toLocaleDateString()}\n📊 Quality Focus: Trusted financial institutions + Current May 2025 data only\n`;
               const results = credibleResults; // Use only premium credible sources
               return results; // Return filtered results instead of reassignment
             }
-            
+
             // Check if this is a financial forecast query
             const financialKeywords = ['price', 'forecast', 'target', 'btc', 'bitcoin', 'usd', 'trading', 'market'];
             const isFinancialQuery = financialKeywords.some(keyword => 
               data.query.toLowerCase().includes(keyword)
             );
-            
+
             if (isFinancialQuery) {
               // Extract current price context if available
               const pricePattern = /(?:current|price|trading).*?\$?([0-9,]+)/i;
@@ -1334,25 +1335,25 @@ ${numberContradictions.join('\n')}
               const forecasts = [];
               const contradictions = [];
               const hypotheses = [];
-              
+
               for (const result of sortedResults) {
                 const content = result.content || '';
                 const title = result.title || '';
-                
+
                 // Look for forecast patterns with prices
                 const forecastMatch = content.match(/(?:forecast|target|expects?|predicts?).*?\$([0-9,]+)/i) ||
                                      title.match(/(?:forecast|target|expects?|predicts?).*?\$([0-9,]+)/i);
-                
+
                 if (forecastMatch) {
                   const forecastPrice = parseInt(forecastMatch[1].replace(',', ''));
-                  
+
                   // Extract timestamp
                   let forecastDate = result.publishedDate;
                   if (!forecastDate && content) {
                     const dateMatch = content.match(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+202[4-5]/i);
                     if (dateMatch) forecastDate = dateMatch[0];
                   }
-                  
+
                   forecasts.push({
                     price: forecastPrice,
                     date: forecastDate,
@@ -1361,13 +1362,13 @@ ${numberContradictions.join('\n')}
                     confidence: 0.8 // Basic confidence scoring
                   });
                 }
-                
+
                 // Extract hypotheses and reasoning patterns
                 const hypothesisPatterns = [
                   /(?:if|when|should|likely|expect|anticipate).*?(?:then|will|could|might)/gi,
                   /(?:due to|because of|driven by|influenced by).*?(?:may|will|could)/gi
                 ];
-                
+
                 for (const pattern of hypothesisPatterns) {
                   const matches = content.match(pattern);
                   if (matches) {
@@ -1379,14 +1380,14 @@ ${numberContradictions.join('\n')}
                   }
                 }
               }
-              
+
               // Cross-validate forecasts for contradictions
               if (forecasts.length > 1) {
                 for (let i = 0; i < forecasts.length; i++) {
                   for (let j = i + 1; j < forecasts.length; j++) {
                     const priceDiff = Math.abs(forecasts[i].price - forecasts[j].price);
                     const percentDiff = (priceDiff / Math.min(forecasts[i].price, forecasts[j].price)) * 100;
-                    
+
                     if (percentDiff > 10) { // Significant difference
                       contradictions.push({
                         source1: forecasts[i].source,
@@ -1399,23 +1400,23 @@ ${numberContradictions.join('\n')}
                   }
                 }
               }
-              
+
               // Generate advanced analysis summary
               if (forecasts.length > 0 || hypotheses.length > 0 || contradictions.length > 0) {
                 advancedAnalysis = `\n🧠 ADVANCED REASONING ANALYSIS:\n`;
-                
+
                 if (forecasts.length > 0) {
                   advancedAnalysis += `📊 Forecasts Identified: ${forecasts.length}\n${forecasts.map(f => 
                     `💡 ${f.source}: $${f.price.toLocaleString()} target ${f.date ? `(${f.date})` : '(undated)'} [Confidence: ${(f.confidence * 100).toFixed(0)}%]`
                   ).join('\n')}\n`;
                 }
-                
+
                 if (contradictions.length > 0) {
                   advancedAnalysis += `⚠️ Source Contradictions: ${contradictions.length}\n${contradictions.map(c =>
                     `🔍 ${c.source1} ($${c.price1.toLocaleString()}) vs ${c.source2} ($${c.price2.toLocaleString()}) - ${c.difference}% difference`
                   ).join('\n')}\n`;
                 }
-                
+
                 if (hypotheses.length > 0) {
                   const topHypotheses = hypotheses.slice(0, 3);
                   advancedAnalysis += `🎯 Key Hypotheses: ${topHypotheses.length}\n${topHypotheses.map(h =>
@@ -1429,7 +1430,7 @@ ${numberContradictions.join('\n')}
 
             // Include Bitcoin market context if available
             const marketContextSection = bitcoinContext ? `${bitcoinContext}\n\n` : '';
-            
+
             webSearchContent = `${marketContextSection}
 Web Search Results (${new Date().toLocaleString()}) - Found ${searchResults.length} results in ${searchTimeMs}ms:
 ${usedSearchEngines.length > 0 ? `Search engines used: ${usedSearchEngines.join(', ')}` : ''}
@@ -1463,7 +1464,7 @@ ${sortedResults.map((result: any, index: number) => {
       /(?:today|yesterday|this week|last week)/i,
       /\d{1,2}\s+(?:hours?|days?)\s+ago/i
     ];
-    
+
     for (const pattern of datePatterns) {
       const dateMatch = result.content.match(pattern);
       if (dateMatch) {
@@ -1471,7 +1472,7 @@ ${sortedResults.map((result: any, index: number) => {
         break;
       }
     }
-    
+
     if (!timeInfo) {
       timeInfo = `⚠️ No timestamp - verify data freshness`;
     }
@@ -1661,7 +1662,7 @@ Use the current date and web search information when responding about current ev
           try {
             aiResponse = await this.callGeminiAPI(messages, 'gemini-1.5-flash');
             modelUsed = 'Gemini 1.5 Flash (fallback)';
-            
+
           } catch (fallbackError) {
             console.error('Gemini fallback failed:', fallbackError);
           }
@@ -1721,7 +1722,7 @@ Use the current date and web search information when responding about current ev
         console.log("Adding source details to message metadata:",
           JSON.stringify(searchMetadata.sourceDetails, null, 2));
 
-        // Format source information in a way that's better for the UI
+                // Format source information in a way that's better for the UI
         // Using a dedicated "Sources:" section at the end rather than inline citations
         const sourceList = searchMetadata.sourceDetails.map((source, index) =>
           `[${index + 1}] ${source.title}\n${source.url}`).join('\n\n');
