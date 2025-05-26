@@ -470,6 +470,7 @@ app.use((req, res, next) => {
   // Import and use cache monitoring routes
   app.use('/api/cache', cacheMonitoringRoutes);
   app.use('/api/yahoo-finance', yahooFinanceMetricsRoutes);
+  app.use('/api/cache-monitoring', cacheMonitoringRoutes);
 
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {
