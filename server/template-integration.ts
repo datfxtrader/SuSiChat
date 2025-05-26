@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { LRUCache } from 'lru-cache';
+import { Agent } from 'http';
 
 // Types and Interfaces
 interface TemplateVariable {
@@ -233,7 +234,7 @@ class OptimizedTemplateService {
         'Connection': 'keep-alive',
       },
       maxRedirects: 3,
-      httpAgent: require('http').Agent({
+      httpAgent: new Agent({
         keepAlive: CONFIG.CONNECTION_POOL.KEEP_ALIVE,
         keepAliveMsecs: CONFIG.CONNECTION_POOL.KEEP_ALIVE_MSECS,
         maxSockets: CONFIG.CONNECTION_POOL.MAX_SOCKETS,

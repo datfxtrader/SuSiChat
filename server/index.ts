@@ -57,8 +57,8 @@ app.use((req, res, next) => {
 
 (async () => {
   // Initialize crash-safe storage system
-  const { CrashSafeResearch } = await import('./crash-safe-storage');
-  await CrashSafeResearch.initialize();
+  const { crashSafeStorage } = await import('./crash-safe-storage');
+  await crashSafeStorage.initialize();
   console.log('🛡️ Crash-safe research storage initialized');
 
   // CRASH-SAFE: Store research results
@@ -68,7 +68,7 @@ app.use((req, res, next) => {
 
       console.log('💾 API: Storing research results crash-safe');
 
-      const result = await CrashSafeResearch.store(conversationId, userId, query, results);
+      const result = await crashSafeStorage.store(conversationId, userId, query, results);
 
       if (result.success) {
         res.json({
@@ -101,7 +101,7 @@ app.use((req, res, next) => {
 
       console.log('🔍 API: Retrieving research results crash-safe:', conversationId);
 
-      const result = await CrashSafeResearch.retrieve(conversationId);
+      const result = await crashSafeStorage.retrieve(conversationId);
 
       if (result.success) {
         res.json({
@@ -180,7 +180,7 @@ app.use((req, res, next) => {
       }
 
       // Fallback to crash-safe storage
-      const research = await CrashSafeResearch.getUserResearch(userId);
+      const research = await crashSafeStorage.getUserResearch(userId);
 
       res.json({
         success: true,
@@ -289,7 +289,7 @@ app.use((req, res, next) => {
       const { conversationId } = req.params;
       console.log('🔍 API: Legacy endpoint - redirecting to crash-safe retrieval');
 
-      const result = await CrashSafeResearch.retrieve(conversationId);
+      const result = await crashSafeStorage.retrieve(conversationId);
 
       if (result.success) {
         res.json({
