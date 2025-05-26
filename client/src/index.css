@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Typewriter cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.typing-cursor {
+  animation: blink 1s infinite;
+}
+
+/* Smooth scrolling for auto-scroll containers */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
 :root {
       --background: 0 0% 100%;
 --foreground: 20 14.3% 4.1%;

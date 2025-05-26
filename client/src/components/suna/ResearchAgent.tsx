@@ -609,7 +609,7 @@ The research service logs show it's working, so this might be a temporary connec
             </div>
           )}
 
-          {messages.map((msg) => (
+          {messages.map((msg, index) => (
             <div key={msg.id} className="mb-4">
               <div className="flex items-start space-x-3">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -629,6 +629,7 @@ The research service logs show it's working, so this might be a temporary connec
                       content={msg.content}
                       timestamp={msg.timestamp}
                       sources={msg.sources}
+                      isLatest={index === messages.length - 1}
                     />
                   )}
                 </div>

@@ -1,9 +1,9 @@
-
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useState, useEffect } from "react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChatMessage } from "@/lib/types";
 import { User } from "@shared/schema";
+import { motion } from 'framer-motion';
 
 // Types
 interface ChatBubbleProps {
@@ -12,6 +12,7 @@ interface ChatBubbleProps {
   className?: string;
   onRetry?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  isLatest?: boolean;
 }
 
 interface MessageAvatarProps {
@@ -93,19 +94,37 @@ const MessageContent = memo<{
   content: string;
   className?: string;
   isLoading?: boolean;
-}>(({ content, className, isLoading }) => (
-  <div className={cn("break-words", className)}>
-    {isLoading ? (
-      <div className="flex items-center space-x-1">
-        <span className="animate-bounce">.</span>
-        <span className="animate-bounce delay-100">.</span>
-        <span className="animate-bounce delay-200">.</span>
-      </div>
-    ) : (
-      <p className="whitespace-pre-wrap">{content}</p>
-    )}
-  </div>
-));
+  isLatest?: boolean;
+  isAI?: boolean;
+}>(({ content, className, isLoading, isLatest, isAI }) => {
+  const [showFullContent, setShowFullContent] = useState(false);
+
+  useEffect(() => {
+    if (isLatest && isAI) {
+      setShowFullContent(false); // Initially hide full content for AI's latest message
+    } else {
+      setShowFullContent(true); // Always show full content for other messages
+    }
+  }, [isLatest, isAI]);
+
+  const toggleContent = () => {
+    setShowFullContent(!showFullContent);
+  };
+
+  return (
+    <div className={cn("break-words", className)}>
+      {isLoading ? (
+        <div className="flex items-center space-x-1">
+          <span className="animate-bounce">.</span>
+          <span className="animate-bounce delay-100">.</span>
+          <span className="animate-bounce delay-200">.</span>
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap">{content}</p>
+      )}
+    </div>
+  );
+});
 
 MessageContent.displayName = "MessageContent";
 
@@ -130,13 +149,14 @@ const ChatBubble = memo<ChatBubbleProps>(({
   currentUser, 
   className,
   onRetry,
-  onDelete 
+  onDelete,
+  isLatest = false
 }) => {
   // Memoize metadata calculations
   const metadata = useMemo<MessageMetadata>(() => {
     const isCurrentUser = message.userId === currentUser.id;
     const isAI = Boolean(message.isAiResponse);
-    
+
     return {
       isCurrentUser,
       isAI,
@@ -182,7 +202,7 @@ const ChatBubble = memo<ChatBubbleProps>(({
     >
       {/* Left side avatar (for non-current user) */}
       {!metadata.isCurrentUser && renderAvatar()}
-      
+
       {/* Message bubble */}
       <div 
         className={cn(
@@ -197,21 +217,23 @@ const ChatBubble = memo<ChatBubbleProps>(({
             {metadata.userName}
           </div>
         )}
-        
+
         {/* Message content */}
         <MessageContent 
           content={message.content}
           className={styles.text}
           isLoading={message.isLoading}
+          isLatest={isLatest}
+          isAI={metadata.isAI}
         />
-        
+
         {/* Timestamp and actions */}
         <div className="flex items-center justify-between gap-2 mt-1">
           <MessageTimestamp 
             timestamp={message.createdAt}
             className={styles.time}
           />
-          
+
           {/* Action buttons (visible on hover) */}
           {metadata.isCurrentUser && (
             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
@@ -236,14 +258,14 @@ const ChatBubble = memo<ChatBubbleProps>(({
             </div>
           )}
         </div>
-        
+
         {/* Error indicator */}
         {message.error && (
           <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full" 
                title="Failed to send" />
         )}
       </div>
-      
+
       {/* Right side avatar (for current user) */}
       {metadata.isCurrentUser && renderAvatar()}
     </div>
@@ -252,6 +274,38 @@ const ChatBubble = memo<ChatBubbleProps>(({
 
 ChatBubble.displayName = "ChatBubble";
 
+// Typewriter Component
+interface TypewriterTextProps {
+  text: string;
+  speed: number;
+  renderMarkdown?: boolean;
+  onComplete?: () => void;
+}
+
+const TypewriterText: React.FC<TypewriterTextProps> = ({ text, speed, renderMarkdown = false, onComplete }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(prevText => prevText + text[currentIndex]);
+        setCurrentIndex(prevIndex => prevIndex + 1);
+      }, speed);
+
+      return () => clearTimeout(timeout);
+    } else if (onComplete) {
+      onComplete();
+    }
+  }, [currentIndex, speed, text, onComplete]);
+
+  return (
+    <div className="text-zinc-200 whitespace-pre-wrap">
+      {displayedText}
+    </div>
+  );
+};
+
 // Export sub-components for flexibility
-export { MessageAvatar, AIAvatar, MessageContent, MessageTimestamp };
+export { MessageAvatar, AIAvatar, MessageContent, MessageTimestamp, TypewriterText };
 export default ChatBubble;

@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useCallback, memo, useMemo, useState } from "react";
 import { ChatMessage } from "@/lib/types";
 import { User } from "@shared/schema";
@@ -52,7 +51,7 @@ const formatDateHeader = (date: Date): string => {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   if (date.toDateString() === today.toDateString()) {
     return "Today";
   } else if (date.toDateString() === yesterday.toDateString()) {
@@ -69,17 +68,17 @@ const formatDateHeader = (date: Date): string => {
 
 const groupMessagesByDate = (messages: ChatMessage[]): MessageGroup[] => {
   const groups: Map<string, ChatMessage[]> = new Map();
-  
+
   messages.forEach(message => {
     const date = new Date(message.createdAt);
     const dateKey = date.toDateString();
-    
+
     if (!groups.has(dateKey)) {
       groups.set(dateKey, []);
     }
     groups.get(dateKey)!.push(message);
   });
-  
+
   return Array.from(groups.entries()).map(([date, messages]) => ({
     date,
     messages
@@ -97,7 +96,7 @@ const WelcomeMessage = memo<{
     suggestions = [],
     onSuggestionClick
   } = config;
-  
+
   return (
     <div className="flex justify-center mb-6">
       <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 max-w-md shadow-sm">
@@ -109,7 +108,7 @@ const WelcomeMessage = memo<{
           <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-4">
             {subtitle}
           </p>
-          
+
           {suggestions.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
@@ -206,6 +205,8 @@ const ScrollToBottomButton = memo<{
 ScrollToBottomButton.displayName = "ScrollToBottomButton";
 
 // Main component
+import { AutoScrollContainer } from '@/components/shared/AutoScrollContainer';
+
 const ChatMessages = memo<ChatMessagesProps>(({
   messages,
   isTyping,
@@ -225,13 +226,13 @@ const ChatMessages = memo<ChatMessagesProps>(({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
-  
+
   // Memoized message groups
   const messageGroups = useMemo(() => {
     if (!groupByDate) return null;
     return groupMessagesByDate(messages);
   }, [messages, groupByDate]);
-  
+
   // Scroll to bottom handler
   const scrollToBottom = useCallback((smooth = true) => {
     if (messagesEndRef.current) {
@@ -241,31 +242,31 @@ const ChatMessages = memo<ChatMessagesProps>(({
       });
     }
   }, []);
-  
+
   // Check if scrolled near bottom
   const checkIfNearBottom = useCallback(() => {
     const container = containerRef.current;
     if (!container) return true;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = container;
     return scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
   }, []);
-  
+
   // Handle scroll event
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    
+
     // Check if near bottom
     const nearBottom = checkIfNearBottom();
     setIsAutoScrolling(nearBottom);
     setShowScrollButton(!nearBottom && showScrollToBottom);
-    
+
     // Check if scrolled to top for loading more
     if (container.scrollTop === 0 && hasMore && !isLoading && onLoadMore) {
       const previousHeight = container.scrollHeight;
       onLoadMore();
-      
+
       // Maintain scroll position after loading
       requestAnimationFrame(() => {
         const newHeight = container.scrollHeight;
@@ -273,29 +274,31 @@ const ChatMessages = memo<ChatMessagesProps>(({
       });
     }
   }, [checkIfNearBottom, hasMore, isLoading, onLoadMore, showScrollToBottom]);
-  
+
   // Auto-scroll effect
   useEffect(() => {
     if (isAutoScrolling) {
       scrollToBottom();
     }
   }, [messages.length, isTyping, isAutoScrolling, scrollToBottom]);
-  
+
   // Set up scroll listener
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    
+
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
-  
+
+  const latestMessageId = messages[messages.length - 1]?.id;
+
   // Render message list
   const renderMessages = () => {
     if (messages.length === 0) {
       return <WelcomeMessage config={welcomeMessage} />;
     }
-    
+
     if (groupByDate && messageGroups) {
       return messageGroups.map((group, groupIndex) => (
         <div key={group.date}>
@@ -314,7 +317,7 @@ const ChatMessages = memo<ChatMessagesProps>(({
         </div>
       ));
     }
-    
+
     return (
       <div className="space-y-3">
         {messages.map((message) => (
@@ -329,7 +332,7 @@ const ChatMessages = memo<ChatMessagesProps>(({
       </div>
     );
   };
-  
+
   return (
     <>
       <div
@@ -350,22 +353,22 @@ const ChatMessages = memo<ChatMessagesProps>(({
           {hasMore && onLoadMore && (
             <LoadMoreButton onClick={onLoadMore} isLoading={isLoading} />
           )}
-          
+
           {/* Messages */}
           {renderMessages()}
-          
+
           {/* Typing indicator */}
           {isTyping && (
             <div className="mt-3">
               <TypingIndicator />
             </div>
           )}
-          
+
           {/* Scroll anchor */}
           <div ref={messagesEndRef} className="h-px" />
         </div>
       </div>
-      
+
       {/* Scroll to bottom button */}
       {showScrollToBottom && (
         <ScrollToBottomButton
