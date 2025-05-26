@@ -1,0 +1,1743 @@
+# Database Architecture & Port Configuration Best Practices
+
+## Table of Contents
+1. [Database Architecture Overview](#database-overview)
+2. [PostgreSQL Schema Design](#postgresql-schema)
+3. [Redis Caching Strategy](#redis-strategy)
+4. [Vector Database Integration](#vector-database)
+5. [Port Configuration & Service Map](#port-config)
+6. [Data Partitioning & Sharding](#partitioning)
+7. [Backup & Recovery Strategy](#backup-recovery)
+8. [Performance Optimization](#performance)
+9. [Security Best Practices](#security)
+10. [Monitoring & Maintenance](#monitoring)
+11. [Development vs Production Setup](#dev-prod)
+12. [Migration Strategy](#migration)
+
+## 1. Database Architecture Overview <a id="database-overview"></a>
+
+### Multi-Database Strategy
+```yaml
+Primary Databases:
+  PostgreSQL (Port 5432):
+    - User data & authentication
+    - Chat conversations & messages
+    - Learning progress & achievements
+    - Research history & sources
+    - System configuration
+
+  Redis (Port 6379):
+    - Session management
+    - Real-time chat state
+    - Cache layer
+    - Rate limiting
+    - Pub/Sub for real-time features
+
+  Vector Database - Qdrant (Port 6333):
+    - Document embeddings
+    - Semantic search
+    - Knowledge graph embeddings
+    - User preference vectors
+
+  Neo4j (Port 7474/7687):
+    - Knowledge graph
+    - Entity relationships
+    - Learning pathways
+    - Research connections
+
+Secondary Storage:
+  MinIO/S3 (Port 9000):
+    - File attachments
+    - Audio recordings
+    - Research documents
+    - Backup storage
+
+  Elasticsearch (Port 9200):
+    - Full-text search
+    - Log aggregation
+    - Analytics data
+```
+
+### Service Architecture Diagram
+```mermaid
+graph TB
+    Client[Client Apps]
+    
+    subgraph API_Gateway[API Gateway - :3000]
+        Gateway[Express/Node.js]
+    end
+    
+    subgraph Services[Microservices]
+        Chat[Chat Service :3001]
+        Research[Research Service :3002]
+        Learning[Learning Service :3003]
+        Agent[Agent Service :3004]
+        Auth[Auth Service :3005]
+    end
+    
+    subgraph Databases[Databases]
+        PG[(PostgreSQL :5432)]
+        Redis[(Redis :6379)]
+        Vector[(Qdrant :6333)]
+        Graph[(Neo4j :7474)]
+        Search[(Elasticsearch :9200)]
+    end
+    
+    subgraph External[External Services]
+        LLM[LLM APIs]
+        DeerFlow[DeerFlow :9000]
+        WebSearch[Search APIs]
+    end
+    
+    Client --> Gateway
+    Gateway --> Services
+    Services --> Databases
+    Services --> External
+```
+
+## 2. PostgreSQL Schema Design <a id="postgresql-schema"></a>
+
+### Core Schema Structure
+```sql
+-- Enable extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For fuzzy text search
+CREATE EXTENSION IF NOT EXISTS "btree_gin"; -- For composite indexes
+
+-- Users and Authentication
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    profile JSONB DEFAULT '{}',
+    preferences JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_active_at TIMESTAMPTZ DEFAULT NOW(),
+    is_active BOOLEAN DEFAULT true,
+    
+    -- Indexes
+    INDEX idx_users_email_active ON users(email, is_active),
+    INDEX idx_users_last_active ON users(last_active_at DESC)
+);
+
+-- Chat Conversations (Partitioned by date)
+CREATE TABLE conversations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255),
+    type VARCHAR(50) DEFAULT 'chat', -- 'chat', 'research', 'learning'
+    agent_id VARCHAR(100),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_message_at TIMESTAMPTZ,
+    message_count INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    is_archived BOOLEAN DEFAULT false,
+    
+    -- Indexes
+    INDEX idx_conversations_user_updated ON conversations(user_id, updated_at DESC),
+    INDEX idx_conversations_type ON conversations(type, user_id),
+    INDEX idx_conversations_archive ON conversations(is_archived, user_id) WHERE NOT is_archived
+) PARTITION BY RANGE (created_at);
+
+-- Create monthly partitions
+CREATE TABLE conversations_2024_01 PARTITION OF conversations
+    FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+-- Continue for each month...
+
+-- Messages (Partitioned for scale)
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    tokens INTEGER,
+    model VARCHAR(50),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    embedding_id UUID, -- Reference to vector DB
+    
+    -- For message ordering
+    sequence_number BIGSERIAL,
+    
+    -- Indexes
+    INDEX idx_messages_conversation ON messages(conversation_id, sequence_number DESC),
+    INDEX idx_messages_user_date ON messages(user_id, created_at DESC),
+    INDEX idx_messages_content_search ON messages USING gin(to_tsvector('english', content))
+) PARTITION BY RANGE (created_at);
+
+-- Research Data
+CREATE TABLE research_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    query TEXT NOT NULL,
+    query_embedding_id UUID,
+    results JSONB DEFAULT '[]',
+    sources JSONB DEFAULT '[]',
+    summary TEXT,
+    metadata JSONB DEFAULT '{}',
+    quality_score FLOAT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    
+    -- Indexes
+    INDEX idx_research_user_date ON research_sessions(user_id, created_at DESC),
+    INDEX idx_research_query ON research_sessions USING gin(to_tsvector('english', query)),
+    INDEX idx_research_expiry ON research_sessions(expires_at) WHERE expires_at IS NOT NULL
+);
+
+-- Learning Progress
+CREATE TABLE learning_progress (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    language_code VARCHAR(10) NOT NULL,
+    level VARCHAR(20) NOT NULL,
+    total_words_learned INTEGER DEFAULT 0,
+    words_mastered INTEGER DEFAULT 0,
+    current_streak INTEGER DEFAULT 0,
+    longest_streak INTEGER DEFAULT 0,
+    total_practice_time INTEGER DEFAULT 0, -- seconds
+    last_practice_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Composite primary key alternative
+    UNIQUE(user_id, language_code),
+    
+    -- Indexes
+    INDEX idx_learning_user ON learning_progress(user_id),
+    INDEX idx_learning_active ON learning_progress(last_practice_at DESC) WHERE last_practice_at IS NOT NULL
+);
+
+-- Vocabulary Learning
+CREATE TABLE vocabulary (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    word VARCHAR(100) NOT NULL,
+    translation VARCHAR(255),
+    language_code VARCHAR(10) NOT NULL,
+    definition TEXT,
+    example_sentence TEXT,
+    difficulty_level INTEGER CHECK (difficulty_level BETWEEN 1 AND 5),
+    times_seen INTEGER DEFAULT 0,
+    times_correct INTEGER DEFAULT 0,
+    last_seen_at TIMESTAMPTZ,
+    mastered_at TIMESTAMPTZ,
+    next_review_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Spaced repetition metadata
+    sm2_easiness FLOAT DEFAULT 2.5,
+    sm2_interval INTEGER DEFAULT 1,
+    sm2_repetitions INTEGER DEFAULT 0,
+    
+    -- Indexes
+    UNIQUE(user_id, word, language_code),
+    INDEX idx_vocabulary_review ON vocabulary(user_id, next_review_at) WHERE next_review_at IS NOT NULL,
+    INDEX idx_vocabulary_language ON vocabulary(user_id, language_code, mastered_at)
+);
+
+-- Knowledge Graph Nodes (Cached from Neo4j)
+CREATE TABLE knowledge_nodes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    node_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    properties JSONB DEFAULT '{}',
+    embedding_id UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Full text search
+    search_vector tsvector GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, ''))
+    ) STORED,
+    
+    -- Indexes
+    INDEX idx_knowledge_user_type ON knowledge_nodes(user_id, node_type),
+    INDEX idx_knowledge_search ON knowledge_nodes USING gin(search_vector)
+);
+
+-- Agent Interactions
+CREATE TABLE agent_interactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    agent_id VARCHAR(100) NOT NULL,
+    interaction_type VARCHAR(50) NOT NULL,
+    input_data JSONB DEFAULT '{}',
+    output_data JSONB DEFAULT '{}',
+    tokens_used INTEGER DEFAULT 0,
+    processing_time_ms INTEGER,
+    success BOOLEAN DEFAULT true,
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Indexes
+    INDEX idx_agent_user_date ON agent_interactions(user_id, created_at DESC),
+    INDEX idx_agent_type ON agent_interactions(agent_id, user_id)
+);
+
+-- User Preferences and Personalization
+CREATE TABLE user_interests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    category VARCHAR(50) NOT NULL,
+    subcategories TEXT[] DEFAULT '{}',
+    weight FLOAT DEFAULT 1.0,
+    source VARCHAR(50), -- 'explicit', 'inferred', 'behavior'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Indexes
+    UNIQUE(user_id, category),
+    INDEX idx_interests_user ON user_interests(user_id)
+);
+
+-- Audit Trail
+CREATE TABLE audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID,
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id UUID,
+    old_data JSONB,
+    new_data JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Partitioned by month for performance
+    INDEX idx_audit_user_date ON audit_logs(user_id, created_at DESC),
+    INDEX idx_audit_entity ON audit_logs(entity_type, entity_id)
+) PARTITION BY RANGE (created_at);
+```
+
+### Optimized Indexes and Constraints
+```sql
+-- Composite indexes for common queries
+CREATE INDEX idx_messages_conversation_role 
+    ON messages(conversation_id, role, created_at DESC);
+
+CREATE INDEX idx_conversations_user_type_updated 
+    ON conversations(user_id, type, updated_at DESC) 
+    WHERE NOT is_archived;
+
+-- Partial indexes for performance
+CREATE INDEX idx_active_users 
+    ON users(last_active_at DESC) 
+    WHERE is_active = true;
+
+-- JSON indexes for metadata queries
+CREATE INDEX idx_conversation_metadata 
+    ON conversations USING gin(metadata);
+
+-- Foreign key constraints with proper cascading
+ALTER TABLE messages 
+    ADD CONSTRAINT fk_messages_conversation 
+    FOREIGN KEY (conversation_id) 
+    REFERENCES conversations(id) 
+    ON DELETE CASCADE;
+
+-- Check constraints
+ALTER TABLE learning_progress 
+    ADD CONSTRAINT check_streak_values 
+    CHECK (current_streak <= longest_streak);
+```
+
+## 3. Redis Caching Strategy <a id="redis-strategy"></a>
+
+### Redis Configuration
+```conf
+# redis.conf
+port 6379
+bind 127.0.0.1 ::1
+protected-mode yes
+maxmemory 4gb
+maxmemory-policy allkeys-lru
+
+# Persistence
+save 900 1
+save 300 10
+save 60 10000
+appendonly yes
+appendfsync everysec
+
+# Performance
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+```
+
+### Key Naming Conventions
+```typescript
+// Redis key patterns
+const RedisKeys = {
+  // Session management
+  session: (sessionId: string) => `session:${sessionId}`,
+  userSessions: (userId: string) => `user:${userId}:sessions`,
+  
+  // Chat state
+  chatState: (conversationId: string) => `chat:${conversationId}:state`,
+  typingIndicator: (conversationId: string) => `chat:${conversationId}:typing`,
+  
+  // Rate limiting
+  rateLimit: (userId: string, action: string) => `ratelimit:${userId}:${action}`,
+  
+  // Cache
+  userCache: (userId: string) => `cache:user:${userId}`,
+  conversationCache: (convId: string) => `cache:conv:${convId}`,
+  researchCache: (queryHash: string) => `cache:research:${queryHash}`,
+  
+  // Real-time
+  onlineUsers: () => 'online:users',
+  activeChats: () => 'active:chats',
+  
+  // Queues
+  messageQueue: () => 'queue:messages',
+  researchQueue: () => 'queue:research',
+  
+  // Locks
+  lock: (resource: string) => `lock:${resource}`,
+  
+  // Analytics
+  metrics: (metric: string, date: string) => `metrics:${metric}:${date}`
+};
+```
+
+### Caching Implementation
+```typescript
+// services/cache.service.ts
+import Redis from 'ioredis';
+import { createHash } from 'crypto';
+
+class CacheService {
+  private redis: Redis;
+  private defaultTTL = 3600; // 1 hour
+  
+  constructor() {
+    this.redis = new Redis({
+      port: 6379,
+      host: 'localhost',
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: true
+    });
+  }
+  
+  // Conversation caching with sliding expiration
+  async cacheConversation(conversationId: string, data: any): Promise<void> {
+    const key = RedisKeys.conversationCache(conversationId);
+    const pipeline = this.redis.pipeline();
+    
+    pipeline.setex(key, this.defaultTTL, JSON.stringify(data));
+    pipeline.zadd('active:conversations', Date.now(), conversationId);
+    
+    await pipeline.exec();
+  }
+  
+  // Research result caching with content-based key
+  async cacheResearchResult(query: string, result: any): Promise<void> {
+    const hash = createHash('sha256').update(query).digest('hex');
+    const key = RedisKeys.researchCache(hash);
+    
+    // Cache for 24 hours
+    await this.redis.setex(key, 86400, JSON.stringify({
+      query,
+      result,
+      cachedAt: new Date().toISOString()
+    }));
+  }
+  
+  // Distributed lock for preventing duplicate operations
+  async acquireLock(resource: string, ttl: number = 5000): Promise<string | null> {
+    const lockId = `${Date.now()}-${Math.random()}`;
+    const key = RedisKeys.lock(resource);
+    
+    const acquired = await this.redis.set(
+      key, 
+      lockId, 
+      'PX', 
+      ttl, 
+      'NX'
+    );
+    
+    return acquired ? lockId : null;
+  }
+  
+  // Rate limiting
+  async checkRateLimit(
+    userId: string, 
+    action: string, 
+    limit: number, 
+    window: number
+  ): Promise<boolean> {
+    const key = RedisKeys.rateLimit(userId, action);
+    const current = await this.redis.incr(key);
+    
+    if (current === 1) {
+      await this.redis.expire(key, window);
+    }
+    
+    return current <= limit;
+  }
+  
+  // Pub/Sub for real-time features
+  async publishChatUpdate(conversationId: string, update: any): Promise<void> {
+    await this.redis.publish(
+      `chat:updates:${conversationId}`, 
+      JSON.stringify(update)
+    );
+  }
+}
+```
+
+## 4. Vector Database Integration <a id="vector-database"></a>
+
+### Qdrant Configuration
+```yaml
+# qdrant/config.yaml
+service:
+  http_port: 6333
+  grpc_port: 6334
+  host: 0.0.0.0
+
+storage:
+  storage_path: ./storage
+  snapshots_path: ./snapshots
+  on_disk_payload: true
+
+performance:
+  max_search_threads: 0
+  max_optimization_threads: 1
+
+wal:
+  wal_capacity_mb: 32
+  wal_segments_ahead: 0
+```
+
+### Vector Collections Schema
+```typescript
+// Vector database collections
+const VectorCollections = {
+  // Document embeddings for semantic search
+  documents: {
+    name: 'documents',
+    vector_size: 1536, // OpenAI ada-002
+    distance: 'Cosine',
+    schema: {
+      user_id: 'keyword',
+      type: 'keyword', // 'chat', 'research', 'note'
+      source_id: 'keyword',
+      timestamp: 'integer',
+      content: 'text',
+      metadata: 'json'
+    }
+  },
+  
+  // User preference embeddings
+  userPreferences: {
+    name: 'user_preferences',
+    vector_size: 768,
+    distance: 'Cosine',
+    schema: {
+      user_id: 'keyword',
+      preference_type: 'keyword',
+      weight: 'float',
+      updated_at: 'integer'
+    }
+  },
+  
+  // Knowledge graph embeddings
+  knowledgeNodes: {
+    name: 'knowledge_nodes',
+    vector_size: 1536,
+    distance: 'Cosine',
+    schema: {
+      node_id: 'keyword',
+      user_id: 'keyword',
+      node_type: 'keyword',
+      title: 'text',
+      connections: 'json'
+    }
+  },
+  
+  // Learning content embeddings
+  learningContent: {
+    name: 'learning_content',
+    vector_size: 768,
+    distance: 'Cosine',
+    schema: {
+      content_id: 'keyword',
+      language: 'keyword',
+      difficulty: 'integer',
+      topic: 'keyword',
+      content: 'text'
+    }
+  }
+};
+```
+
+### Vector Service Implementation
+```typescript
+// services/vector.service.ts
+import { QdrantClient } from '@qdrant/js-client-rest';
+
+class VectorService {
+  private client: QdrantClient;
+  
+  constructor() {
+    this.client = new QdrantClient({
+      host: 'localhost',
+      port: 6333,
+    });
+  }
+  
+  async initializeCollections(): Promise<void> {
+    for (const [key, config] of Object.entries(VectorCollections)) {
+      try {
+        await this.client.createCollection(config.name, {
+          vectors: {
+            size: config.vector_size,
+            distance: config.distance
+          }
+        });
+        
+        // Create indexes
+        await this.createIndexes(config.name, config.schema);
+      } catch (error) {
+        if (!error.message.includes('already exists')) {
+          throw error;
+        }
+      }
+    }
+  }
+  
+  async indexDocument(
+    userId: string,
+    documentId: string,
+    content: string,
+    embedding: number[],
+    metadata: any
+  ): Promise<void> {
+    await this.client.upsert('documents', {
+      wait: true,
+      points: [{
+        id: documentId,
+        vector: embedding,
+        payload: {
+          user_id: userId,
+          content: content.substring(0, 1000), // Truncate for storage
+          timestamp: Date.now(),
+          ...metadata
+        }
+      }]
+    });
+  }
+  
+  async semanticSearch(
+    userId: string,
+    queryEmbedding: number[],
+    limit: number = 10,
+    filters?: any
+  ): Promise<any[]> {
+    const searchFilters = {
+      must: [
+        { key: 'user_id', match: { value: userId } }
+      ]
+    };
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        searchFilters.must.push({ key, match: { value } });
+      });
+    }
+    
+    const results = await this.client.search('documents', {
+      vector: queryEmbedding,
+      limit,
+      filter: searchFilters,
+      with_payload: true,
+      with_vector: false
+    });
+    
+    return results.map(r => ({
+      id: r.id,
+      score: r.score,
+      ...r.payload
+    }));
+  }
+}
+```
+
+## 5. Port Configuration & Service Map <a id="port-config"></a>
+
+### Complete Port Mapping
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    depends_on:
+      - redis
+      - postgres
+
+  # Microservices
+  chat-service:
+    build: ./services/chat
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/chatdb
+      - REDIS_URL=redis://redis:6379
+
+  research-service:
+    build: ./services/research
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - DEERFLOW_URL=http://deerflow:9000
+
+  learning-service:
+    build: ./services/learning
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+
+  agent-service:
+    build: ./services/agents
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+
+  auth-service:
+    build: ./services/auth
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - JWT_SECRET=${JWT_SECRET}
+
+  # Databases
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=secure_password
+      - POSTGRES_DB=maindb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
+
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  neo4j:
+    image: neo4j:5
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["graph-data-science"]
+    volumes:
+      - neo4j_data:/data
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+
+  # DeerFlow Research
+  deerflow:
+    build: ./deerflow
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  # Object Storage
+  minio:
+    image: minio/minio
+    ports:
+      - "9001:9001"  # API
+      - "9002:9002"  # Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9002"
+    volumes:
+      - minio_data:/data
+
+  # Message Queue
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3030:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  neo4j_data:
+  elastic_data:
+  minio_data:
+```
+
+### Service Discovery Configuration
+```typescript
+// config/services.ts
+export const ServiceConfig = {
+  apiGateway: {
+    host: process.env.API_GATEWAY_HOST || 'localhost',
+    port: parseInt(process.env.API_GATEWAY_PORT || '3000'),
+    healthCheck: '/health'
+  },
+  
+  services: {
+    chat: {
+      host: process.env.CHAT_SERVICE_HOST || 'localhost',
+      port: 3001,
+      endpoints: {
+        messages: '/api/messages',
+        conversations: '/api/conversations',
+        streaming: '/api/stream'
+      }
+    },
+    
+    research: {
+      host: process.env.RESEARCH_SERVICE_HOST || 'localhost',
+      port: 3002,
+      endpoints: {
+        search: '/api/search',
+        analyze: '/api/analyze',
+        sources: '/api/sources'
+      }
+    },
+    
+    learning: {
+      host: process.env.LEARNING_SERVICE_HOST || 'localhost',
+      port: 3003,
+      endpoints: {
+        lessons: '/api/lessons',
+        progress: '/api/progress',
+        vocabulary: '/api/vocabulary'
+      }
+    },
+    
+    agents: {
+      host: process.env.AGENTS_SERVICE_HOST || 'localhost',
+      port: 3004,
+      endpoints: {
+        list: '/api/agents',
+        interact: '/api/interact',
+        configure: '/api/configure'
+      }
+    },
+    
+    auth: {
+      host: process.env.AUTH_SERVICE_HOST || 'localhost',
+      port: 3005,
+      endpoints: {
+        login: '/api/auth/login',
+        refresh: '/api/auth/refresh',
+        verify: '/api/auth/verify'
+      }
+    }
+  },
+  
+  databases: {
+    postgres: {
+      host: process.env.POSTGRES_HOST || 'localhost',
+      port: 5432,
+      database: process.env.POSTGRES_DB || 'maindb',
+      user: process.env.POSTGRES_USER || 'appuser',
+      password: process.env.POSTGRES_PASSWORD,
+      ssl: process.env.NODE_ENV === 'production'
+    },
+    
+    redis: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: 6379,
+      password: process.env.REDIS_PASSWORD,
+      db: 0
+    },
+    
+    qdrant: {
+      host: process.env.QDRANT_HOST || 'localhost',
+      port: 6333,
+      apiKey: process.env.QDRANT_API_KEY
+    },
+    
+    neo4j: {
+      uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
+      user: process.env.NEO4J_USER || 'neo4j',
+      password: process.env.NEO4J_PASSWORD
+    },
+    
+    elasticsearch: {
+      node: process.env.ELASTIC_NODE || 'http://localhost:9200',
+      auth: {
+        username: process.env.ELASTIC_USER,
+        password: process.env.ELASTIC_PASSWORD
+      }
+    }
+  },
+  
+  external: {
+    deerflow: {
+      url: process.env.DEERFLOW_URL || 'http://localhost:9000',
+      apiKey: process.env.DEERFLOW_API_KEY
+    },
+    
+    openai: {
+      apiKey: process.env.OPENAI_API_KEY,
+      organization: process.env.OPENAI_ORG
+    }
+  }
+};
+```
+
+## 6. Data Partitioning & Sharding <a id="partitioning"></a>
+
+### PostgreSQL Partitioning Strategy
+```sql
+-- Automatic partition management
+CREATE OR REPLACE FUNCTION create_monthly_partitions()
+RETURNS void AS $$
+DECLARE
+    start_date date;
+    end_date date;
+    partition_name text;
+BEGIN
+    -- Create partitions for next 3 months
+    FOR i IN 0..2 LOOP
+        start_date := date_trunc('month', CURRENT_DATE) + interval '1 month' * i;
+        end_date := start_date + interval '1 month';
+        
+        -- Messages partitions
+        partition_name := 'messages_' || to_char(start_date, 'YYYY_MM');
+        
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_class WHERE relname = partition_name
+        ) THEN
+            EXECUTE format(
+                'CREATE TABLE %I PARTITION OF messages FOR VALUES FROM (%L) TO (%L)',
+                partition_name, start_date, end_date
+            );
+            
+            -- Create indexes on partition
+            EXECUTE format(
+                'CREATE INDEX %I ON %I (conversation_id, sequence_number DESC)',
+                partition_name || '_conv_idx', partition_name
+            );
+        END IF;
+        
+        -- Conversations partitions
+        partition_name := 'conversations_' || to_char(start_date, 'YYYY_MM');
+        
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_class WHERE relname = partition_name
+        ) THEN
+            EXECUTE format(
+                'CREATE TABLE %I PARTITION OF conversations FOR VALUES FROM (%L) TO (%L)',
+                partition_name, start_date, end_date
+            );
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule monthly execution
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+SELECT cron.schedule('create-partitions', '0 0 1 * *', 'SELECT create_monthly_partitions()');
+
+-- Partition maintenance
+CREATE OR REPLACE FUNCTION drop_old_partitions()
+RETURNS void AS $$
+DECLARE
+    cutoff_date date;
+    partition_name text;
+BEGIN
+    cutoff_date := CURRENT_DATE - interval '6 months';
+    
+    FOR partition_name IN 
+        SELECT tablename 
+        FROM pg_tables 
+        WHERE tablename LIKE 'messages_%' 
+           OR tablename LIKE 'conversations_%'
+    LOOP
+        IF partition_name ~ '\d{4}_\d{2}$' THEN
+            IF to_date(right(partition_name, 7), 'YYYY_MM') < cutoff_date THEN
+                EXECUTE format('DROP TABLE IF EXISTS %I CASCADE', partition_name);
+                RAISE NOTICE 'Dropped partition: %', partition_name;
+            END IF;
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Redis Clustering Configuration
+```conf
+# Redis cluster configuration for scaling
+port 7000
+cluster-enabled yes
+cluster-config-file nodes-7000.conf
+cluster-node-timeout 5000
+appendonly yes
+
+# Cluster setup script
+#!/bin/bash
+redis-cli --cluster create \
+  127.0.0.1:7000 \
+  127.0.0.1:7001 \
+  127.0.0.1:7002 \
+  127.0.0.1:7003 \
+  127.0.0.1:7004 \
+  127.0.0.1:7005 \
+  --cluster-replicas 1
+```
+
+## 7. Backup & Recovery Strategy <a id="backup-recovery"></a>
+
+### Automated Backup System
+```yaml
+# backup/docker-compose.backup.yml
+version: '3.8'
+
+services:
+  postgres-backup:
+    image: postgres:15-alpine
+    environment:
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    command: |
+      sh -c '
+        while true; do
+          BACKUP_FILE="/backups/postgres_$(date +%Y%m%d_%H%M%S).sql.gz"
+          pg_dump -h postgres -U appuser -d maindb | gzip > $$BACKUP_FILE
+          find /backups -name "postgres_*.sql.gz" -mtime +7 -delete
+          sleep 86400
+        done
+      '
+
+  redis-backup:
+    image: redis:7-alpine
+    volumes:
+      - ./backups:/backups
+      - redis_data:/data:ro
+    command: |
+      sh -c '
+        while true; do
+          redis-cli -h redis --rdb /backups/redis_$(date +%Y%m%d_%H%M%S).rdb
+          find /backups -name "redis_*.rdb" -mtime +3 -delete
+          sleep 3600
+        done
+      '
+
+  vector-backup:
+    image: qdrant/qdrant
+    volumes:
+      - ./backups:/backups
+      - qdrant_data:/qdrant/storage:ro
+    command: |
+      sh -c '
+        while true; do
+          curl -X POST "http://qdrant:6333/collections/backup" \
+            -H "Content-Type: application/json" \
+            -d "{\"location\": \"/backups/qdrant_$(date +%Y%m%d_%H%M%S)\"}"
+          sleep 86400
+        done
+      '
+
+  s3-sync:
+    image: amazon/aws-cli
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./backups:/backups
+    command: |
+      sh -c '
+        while true; do
+          aws s3 sync /backups s3://${BACKUP_BUCKET}/backups/ --delete
+          sleep 3600
+        done
+      '
+```
+
+### Recovery Procedures
+```bash
+#!/bin/bash
+# restore.sh - Database restoration script
+
+# PostgreSQL restoration
+restore_postgres() {
+    local backup_file=$1
+    echo "Restoring PostgreSQL from $backup_file..."
+    
+    # Stop services
+    docker-compose stop chat-service research-service learning-service
+    
+    # Restore database
+    gunzip < "$backup_file" | docker exec -i postgres psql -U appuser -d maindb
+    
+    # Restart services
+    docker-compose start chat-service research-service learning-service
+}
+
+# Redis restoration
+restore_redis() {
+    local backup_file=$1
+    echo "Restoring Redis from $backup_file..."
+    
+    # Stop Redis
+    docker-compose stop redis
+    
+    # Copy backup file
+    docker cp "$backup_file" redis:/data/dump.rdb
+    
+    # Start Redis
+    docker-compose start redis
+}
+
+# Vector DB restoration
+restore_qdrant() {
+    local backup_dir=$1
+    echo "Restoring Qdrant from $backup_dir..."
+    
+    curl -X POST "http://localhost:6333/collections/restore" \
+        -H "Content-Type: application/json" \
+        -d "{\"location\": \"$backup_dir\"}"
+}
+```
+
+## 8. Performance Optimization <a id="performance"></a>
+
+### Database Connection Pooling
+```typescript
+// db/connection-pool.ts
+import { Pool } from 'pg';
+import Redis from 'ioredis';
+import { QdrantClient } from '@qdrant/js-client-rest';
+
+class DatabaseConnectionManager {
+  private static instance: DatabaseConnectionManager;
+  private pgPool: Pool;
+  private redisClient: Redis;
+  private redisSubscriber: Redis;
+  private qdrantClient: QdrantClient;
+  
+  private constructor() {
+    // PostgreSQL connection pool
+    this.pgPool = new Pool({
+      host: ServiceConfig.databases.postgres.host,
+      port: ServiceConfig.databases.postgres.port,
+      database: ServiceConfig.databases.postgres.database,
+      user: ServiceConfig.databases.postgres.user,
+      password: ServiceConfig.databases.postgres.password,
+      max: 20, // Maximum connections
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+      statement_timeout: 30000,
+      query_timeout: 30000
+    });
+    
+    // Redis connection with retry
+    this.redisClient = new Redis({
+      ...ServiceConfig.databases.redis,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      reconnectOnError: (err) => {
+        const targetError = 'READONLY';
+        if (err.message.includes(targetError)) {
+          return true;
+        }
+        return false;
+      },
+      maxRetriesPerRequest: 3
+    });
+    
+    // Separate Redis connection for subscriptions
+    this.redisSubscriber = this.redisClient.duplicate();
+    
+    // Qdrant client
+    this.qdrantClient = new QdrantClient({
+      host: ServiceConfig.databases.qdrant.host,
+      port: ServiceConfig.databases.qdrant.port,
+      apiKey: ServiceConfig.databases.qdrant.apiKey
+    });
+  }
+  
+  static getInstance(): DatabaseConnectionManager {
+    if (!this.instance) {
+      this.instance = new DatabaseConnectionManager();
+    }
+    return this.instance;
+  }
+  
+  // Health checks
+  async healthCheck(): Promise<{
+    postgres: boolean;
+    redis: boolean;
+    qdrant: boolean;
+  }> {
+    const results = {
+      postgres: false,
+      redis: false,
+      qdrant: false
+    };
+    
+    try {
+      await this.pgPool.query('SELECT 1');
+      results.postgres = true;
+    } catch (error) {
+      console.error('PostgreSQL health check failed:', error);
+    }
+    
+    try {
+      await this.redisClient.ping();
+      results.redis = true;
+    } catch (error) {
+      console.error('Redis health check failed:', error);
+    }
+    
+    try {
+      await this.qdrantClient.getCollections();
+      results.qdrant = true;
+    } catch (error) {
+      console.error('Qdrant health check failed:', error);
+    }
+    
+    return results;
+  }
+}
+```
+
+### Query Optimization
+```sql
+-- Analyze query performance
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- Find slow queries
+SELECT 
+    query,
+    calls,
+    total_exec_time,
+    mean_exec_time,
+    stddev_exec_time,
+    rows
+FROM pg_stat_statements
+WHERE mean_exec_time > 100
+ORDER BY mean_exec_time DESC
+LIMIT 20;
+
+-- Create materialized views for complex queries
+CREATE MATERIALIZED VIEW user_activity_summary AS
+SELECT 
+    u.id as user_id,
+    u.username,
+    COUNT(DISTINCT c.id) as total_conversations,
+    COUNT(DISTINCT m.id) as total_messages,
+    SUM(m.tokens) as total_tokens,
+    MAX(m.created_at) as last_message_at,
+    COUNT(DISTINCT DATE(m.created_at)) as active_days
+FROM users u
+LEFT JOIN conversations c ON u.id = c.user_id
+LEFT JOIN messages m ON c.id = m.conversation_id
+GROUP BY u.id, u.username;
+
+-- Create index on materialized view
+CREATE INDEX idx_user_activity_last_message 
+ON user_activity_summary(last_message_at DESC);
+
+-- Refresh materialized view periodically
+CREATE OR REPLACE FUNCTION refresh_user_activity()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY user_activity_summary;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule refresh
+SELECT cron.schedule('refresh-user-activity', '*/15 * * * *', 'SELECT refresh_user_activity()');
+```
+
+## 9. Security Best Practices <a id="security"></a>
+
+### Database Security Configuration
+```sql
+-- Row Level Security (RLS)
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY messages_isolation ON messages
+    FOR ALL
+    TO application_role
+    USING (user_id = current_setting('app.current_user_id')::uuid);
+
+CREATE POLICY conversations_isolation ON conversations
+    FOR ALL
+    TO application_role
+    USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- Encryption at rest
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Encrypt sensitive data
+ALTER TABLE users 
+    ALTER COLUMN email TYPE text USING pgp_sym_encrypt(email, current_setting('app.encryption_key'));
+
+-- Audit logging
+CREATE TABLE security_audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    event_time TIMESTAMPTZ DEFAULT NOW(),
+    user_id UUID,
+    action VARCHAR(50),
+    object_type VARCHAR(50),
+    object_id VARCHAR(100),
+    ip_address INET,
+    user_agent TEXT,
+    success BOOLEAN,
+    error_message TEXT
+);
+
+-- Trigger for sensitive operations
+CREATE OR REPLACE FUNCTION audit_sensitive_operation()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO security_audit_log (
+        user_id, action, object_type, object_id, success
+    ) VALUES (
+        current_setting('app.current_user_id')::uuid,
+        TG_OP,
+        TG_TABLE_NAME,
+        NEW.id::text,
+        true
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER audit_user_changes
+    AFTER INSERT OR UPDATE OR DELETE ON users
+    FOR EACH ROW EXECUTE FUNCTION audit_sensitive_operation();
+```
+
+### Network Security
+```yaml
+# docker-compose.security.yml
+version: '3.8'
+
+services:
+  # Internal network for databases
+  postgres:
+    networks:
+      - internal
+    expose:
+      - "5432"
+    # Remove external port mapping in production
+    # ports:
+    #   - "5432:5432"
+
+  redis:
+    networks:
+      - internal
+    expose:
+      - "6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+
+  # API Gateway with rate limiting
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    networks:
+      - frontend
+      - internal
+
+networks:
+  frontend:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+```
+
+## 10. Monitoring & Maintenance <a id="monitoring"></a>
+
+### Prometheus Metrics
+```yaml
+# prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: 'services'
+    static_configs:
+      - targets: 
+        - 'chat-service:3001'
+        - 'research-service:3002'
+        - 'learning-service:3003'
+        - 'agent-service:3004'
+```
+
+### Database Monitoring Queries
+```sql
+-- Active connections monitoring
+CREATE OR REPLACE VIEW connection_stats AS
+SELECT 
+    pid,
+    usename,
+    application_name,
+    client_addr,
+    backend_start,
+    state,
+    wait_event_type,
+    wait_event,
+    query_start,
+    state_change,
+    query
+FROM pg_stat_activity
+WHERE state != 'idle'
+ORDER BY backend_start;
+
+-- Table size monitoring
+CREATE OR REPLACE VIEW table_sizes AS
+SELECT
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
+    pg_total_relation_size(schemaname||'.'||tablename) AS size_bytes
+FROM pg_tables
+WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+ORDER BY size_bytes DESC;
+
+-- Index usage statistics
+CREATE OR REPLACE VIEW index_usage AS
+SELECT
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan,
+    idx_tup_read,
+    idx_tup_fetch,
+    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+FROM pg_stat_user_indexes
+ORDER BY idx_scan DESC;
+```
+
+## 11. Development vs Production Setup <a id="dev-prod"></a>
+
+### Environment-Specific Configurations
+```typescript
+// config/database.config.ts
+export const getDatabaseConfig = (env: string) => {
+  const configs = {
+    development: {
+      postgres: {
+        host: 'localhost',
+        port: 5432,
+        database: 'dev_db',
+        user: 'developer',
+        password: 'dev_password',
+        ssl: false,
+        max: 5
+      },
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        db: 0
+      },
+      migrations: {
+        directory: './migrations',
+        tableName: 'migrations',
+        stub: './migration.stub'
+      }
+    },
+    
+    production: {
+      postgres: {
+        host: process.env.DB_HOST,
+        port: parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        ssl: { rejectUnauthorized: false },
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000
+      },
+      redis: {
+        host: process.env.REDIS_HOST,
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASSWORD,
+        tls: {},
+        db: 0
+      },
+      migrations: {
+        directory: './migrations',
+        tableName: 'migrations',
+        disableTransactions: false
+      }
+    },
+    
+    test: {
+      postgres: {
+        host: 'localhost',
+        port: 5433, // Different port for test DB
+        database: 'test_db',
+        user: 'test_user',
+        password: 'test_password',
+        ssl: false,
+        max: 1
+      },
+      redis: {
+        host: 'localhost',
+        port: 6380, // Different port for test Redis
+        db: 1
+      }
+    }
+  };
+  
+  return configs[env] || configs.development;
+};
+```
+
+### Development Docker Compose Override
+```yaml
+# docker-compose.override.yml (for development)
+version: '3.8'
+
+services:
+  # Development tools
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    depends_on:
+      - postgres
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+
+  # Development volumes for hot reload
+  api-gateway:
+    volumes:
+      - ./api-gateway:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+
+  chat-service:
+    volumes:
+      - ./services/chat:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+```
+
+## 12. Migration Strategy <a id="migration"></a>
+
+### Database Migration Tool Setup
+```typescript
+// migrations/migration-runner.ts
+import { Knex } from 'knex';
+
+export class MigrationRunner {
+  private knex: Knex;
+  
+  constructor(config: Knex.Config) {
+    this.knex = require('knex')(config);
+  }
+  
+  async runMigrations(): Promise<void> {
+    try {
+      // Check current version
+      const currentVersion = await this.getCurrentVersion();
+      console.log(`Current database version: ${currentVersion}`);
+      
+      // Run pending migrations
+      const [batchNo, migrations] = await this.knex.migrate.latest();
+      
+      if (migrations.length === 0) {
+        console.log('Database is up to date');
+      } else {
+        console.log(`Batch ${batchNo} run: ${migrations.length} migrations`);
+        migrations.forEach(migration => {
+          console.log(`- ${migration}`);
+        });
+      }
+    } catch (error) {
+      console.error('Migration failed:', error);
+      throw error;
+    }
+  }
+  
+  async rollback(): Promise<void> {
+    const [batchNo, migrations] = await this.knex.migrate.rollback();
+    
+    if (migrations.length === 0) {
+      console.log('No migrations to rollback');
+    } else {
+      console.log(`Batch ${batchNo} rolled back: ${migrations.length} migrations`);
+    }
+  }
+  
+  private async getCurrentVersion(): Promise<string> {
+    try {
+      const result = await this.knex('migrations')
+        .orderBy('id', 'desc')
+        .first();
+      return result?.name || 'No migrations run';
+    } catch {
+      return 'Migration table not found';
+    }
+  }
+}
+
+// Usage
+const migrationConfig = {
+  client: 'postgresql',
+  connection: getDatabaseConfig(process.env.NODE_ENV).postgres,
+  migrations: {
+    directory: './migrations',
+    extension: 'ts',
+    tableName: 'migrations'
+  }
+};
+
+const runner = new MigrationRunner(migrationConfig);
+
+// CLI commands
+if (process.argv[2] === 'up') {
+  runner.runMigrations();
+} else if (process.argv[2] === 'down') {
+  runner.rollback();
+}
+```
+
+### Sample Migration Files
+```typescript
+// migrations/001_initial_schema.ts
+import { Knex } from 'knex';
+
+export async function up(knex: Knex): Promise<void> {
+  // Enable extensions
+  await knex.raw('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+  await knex.raw('CREATE EXTENSION IF NOT EXISTS "pg_trgm"');
+  
+  // Create users table
+  await knex.schema.createTable('users', table => {
+    table.uuid('id').primary().defaultTo(knex.raw('uuid_generate_v4()'));
+    table.string('email', 255).unique().notNullable();
+    table.string('username', 50).unique().notNullable();
+    table.string('password_hash', 255).notNullable();
+    table.jsonb('profile').defaultTo('{}');
+    table.jsonb('preferences').defaultTo('{}');
+    table.timestamps(true, true);
+    table.timestamp('last_active_at').defaultTo(knex.fn.now());
+    table.boolean('is_active').defaultTo(true);
+    
+    // Indexes
+    table.index(['email', 'is_active']);
+    table.index('last_active_at');
+  });
+}
+
+export async function down(knex: Knex): Promise<void> {
+  await knex.schema.dropTableIfExists('users');
+}
+```
+
+This comprehensive guide provides a complete database and port configuration strategy for your AI-powered learning platform, with proper separation of concerns, scalability considerations, and security best practices.
