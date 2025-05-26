@@ -896,8 +896,11 @@ class SunaIntegrationService {
           // For Research Depth 3, force Gemini for comprehensive reports (no token limits)
           const modelId = 'gemini-1.5-flash';
           const startTime = Date.now();
+          
+          // Generate conversation ID for caching
+          const conversationId = crypto.randomUUID();
 
-          // Optimized DeerFlow research call
+          // Optimized DeerFlow research call with user context
           const deerflowResult = await researchService.performResearch({
             query: data.query,
             depth: ResearchDepth.Deep,
@@ -905,7 +908,9 @@ class SunaIntegrationService {
             researchDepth: researchDepth,
             researchLength: 'comprehensive',
             researchTone: 'analytical',
-            minWordCount: 2500
+            minWordCount: 2500,
+            userId: data.userId || 'anonymous',
+            conversationId: conversationId
           });
 
           if (deerflowResult && deerflowResult.report) {

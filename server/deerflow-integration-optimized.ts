@@ -1,6 +1,7 @@
 
 import { deerflowClient, DeerFlowResearchParams, DeerFlowResearchResponse } from './deerflow-client';
 import { llmService } from './llm';
+import { researchCache } from './optimized-research-cache';
 import axios, { AxiosInstance } from 'axios';
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
@@ -56,6 +57,8 @@ export interface ResearchParams {
   researchDepth?: number;
   cacheEnabled?: boolean;
   priority?: 'high' | 'normal' | 'low';
+  userId?: string;
+  conversationId?: string;
 }
 
 /**
@@ -419,10 +422,22 @@ export class OptimizedResearchService extends EventEmitter {
         { priority }
       );
       
-      // Cache successful result
+      // Cache successful result with optimized storage
       if (params.cacheEnabled !== false && result) {
         const cacheKey = this.generateCacheKey(params);
         this.resultsCache.set(cacheKey, result);
+        
+        // Also store in optimized research cache if we have user context
+        if (params.userId && params.conversationId) {
+          await researchCache.storeResult(params.userId, params.conversationId, {
+            content: result.report,
+            sources: result.sources,
+            metadata: {
+              depth: result.depth,
+              processingTime: result.processingTime
+            }
+          });
+        }
       }
       
       // Update metrics

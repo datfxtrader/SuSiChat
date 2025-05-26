@@ -122,13 +122,58 @@ app.use((req, res, next) => {
     }
   });
 
-  // CRASH-SAFE: Get all user research
+  // OPTIMIZED: Get all user research with cache
+  app.get('/api/research/user-research-optimized/:userId', async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { researchCache } = await import('./optimized-research-cache');
+
+      console.log('🔍 API: Getting optimized research for user:', userId);
+
+      const research = await researchCache.getUserConversations(userId);
+
+      res.json({
+        success: true,
+        research,
+        count: research.length,
+        storageType: 'optimized-cache',
+        cacheMetrics: researchCache.getMetrics()
+      });
+
+    } catch (error) {
+      console.error('❌ API: Error getting user research:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error getting user research',
+        error: (error as Error).message
+      });
+    }
+  });
+
+  // CRASH-SAFE: Get all user research (legacy fallback)
   app.get('/api/research/user-research-safe/:userId', async (req: any, res) => {
     try {
       const { userId } = req.params;
+      const { researchCache } = await import('./optimized-research-cache');
 
-      console.log('🔍 API: Getting all research for user:', userId);
+      console.log('🔍 API: Getting research for user (with cache fallback):', userId);
 
+      // Try optimized cache first
+      try {
+        const research = await researchCache.getUserConversations(userId);
+        if (research && research.length > 0) {
+          return res.json({
+            success: true,
+            research,
+            count: research.length,
+            storageType: 'optimized-cache'
+          });
+        }
+      } catch (cacheError) {
+        console.warn('Cache retrieval failed, falling back to crash-safe storage:', cacheError);
+      }
+
+      // Fallback to crash-safe storage
       const research = await CrashSafeResearch.getUserResearch(userId);
 
       res.json({
@@ -148,11 +193,12 @@ app.use((req, res, next) => {
     }
   });
 
-  // CRASH-SAFE: System status
+  // CRASH-SAFE: System status with optimized cache metrics
   app.get('/api/research/system-status', async (req: any, res) => {
     try {
       const { join } = await import('path');
       const { readdir } = await import('fs/promises');
+      const { researchCache } = await import('./optimized-research-cache');
 
       const backupDir = join(process.cwd(), 'research-backups');
 
@@ -167,6 +213,8 @@ app.use((req, res, next) => {
         // Directory doesn't exist yet
       }
 
+      const cacheMetrics = researchCache.getMetrics();
+
       res.json({
         success: true,
         system: {
@@ -175,11 +223,52 @@ app.use((req, res, next) => {
           backupDirectory: backupDir,
           researchFilesCount: fileCount,
           indexFileExists: indexExists,
-          status: 'operational'
+          status: 'operational',
+          optimizedCache: {
+            enabled: true,
+            ...cacheMetrics
+          }
         },
-        message: 'Crash-safe research storage is active and operational'
+        message: 'Optimized research storage is active and operational'
       });
 
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  });
+
+  // Optimized cache metrics endpoint
+  app.get('/api/research/cache-metrics', async (req: any, res) => {
+    try {
+      const { researchCache } = await import('./optimized-research-cache');
+      const metrics = researchCache.getMetrics();
+      
+      res.json({
+        success: true,
+        metrics,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  });
+
+  // Clear optimized cache endpoint
+  app.post('/api/research/clear-cache-optimized', async (req: any, res) => {
+    try {
+      const { researchCache } = await import('./optimized-research-cache');
+      researchCache.clear();
+      
+      res.json({
+        success: true,
+        message: 'Optimized research cache cleared successfully'
+      });
     } catch (error) {
       res.status(500).json({
         success: false,
@@ -375,6 +464,10 @@ app.use((req, res, next) => {
   app.use('/api/web-search', webSearchRoutes);
   app.use('/api/enhanced-web-search', enhancedWebSearchRoutes);
   app.use('/api/search-metrics', searchMetricsRoutes);
+  
+  // Import and use cache monitoring routes
+  const cacheMonitoringRoutes = (await import('./routes/cache-monitoring')).default;
+  app.use('/api/cache-monitoring', cacheMonitoringRoutes);
 
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {
@@ -477,6 +570,13 @@ app.use((req, res, next) => {
   // Graceful shutdown
   process.on('SIGTERM', async () => {
     console.log('🛑 SIGTERM signal received: closing HTTP server');
+    try {
+      const { researchCache } = await import('./optimized-research-cache');
+      await researchCache.shutdown();
+      console.log('✅ Optimized cache shutdown complete');
+    } catch (error) {
+      console.error('❌ Cache shutdown error:', error);
+    }
     await shutdownResearchService();
     server.close(() => {
       console.log('🔒 HTTP server closed');
@@ -486,6 +586,13 @@ app.use((req, res, next) => {
 
   process.on('SIGINT', async () => {
     console.log('🛑 SIGINT signal received: closing HTTP server');
+    try {
+      const { researchCache } = await import('./optimized-research-cache');
+      await researchCache.shutdown();
+      console.log('✅ Optimized cache shutdown complete');
+    } catch (error) {
+      console.error('❌ Cache shutdown error:', error);
+    }
     await shutdownResearchService();
     server.close(() => {
       console.log('🔒 HTTP server closed');
