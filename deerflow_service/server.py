@@ -815,7 +815,7 @@ async def perform_research_endpoint(request: ResearchRequest, background_tasks: 
 
     # Create initial response
     initial_response = ResearchResponse(
-        status={"status": "processing", "message": "Research started"},```python
+        status={"status": "processing", "message": "Research started"},
         service_process_log=["Research initialized", "Processing request..."]
     )
 
