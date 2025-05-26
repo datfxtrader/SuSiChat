@@ -33,6 +33,9 @@ class JobQueue extends EventEmitter {
   private isRunning = false;
   private maxConcurrency = 5;
   private checkInterval = 1000;
+  private rateLimiter = new Map<string, { tokens: number; lastRefill: number; maxTokens: number; refillRate: number }>();
+  private priorityQueue: Job[] = [];
+  private circuitBreakers = new Map<string, { failures: number; lastFailure: number; isOpen: boolean }>();
 
   constructor(options: { maxConcurrency?: number; checkInterval?: number } = {}) {
     super();
@@ -46,6 +49,16 @@ class JobQueue extends EventEmitter {
   }
 
   async add(type: string, data: any, options: JobOptions = {}): Promise<string> {
+    // Check rate limit for job type
+    if (!this.checkRateLimit(type)) {
+      throw new Error(`Rate limit exceeded for job type: ${type}`);
+    }
+
+    // Check circuit breaker
+    if (this.isCircuitBreakerOpen(type)) {
+      throw new Error(`Circuit breaker open for job type: ${type}`);
+    }
+
     const jobId = `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const job: Job = {
@@ -62,10 +75,74 @@ class JobQueue extends EventEmitter {
     };
 
     this.jobs.set(jobId, job);
+    
+    // Add to priority queue
+    this.priorityQueue.push(job);
+    this.priorityQueue.sort((a, b) => b.priority - a.priority || a.createdAt.getTime() - b.createdAt.getTime());
+    
     this.emit('job:added', job);
     
-    console.log(`Added job ${jobId} of type ${type}`);
+    console.log(`Added job ${jobId} of type ${type} (priority: ${job.priority})`);
     return jobId;
+  }
+
+  private checkRateLimit(jobType: string): boolean {
+    const now = Date.now();
+    const limiter = this.rateLimiter.get(jobType) || {
+      tokens: 10,
+      lastRefill: now,
+      maxTokens: 10,
+      refillRate: 1 // tokens per second
+    };
+
+    // Refill tokens based on time passed
+    const timePassed = (now - limiter.lastRefill) / 1000;
+    limiter.tokens = Math.min(limiter.maxTokens, limiter.tokens + timePassed * limiter.refillRate);
+    limiter.lastRefill = now;
+
+    if (limiter.tokens >= 1) {
+      limiter.tokens--;
+      this.rateLimiter.set(jobType, limiter);
+      return true;
+    }
+
+    this.rateLimiter.set(jobType, limiter);
+    return false;
+  }
+
+  private isCircuitBreakerOpen(jobType: string): boolean {
+    const breaker = this.circuitBreakers.get(jobType);
+    if (!breaker) return false;
+
+    if (breaker.isOpen) {
+      const timeSinceLastFailure = Date.now() - breaker.lastFailure;
+      if (timeSinceLastFailure > 60000) { // 60 second timeout
+        breaker.isOpen = false;
+        breaker.failures = 0;
+        console.log(`Circuit breaker reset for job type: ${jobType}`);
+      }
+    }
+
+    return breaker.isOpen;
+  }
+
+  private updateCircuitBreaker(jobType: string, success: boolean): void {
+    const breaker = this.circuitBreakers.get(jobType) || { failures: 0, lastFailure: 0, isOpen: false };
+
+    if (success) {
+      breaker.failures = 0;
+      breaker.isOpen = false;
+    } else {
+      breaker.failures++;
+      breaker.lastFailure = Date.now();
+      
+      if (breaker.failures >= 5) { // threshold
+        breaker.isOpen = true;
+        console.warn(`Circuit breaker opened for job type: ${jobType}`);
+      }
+    }
+
+    this.circuitBreakers.set(jobType, breaker);
   }
 
   start() {
@@ -129,6 +206,7 @@ class JobQueue extends EventEmitter {
       job.error = `No handler registered for job type: ${job.type}`;
       this.processing.delete(job.id);
       this.emit('job:failed', job);
+      this.updateCircuitBreaker(job.type, false);
       return;
     }
 
@@ -137,14 +215,24 @@ class JobQueue extends EventEmitter {
     this.emit('job:started', job);
 
     try {
-      const result = await handler(job);
+      // Execute with timeout
+      const result = await Promise.race([
+        handler(job),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Job timeout')), 300000) // 5 minutes
+        )
+      ]);
+      
       job.status = 'completed';
       job.result = result;
       this.processing.delete(job.id);
       this.emit('job:completed', job);
+      this.updateCircuitBreaker(job.type, true);
       console.log(`Job ${job.id} completed successfully`);
+      
     } catch (error) {
       job.error = error.message;
+      this.updateCircuitBreaker(job.type, false);
       
       if (job.attempts >= job.maxAttempts) {
         job.status = 'failed';

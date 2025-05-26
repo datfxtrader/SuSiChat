@@ -26,13 +26,13 @@ type ClientConnection = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Add structured logging middleware
   app.use(requestLogger);
-  
+
   // Add input sanitization middleware
   app.use(sanitizeUserInput);
-  
+
   // Auth middleware
   await setupAuth(app);
-  
+
   // Health check endpoints
   app.get('/api/health/database', async (req, res) => {
     try {
@@ -42,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ status: 'unhealthy', error: error.message });
     }
   });
-  
+
   // Metrics endpoint
   app.get('/api/metrics', async (req, res) => {
     try {
@@ -52,33 +52,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to collect metrics' });
     }
   });
-  
+
   // Job queue endpoints
   app.post('/api/jobs/submit', validateContent({ maxLength: 1000 }), async (req, res) => {
     try {
       const { type, data, priority, delay } = req.body;
       const jobId = await jobQueue.add(type, data, { priority, delay });
-      
+
       logger.info('Job submitted', { 
         jobId, 
         type, 
         component: 'job_queue' 
       });
-      
+
       res.json({ job_id: jobId, status: 'submitted' });
     } catch (error) {
       logger.error('Failed to submit job', error);
       res.status(500).json({ error: 'Failed to submit job' });
     }
   });
-  
+
   app.get('/api/jobs/:jobId/status', async (req, res) => {
     try {
       const job = jobQueue.getJob(req.params.jobId);
       if (!job) {
         return res.status(404).json({ error: 'Job not found' });
       }
-      
+
       res.json({
         id: job.id,
         type: job.type,
@@ -93,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to get job status' });
     }
   });
-  
+
   // Content validation test endpoint
   app.post('/api/test/sanitization', validateContent({ enableProfanityFilter: true }), async (req, res) => {
     res.json({ 
@@ -169,7 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
 
           const savedMessage = await enhancedStorage.createMessage(messageData);
-          
+
           // Record metrics
           metricsCollector.incrementCounter('messages.created', 1, {
             type: familyRoomId ? 'family' : 'personal'
@@ -496,6 +496,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const express = require('express');
   const router = express.Router();
   const { checkLLMHealth, testLLMConnectivity } = require('./llm-health-check');
+  import { enhancedIntegration } from './enhanced-integration-layer';
+  import { asyncManager } from './enhanced-async-manager';
+  import { logger } from './monitoring/logger';
 
   router.get('/llm/health', async (req: Request, res: Response) => {
     try {
@@ -514,6 +517,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to test LLM connectivity' });
     }
   });
+
+  router.post('/research', async (req, res) => {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    const { research_question, research_depth, options = {} } = req.body;
+
+    if (!research_question) {
+      return res.status(400).json({ error: 'Research question is required' });
+    }
+
+    const depth = Math.min(Math.max(parseInt(research_depth) || 3, 1), 5);
+
+    logger.info('Research request received', {
+      requestId,
+      query: research_question.substring(0, 100),
+      depth,
+      component: 'api'
+    });
+
+    // Use enhanced integration layer
+    const result = await enhancedIntegration.performResearch({
+      query: research_question,
+      depth,
+      options: {
+        useParallel: options.parallel || false,
+        timeout: options.timeout || 120000,
+        priority: options.priority || 1,
+        enableFallback: options.fallback !== false
+      }
+    });
+
+    logger.info('Research request completed', {
+      requestId,
+      status: result.status,
+      executionTime: result.metadata?.executionTime,
+      component: 'api'
+    });
+
+    res.json(result);
+
+  } catch (error) {
+    logger.error('Research request failed', error, {
+      requestId,
+      component: 'api'
+    });
+
+    res.status(500).json({ 
+      error: 'Research failed', 
+      message: error.message,
+      status: 'error',
+      requestId
+    });
+  }
+});
+
+// System metrics endpoint
+router.get('/system/metrics', async (req, res) => {
+  try {
+    const metrics = enhancedIntegration.getSystemMetrics();
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      metrics
+    });
+  } catch (error) {
+    logger.error('Failed to get system metrics', error, {
+      component: 'api'
+    });
+    res.status(500).json({ error: 'Failed to get metrics' });
+  }
+});
+
+// Background job endpoint
+router.post('/research/background', async (req, res) => {
+  try {
+    const { research_question, research_depth, options = {} } = req.body;
+
+    if (!research_question) {
+      return res.status(400).json({ error: 'Research question is required' });
+    }
+
+    const depth = Math.min(Math.max(parseInt(research_depth) || 3, 1), 5);
+
+    const jobId = await enhancedIntegration.queueResearch({
+      query: research_question,
+      depth,
+      options
+    });
+
+    res.json({
+      status: 'queued',
+      jobId,
+      message: 'Research has been queued for background processing'
+    });
+
+  } catch (error) {
+    logger.error('Failed to queue research', error, {
+      component: 'api'
+    });
+    res.status(500).json({ error: 'Failed to queue research' });
+  }
+});
 
   app.use('/api', router);
 

@@ -120,6 +120,65 @@ class StructuredLogger {
       duration,
       timestamp: new Date().toISOString()
     });
+
+    // Track performance metrics
+    this.trackPerformanceMetric(operation, duration, context);
+  }
+
+  private performanceMetrics = new Map<string, {
+    count: number;
+    totalDuration: number;
+    minDuration: number;
+    maxDuration: number;
+    avgDuration: number;
+    lastUpdated: number;
+  }>();
+
+  private trackPerformanceMetric(operation: string, duration: number, context: LogContext = {}) {
+    const key = `${operation}:${context.component || 'unknown'}`;
+    const existing = this.performanceMetrics.get(key) || {
+      count: 0,
+      totalDuration: 0,
+      minDuration: Infinity,
+      maxDuration: 0,
+      avgDuration: 0,
+      lastUpdated: Date.now()
+    };
+
+    existing.count++;
+    existing.totalDuration += duration;
+    existing.minDuration = Math.min(existing.minDuration, duration);
+    existing.maxDuration = Math.max(existing.maxDuration, duration);
+    existing.avgDuration = existing.totalDuration / existing.count;
+    existing.lastUpdated = Date.now();
+
+    this.performanceMetrics.set(key, existing);
+
+    // Log slow operations
+    if (duration > 5000) { // 5 seconds
+      this.warn(`Slow operation detected: ${operation}`, {
+        ...context,
+        duration,
+        avgDuration: existing.avgDuration
+      });
+    }
+  }
+
+  getPerformanceMetrics(): Record<string, any> {
+    const metrics: Record<string, any> = {};
+    for (const [key, value] of this.performanceMetrics.entries()) {
+      metrics[key] = value;
+    }
+    return metrics;
+  }
+
+  clearOldMetrics(maxAgeMs: number = 24 * 60 * 60 * 1000): void {
+    const cutoff = Date.now() - maxAgeMs;
+    for (const [key, value] of this.performanceMetrics.entries()) {
+      if (value.lastUpdated < cutoff) {
+        this.performanceMetrics.delete(key);
+      }
+    }
   }
 
   audit(action: string, context: LogContext = {}) {
