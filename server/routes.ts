@@ -127,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  // Set up WebSocket server for real-timeserver for real-time chat
+  // Set up WebSocket server for real-time chat
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const connections: ClientConnection[] = [];
 
@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Join family room
         else if (data.type === 'join_family_room') {
-          const isInRoom = await storage.isUserInFamilyRoom(clientInfo.userId, data.roomId);
+          const isInRoom = await enhancedStorage.isUserInFamilyRoom(clientInfo.userId, data.roomId);
           if (isInRoom) {
             clientInfo.familyRoomId = data.roomId;
             ws.send(JSON.stringify({ type: 'join_success', roomId: data.roomId }));
@@ -205,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isAiResponse: true
           };
 
-          const savedAiMessage = await storage.createMessage(aiMessageData);
+          const savedAiMessage = await enhancedStorage.createMessage(aiMessageData);
 
           // Broadcast AI response to same clients
           for (const client of broadcastTarget) {
