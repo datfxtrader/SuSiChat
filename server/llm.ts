@@ -1,4 +1,5 @@
-import axios from 'axios';
+
+import axios, { AxiosInstance, AxiosError } from 'axios';
 import { storage } from './storage';
 
 interface DeepSeekMessage {
@@ -14,17 +15,74 @@ interface DeepSeekConfig {
   stream?: boolean;
 }
 
+interface DeepSeekResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
+
+// Configuration constants
+const CONFIG = {
+  DEFAULT_TEMPERATURE: 0.7,
+  DEFAULT_MAX_TOKENS: 1000,
+  RESEARCH_MAX_TOKENS: 4000,
+  MAX_MEMORIES_CONTEXT: 5,
+  API_TIMEOUT: 30000, // 30 seconds
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 1000, // 1 second
+} as const;
+
+// Personal information patterns compiled once
+const PERSONAL_PATTERNS = [
+  /\bmy name is\b/i,
+  /\bi am\s+(?:a|an)?\s*\w+/i,
+  /\bi (?:like|love|enjoy|prefer)\b/i,
+  /\bmy (?:favorite|favourite)\b/i,
+  /\bi (?:don't|do not|dislike|hate)\b/i,
+  /\bi (?:need|want|have) to\b/i,
+  /\bi work (?:at|for|as)\b/i,
+  /\bi live (?:in|at)\b/i,
+] as const;
+
 export class LLMService {
-  private apiKey: string;
-  private apiEndpoint: string;
-  private model: string;
-  private systemPrompt: string;
+  private readonly apiKey: string;
+  private readonly apiEndpoint: string;
+  private readonly model: string;
+  private readonly systemPrompt: string;
+  private readonly axiosInstance: AxiosInstance;
+  
+  // Cache for user contexts to avoid repeated DB queries
+  private userContextCache = new Map<string, { context: string; timestamp: number }>();
+  private readonly contextCacheTimeout = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
+    // Validate environment variables
     this.apiKey = process.env.DEEPSEEK_API_KEY || '';
+    if (!this.apiKey) {
+      console.warn('DEEPSEEK_API_KEY not set - LLM service will not function');
+    }
+    
     this.apiEndpoint = process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions';
     this.model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-    this.systemPrompt = `You are Suna, an advanced open-source generalist AI agent designed to help accomplish real-world tasks. 
+    
+    // Pre-compile system prompt
+    this.systemPrompt = this.getSystemPrompt();
+    
+    // Create axios instance with defaults
+    this.axiosInstance = axios.create({
+      baseURL: this.apiEndpoint,
+      timeout: CONFIG.API_TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      }
+    });
+  }
+
+  private getSystemPrompt(): string {
+    return `You are Suna, an advanced open-source generalist AI agent designed to help accomplish real-world tasks. 
 You are currently running in Tongkeeper, a family-oriented assistant platform.
 
 In your full implementation, you have several powerful capabilities:
@@ -52,125 +110,180 @@ Always prioritize providing accurate, helpful information while maintaining a ba
     message: string,
     familyRoomId?: number
   ): Promise<string> {
-    // Get user history for context
-    const userPreferences = await storage.getUserPreferences(userId);
-    const relevantMemories = await storage.searchUserMemories(userId, message);
-    
-    // Build context section from user preferences and memories
-    let contextStr = '';
-    if (userPreferences.length > 0) {
-      contextStr += 'User preferences:\n';
-      userPreferences.forEach(pref => {
-        contextStr += `- ${pref.key}: ${pref.value}\n`;
-      });
-      contextStr += '\n';
+    if (!this.apiKey) {
+      return "I'm sorry, but the AI service is not properly configured. Please contact your administrator.";
     }
-    
-    if (relevantMemories.length > 0) {
-      contextStr += 'Relevant information about the user:\n';
-      relevantMemories.slice(0, 5).forEach(memory => {
-        contextStr += `- ${memory.content}\n`;
-      });
-      contextStr += '\n';
-    }
-    
-    // Prepare messages array with system prompt and context
-    const messages: DeepSeekMessage[] = [
-      {
-        role: 'system',
-        content: this.systemPrompt + (contextStr ? `\n\nUser context:\n${contextStr}` : '')
-      },
-      { role: 'user', content: message }
-    ];
-    
+
     try {
-      const response = await axios.post(
-        this.apiEndpoint,
+      // Get or build user context
+      const context = await this.getUserContext(userId, message);
+      
+      // Prepare messages
+      const messages: DeepSeekMessage[] = [
         {
-          model: this.model,
-          messages,
-          temperature: 0.7,
-          max_tokens: 1000
+          role: 'system',
+          content: context ? `${this.systemPrompt}\n\nUser context:\n${context}` : this.systemPrompt
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          }
-        }
+        { role: 'user', content: message }
+      ];
+      
+      // Make API call with retry logic
+      const responseText = await this.callDeepSeekWithRetry({
+        model: this.model,
+        messages,
+        temperature: CONFIG.DEFAULT_TEMPERATURE,
+        max_tokens: CONFIG.DEFAULT_MAX_TOKENS
+      });
+      
+      // Asynchronously extract and store memory (don't wait)
+      this.extractAndStoreMemory(userId, message, responseText).catch(err => 
+        console.error('Failed to store memory:', err)
       );
-      
-      const responseText = response.data.choices[0].message.content;
-      
-      // Extract potential facts/preferences for memory
-      await this.extractAndStoreMemory(userId, message, responseText);
       
       return responseText;
     } catch (error) {
-      console.error('Error calling DeepSeek API:', error);
-      return "I'm sorry, I encountered an issue while processing your request. Please try again in a moment.";
+      console.error('Error in generateResponse:', error);
+      return this.getErrorMessage(error);
     }
   }
   
-  /**
-   * Generate a comprehensive research report from web sources
-   */
   async generateResearchReport(
     messages: DeepSeekMessage[],
-    temperature: number = 0.7,
-    maxTokens: number = 4000
-  ): Promise<{message: string}> {
+    temperature: number = CONFIG.DEFAULT_TEMPERATURE,
+    maxTokens: number = CONFIG.RESEARCH_MAX_TOKENS
+  ): Promise<{ message: string }> {
+    if (!this.apiKey) {
+      return { message: "The AI service is not properly configured for research reports." };
+    }
+
     try {
-      // Call DeepSeek API for research report
-      const response = await axios.post(
-        this.apiEndpoint,
-        {
-          model: this.model,
-          messages,
-          temperature,
-          max_tokens: maxTokens
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          }
-        }
-      );
+      const responseText = await this.callDeepSeekWithRetry({
+        model: this.model,
+        messages,
+        temperature,
+        max_tokens: maxTokens
+      });
       
-      if (response.data.choices && response.data.choices[0]) {
-        return { message: response.data.choices[0].message.content };
-      } else {
-        console.error('Unexpected DeepSeek API response format:', response.data);
-        return { message: 'I encountered an issue generating a detailed research report.' };
-      }
+      return { message: responseText };
     } catch (error) {
-      console.error('Error generating research report with LLM:', error);
-      return { message: 'I apologize, but I encountered an error while trying to generate a detailed research report.' };
+      console.error('Error generating research report:', error);
+      return { message: this.getErrorMessage(error) };
     }
   }
   
-  private async extractAndStoreMemory(userId: string, userMessage: string, aiResponse: string) {
-    // This is a simplified logic to extract potential memory items
-    // In a production system, this would use more sophisticated NLP techniques
+  private async getUserContext(userId: string, message: string): Promise<string> {
+    // Check cache first
+    const cached = this.userContextCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < this.contextCacheTimeout) {
+      return cached.context;
+    }
     
-    // Very simple heuristic: store info when user shares personal details
-    const personalPrefixes = [
-      "my name is", "i am", "i like", "i love", "i prefer", 
-      "my favorite", "i don't like", "i hate", "i need to", "i want to"
-    ];
+    try {
+      // Fetch data in parallel
+      const [userPreferences, relevantMemories] = await Promise.all([
+        storage.getUserPreferences(userId),
+        storage.searchUserMemories(userId, message)
+      ]);
+      
+      let context = '';
+      
+      // Build preferences context
+      if (userPreferences.length > 0) {
+        const prefLines = userPreferences
+          .map(pref => `- ${pref.key}: ${pref.value}`)
+          .join('\n');
+        context += `User preferences:\n${prefLines}\n\n`;
+      }
+      
+      // Build memories context
+      if (relevantMemories.length > 0) {
+        const memoryLines = relevantMemories
+          .slice(0, CONFIG.MAX_MEMORIES_CONTEXT)
+          .map(memory => `- ${memory.content}`)
+          .join('\n');
+        context += `Relevant information about the user:\n${memoryLines}\n`;
+      }
+      
+      // Cache the context
+      this.userContextCache.set(userId, { context, timestamp: Date.now() });
+      
+      return context;
+    } catch (error) {
+      console.error('Error building user context:', error);
+      return '';
+    }
+  }
+  
+  private async callDeepSeekWithRetry(config: DeepSeekConfig): Promise<string> {
+    let lastError: Error | null = null;
     
-    const lowercaseMsg = userMessage.toLowerCase();
+    for (let attempt = 0; attempt < CONFIG.RETRY_ATTEMPTS; attempt++) {
+      try {
+        const response = await this.axiosInstance.post<DeepSeekResponse>('', config);
+        
+        if (response.data?.choices?.[0]?.message?.content) {
+          return response.data.choices[0].message.content;
+        }
+        
+        throw new Error('Invalid response format from DeepSeek API');
+      } catch (error) {
+        lastError = error as Error;
+        
+        // Don't retry on client errors (4xx)
+        if (axios.isAxiosError(error) && error.response?.status && error.response.status < 500) {
+          break;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        if (attempt < CONFIG.RETRY_ATTEMPTS - 1) {
+          await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * Math.pow(2, attempt)));
+        }
+      }
+    }
     
-    for (const prefix of personalPrefixes) {
-      if (lowercaseMsg.includes(prefix)) {
+    throw lastError || new Error('Failed to call DeepSeek API');
+  }
+  
+  private async extractAndStoreMemory(userId: string, userMessage: string, aiResponse: string): Promise<void> {
+    // Check if message contains personal information using pre-compiled patterns
+    const containsPersonalInfo = PERSONAL_PATTERNS.some(pattern => pattern.test(userMessage));
+    
+    if (containsPersonalInfo) {
+      try {
         await storage.createMemory({
           userId,
           content: userMessage,
           embedding: null // Would store vector embeddings in a production system
         });
-        break;
+        
+        // Clear user context cache to include new memory
+        this.userContextCache.delete(userId);
+      } catch (error) {
+        console.error('Failed to create memory:', error);
       }
+    }
+  }
+  
+  private getErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 429) {
+        return "I'm currently experiencing high demand. Please try again in a moment.";
+      } else if (error.response?.status === 401) {
+        return "There's an issue with my authentication. Please contact support.";
+      } else if (error.code === 'ECONNABORTED') {
+        return "The request took too long. Please try again with a simpler query.";
+      }
+    }
+    
+    return "I'm sorry, I encountered an issue while processing your request. Please try again in a moment.";
+  }
+  
+  // Utility method to clear context cache
+  clearContextCache(userId?: string): void {
+    if (userId) {
+      this.userContextCache.delete(userId);
+    } else {
+      this.userContextCache.clear();
     }
   }
 }
