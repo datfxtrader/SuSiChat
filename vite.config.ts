@@ -48,7 +48,7 @@ export default defineConfig(async ({ mode }) => {
     ],
     
     server: {
-      host: '0.0.0.0',
+      host: true,
       port: 5173,
       strictPort: true,
       // Optimized HMR for Replit
@@ -64,17 +64,8 @@ export default defineConfig(async ({ mode }) => {
         interval: 1000,
         ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
       },
-      // Allow Replit hosts
-      allowedHosts: [
-        '.replit.dev',
-        '.replit.app', 
-        '.repl.co',
-        '.picard.replit.dev',
-        '*.picard.replit.dev',
-        '*.riker.replit.dev',
-        '*.kirk.replit.dev',
-        'localhost'
-      ],
+      // Allow all hosts including Replit domains
+      allowedHosts: 'all',
       // Proxy configuration for backend API
       proxy: {
         '/api': {
