@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -11,7 +10,7 @@ export default defineConfig({
       include: '**/*.{tsx,ts,jsx,js}',
     }),
   ],
-  
+
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -19,6 +18,7 @@ export default defineConfig({
     hmr: {
       clientPort: 443,
       protocol: 'wss',
+      overlay: false, // Disable error overlay to prevent reload loops
     },
     allowedHosts: [
       '.replit.dev',
@@ -28,7 +28,10 @@ export default defineConfig({
       '.picard.replit.dev'
     ]
   },
-  
+
+  // Explicitly set the root to current directory when running from client/
+  root: process.cwd(),
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -37,7 +40,7 @@ export default defineConfig({
     },
     extensions: ['.tsx', '.ts', '.jsx', '.js'],
   },
-  
+
   build: {
     outDir: path.resolve(__dirname, "../dist/public"),
     emptyOutDir: true,
@@ -45,7 +48,7 @@ export default defineConfig({
     minify: 'esbuild',
     cssCodeSplit: true,
   },
-  
+
   optimizeDeps: {
     include: [
       'react',
@@ -59,7 +62,7 @@ export default defineConfig({
       'tailwind-merge',
     ],
   },
-  
+
   esbuild: {
     jsx: 'automatic',
     jsxDev: true,
