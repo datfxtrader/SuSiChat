@@ -20,7 +20,6 @@ export default defineConfig({
       clientPort: 443,
       protocol: 'wss',
     },
-    // Allow Replit hosts
     allowedHosts: [
       '.replit.dev',
       '.replit.app',
