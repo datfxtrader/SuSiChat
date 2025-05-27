@@ -1,4 +1,5 @@
 
+/** @jsxImportSource react */
 import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";

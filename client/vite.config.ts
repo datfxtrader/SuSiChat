@@ -6,8 +6,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react({
-      jsxRuntime: 'automatic',
-      jsxImportSource: 'react'
+      jsxRuntime: 'automatic'
     })
   ],
   resolve: {
@@ -19,20 +18,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: false,
-    hmr: {
-      port: 5173,
-      host: '0.0.0.0'
-    },
-    // Allow Replit hosts
-    allowedHosts: [
-      '.replit.dev',
-      '.replit.app',
-      '.repl.co',
-      'localhost',
-      '.picard.replit.dev'
-    ]
+    hmr: true
   },
   optimizeDeps: {
-    include: ['react', 'react-dom']
+    include: ['react', 'react-dom', 'react/jsx-runtime']
   }
 })
