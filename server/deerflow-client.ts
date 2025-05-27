@@ -255,9 +255,8 @@ export class DeerFlowClient {
   getDeerFlowServiceUrl(): string {
     return DEERFLOW_CONFIG.SERVICE_URL;
   }
-}
 
-static getInstance(): DeerFlowClient {
+  static getInstance(): DeerFlowClient {
     if (!DeerFlowClient.instance) {
       DeerFlowClient.instance = new DeerFlowClient();
     }
@@ -309,4 +308,4 @@ static getInstance(): DeerFlowClient {
 }
 
 // Export singleton
-export const deerflowClient = DeerFlowClient.getInstance();nt.getInstance();
+export const deerflowClient = DeerFlowClient.getInstance();
