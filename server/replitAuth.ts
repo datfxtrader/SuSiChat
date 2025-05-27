@@ -98,19 +98,37 @@ export async function setupAuth(app: Express) {
     passport.use(strategy);
   }
 
+  // Also register strategy for the host header format
+  const strategy = new Strategy(
+    {
+      name: `replitauth:0.0.0.0:5000`,
+      config,
+      scope: "openid email profile offline_access",
+      callbackURL: `https://${process.env.REPLIT_DOMAINS!.split(",")[0]}/api/callback`,
+    },
+    verify,
+  );
+  passport.use(strategy);
+
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
     console.log("Login attempt from:", req.headers.host);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    // Use the host header instead of hostname for Replit
+    const host = req.headers.host || req.hostname;
+    console.log("Using authentication strategy for host:", host);
+    passport.authenticate(`replitauth:${host}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, { failureRedirect: "/?error=auth_failed" })(req, res, next);
+    // Use the host header instead of hostname for Replit
+    const host = req.headers.host || req.hostname;
+    console.log("Processing callback for host:", host);
+    passport.authenticate(`replitauth:${host}`, { failureRedirect: "/?error=auth_failed" })(req, res, next);
   }, (req, res) => {
     console.log("Authentication successful for user:", req.user);
     res.redirect("/chat");
