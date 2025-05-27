@@ -143,7 +143,7 @@ app.use((req, res, next) => {
     
     try {
       // Test if basic tables exist
-      await enhancedDbManager.query('SELECT 1 FROM users LIMIT 1');
+      const testResult = await enhancedDbManager.query('SELECT 1 FROM users LIMIT 1');
       console.log('✅ Database schema exists');
       
       // Now apply optimizations
@@ -151,7 +151,42 @@ app.use((req, res, next) => {
       console.log('✅ Database optimizations applied');
     } catch (schemaError) {
       console.log('⚠️ Database schema needs initialization');
-      console.log('💡 Use POST /api/admin/initialize-database to set up the schema');
+      console.log('💡 Run: curl -X POST http://0.0.0.0:3000/api/admin/initialize-database');
+      
+      // Try to initialize automatically
+      try {
+        const { readFile } = await import('fs/promises');
+        const { join } = await import('path');
+        
+        const sqlPath = join(process.cwd(), 'server/migrations/000_initialize_schema.sql');
+        const sql = await readFile(sqlPath, 'utf-8');
+        
+        console.log('🔧 Auto-initializing database schema...');
+        
+        const statements = sql.split(';').filter(stmt => stmt.trim());
+        
+        for (const statement of statements) {
+          if (statement.trim()) {
+            try {
+              await enhancedDbManager.query(statement);
+            } catch (error) {
+              if (!error.message.includes('already exists')) {
+                console.warn('Migration warning:', error.message);
+              }
+            }
+          }
+        }
+        
+        console.log('✅ Database schema auto-initialized');
+        
+        // Try optimizations again
+        await enhancedDbManager.createOptimizedIndexes();
+        console.log('✅ Database optimizations applied');
+        
+      } catch (autoInitError) {
+        console.warn('⚠️ Auto-initialization failed:', autoInitError.message);
+        console.log('💡 Manual initialization required via API endpoint');
+      }
     }</old_str>
     
     // Start monitoring

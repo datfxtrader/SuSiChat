@@ -12,7 +12,7 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [workflows]
-runButton = "Start Application"
+runButton = "Development Server"
 
 [[workflows.workflow]]
 name = "Project"
@@ -177,6 +177,19 @@ mode = "parallel"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pkill -f \"python.*deerflow_service/server.py\" || true; sleep 2; python deerflow_service/server.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Development Server"
+author = 36382494
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python deerflow_service/server.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"

@@ -1,58 +1,45 @@
-import React, { useEffect } from "react";
-import { Switch, Route } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
-import { useWebsocket } from "@/hooks/useWebsocket";
-import ReactPreamble from "@/components/ReactPreamble";
-
-// Pages
-import Home from "@/pages/home";
-import Chat from "@/pages/chat";
-import Schedule from "@/pages/schedule";
-import FamilyRoom from "@/pages/family-room";
-import FamilyRoomDetail from "@/pages/family-room/[id]";
-import Profile from "@/pages/profile";
-import TripPlanning from "@/pages/trip";
-import ResearchBlog from "@/pages/research-blog";
-import ResearchAgent from "@/pages/research-agent";
-import TemplatesPage from "@/pages/templates";
-import DebugTabPersistence from "@/pages/debug-tab-persistence";
-
-import NotFound from "@/pages/not-found";
-import VietnameseChat from './pages/vietnamese-chat';
-import Admin from './pages/admin';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { MainLayout } from './components/layout/MainLayout';
+import HomePage from './pages/home';
+import ChatPage from './pages/chat';
+import ResearchAgentPage from './pages/research-agent';
+import VietnameseChatPage from './pages/vietnamese-chat';
+import ProfilePage from './pages/profile';
+import AdminPage from './pages/admin';
+import SchedulePage from './pages/schedule';
+import FamilyRoomPage from './pages/family-room';
+import FamilyRoomDetailPage from './pages/family-room/[id]';
+import HomeworkPage from './pages/homework';
+import TemplatesPage from './pages/templates';
+import TripPage from './pages/trip';
+import ResearchBlogPage from './pages/research-blog';
+import SystemHealthPage from './pages/system-health';
+import NotFoundPage from './pages/not-found';
+import DebugTabPersistencePage from './pages/debug-tab-persistence';
 
 function App() {
-  const { user, isAuthenticated } = useAuth();
-  const { isConnected } = useWebsocket();
-
-  // Initialize WebSocket connection when authenticated
-  useEffect(() => {
-    if (isAuthenticated && !isConnected && user) {
-      // WebSocket initialization is handled in useWebsocket hook
-      console.log("User authenticated, WebSocket connection established");
-    }
-  }, [isAuthenticated, isConnected, user]);
-
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/chat" component={Chat} />
-      <Route path="/schedule" component={Schedule} />
-      <Route path="/family-room" component={FamilyRoom} />
-      <Route path="/family-room/:id" component={FamilyRoomDetail} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/research-agent" component={ResearchAgent} />
-      <Route path="/system-health" component={() => import('./pages/system-health')} />
-      <Route path="/research-blog" component={ResearchBlog} />
-      <Route path="/templates" component={TemplatesPage} />
-      <Route path="/debug-tab-persistence" component={DebugTabPersistence} />
-      <Route path="/trip" component={TripPlanning} />
-      <Route path="/homework" component={() => import('./pages/homework')} />
-      <Route path="/vietnamese-chat" component={VietnameseChat} />
-      <Route path="/admin" component={Admin} />
-
-      <Route component={NotFound} />
-    </Switch>
+    <MainLayout>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/chat" element={<ChatPage />} />
+        <Route path="/research-agent" element={<ResearchAgentPage />} />
+        <Route path="/vietnamese-chat" element={<VietnameseChatPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/schedule" element={<SchedulePage />} />
+        <Route path="/family-room" element={<FamilyRoomPage />} />
+        <Route path="/family-room/:id" element={<FamilyRoomDetailPage />} />
+        <Route path="/homework" element={<HomeworkPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/trip" element={<TripPage />} />
+        <Route path="/research-blog" element={<ResearchBlogPage />} />
+        <Route path="/system-health" element={<SystemHealthPage />} />
+        <Route path="/debug-tab-persistence" element={<DebugTabPersistencePage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </MainLayout>
   );
 }
 
