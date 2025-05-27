@@ -109,13 +109,12 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.get("/api/callback", 
-    passport.authenticate(`replitauth:${req.hostname}`, { failureRedirect: "/?error=auth_failed" }), 
-    (req, res) => {
-      console.log("Authentication successful for user:", req.user);
-      res.redirect("/chat");
-    }
-  );
+  app.get("/api/callback", (req, res, next) => {
+    passport.authenticate(`replitauth:${req.hostname}`, { failureRedirect: "/?error=auth_failed" })(req, res, next);
+  }, (req, res) => {
+    console.log("Authentication successful for user:", req.user);
+    res.redirect("/chat");
+  });
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
