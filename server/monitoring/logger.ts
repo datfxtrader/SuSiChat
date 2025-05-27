@@ -20,10 +20,13 @@ class StructuredLogger {
   }
 
   private ensureLogDirectory() {
-    const fs = require('fs');
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
-    }
+    import('fs').then(fs => {
+      if (!fs.existsSync(this.logDir)) {
+        fs.mkdirSync(this.logDir, { recursive: true });
+      }
+    }).catch(() => {
+      // Log directory creation failed, but continue
+    });
   }
 
   private initializeLogger() {
