@@ -60,6 +60,13 @@ export default defineConfig(async ({ mode }) => {
       host: '0.0.0.0',
       port: 5173,
       strictPort: false,
+      // Allow Replit hosts
+      allowedHosts: [
+        '.replit.dev',
+        'localhost',
+        '127.0.0.1',
+        '0.0.0.0'
+      ],
       // Optimize HMR for Replit
       hmr: isReplit ? {
         clientPort: 443,
