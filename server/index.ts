@@ -662,9 +662,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Development server on port 3000, production uses port 5000 via env
-  // this serves both the API and the client.
-  const port = parseInt(process.env.PORT || "3000");
+  // Use port 3001 to avoid conflicts with Vite dev server
+  // Server on port 3001, Vite dev server on 5173
+  const port = parseInt(process.env.PORT || "3001");
 
   // Check if port is already in use
   const { createServer } = await import('net');
