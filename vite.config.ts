@@ -11,20 +11,23 @@ const isDev = process.env.NODE_ENV !== "production";
 
 // Lazy load Replit plugins only when needed
 const loadReplitPlugins = async () => {
-  if (!isReplit) return [];
+  if (!isReplit || !isDev) return [];
   
-  const plugins = [];
-  
-  // Runtime error overlay for development
-  if (isDev) {
+  try {
+    const plugins = [];
+    
+    // Runtime error overlay for development
     const { default: runtimeErrorOverlay } = await import("@replit/vite-plugin-runtime-error-modal");
     plugins.push(runtimeErrorOverlay());
     
     const { cartographer } = await import("@replit/vite-plugin-cartographer");
     plugins.push(cartographer());
+    
+    return plugins;
+  } catch (error) {
+    console.warn('Failed to load Replit plugins:', error.message);
+    return [];
   }
-  
-  return plugins;
 };
 
 export default defineConfig(async ({ mode }) => {
@@ -38,9 +41,7 @@ export default defineConfig(async ({ mode }) => {
     plugins: [
       react({
         jsxRuntime: 'automatic',
-        // Optimize refresh boundary checks
         fastRefresh: true,
-        // Include only necessary files
         include: '**/*.{tsx,ts,jsx,js}',
       }),
       ...replitPlugins,
@@ -49,21 +50,44 @@ export default defineConfig(async ({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 5173,
-      strictPort: false,
-      // Optimize HMR for Replit
+      strictPort: true,
+      // Optimized HMR for Replit
       hmr: isReplit ? {
         clientPort: 443,
         protocol: 'wss',
+        timeout: 120000,
+        overlay: false, // Prevent reload loops
       } : true,
+      // Watch configuration for better file change detection
+      watch: {
+        usePolling: isReplit,
+        interval: 1000,
+        ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
+      },
       // Allow Replit hosts
       allowedHosts: [
         '.replit.dev',
         '.replit.app', 
         '.repl.co',
         '.picard.replit.dev',
-        '9b461e61-9153-43ea-a698-467b60fa81d4-00-2u6rxedgefsrw.picard.replit.dev',
         'localhost'
       ],
+      // Proxy configuration for backend API
+      proxy: {
+        '/api': {
+          target: 'http://0.0.0.0:5000',
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+          timeout: 120000,
+          proxyTimeout: 120000,
+        },
+        '/socket.io': {
+          target: 'http://0.0.0.0:5000',
+          changeOrigin: true,
+          ws: true,
+        }
+      }
     },
     
     resolve: {
@@ -72,37 +96,49 @@ export default defineConfig(async ({ mode }) => {
         "@shared": path.resolve(__dirname, "./shared"),
         "@assets": path.resolve(__dirname, "./attached_assets"),
       },
-      // Prefer source files over compiled
-      extensions: ['.tsx', '.ts', '.jsx', '.js'],
+      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
     },
     
     root: path.resolve(__dirname, "./client"),
     publicDir: "public",
+    base: './',
     
     build: {
       outDir: path.resolve(__dirname, "./dist/public"),
       emptyOutDir: true,
-      // Optimize build
       target: 'es2020',
       minify: 'esbuild',
-      // Enable CSS code splitting
+      sourcemap: false,
       cssCodeSplit: true,
-      // Optimize chunk size
+      // Optimize chunk size and splitting
       rollupOptions: {
         output: {
           manualChunks: {
             'react-vendor': ['react', 'react-dom'],
             'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-toast'],
+            'router-vendor': ['wouter'],
+            'query-vendor': ['@tanstack/react-query'],
             'utils': ['clsx', 'tailwind-merge', 'date-fns'],
           },
+          // Optimize file naming
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]'
+        },
+        // External dependencies that shouldn't be bundled
+        external: [],
+      },
+      chunkSizeWarningLimit: 1000,
+      // Increase memory limit for large builds
+      terserOptions: {
+        compress: {
+          drop_console: mode === 'production',
+          drop_debugger: mode === 'production',
         },
       },
-      // Increase chunk size warning limit
-      chunkSizeWarningLimit: 1000,
     },
     
     optimizeDeps: {
-      // Include commonly used dependencies
       include: [
         'react',
         'react-dom',
@@ -114,44 +150,62 @@ export default defineConfig(async ({ mode }) => {
         'clsx',
         'tailwind-merge',
       ],
-      // Don't force optimization in production
+      exclude: [
+        '@replit/vite-plugin-runtime-error-modal', 
+        '@replit/vite-plugin-cartographer'
+      ],
       force: isDev,
-      // Exclude large or problematic dependencies
-      exclude: ['@replit/vite-plugin-runtime-error-modal', '@replit/vite-plugin-cartographer'],
     },
     
     esbuild: {
-      // Optimize JSX transform
       jsx: 'automatic',
       jsxDev: isDev,
       jsxImportSource: 'react',
-      // Drop console.logs in production
-      drop: mode === 'production' ? ['console', 'debugger'] : [],
-      // Target modern browsers
       target: 'es2020',
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+      legalComments: 'none',
     },
     
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
-      // Define feature flags
       __DEV__: isDev,
       __PROD__: !isDev,
+      __REPLIT__: isReplit,
     },
     
-    // Performance optimizations
     css: {
-      // Enable CSS modules
       modules: {
         localsConvention: 'camelCase',
       },
-      // Optimize CSS
       devSourcemap: isDev,
+      // PostCSS optimizations
+      postcss: {},
     },
     
-    // Preview server configuration
     preview: {
-      port: 4173,
       host: '0.0.0.0',
+      port: 4173,
+      strictPort: true,
     },
+    
+    // Performance optimizations
+    worker: {
+      format: 'es',
+    },
+    
+    // Experimental features for better performance
+    experimental: {
+      renderBuiltUrl(filename, { hostType }) {
+        if (hostType === 'js') {
+          return { js: `${filename}` };
+        } else {
+          return { relative: true };
+        }
+      },
+    },
+    
+    // Error handling
+    logLevel: isDev ? 'info' : 'warn',
+    clearScreen: false,
   };
 });
