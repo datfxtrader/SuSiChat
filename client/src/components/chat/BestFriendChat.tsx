@@ -189,8 +189,6 @@ const EnhancedMessage = memo(({ message, isLatest, userProfile }: {
   );
 });
 
-import { BelgaCatIcon } from '@/components/shared/BelgaCatIcon';
-
 // ============================================
 // MAIN COMPONENT
 // ============================================

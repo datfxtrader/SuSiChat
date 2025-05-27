@@ -498,7 +498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/learning', homework); // Enhanced learning endpoints
 
 
-  app.use('/api', router);
+  // Router endpoint removed due to undefined router
 
   // Add these endpoints after existing routes
 
