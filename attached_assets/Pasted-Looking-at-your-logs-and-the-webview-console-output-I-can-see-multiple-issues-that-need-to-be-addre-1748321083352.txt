@@ -1,0 +1,109 @@
+Looking at your logs and the webview console output, I can see multiple issues that need to be addressed:
+
+## Current Status Report
+
+✅ **Working Systems:**
+* Database schema and optimizations ✅
+* Enhanced monitoring system ✅
+* Crash-safe storage ✅
+* All database indexes created successfully ✅
+
+❌ **Critical Issues:**
+1. **Port Conflict on 3001** - Your server can't start because port 3001 is already in use
+2. **Vite Connection Failures** - Frontend can't connect to the backend
+3. **React Preamble Detection Error** - Vite plugin issue causing runtime errors
+4. **Wouter Router Import Error** - Missing `BrowserRouter` export from wouter
+5. **Unhandled Promise Rejections** - Multiple async errors
+
+## Immediate Fixes
+
+**1. Force Kill All Processes (Replit Shell):**
+```bash
+# Nuclear option - kill everything
+pkill -9 -f node
+pkill -9 -f tsx
+pkill -9 -f vite
+sleep 2
+```
+
+**2. Fix the Wouter Import Error - Update your `main.tsx`:**
+```typescript
+/** @jsxImportSource react */
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// Fix: Import Router correctly from wouter
+import { Router } from 'wouter';  // This is correct
+import App from './App';
+import './index.css';
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
+
+// Force React detection
+export const ForceReactDetection = () => <div style={{ display: 'none' }} />;
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
+
+root.render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <App />
+          <ForceReactDetection />
+        </Router>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  </React.StrictMode>
+);
+```
+
+**3. Update Server Port Configuration - `server/index.ts`:**
+```typescript
+// Use a different port range
+const PORT = process.env.PORT || 8080;  // Try 8080 instead
+```
+
+**4. Update Client API Configuration - `client/src/lib/api.ts`:**
+```typescript
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+```
+
+**5. Create a Restart Script - Save as `restart.sh` in root:**
+```bash
+#!/bin/bash
+echo "🔄 Cleaning up processes..."
+pkill -9 -f node
+pkill -9 -f tsx
+pkill -9 -f vite
+
+echo "🧹 Clearing caches..."
+rm -rf client/node_modules/.vite
+rm -rf client/.vite
+
+echo "🚀 Starting fresh..."
+npm run dev
+```
+
+**6. Run the restart script:**
+```bash
+chmod +x restart.sh
+./restart.sh
+```
+
+**7. If issues persist, try Replit's nuclear option:**
+- Click the three dots menu (⋮) in the top right
+- Select "Restart Repl"
+- This will completely restart the container
+
+The key issues are the port conflict and the module import errors. The fixes above should resolve them. The React preamble warning is annoying but won't break your app once the other issues are fixed.
