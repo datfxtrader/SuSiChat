@@ -1,9 +1,15 @@
 modules = ["nodejs-20", "web", "postgresql-16", "python-3.11", "python3"]
 run = "npm run dev"
+entrypoint = "client/index.html"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
+XDG_CONFIG_HOME = "/home/runner/.config"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
 packages = ["jq", "libxcrypt", "lsof"]
 
 [deployment]
