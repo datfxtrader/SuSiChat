@@ -1,0 +1,60 @@
+# Accessing Your SuSiChat App on Replit
+
+## ✅ Your app is now running successfully!
+
+### Access URLs:
+
+1. **Primary URL (Vite Dev Server - Port 5173)**:
+   - This is where you should access your frontend
+   - In Replit, this will be: `https://[your-repl-name].[your-username].repl.co`
+   - Or use the Webview panel in Replit
+
+2. **Backend API (Express - Port 5000)**:
+   - Your API endpoints are at: `https://[your-repl-name].[your-username].repl.co/api/*`
+   - The Vite proxy will forward `/api` requests to your Express server
+
+### Quick Verification:
+
+1. **Check Frontend**: 
+   - Open the Replit webview or click the "Open in a new tab" button
+   - You should see your React app
+
+2. **Check Backend API**:
+   - Visit: `https://[your-repl-name].[your-username].repl.co/api/health`
+   - You should see: `{"status":"ok","timestamp":"..."}`
+
+### Common Issues & Solutions:
+
+#### If you see a blank page:
+1. Check the browser console (F12) for errors
+2. Hard refresh: `Ctrl+Shift+R` (Windows) or `Cmd+Shift+R` (Mac)
+3. Clear browser cache
+
+#### If API calls fail:
+1. Make sure your frontend is making requests to `/api/*` (not `http://localhost:5000`)
+2. Check that your vite.config has the proxy setup:
+   ```js
+   proxy: {
+     '/api': {
+       target: 'http://localhost:5000',
+       changeOrigin: true
+     }
+   }
+   ```
+
+#### If you see "Cannot GET /":
+- You're accessing port 5000 directly instead of 5173
+- Use the main Replit URL (which maps to port 5173)
+
+### Current Setup Summary:
+- ✅ Vite dev server: Running on port 5173 (frontend)
+- ✅ Express server: Running on port 5000 (backend API)
+- ✅ Dependencies: All optimized and loaded
+- ✅ Hot Module Replacement: Ready for instant updates
+
+### Next Steps:
+1. Open your app in the Replit webview
+2. Start developing! Any changes to your React code will hot-reload instantly
+3. Your API is available at `/api/*` endpoints
+
+Your development environment is now fully configured and running! 🎉
