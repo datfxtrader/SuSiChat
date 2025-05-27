@@ -41,6 +41,18 @@ const Home: React.FC = () => {
     document.title = 'SuSi - Your AI Assistant Friend';
   }, []);
 
+  const handleLogin = () => {
+    try {
+      // Clear any existing auth state
+      localStorage.removeItem('auth_error');
+      window.location.href = '/api/login';
+    } catch (error) {
+      console.error('Login redirect failed:', error);
+      // Fallback - refresh the page
+      window.location.reload();
+    }
+  };
+
   return (
     <MainLayout showHeader={false}>
       <div className="flex-1 flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-4">
@@ -73,15 +85,7 @@ const Home: React.FC = () => {
                 <a 
                   href="/api/login"
                   className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2 w-full"
-                  onClick={() => {
-          try {
-            window.location.href = '/api/login';
-          } catch (error) {
-            console.warn('Login redirect failed:', error);
-            // Fallback navigation
-            window.open('/api/login', '_self');
-          }
-        }}
+                  onClick={handleLogin}
                 >
                   <span className="material-icons mr-2 text-sm">login</span>
                   Log In with Replit

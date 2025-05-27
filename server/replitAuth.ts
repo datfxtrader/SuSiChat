@@ -90,21 +90,20 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  // Get the actual Replit app URL for callbacks
-  const replId = process.env.REPL_ID;
-  const replOwner = process.env.REPL_OWNER;
-  const replSlug = process.env.REPL_SLUG;
-  
-  // Construct the proper Replit callback URL
-  let callbackURL;
-  if (replId && replOwner && replSlug) {
-    callbackURL = `https://${replSlug}.${replOwner}.repl.co/api/callback`;
-  } else if (process.env.REPLIT_DOMAINS) {
-    const domains = process.env.REPLIT_DOMAINS.split(",");
-    callbackURL = `https://${domains[0]}/api/callback`;
-  } else {
-    callbackURL = `https://0.0.0.0:5000/api/callback`;
+  // Determine the correct callback URL based on environment
+  function getCallbackURL(): string {
+    // For Replit deployment, use the public URL with correct domain format
+    if (process.env.REPL_ID) {
+      const replUrl = process.env.REPL_URL || `https://${process.env.REPL_ID}.replit.app`;
+      return `${replUrl}/api/callback`;
+    }
+
+    // For local development
+    return 'http://0.0.0.0:5000/api/callback';
   }
+
+  // Get the actual Replit app URL for callbacks
+  const callbackURL = getCallbackURL();
 
   console.log('🔧 OAuth callback URL configured as:', callbackURL);
 
@@ -141,7 +140,7 @@ export async function setupAuth(app: Express) {
   app.get("/api/login", (req, res, next) => {
     console.log("Login attempt from:", req.headers.host);
     console.log("Using primary authentication strategy");
-    
+
     passport.authenticate("replitauth:primary", {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
@@ -153,18 +152,18 @@ export async function setupAuth(app: Express) {
     console.log('Callback URL:', req.url);
     console.log('Host header:', req.get('host'));
     console.log('Query params:', req.query);
-    
+
     // Prevent redirect loops
     if (req.session && req.session.authInProgress) {
       console.log('Auth already in progress, preventing loop');
       return res.redirect('/chat');
     }
-    
+
     // Mark auth as in progress
     if (req.session) {
       req.session.authInProgress = true;
     }
-    
+
     // Check for OAuth errors in query params
     if (req.query.error) {
       console.error('OAuth error received:', req.query.error, req.query.error_description);
@@ -189,7 +188,7 @@ export async function setupAuth(app: Express) {
     })(req, res, (err) => {
       clearTimeout(timeoutId);
       if (req.session) req.session.authInProgress = false;
-      
+
       if (err) {
         console.error('OAuth authentication error:', err);
         return res.redirect('/?error=auth_error');
@@ -198,13 +197,13 @@ export async function setupAuth(app: Express) {
     });
   }, (req, res) => {
     if (res.headersSent) return;
-    
+
     console.log("Authentication successful for user:", req.user);
-    
+
     try {
       // Clear auth progress flag
       if (req.session) req.session.authInProgress = false;
-      
+
       // Immediate redirect to prevent timeout
       res.writeHead(302, { 'Location': '/chat' });
       res.end();
