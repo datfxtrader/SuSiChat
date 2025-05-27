@@ -125,10 +125,24 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log('=== OAuth Callback Debug ===');
+    console.log('Callback URL:', req.url);
+    console.log('Host header:', req.get('host'));
+    console.log('Hostname:', req.hostname);
+    console.log('Query params:', req.query);
+    console.log('Headers:', {
+      'x-replit-user-id': req.headers['x-replit-user-id'],
+      'x-forwarded-proto': req.headers['x-forwarded-proto'],
+      'x-forwarded-host': req.headers['x-forwarded-host']
+    });
+
     // Use the host header instead of hostname for Replit
     const host = req.headers.host || req.hostname;
     console.log("Processing callback for host:", host);
-    passport.authenticate(`replitauth:${host}`, { failureRedirect: "/?error=auth_failed" })(req, res, next);
+
+    passport.authenticate(`replitauth:${host}`, { 
+      failureRedirect: "/?error=auth_failed"
+    })(req, res, next);
   }, (req, res) => {
     console.log("Authentication successful for user:", req.user);
     res.redirect("/chat");
