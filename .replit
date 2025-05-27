@@ -1,211 +1,41 @@
-modules = ["nodejs-20", "web", "postgresql-16", "python-3.11", "python3"]
 run = "npm run dev"
-hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+entrypoint = "client/src/main.tsx"
+modules = ["nodejs-20:v25-20240515-b29e8f7"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["jq", "libxcrypt"]
 
 [deployment]
-deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
-
-[workflows]
-runButton = "Start Application"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Start Full Stack"
-author = 36382494
-mode = "parallel"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pkill -f \"python.*deerflow_service/server.py\" || true; sleep 2; python deerflow_service/server.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-
-[[workflows.workflow]]
-name = "Test Optimizations"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_system_comprehensive.py"
-
-[[workflows.workflow]]
-name = "Test Comprehensive"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_comprehensive.py"
-
-[[workflows.workflow]]
-name = "Test Optimized Complete App"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_complete_app.py"
-
-[[workflows.workflow]]
-name = "Test Enhanced Frontend"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_frontend_functionality.py"
-
-[[workflows.workflow]]
-name = "Test APIs"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node test-apis.js"
-
-[[workflows.workflow]]
-name = "Test Vietnamese Chatbot"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "chmod +x run_vietnamese_chatbot_tests.sh"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "./run_vietnamese_chatbot_tests.sh"
-
-[[workflows.workflow]]
-name = "Test All Systems"
-author = 36382494
-mode = "parallel"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_vietnamese_chatbot_comprehensive.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_vietnamese_ui_components.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_comprehensive.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_complete_app.py"
-
-[[workflows.workflow]]
-name = "Test Homework System"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_homework_functionality.py"
-
-[[workflows.workflow]]
-name = "Test FamilyStudy System"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 test_family_study_complete.py"
-
-[[workflows.workflow]]
-name = "Test Model Configuration"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_model_config_integration.py"
-
-[[workflows.workflow]]
-name = "Quick System Test"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python test_optimized_comprehensive.py"
-
-[[workflows.workflow]]
-name = "Start SuSi Chat Service"
-author = 36382494
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd suna-repo/backend && python api.py"
-
-[[workflows.workflow]]
-name = "Start Application"
-author = 36382494
-mode = "parallel"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pkill -f \"python.*deerflow_service/server.py\" || true; sleep 2; cd deerflow_service && python server.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
+deploymentTarget = "cloudrun"
 
 [[ports]]
-localPort = 3000
-externalPort = 3000
-
-[[ports]]
-localPort = 4000
+localPort = 3001
 externalPort = 3001
 
 [[ports]]
-localPort = 5000
+localPort = 5173
 externalPort = 80
 
 [[ports]]
-localPort = 8000
-externalPort = 8000
+localPort = 5174
+externalPort = 5174
 
-[[ports]]
-localPort = 8080
-externalPort = 8080
+[env]
+NODE_ENV = "development"
+VITE_HMR_PROTOCOL = "wss"
+VITE_HMR_CLIENT_PORT = "443"
 
-[[ports]]
-localPort = 9000
-externalPort = 9000
+[packager]
+language = "nodejs"
 
-[[ports]]
-localPort = 9001
-externalPort = 3002
+[packager.features]
+enabledForHosting = false
+packageSearch = true
+guessImports = true
+
+[languages.javascript]
+pattern = "**/{*.js,*.jsx,*.ts,*.tsx}"
+
+[languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
