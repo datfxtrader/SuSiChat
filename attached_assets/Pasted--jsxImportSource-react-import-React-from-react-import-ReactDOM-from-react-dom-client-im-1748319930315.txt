@@ -1,0 +1,145 @@
+/** @jsxImportSource react */
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Router } from 'wouter';
+import App from './App';
+import './index.css';
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
+
+// This empty component forces React detection
+const ForceReactDetection = () => <></>;
+
+const queryClient = new QueryClient({
+defaultOptions: {
+queries: {
+staleTime: 1000 * 60 * 5, // 5 minutes
+refetchOnWindowFocus: false,
+},
+},
+});
+
+const root = ReactDOM.createRoot(
+document.getElementById('root') as HTMLElement
+);
+
+root.render(
+<React.StrictMode>
+<ErrorBoundary>
+<QueryClientProvider client={queryClient}>
+<Router>
+<App />
+</Router>
+</QueryClientProvider>
+</ErrorBoundary>
+</React.StrictMode>
+); import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+plugins: [
+react({
+jsxRuntime: 'automatic',
+include: '/*.{tsx,ts,jsx,js}',
+babel: {
+parserOpts: {
+plugins: ['jsx']
+}
+}
+}),
+// Replit plugins
+...(process.env.REPL_ID
+? [
+(await import("@replit/vite-plugin-runtime-error-modal")).default(),
+...(process.env.NODE_ENV !== "production"
+? [(await import("@replit/vite-plugin-cartographer")).cartographer()]
+: [])
+]
+: [])
+],
+server: {
+host: '0.0.0.0',
+port: 5173,
+strictPort: false,
+hmr: {
+clientPort: 443,
+protocol: 'wss'
+}
+},
+resolve: {
+alias: {
+"@": path.resolve(__dirname, "./src"),
+"@shared": path.resolve(__dirname, "../shared"),
+"@assets": path.resolve(__dirname, "../attached_assets"),
+},
+},
+root: __dirname,
+build: {
+outDir: path.resolve(__dirname, "../dist/public"),
+emptyOutDir: true,
+},
+optimizeDeps: {
+include: [
+'react',
+'react-dom',
+'react/jsx-runtime',
+'react/jsx-dev-runtime'
+],
+force: true
+},
+esbuild: {
+jsx: 'automatic',
+jsxDev: true,
+jsxImportSource: 'react'
+}
+}); / @jsxImportSource react */
+import React from 'react';
+import { Routes, Route } from 'wouter';
+// ... rest of your imports
+
+// Add at the top of your App component
+const App = () => {
+// Your existing App component code
+return (
+<>
+{/* Your existing JSX */}
+</>
+);
+};
+
+export default App; {
+"compilerOptions": {
+"target": "ES2020",
+"useDefineForClassFields": true,
+"lib": ["ES2020", "DOM", "DOM.Iterable"],
+"module": "ESNext",
+"skipLibCheck": true,
+"jsx": "react-jsx",
+"jsxImportSource": "react",
+
+/* Bundler mode */
+"moduleResolution": "bundler",
+"allowImportingTsExtensions": true,
+"resolveJsonModule": true,
+"isolatedModules": true,
+"noEmit": true,
+/* Linting */
+"strict": true,
+"noUnusedLocals": true,
+"noUnusedParameters": true,
+"noFallthroughCasesInSwitch": true,
+/* Path mapping */
+"baseUrl": ".",
+"paths": {
+  "@/*": ["./src/*"],
+  "@shared/*": ["../shared/*"],
+  "@assets/*": ["../attached_assets/*"]
+}
+},
+"include": ["src"],
+"references": [{ "path": "./tsconfig.node.json" }]
+}
