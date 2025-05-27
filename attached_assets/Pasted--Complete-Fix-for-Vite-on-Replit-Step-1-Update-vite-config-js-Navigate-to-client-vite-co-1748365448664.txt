@@ -1,0 +1,94 @@
+# Complete Fix for Vite on Replit
+
+## Step 1: Update vite.config.js
+
+Navigate to `client/vite.config.js` (or create it if it doesn't exist) and use this configuration:
+
+```javascript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true, // This is simpler than '0.0.0.0' and works better with Replit
+    port: 5173,
+    strictPort: true,
+    allowedHosts: 'all', // This allows all hosts including Replit domains
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false
+      },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true
+      }
+    }
+  }
+})
+```
+
+## Step 2: Update .replit file
+
+Make sure your `.replit` file has this configuration:
+
+```toml
+run = "npm run dev"
+entrypoint = "client/index.html"
+
+[[ports]]
+localPort = 5173
+externalPort = 80
+
+[[ports]]
+localPort = 5000
+externalPort = 3000
+```
+
+## Step 3: Restart the server
+
+```bash
+npm run dev
+```
+
+## Step 4: Access your app
+
+After the servers start:
+1. The Replit webview should automatically load your app
+2. If not, click the refresh button in the webview
+3. Or click "Open in new tab" to see it in a full browser window
+
+## Troubleshooting
+
+If you still see the "Blocked host" error:
+
+1. **Try the simplest config** - Update vite.config.js to:
+```javascript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+    allowedHosts: 'all'
+  }
+})
+```
+
+2. **Clear browser cache**:
+   - Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
+
+3. **Check the console** for any other errors
+
+## Expected Result
+
+Once properly configured, you should see:
+- Your React app loading in the Replit webview
+- No "Blocked host" errors
+- Hot module replacement working for instant updates
+
+The key fix is setting `allowedHosts: 'all'` in the Vite config, which allows Replit's dynamic domains to access the dev server.
