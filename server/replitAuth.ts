@@ -154,27 +154,42 @@ export async function setupAuth(app: Express) {
     console.log('Host header:', req.get('host'));
     console.log('Query params:', req.query);
     
+    // Prevent redirect loops
+    if (req.session && req.session.authInProgress) {
+      console.log('Auth already in progress, preventing loop');
+      return res.redirect('/chat');
+    }
+    
+    // Mark auth as in progress
+    if (req.session) {
+      req.session.authInProgress = true;
+    }
+    
     // Check for OAuth errors in query params
     if (req.query.error) {
       console.error('OAuth error received:', req.query.error, req.query.error_description);
+      if (req.session) req.session.authInProgress = false;
       return res.redirect(`/?error=${req.query.error}&description=${encodeURIComponent(req.query.error_description || 'Authentication failed')}`);
     }
 
     console.log("Processing callback with primary strategy");
 
-    // Add timeout protection
+    // Reduced timeout to prevent hanging
     const timeoutId = setTimeout(() => {
       if (!res.headersSent) {
         console.error('OAuth callback timeout');
+        if (req.session) req.session.authInProgress = false;
         res.redirect('/?error=timeout');
       }
-    }, 25000);
+    }, 10000);
 
     passport.authenticate("replitauth:primary", { 
       failureRedirect: "/?error=auth_failed",
       failureFlash: false
     })(req, res, (err) => {
       clearTimeout(timeoutId);
+      if (req.session) req.session.authInProgress = false;
+      
       if (err) {
         console.error('OAuth authentication error:', err);
         return res.redirect('/?error=auth_error');
@@ -187,8 +202,12 @@ export async function setupAuth(app: Express) {
     console.log("Authentication successful for user:", req.user);
     
     try {
-      // Quick redirect without session save to prevent timeout
-      res.redirect("/chat");
+      // Clear auth progress flag
+      if (req.session) req.session.authInProgress = false;
+      
+      // Immediate redirect to prevent timeout
+      res.writeHead(302, { 'Location': '/chat' });
+      res.end();
     } catch (error) {
       console.error('Redirect error:', error);
       if (!res.headersSent) {

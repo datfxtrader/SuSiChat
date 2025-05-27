@@ -13,7 +13,7 @@ const Home: React.FC = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get('error');
     const description = urlParams.get('description');
-    
+
     if (error) {
       const errorMap: Record<string, string> = {
         'access_denied': 'You denied access to the application.',
@@ -22,9 +22,9 @@ const Home: React.FC = () => {
         'auth_failed': 'Authentication failed. Please try again.',
         'session_error': 'Session error. Please try again.'
       };
-      
+
       setErrorMessage(errorMap[error] || description || 'Authentication failed. Please try again.');
-      
+
       // Clear URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -73,7 +73,15 @@ const Home: React.FC = () => {
                 <a 
                   href="/api/login"
                   className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2 w-full"
-                  onClick={() => setErrorMessage("")}
+                  onClick={() => {
+          try {
+            window.location.href = '/api/login';
+          } catch (error) {
+            console.warn('Login redirect failed:', error);
+            // Fallback navigation
+            window.open('/api/login', '_self');
+          }
+        }}
                 >
                   <span className="material-icons mr-2 text-sm">login</span>
                   Log In with Replit

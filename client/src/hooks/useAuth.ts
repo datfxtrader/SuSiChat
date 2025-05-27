@@ -5,38 +5,48 @@ export function useAuth() {
     queryKey: ['auth', 'user'],
     queryFn: async () => {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
         const response = await fetch('/api/auth/user', {
           credentials: 'include',
-          timeout: 10000, // 10 second timeout
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           if (response.status === 401) {
             return null; // Not authenticated, don't throw
           }
-          throw new Error(`Auth error: ${response.status}`);
+          console.warn(`Auth response not ok: ${response.status}`);
+          return null;
         }
 
-        return response.json();
+        const data = await response.json();
+        return data;
       } catch (error) {
-        console.log('useAuth query error:', error);
-        return null; // Return null instead of throwing
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            console.warn('Auth request timed out');
+          } else {
+            console.warn('useAuth fetch error:', error.message);
+          }
+        }
+        return null; // Always return null instead of throwing
       }
     },
-    retry: 1,
-    retryDelay: 1000,
+    retry: false, // Disable retries to prevent loops
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
-
-  if (error) {
-    console.error("useAuth query error:", error);
-  }
 
   return {
     user,
     isLoading,
-    isAuthenticated: !!user,
-    error,
+    isAuthenticated: !!user && user !== null,
+    error: null, // Don't expose errors to prevent UI issues
   };
 }
