@@ -1,0 +1,85 @@
+// client/src/App.tsx
+import React, { useState, useEffect } from 'react'
+import './App.css'
+
+function App() {
+  const [connected, setConnected] = useState(false)
+  const [message, setMessage] = useState('')
+  const [chatMessages, setChatMessages] = useState<Array<{text: string, sender: 'user' | 'bot'}>>([])
+
+  useEffect(() => {
+    // Check connection to backend
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          setConnected(true)
+        }
+      })
+      .catch(err => {
+        console.error('Failed to connect to backend:', err)
+        setConnected(false)
+      })
+  }, [])
+
+  const sendMessage = async () => {
+    if (!message.trim()) return
+
+    // Add user message to chat
+    setChatMessages(prev => [...prev, { text: message, sender: 'user' }])
+    
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message }),
+      })
+      
+      const data = await response.json()
+      
+      // Add bot response to chat
+      setChatMessages(prev => [...prev, { text: data.response, sender: 'bot' }])
+    } catch (error) {
+      console.error('Error sending message:', error)
+      setChatMessages(prev => [...prev, { text: 'Sorry, I encountered an error.', sender: 'bot' }])
+    }
+    
+    // Clear input
+    setMessage('')
+  }
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>SuSiChat</h1>
+        <p>Status: {connected ? '🟢 Connected' : '🔴 Disconnected'}</p>
+      </header>
+      
+      <main className="chat-container">
+        <div className="messages">
+          {chatMessages.map((msg, index) => (
+            <div key={index} className={`message ${msg.sender}`}>
+              <span className="sender">{msg.sender === 'user' ? 'You' : 'Bot'}:</span>
+              <span className="text">{msg.text}</span>
+            </div>
+          ))}
+        </div>
+        
+        <div className="input-area">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Type your message..."
+          />
+          <button onClick={sendMessage}>Send</button>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export default App
