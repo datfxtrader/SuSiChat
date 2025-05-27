@@ -50,7 +50,7 @@ function App() {
       <Route path="/homework" component={() => import('./pages/homework')} />
       <Route path="/vietnamese-chat" component={VietnameseChat} />
       <Route path="/admin" component={Admin} />
-
+      <Route path="/:rest*" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
