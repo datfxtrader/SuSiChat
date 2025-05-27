@@ -32,9 +32,9 @@ export async function apiRequest<T>(
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'production' 
-  ? '' 
-  : 'http://0.0.0.0:8000');
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://your-production-domain.com' 
+  : 'http://0.0.0.0:5000';
 
 // Export api object for compatibility
 export const api = {
