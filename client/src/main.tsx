@@ -7,8 +7,8 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
-// Ensure React is detected by Vite - this JSX element forces preamble detection
-const ReactDetection = () => <div style={{ display: 'none' }}>React JSX Detection</div>;
+// Force React preamble detection - must be at top level
+React.createElement('div');
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,7 +29,6 @@ root.render(
       <QueryClientProvider client={queryClient}>
         <Router>
           <App />
-          <ReactDetection />
         </Router>
       </QueryClientProvider>
     </ErrorBoundary>
