@@ -662,9 +662,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Production server on port 3000 for API and client
+  // Production server on port 3001 for API and client
   // this serves both the API and the client.
-  const port = parseInt(process.env.PORT || "3000");
+  const port = parseInt(process.env.PORT || "3001");
 
   // Check if port is already in use
   const { createServer } = await import('net');
