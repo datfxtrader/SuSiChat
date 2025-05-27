@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -11,42 +12,40 @@ const isDev = process.env.NODE_ENV !== "production";
 // Lazy load Replit plugins only when needed
 const loadReplitPlugins = async () => {
   if (!isReplit) return [];
-
+  
   const plugins = [];
-
+  
   // Runtime error overlay for development
   if (isDev) {
     const { default: runtimeErrorOverlay } = await import("@replit/vite-plugin-runtime-error-modal");
     plugins.push(runtimeErrorOverlay());
-
+    
     const { cartographer } = await import("@replit/vite-plugin-cartographer");
     plugins.push(cartographer());
   }
-
+  
   return plugins;
 };
 
 export default defineConfig(async ({ mode }) => {
   // Load env variables
   const env = loadEnv(mode, process.cwd(), '');
-
+  
   // Load Replit plugins if needed
   const replitPlugins = await loadReplitPlugins();
-
+  
   return {
     plugins: [
       react({
         jsxRuntime: 'automatic',
         // Optimize refresh boundary checks
         fastRefresh: true,
-        // Exclude node_modules from transform
-        exclude: /node_modules/,
         // Include only necessary files
         include: '**/*.{tsx,ts,jsx,js}',
       }),
       ...replitPlugins,
     ],
-
+    
     server: {
       host: '0.0.0.0',
       port: 5173,
@@ -56,28 +55,21 @@ export default defineConfig(async ({ mode }) => {
         clientPort: 443,
         protocol: 'wss',
       } : true,
-      // Prebundle dependencies for faster cold starts
-      warmup: {
-        clientFiles: [
-          './src/main.tsx',
-          './src/pages/research-agent.tsx',
-        ]
-      }
     },
-
+    
     resolve: {
       alias: {
-        "@": "/src",
+        "@": path.resolve(__dirname, "./client/src"),
         "@shared": path.resolve(__dirname, "./shared"),
         "@assets": path.resolve(__dirname, "./attached_assets"),
       },
       // Prefer source files over compiled
       extensions: ['.tsx', '.ts', '.jsx', '.js'],
     },
-
+    
     root: path.resolve(__dirname, "./client"),
-    publicDir: path.resolve(__dirname, "./client/public"),
-
+    publicDir: "public",
+    
     build: {
       outDir: path.resolve(__dirname, "./dist/public"),
       emptyOutDir: true,
@@ -99,7 +91,7 @@ export default defineConfig(async ({ mode }) => {
       // Increase chunk size warning limit
       chunkSizeWarningLimit: 1000,
     },
-
+    
     optimizeDeps: {
       // Include commonly used dependencies
       include: [
@@ -118,7 +110,7 @@ export default defineConfig(async ({ mode }) => {
       // Exclude large or problematic dependencies
       exclude: ['@replit/vite-plugin-runtime-error-modal', '@replit/vite-plugin-cartographer'],
     },
-
+    
     esbuild: {
       // Optimize JSX transform
       jsx: 'automatic',
@@ -129,14 +121,14 @@ export default defineConfig(async ({ mode }) => {
       // Target modern browsers
       target: 'es2020',
     },
-
+    
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
       // Define feature flags
       __DEV__: isDev,
       __PROD__: !isDev,
     },
-
+    
     // Performance optimizations
     css: {
       // Enable CSS modules
@@ -146,7 +138,7 @@ export default defineConfig(async ({ mode }) => {
       // Optimize CSS
       devSourcemap: isDev,
     },
-
+    
     // Preview server configuration
     preview: {
       port: 4173,
