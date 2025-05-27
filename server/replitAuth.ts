@@ -8,8 +8,14 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
+console.log('🔧 Environment check:');
+console.log('REPL_ID:', process.env.REPL_ID);
+console.log('REPL_OWNER:', process.env.REPL_OWNER);  
+console.log('REPL_SLUG:', process.env.REPL_SLUG);
+console.log('REPLIT_DOMAINS:', process.env.REPLIT_DOMAINS);
+
+if (!process.env.REPLIT_DOMAINS && !process.env.REPL_ID) {
+  throw new Error("Neither REPLIT_DOMAINS nor REPL_ID environment variables are provided");
 }
 
 const getOidcConfig = memoize(
@@ -84,37 +90,49 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  // Get the primary domain from REPLIT_DOMAINS
-  const domains = process.env.REPLIT_DOMAINS!.split(",");
-  const primaryDomain = domains[0];
+  // Get the actual Replit app URL for callbacks
+  const replId = process.env.REPL_ID;
+  const replOwner = process.env.REPL_OWNER;
+  const replSlug = process.env.REPL_SLUG;
   
-  // Register strategy for each domain
-  for (const domain of domains) {
-    const strategy = new Strategy(
-      {
-        name: `replitauth:${domain}`,
-        config,
-        scope: "openid email profile offline_access",
-        callbackURL: `https://${domain}/api/callback`,
-      },
-      verify,
-    );
-    passport.use(strategy);
+  // Construct the proper Replit callback URL
+  let callbackURL;
+  if (replId && replOwner && replSlug) {
+    callbackURL = `https://${replSlug}.${replOwner}.repl.co/api/callback`;
+  } else if (process.env.REPLIT_DOMAINS) {
+    const domains = process.env.REPLIT_DOMAINS.split(",");
+    callbackURL = `https://${domains[0]}/api/callback`;
+  } else {
+    callbackURL = `https://0.0.0.0:5000/api/callback`;
   }
 
-  // Register fallback strategies for common host formats
+  console.log('🔧 OAuth callback URL configured as:', callbackURL);
+
+  // Register primary strategy with correct callback URL
+  const strategy = new Strategy(
+    {
+      name: `replitauth:primary`,
+      config,
+      scope: "openid email profile offline_access",
+      callbackURL: callbackURL,
+    },
+    verify,
+  );
+  passport.use(strategy);
+
+  // Register fallback strategies for development
   const fallbackHosts = ['0.0.0.0:5000', 'localhost:5000'];
   for (const host of fallbackHosts) {
-    const strategy = new Strategy(
+    const fallbackStrategy = new Strategy(
       {
         name: `replitauth:${host}`,
         config,
         scope: "openid email profile offline_access",
-        callbackURL: `https://${primaryDomain}/api/callback`,
+        callbackURL: callbackURL, // Use the same callback URL
       },
       verify,
     );
-    passport.use(strategy);
+    passport.use(fallbackStrategy);
   }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
@@ -122,26 +140,12 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     console.log("Login attempt from:", req.headers.host);
-    const host = req.headers.host || req.hostname;
-    console.log("Using authentication strategy for host:", host);
+    console.log("Using primary authentication strategy");
     
-    // Try to find a matching strategy
-    const strategyName = `replitauth:${host}`;
-    const strategy = passport._strategies[strategyName];
-    
-    if (!strategy) {
-      console.log(`No strategy found for ${strategyName}, using primary domain strategy`);
-      const primaryDomain = process.env.REPLIT_DOMAINS!.split(",")[0];
-      passport.authenticate(`replitauth:${primaryDomain}`, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
-    } else {
-      passport.authenticate(strategyName, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
-    }
+    passport.authenticate("replitauth:primary", {
+      prompt: "login consent",
+      scope: ["openid", "email", "profile", "offline_access"],
+    })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
@@ -156,17 +160,9 @@ export async function setupAuth(app: Express) {
       return res.redirect(`/?error=${req.query.error}&description=${encodeURIComponent(req.query.error_description || 'Authentication failed')}`);
     }
 
-    const host = req.headers.host || req.hostname;
-    console.log("Processing callback for host:", host);
+    console.log("Processing callback with primary strategy");
 
-    // Try to find matching strategy, fallback to primary domain
-    const strategyName = `replitauth:${host}`;
-    const strategy = passport._strategies[strategyName];
-    
-    const finalStrategy = strategy ? strategyName : `replitauth:${process.env.REPLIT_DOMAINS!.split(",")[0]}`;
-    console.log("Using strategy:", finalStrategy);
-
-    passport.authenticate(finalStrategy, { 
+    passport.authenticate("replitauth:primary", { 
       failureRedirect: "/?error=auth_failed",
       failureFlash: false
     })(req, res, next);
