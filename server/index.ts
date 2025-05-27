@@ -90,13 +90,57 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Database initialization endpoint
+  app.post('/api/admin/initialize-database', async (req: any, res) => {
+    try {
+      console.log('🔧 Initializing database schema...');
+      
+      // Read and execute the initialization SQL
+      const { readFile } = await import('fs/promises');
+      const { join } = await import('path');
+      
+      const sqlPath = join(process.cwd(), 'server/migrations/000_initialize_schema.sql');
+      const sql = await readFile(sqlPath, 'utf-8');
+      
+      // Execute the SQL in chunks to handle large migrations
+      const statements = sql.split(';').filter(stmt => stmt.trim());
+      
+      for (const statement of statements) {
+        if (statement.trim()) {
+          try {
+            await enhancedDbManager.query(statement);
+          } catch (error) {
+            // Log but don't fail on already exists errors
+            if (!error.message.includes('already exists')) {
+              console.warn('Migration warning:', error.message);
+            }
+          }
+        }
+      }
+      
+      console.log('✅ Database schema initialized');
+      
+      res.json({
+        success: true,
+        message: 'Database schema initialized successfully'
+      });
+      
+    } catch (error) {
+      console.error('❌ Database initialization failed:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // Initialize enhanced database and monitoring systems
   console.log('🚀 Initializing enhanced systems...');
   
   try {
     // Initialize database optimizations
     await enhancedDbManager.createOptimizedIndexes();
-    console.log('✅ Database optimizations applied');
+    console.log('✅ Database optimizations applied');</old_str>
     
     // Start monitoring
     console.log('✅ Advanced monitoring system started');
@@ -546,8 +590,38 @@ app.use((req, res, next) => {
   const searchEnginesRouter = (await import('./routes/search-engines')).default;
   app.use('/api/search-engines', searchEnginesRouter);
 
+  // Database health check endpoint
+  app.get('/api/health/database', async (req: any, res) => {
+    try {
+      const startTime = Date.now();
+      await enhancedDbManager.query('SELECT 1 as health_check');
+      const responseTime = Date.now() - startTime;
+      
+      const metrics = enhancedDbManager.getMetrics();
+      
+      res.json({
+        healthy: true,
+        responseTime: `${responseTime}ms`,
+        metrics: {
+          totalConnections: metrics.totalConnections,
+          activeConnections: metrics.activeConnections,
+          totalQueries: metrics.totalQueries,
+          failedQueries: metrics.failedQueries,
+          averageQueryTime: `${metrics.averageQueryTime}ms`
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        healthy: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   // System health and monitoring routes
-  app.use('/api/system', systemHealthRoutes);
+  app.use('/api/system', systemHealthRoutes);</old_str>
   
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {

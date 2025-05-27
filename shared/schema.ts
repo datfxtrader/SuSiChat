@@ -1,170 +1,187 @@
-import {
-  pgTable,
-  text,
-  serial,
-  varchar,
-  timestamp,
-  jsonb,
-  index,
-  boolean,
-  integer,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
 
-// Session storage table for authentication
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
+import { pgTable, text, timestamp, boolean, integer, jsonb, uuid, varchar, decimal } from "drizzle-orm/pg-core";
+import { createId } from "@paralleldrive/cuid2";
 
-// User storage table
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  email: text("email").unique().notNull(),
+  username: text("username").unique(),
+  name: text("name"),
+  avatar: text("avatar"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-
-// User Preferences table for personalization
-export const userPreferences = pgTable("user_preferences", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  key: text("key").notNull(),
-  value: text("value").notNull(),
+export const conversations = pgTable("conversations", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  title: text("title"),
+  isArchived: boolean("is_archived").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertUserPreferenceSchema = createInsertSchema(userPreferences).pick({
-  userId: true,
-  key: true,
-  value: true,
-});
-
-export type InsertUserPreference = z.infer<typeof insertUserPreferenceSchema>;
-export type UserPreference = typeof userPreferences.$inferSelect;
-
-// Reminders for schedule management
-export const reminders = pgTable("reminders", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  datetime: timestamp("datetime").notNull(),
-  completed: boolean("completed").default(false),
-  repeat: text("repeat").default("never"),
-  notifyBefore: integer("notify_before").default(0), // minutes
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertReminderSchema = createInsertSchema(reminders).pick({
-  userId: true,
-  title: true,
-  description: true,
-  datetime: true,
-  repeat: true,
-  notifyBefore: true,
-});
-
-export type InsertReminder = z.infer<typeof insertReminderSchema>;
-export type Reminder = typeof reminders.$inferSelect;
-
-// Family rooms for group chat
-export const familyRooms = pgTable("family_rooms", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  createdById: varchar("created_by_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertFamilyRoomSchema = createInsertSchema(familyRooms).pick({
-  name: true,
-  createdById: true,
-});
-
-export type InsertFamilyRoom = z.infer<typeof insertFamilyRoomSchema>;
-export type FamilyRoom = typeof familyRooms.$inferSelect;
-
-// Family room members
-export const familyRoomMembers = pgTable("family_room_members", {
-  id: serial("id").primaryKey(),
-  familyRoomId: integer("family_room_id")
-    .notNull()
-    .references(() => familyRooms.id, { onDelete: "cascade" }),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  isAdmin: boolean("is_admin").default(false),
-  joinedAt: timestamp("joined_at").defaultNow(),
-}, (table) => {
-  return {
-    uniqMembership: index("uniq_room_user").on(table.familyRoomId, table.userId),
-  };
-});
-
-export const insertFamilyRoomMemberSchema = createInsertSchema(familyRoomMembers).pick({
-  familyRoomId: true,
-  userId: true,
-  isAdmin: true,
-});
-
-export type InsertFamilyRoomMember = z.infer<typeof insertFamilyRoomMemberSchema>;
-export type FamilyRoomMember = typeof familyRoomMembers.$inferSelect;
-
-// Messages for both personal and family chats
 export const messages = pgTable("messages", {
-  id: serial("id").primaryKey(),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  conversationId: text("conversation_id")
+    .references(() => conversations.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
   content: text("content").notNull(),
-  userId: varchar("user_id")
-    .references(() => users.id, { onDelete: "cascade" }),
-  familyRoomId: integer("family_room_id")
-    .references(() => familyRooms.id, { onDelete: "cascade" }),
-  isAiResponse: boolean("is_ai_response").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+  tokens: integer("tokens"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertMessageSchema = createInsertSchema(messages).pick({
-  content: true,
-  userId: true,
-  familyRoomId: true,
-  isAiResponse: true,
+export const researchSessions = pgTable("research_sessions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  conversationId: text("conversation_id")
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  query: text("query").notNull(),
+  results: jsonb("results"),
+  status: text("status", { enum: ["pending", "running", "completed", "failed"] })
+    .default("pending")
+    .notNull(),
+  depth: integer("depth").default(3),
+  model: text("model").default("deepseek-v3"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
 });
 
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export const learningProgress = pgTable("learning_progress", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  languageCode: text("language_code").notNull(),
+  level: text("level").notNull(),
+  progress: integer("progress").default(0),
+  completedLessons: jsonb("completed_lessons").default('[]'),
+  streakDays: integer("streak_days").default(0),
+  lastStudyDate: timestamp("last_study_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const familyRooms = pgTable("family_rooms", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  name: text("name").notNull(),
+  description: text("description"),
+  ownerId: text("owner_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  inviteCode: text("invite_code").unique().notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const familyMembers = pgTable("family_members", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  roomId: text("room_id")
+    .references(() => familyRooms.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  role: text("role", { enum: ["parent", "child", "tutor"] })
+    .default("child")
+    .notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+export const blogPosts = pgTable("blog_posts", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  excerpt: text("excerpt"),
+  slug: text("slug").unique().notNull(),
+  authorId: text("author_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  published: boolean("published").default(false).notNull(),
+  tags: jsonb("tags").default('[]'),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  publishedAt: timestamp("published_at"),
+});
+
+export const vietnameseChatSessions = pgTable("vietnamese_chat_sessions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  sessionName: text("session_name"),
+  personality: text("personality").default("friendly").notNull(),
+  language: text("language").default("vietnamese").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastInteraction: timestamp("last_interaction").defaultNow().notNull(),
+});
+
+export const vietnameseChatMessages = pgTable("vietnamese_chat_messages", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  sessionId: text("session_id")
+    .references(() => vietnameseChatSessions.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  content: text("content").notNull(),
+  translation: text("translation"),
+  sentiment: text("sentiment"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Export types
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;
-
-// Memory for long-term context
-export const memories = pgTable("memories", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  content: text("content").notNull(),
-  embedding: jsonb("embedding"), // Vector embedding for semantic search
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertMemorySchema = createInsertSchema(memories).pick({
-  userId: true,
-  content: true,
-  embedding: true,
-});
-
-export type InsertMemory = z.infer<typeof insertMemorySchema>;
-export type Memory = typeof memories.$inferSelect;
+export type NewMessage = typeof messages.$inferInsert;
+export type ResearchSession = typeof researchSessions.$inferSelect;
+export type NewResearchSession = typeof researchSessions.$inferInsert;
+export type LearningProgress = typeof learningProgress.$inferSelect;
+export type NewLearningProgress = typeof learningProgress.$inferInsert;
+export type FamilyRoom = typeof familyRooms.$inferSelect;
+export type NewFamilyRoom = typeof familyRooms.$inferInsert;
+export type FamilyMember = typeof familyMembers.$inferSelect;
+export type NewFamilyMember = typeof familyMembers.$inferInsert;
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type NewBlogPost = typeof blogPosts.$inferInsert;
+export type VietnameseChatSession = typeof vietnameseChatSessions.$inferSelect;
+export type NewVietnameseChatSession = typeof vietnameseChatSessions.$inferInsert;
+export type VietnameseChatMessage = typeof vietnameseChatMessages.$inferSelect;
+export type NewVietnameseChatMessage = typeof vietnameseChatMessages.$inferInsert;
