@@ -1,3 +1,4 @@
+
 /** @jsxImportSource react */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -7,13 +8,13 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
-// Force React detection for Vite
-const ForceReactDetection = () => <></>;
+// Force React detection
+export const ForceReactDetection = () => <div style={{ display: 'none' }} />;
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
       refetchOnWindowFocus: false,
     },
   },
@@ -29,6 +30,7 @@ root.render(
       <QueryClientProvider client={queryClient}>
         <Router>
           <App />
+          <ForceReactDetection />
         </Router>
       </QueryClientProvider>
     </ErrorBoundary>
