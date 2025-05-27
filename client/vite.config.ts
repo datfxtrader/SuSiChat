@@ -18,9 +18,20 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    strictPort: false,
     hmr: {
+      clientPort: 443,
+      protocol: 'wss',
       overlay: false
-    }
+    },
+    // Allow all Replit hosts
+    allowedHosts: [
+      '.replit.dev',
+      '.replit.app',
+      '.repl.co',
+      'localhost',
+      '.picard.replit.dev'
+    ]
   },
   esbuild: {
     jsxInject: `import React from 'react'`
