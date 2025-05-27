@@ -138,9 +138,21 @@ app.use((req, res, next) => {
   console.log('🚀 Initializing enhanced systems...');
   
   try {
-    // Initialize database optimizations
-    await enhancedDbManager.createOptimizedIndexes();
-    console.log('✅ Database optimizations applied');</old_str>
+    // Initialize database schema first
+    console.log('🔧 Checking database schema...');
+    
+    try {
+      // Test if basic tables exist
+      await enhancedDbManager.query('SELECT 1 FROM users LIMIT 1');
+      console.log('✅ Database schema exists');
+      
+      // Now apply optimizations
+      await enhancedDbManager.createOptimizedIndexes();
+      console.log('✅ Database optimizations applied');
+    } catch (schemaError) {
+      console.log('⚠️ Database schema needs initialization');
+      console.log('💡 Use POST /api/admin/initialize-database to set up the schema');
+    }</old_str>
     
     // Start monitoring
     console.log('✅ Advanced monitoring system started');
