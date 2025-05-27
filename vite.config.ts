@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -19,10 +18,13 @@ const cartographer = process.env.REPL_ID && process.env.NODE_ENV !== "production
 export default defineConfig({
   plugins: [
     react({
-      // Force automatic JSX runtime for Replit
       jsxRuntime: 'automatic',
-      // Include all possible file extensions
-      include: '**/*.{jsx,tsx,js,ts,mjs,cjs}',
+      include: '**/*.{tsx,ts,jsx,js}',
+      babel: {
+        parserOpts: {
+          plugins: ['jsx']
+        }
+      }
     }),
     ...(runtimeErrorOverlay ? [runtimeErrorOverlay()] : []),
     ...(cartographer ? [cartographer()] : []),
@@ -50,6 +52,20 @@ export default defineConfig({
     emptyOutDir: true,
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react/jsx-runtime'],
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime'
+    ],
+    force: true
   },
+  esbuild: {
+    jsx: 'automatic',
+    jsxDev: true,
+    jsxImportSource: 'react'
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+  }
 });

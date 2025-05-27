@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import React, { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
