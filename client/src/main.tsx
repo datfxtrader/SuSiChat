@@ -1,7 +1,12 @@
 /** @jsxImportSource react */
+/** @jsxRuntime automatic */
 import React from 'react';
-const _jsx = React.createElement('div', null, 'Force React Detection');
 import ReactDOM from 'react-dom/client';
+
+// Force React detection - this must be a real JSX element
+export const ReactPreamble = () => <div />;
+
+// Rest of your imports...
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import App from './App';
