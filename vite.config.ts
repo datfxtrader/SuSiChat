@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -11,28 +12,28 @@ const isDev = process.env.NODE_ENV !== "production";
 // Lazy load Replit plugins only when needed
 const loadReplitPlugins = async () => {
   if (!isReplit) return [];
-
+  
   const plugins = [];
-
+  
   // Runtime error overlay for development
   if (isDev) {
     const { default: runtimeErrorOverlay } = await import("@replit/vite-plugin-runtime-error-modal");
     plugins.push(runtimeErrorOverlay());
-
+    
     const { cartographer } = await import("@replit/vite-plugin-cartographer");
     plugins.push(cartographer());
   }
-
+  
   return plugins;
 };
 
 export default defineConfig(async ({ mode }) => {
   // Load env variables
   const env = loadEnv(mode, process.cwd(), '');
-
+  
   // Load Replit plugins if needed
   const replitPlugins = await loadReplitPlugins();
-
+  
   return {
     plugins: [
       react({
@@ -46,7 +47,7 @@ export default defineConfig(async ({ mode }) => {
       }),
       ...replitPlugins,
     ],
-
+    
     server: {
       host: '0.0.0.0',
       port: 5173,
@@ -59,12 +60,12 @@ export default defineConfig(async ({ mode }) => {
       // Prebundle dependencies for faster cold starts
       warmup: {
         clientFiles: [
-          './client/src/main.tsx',
-          './client/src/pages/research-agent.tsx',
+          './src/main.tsx',
+          './src/pages/research-agent.tsx',
         ]
       }
     },
-
+    
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./client/src"),
@@ -74,9 +75,10 @@ export default defineConfig(async ({ mode }) => {
       // Prefer source files over compiled
       extensions: ['.tsx', '.ts', '.jsx', '.js'],
     },
-
+    
     root: path.resolve(__dirname, "./client"),
-
+    publicDir: path.resolve(__dirname, "./client/public"),
+    
     build: {
       outDir: path.resolve(__dirname, "./dist/public"),
       emptyOutDir: true,
