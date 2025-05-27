@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react({
-      jsxImportSource: '@emotion/react',
+      jsxImportSource: 'react',
       babel: {
         plugins: ['@emotion/babel-plugin']
       }
@@ -33,8 +33,5 @@ export default defineConfig({
       'localhost',
       '.picard.replit.dev'
     ]
-  },
-  esbuild: {
-    jsxInject: `import React from 'react'`
   }
 })
