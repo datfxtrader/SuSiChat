@@ -1,7 +1,8 @@
+import React, { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebsocket } from "@/hooks/useWebsocket";
-import { useEffect } from "react";
+import ReactPreamble from "@/components/ReactPreamble";
 
 // Pages
 import Home from "@/pages/home";
