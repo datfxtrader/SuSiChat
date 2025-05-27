@@ -55,6 +55,15 @@ export default defineConfig(async ({ mode }) => {
         clientPort: 443,
         protocol: 'wss',
       } : true,
+      // Allow Replit hosts
+      allowedHosts: [
+        '.replit.dev',
+        '.replit.app', 
+        '.repl.co',
+        '.picard.replit.dev',
+        '9b461e61-9153-43ea-a698-467b60fa81d4-00-2u6rxedgefsrw.picard.replit.dev',
+        'localhost'
+      ],
     },
     
     resolve: {
