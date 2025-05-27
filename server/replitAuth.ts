@@ -102,18 +102,20 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    console.log("Login attempt from:", req.headers.host);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
-  app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
-    })(req, res, next);
-  });
+  app.get("/api/callback", 
+    passport.authenticate(`replitauth:${req.hostname}`, { failureRedirect: "/?error=auth_failed" }), 
+    (req, res) => {
+      console.log("Authentication successful for user:", req.user);
+      res.redirect("/chat");
+    }
+  );
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {

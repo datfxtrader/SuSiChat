@@ -40,13 +40,18 @@ const Home: React.FC = () => {
               <p className="text-neutral-600 dark:text-neutral-400 mb-4">
                 Log in to get started with your personal AI assistant.
               </p>
-              <a 
-                href="/api/login"
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-              >
-                <span className="material-icons mr-2 text-sm">login</span>
-                Log In
-              </a>
+              <div className="space-y-3">
+                <a 
+                  href="/api/login"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2 w-full"
+                >
+                  <span className="material-icons mr-2 text-sm">login</span>
+                  Log In with Replit
+                </a>
+                <div className="text-center text-sm text-neutral-500">
+                  or use Google authentication (if configured)
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -48,6 +48,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Authentication test endpoint
+  app.get('/api/auth/test', (req: any, res) => {
+    console.log("Auth test - Session:", req.session);
+    console.log("Auth test - User:", req.user);
+    console.log("Auth test - Headers:", req.headers);
+    
+    res.json({
+      authenticated: req.isAuthenticated ? req.isAuthenticated() : false,
+      user: req.user || null,
+      session: req.session || null,
+      headers: {
+        'x-replit-user-id': req.headers['x-replit-user-id'],
+        'x-replit-user-name': req.headers['x-replit-user-name'],
+        'x-replit-user-email': req.headers['x-replit-user-email']
+      }
+    });
+  });
+
+
+
+  // Environment diagnostic endpoint (remove in production)
+  app.get('/api/debug/env', (req: any, res) => {
+    res.json({
+      hasReplitDomains: !!process.env.REPLIT_DOMAINS,
+      replitDomainCount: process.env.REPLIT_DOMAINS?.split(',').length || 0,
+      nodeEnv: process.env.NODE_ENV,
+      port: process.env.PORT || 'not set',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+
   // Metrics endpoint
   app.get('/api/metrics', async (req, res) => {
     try {
