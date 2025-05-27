@@ -1,14 +1,7 @@
-
+/** @jsx React.createElement */
 import React from 'react';
 
-// This preamble file helps @vitejs/plugin-react detect React usage
-// It ensures proper JSX transformation and React detection
+// This file exists to help the React plugin detect JSX preamble
+const Preamble = () => React.createElement('div', null, 'Preamble detected');
 
-export const ReactPreamble = () => {
-  return React.createElement('div', { 
-    style: { display: 'none' } 
-  }, 'React preamble loaded');
-};
-
-// Export React for compatibility
-export default React;
+export default Preamble;

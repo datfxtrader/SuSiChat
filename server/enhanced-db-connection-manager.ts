@@ -296,89 +296,23 @@ class EnhancedDatabaseManager extends EventEmitter {
   }
   
   async createOptimizedIndexes(): Promise<void> {
-    // First check if tables exist before creating indexes
-    const tableChecks = [
-      { table: 'messages', columns: ['conversation_id', 'created_at', 'user_id', 'tokens'] },
-      { table: 'conversations', columns: ['user_id', 'updated_at', 'is_archived'] },
-      { table: 'research_sessions', columns: ['user_id', 'created_at'] },
-      { table: 'learning_progress', columns: ['user_id', 'language_code'] },
+    const indexes = [
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at DESC)',
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC) WHERE NOT is_archived',
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_messages_user_tokens ON messages(user_id, tokens) WHERE tokens IS NOT NULL',
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_research_sessions_user_created ON research_sessions(user_id, created_at DESC)',
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_learning_progress_user_language ON learning_progress(user_id, language_code)',
     ];
-
-    const existingTables = [];
     
-    for (const { table, columns } of tableChecks) {
+    for (const indexQuery of indexes) {
       try {
-        // Check if table exists
-        const tableResult = await this.query(`
-          SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name = $1
-          )
-        `, [table]);
-        
-        if (tableResult[0]?.exists) {
-          // Check if columns exist
-          const columnChecks = await Promise.all(
-            columns.map(column => 
-              this.query(`
-                SELECT EXISTS (
-                  SELECT FROM information_schema.columns 
-                  WHERE table_schema = 'public' 
-                  AND table_name = $1 
-                  AND column_name = $2
-                )
-              `, [table, column])
-            )
-          );
-          
-          const allColumnsExist = columnChecks.every(result => result[0]?.exists);
-          if (allColumnsExist) {
-            existingTables.push(table);
-          } else {
-            console.log(`⚠️ Table ${table} exists but missing some columns`);
-          }
-        } else {
-          console.log(`⚠️ Table ${table} does not exist, skipping index creation`);
-        }
+        await this.query(indexQuery);
+        console.log('✅ Index created successfully');
       } catch (error) {
-        console.log(`⚠️ Could not verify table ${table}: ${error.message}`);
-      }
-    }
-
-    // Only create indexes for tables that exist with all required columns
-    const indexMap = {
-      'messages': [
-        'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at DESC)',
-        'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_messages_user_tokens ON messages(user_id, tokens) WHERE tokens IS NOT NULL'
-      ],
-      'conversations': [
-        'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC) WHERE NOT is_archived'
-      ],
-      'research_sessions': [
-        'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_research_sessions_user_created ON research_sessions(user_id, created_at DESC)'
-      ],
-      'learning_progress': [
-        'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_learning_progress_user_language ON learning_progress(user_id, language_code)'
-      ]
-    };
-    
-    for (const table of existingTables) {
-      const indexes = indexMap[table] || [];
-      for (const indexQuery of indexes) {
-        try {
-          await this.query(indexQuery);
-          console.log(`✅ Index created successfully for ${table}`);
-        } catch (error) {
-          if (!error.message.includes('already exists')) {
-            console.error(`❌ Index creation failed for ${table}:`, error.message);
-          }
+        if (!error.message.includes('already exists')) {
+          console.error('❌ Index creation failed:', error);
         }
       }
-    }
-    
-    if (existingTables.length === 0) {
-      console.log('📝 No tables found for index creation. Database schema may need to be initialized.');
     }
   }
   

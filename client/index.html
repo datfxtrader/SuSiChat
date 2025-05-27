@@ -1,176 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Research Platform</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Tongkeeper AI Assistant</title>
+    <meta name="description" content="Tongkeeper is a family-oriented AI assistant that helps with scheduling, homework, family chat, and more." />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <meta property="og:title" content="Tongkeeper AI Assistant" />
+    <meta property="og:description" content="Your family's personal AI assistant for scheduling, homework help, and more." />
+    <meta property="og:type" content="website" />
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 40px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #4a5568;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5rem;
-        }
-        .status-card {
-            background: #f0f9ff;
-            border: 2px solid #0ea5e9;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .status-title {
-            color: #0ea5e9;
-            font-size: 1.3rem;
-            margin: 0 0 15px 0;
-            font-weight: 600;
-        }
-        .status-item {
-            margin: 10px 0;
-            font-size: 1.1rem;
-        }
-        .api-section {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .api-test {
-            margin: 10px 0;
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
-            border-left: 4px solid #10b981;
-        }
-        button {
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            margin: 5px;
-        }
-        button:hover {
-            background: #2563eb;
-        }
-        #results {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 6px;
-            min-height: 100px;
-        }
+      .chat-bubble-ai {
+        border-radius: 18px 18px 18px 4px;
+      }
+      .chat-bubble-user {
+        border-radius: 18px 18px 4px 18px;
+      }
+      .auto-overflow {
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+      }
+      .auto-overflow::-webkit-scrollbar {
+        width: 6px;
+      }
+      .auto-overflow::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .auto-overflow::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.5);
+        border-radius: 20px;
+      }
     </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔬 AI Research Platform</h1>
-        
-        <div class="status-card">
-            <h3 class="status-title">System Status</h3>
-            <div class="status-item">✅ Backend server running on port 3000</div>
-            <div class="status-item">✅ Database connected successfully</div>
-            <div class="status-item">✅ Research APIs loaded and ready</div>
-            <div class="status-item">✅ Multi-LLM integration available</div>
-        </div>
-
-        <div class="api-section">
-            <h3>Test Your Research Platform</h3>
-            <p>Your AI research platform backend is fully operational! You can test the research functionality directly:</p>
-            
-            <div class="api-test">
-                <strong>Quick Research Test:</strong><br>
-                <button onclick="testBasicResearch()">Test Basic Research</button>
-                <button onclick="testHealthCheck()">Check API Health</button>
-                <button onclick="testDeerFlowIntegration()">Test DeerFlow Integration</button>
-            </div>
-            
-            <div id="results"></div>
-        </div>
-
-        <div style="text-align: center; margin-top: 30px; color: #6b7280;">
-            <p>The research functionality is fully available through the backend API while we resolve the frontend React configuration.</p>
-        </div>
-    </div>
-
-    <script>
-        async function testHealthCheck() {
-            const results = document.getElementById('results');
-            results.innerHTML = 'Testing API health...';
-            
-            try {
-                const response = await fetch('/api/health');
-                const data = await response.json();
-                results.innerHTML = `<strong>✅ Health Check Success:</strong><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (error) {
-                results.innerHTML = `<strong>❌ Health Check Failed:</strong><br>${error.message}`;
-            }
-        }
-
-        async function testBasicResearch() {
-            const results = document.getElementById('results');
-            results.innerHTML = 'Starting research test...';
-            
-            try {
-                const response = await fetch('/api/research', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: 'AI research trends 2024',
-                        depth: '8K',
-                        includeReasoning: true
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    results.innerHTML = `<strong>✅ Research Test Success:</strong><br>Research initiated with ID: ${data.id || 'Unknown'}`;
-                } else {
-                    results.innerHTML = `<strong>⚠️ Research API Response:</strong><br>Status: ${response.status}`;
-                }
-            } catch (error) {
-                results.innerHTML = `<strong>❌ Research Test Failed:</strong><br>${error.message}`;
-            }
-        }
-
-        async function testDeerFlowIntegration() {
-            const results = document.getElementById('results');
-            results.innerHTML = 'Testing DeerFlow integration...';
-            
-            try {
-                const response = await fetch('/api/deerflow/health');
-                if (response.ok) {
-                    const data = await response.json();
-                    results.innerHTML = `<strong>✅ DeerFlow Integration:</strong><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
-                } else {
-                    results.innerHTML = `<strong>⚠️ DeerFlow Status:</strong><br>Status: ${response.status}`;
-                }
-            } catch (error) {
-                results.innerHTML = `<strong>❌ DeerFlow Test Failed:</strong><br>${error.message}`;
-            }
-        }
-
-        // Auto-run health check on load
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(testHealthCheck, 1000);
-        });
-    </script>
-</body>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+  </body>
 </html>
