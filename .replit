@@ -1,80 +1,115 @@
+modules = ["nodejs-20", "web", "postgresql-16", "python-3.11", "python3"]
 run = "npm run dev"
-entrypoint = "client/src/main.tsx"
-modules = ["nodejs-20:v25-20240515-b29e8f7"]
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["jq", "libxcrypt"]
 
 [deployment]
+deploymentTarget = "autoscale"
+build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
-deploymentTarget = "cloudrun"
-
-[[ports]]
-localPort = 3000
-externalPort = 3001
-
-[[ports]]
-localPort = 3001
-externalPort = 5000
-
-[[ports]]
-localPort = 5000
-externalPort = 3000
-
-[[ports]]
-localPort = 5173
-externalPort = 5173
-
-[[ports]]
-localPort = 5174
-externalPort = 80
-
-[[ports]]
-localPort = 5175
-externalPort = 3002
-
-[[ports]]
-localPort = 5176
-externalPort = 3003
-
-[[ports]]
-localPort = 8000
-externalPort = 8000
-
-[env]
-NODE_ENV = "development"
-VITE_HMR_PROTOCOL = "wss"
-VITE_HMR_CLIENT_PORT = "443"
-
-[packager]
-language = "nodejs"
-
-[packager.features]
-enabledForHosting = false
-packageSearch = true
-guessImports = true
-
-[languages.javascript]
-pattern = "**/{*.js,*.jsx,*.ts,*.tsx}"
-
-[languages.javascript.languageServer]
-start = "typescript-language-server --stdio"
 
 [workflows]
-runButton = "Development Server"
+runButton = "Start Full Stack"
 
 [[workflows.workflow]]
-name = "Development Server"
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Start Full Stack"
 author = 36382494
-mode = "sequential"
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python deerflow_service/server.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
 
-[deployment]
-run = ["sh", "-c", "npm run dev"]
+[[workflows.workflow]]
+name = "Test Optimizations"
+author = 36382494
+mode = "sequential"
 
-[auth]
-pageAfterSignUp = "/chat"
-pageAfterSignIn = "/chat"
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_system_comprehensive.py"
+
+[[workflows.workflow]]
+name = "Test Comprehensive"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_comprehensive.py"
+
+[[workflows.workflow]]
+name = "Test Optimized Complete App"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_complete_app.py"
+
+[[workflows.workflow]]
+name = "Test Enhanced Frontend"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_optimized_frontend_functionality.py"
+
+[[workflows.workflow]]
+name = "Test APIs"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node test-apis.js"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
+localPort = 4000
+externalPort = 3001
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 9000
+externalPort = 9000
