@@ -662,9 +662,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Use port 3001 to avoid conflicts with Vite dev server
-  // Server on port 3001, Vite dev server on 5173
-  const port = parseInt(process.env.PORT || "3001");
+  // Use port 8000 to avoid conflicts 
+  // Server on port 8000, Vite dev server on 5173
+  const port = parseInt(process.env.PORT || "8000");
 
   // Check if port is already in use
   const { createServer } = await import('net');

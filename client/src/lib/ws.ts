@@ -11,7 +11,9 @@ export function initializeWebSocket(userId: string): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = process.env.NODE_ENV === 'production' 
+        ? `${protocol}//${window.location.host}/ws`
+        : 'ws://0.0.0.0:8000/ws';
 
       // Close existing socket if any
       if (socket) {

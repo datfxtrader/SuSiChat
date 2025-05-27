@@ -34,7 +34,7 @@ export async function apiRequest<T>(
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
   ? '' 
-  : 'http://0.0.0.0:3001';
+  : 'http://0.0.0.0:8000';
 
 // Export api object for compatibility
 export const api = {
