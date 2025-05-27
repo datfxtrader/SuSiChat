@@ -12,7 +12,7 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [workflows]
-runButton = "Start Full Stack"
+runButton = "Rerouted Preview"
 
 [[workflows.workflow]]
 name = "Project"
@@ -92,6 +92,15 @@ args = "node test-apis.js"
 
 [[workflows.workflow]]
 name = "Start Fixed Frontend"
+author = 36382494
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd client && npm run dev"
+
+[[workflows.workflow]]
+name = "Rerouted Preview"
 author = 36382494
 mode = "sequential"
 
