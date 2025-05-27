@@ -5,10 +5,8 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react({
-      jsxImportSource: 'react',
-      babel: {
-        plugins: ['@emotion/babel-plugin']
-      }
+      jsxRuntime: 'automatic',
+      jsxImportSource: 'react'
     })
   ],
   resolve: {
@@ -23,14 +21,9 @@ export default defineConfig({
     hmr: {
       port: 5173,
       host: '0.0.0.0'
-    },
-    // Allow all Replit hosts
-    allowedHosts: [
-      '.replit.dev',
-      '.replit.app',
-      '.repl.co',
-      'localhost',
-      '.picard.replit.dev'
-    ]
+    }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom']
   }
 })
