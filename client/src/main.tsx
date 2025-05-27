@@ -7,9 +7,6 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
-// Force React preamble detection - must be at top level
-React.createElement('div');
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
