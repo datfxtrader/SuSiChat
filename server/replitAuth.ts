@@ -172,7 +172,16 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   }, (req, res) => {
     console.log("Authentication successful for user:", req.user);
-    res.redirect("/chat");
+    
+    // Ensure session is saved before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.redirect('/?error=session_error');
+      }
+      console.log('Session saved successfully, redirecting to /chat');
+      res.redirect("/chat");
+    });
   });
 
   app.get("/api/logout", (req, res) => {
