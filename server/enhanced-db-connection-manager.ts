@@ -296,6 +296,29 @@ class EnhancedDatabaseManager extends EventEmitter {
   }
   
   async createOptimizedIndexes(): Promise<void> {
+    // First, ensure required columns exist
+    try {
+      await this.query(`
+        ALTER TABLE messages 
+        ADD COLUMN IF NOT EXISTS conversation_id UUID,
+        ADD COLUMN IF NOT EXISTS tokens INTEGER
+      `);
+      
+      await this.query(`
+        CREATE TABLE IF NOT EXISTS conversations (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR(255) NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          is_archived BOOLEAN DEFAULT FALSE,
+          last_message_at TIMESTAMP
+        )
+      `);
+      
+      console.log('✅ Database schema updated');
+    } catch (error) {
+      console.log('⚠️ Schema update skipped:', error.message);
+    }
+    
     const indexes = [
       'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at DESC)',
       'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC) WHERE NOT is_archived',
