@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import MainLayout from "@/components/layout/MainLayout";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
 
 const Home: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -41,16 +42,14 @@ const Home: React.FC = () => {
     document.title = 'SuSi - Your AI Assistant Friend';
   }, []);
 
-  const handleLogin = () => {
-    try {
-      // Clear any existing auth state
-      localStorage.removeItem('auth_error');
-      window.location.href = '/api/login';
-    } catch (error) {
-      console.error('Login redirect failed:', error);
-      // Fallback - refresh the page
-      window.location.reload();
-    }
+  const handleLoginSuccess = () => {
+    // Refresh the page or redirect to dashboard
+    window.location.reload();
+  };
+
+  const handleLoginError = (error: string) => {
+    console.error('Login error:', error);
+    // Show error message to user
   };
 
   return (
@@ -82,14 +81,11 @@ const Home: React.FC = () => {
                 Log in to get started with your personal AI assistant.
               </p>
               <div className="space-y-3">
-                <a 
-                  href="/api/login"
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2 w-full"
-                  onClick={handleLogin}
-                >
-                  <span className="material-icons mr-2 text-sm">login</span>
-                  Log In with Replit
-                </a>
+                
+                <GoogleSignIn 
+                  onSuccess={handleLoginSuccess}
+                  onError={handleLoginError}
+                />
                 <div className="text-center text-sm text-neutral-500">
                   or use Google authentication (if configured)
                 </div>
