@@ -84,8 +84,12 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
+  // Get the primary domain from REPLIT_DOMAINS
+  const domains = process.env.REPLIT_DOMAINS!.split(",");
+  const primaryDomain = domains[0];
+  
+  // Register strategy for each domain
+  for (const domain of domains) {
     const strategy = new Strategy(
       {
         name: `replitauth:${domain}`,
@@ -98,50 +102,73 @@ export async function setupAuth(app: Express) {
     passport.use(strategy);
   }
 
-  // Also register strategy for the host header format
-  const strategy = new Strategy(
-    {
-      name: `replitauth:0.0.0.0:5000`,
-      config,
-      scope: "openid email profile offline_access",
-      callbackURL: `https://${process.env.REPLIT_DOMAINS!.split(",")[0]}/api/callback`,
-    },
-    verify,
-  );
-  passport.use(strategy);
+  // Register fallback strategies for common host formats
+  const fallbackHosts = ['0.0.0.0:5000', 'localhost:5000'];
+  for (const host of fallbackHosts) {
+    const strategy = new Strategy(
+      {
+        name: `replitauth:${host}`,
+        config,
+        scope: "openid email profile offline_access",
+        callbackURL: `https://${primaryDomain}/api/callback`,
+      },
+      verify,
+    );
+    passport.use(strategy);
+  }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
     console.log("Login attempt from:", req.headers.host);
-    // Use the host header instead of hostname for Replit
     const host = req.headers.host || req.hostname;
     console.log("Using authentication strategy for host:", host);
-    passport.authenticate(`replitauth:${host}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    
+    // Try to find a matching strategy
+    const strategyName = `replitauth:${host}`;
+    const strategy = passport._strategies[strategyName];
+    
+    if (!strategy) {
+      console.log(`No strategy found for ${strategyName}, using primary domain strategy`);
+      const primaryDomain = process.env.REPLIT_DOMAINS!.split(",")[0];
+      passport.authenticate(`replitauth:${primaryDomain}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    } else {
+      passport.authenticate(strategyName, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    }
   });
 
   app.get("/api/callback", (req, res, next) => {
     console.log('=== OAuth Callback Debug ===');
     console.log('Callback URL:', req.url);
     console.log('Host header:', req.get('host'));
-    console.log('Hostname:', req.hostname);
     console.log('Query params:', req.query);
-    console.log('Headers:', {
-      'x-replit-user-id': req.headers['x-replit-user-id'],
-      'x-forwarded-proto': req.headers['x-forwarded-proto'],
-      'x-forwarded-host': req.headers['x-forwarded-host']
-    });
+    
+    // Check for OAuth errors in query params
+    if (req.query.error) {
+      console.error('OAuth error received:', req.query.error, req.query.error_description);
+      return res.redirect(`/?error=${req.query.error}&description=${encodeURIComponent(req.query.error_description || 'Authentication failed')}`);
+    }
 
-    // Use the host header instead of hostname for Replit
     const host = req.headers.host || req.hostname;
     console.log("Processing callback for host:", host);
 
-    passport.authenticate(`replitauth:${host}`, { 
-      failureRedirect: "/?error=auth_failed"
+    // Try to find matching strategy, fallback to primary domain
+    const strategyName = `replitauth:${host}`;
+    const strategy = passport._strategies[strategyName];
+    
+    const finalStrategy = strategy ? strategyName : `replitauth:${process.env.REPLIT_DOMAINS!.split(",")[0]}`;
+    console.log("Using strategy:", finalStrategy);
+
+    passport.authenticate(finalStrategy, { 
+      failureRedirect: "/?error=auth_failed",
+      failureFlash: false
     })(req, res, next);
   }, (req, res) => {
     console.log("Authentication successful for user:", req.user);
