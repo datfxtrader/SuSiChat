@@ -1,4 +1,3 @@
-
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -12,28 +11,28 @@ const isDev = process.env.NODE_ENV !== "production";
 // Lazy load Replit plugins only when needed
 const loadReplitPlugins = async () => {
   if (!isReplit) return [];
-  
+
   const plugins = [];
-  
+
   // Runtime error overlay for development
   if (isDev) {
     const { default: runtimeErrorOverlay } = await import("@replit/vite-plugin-runtime-error-modal");
     plugins.push(runtimeErrorOverlay());
-    
+
     const { cartographer } = await import("@replit/vite-plugin-cartographer");
     plugins.push(cartographer());
   }
-  
+
   return plugins;
 };
 
 export default defineConfig(async ({ mode }) => {
   // Load env variables
   const env = loadEnv(mode, process.cwd(), '');
-  
+
   // Load Replit plugins if needed
   const replitPlugins = await loadReplitPlugins();
-  
+
   return {
     plugins: [
       react({
@@ -47,7 +46,7 @@ export default defineConfig(async ({ mode }) => {
       }),
       ...replitPlugins,
     ],
-    
+
     server: {
       host: '0.0.0.0',
       port: 5173,
@@ -65,7 +64,7 @@ export default defineConfig(async ({ mode }) => {
         ]
       }
     },
-    
+
     resolve: {
       alias: {
         "@": "/src",
@@ -75,10 +74,10 @@ export default defineConfig(async ({ mode }) => {
       // Prefer source files over compiled
       extensions: ['.tsx', '.ts', '.jsx', '.js'],
     },
-    
+
     root: path.resolve(__dirname, "./client"),
     publicDir: path.resolve(__dirname, "./client/public"),
-    
+
     build: {
       outDir: path.resolve(__dirname, "./dist/public"),
       emptyOutDir: true,
@@ -100,7 +99,7 @@ export default defineConfig(async ({ mode }) => {
       // Increase chunk size warning limit
       chunkSizeWarningLimit: 1000,
     },
-    
+
     optimizeDeps: {
       // Include commonly used dependencies
       include: [
@@ -119,7 +118,7 @@ export default defineConfig(async ({ mode }) => {
       // Exclude large or problematic dependencies
       exclude: ['@replit/vite-plugin-runtime-error-modal', '@replit/vite-plugin-cartographer'],
     },
-    
+
     esbuild: {
       // Optimize JSX transform
       jsx: 'automatic',
@@ -130,14 +129,14 @@ export default defineConfig(async ({ mode }) => {
       // Target modern browsers
       target: 'es2020',
     },
-    
+
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
       // Define feature flags
       __DEV__: isDev,
       __PROD__: !isDev,
     },
-    
+
     // Performance optimizations
     css: {
       // Enable CSS modules
@@ -147,7 +146,7 @@ export default defineConfig(async ({ mode }) => {
       // Optimize CSS
       devSourcemap: isDev,
     },
-    
+
     // Preview server configuration
     preview: {
       port: 4173,
