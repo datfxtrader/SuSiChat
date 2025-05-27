@@ -70,6 +70,9 @@ export default defineConfig(async ({ mode }) => {
         '.replit.app', 
         '.repl.co',
         '.picard.replit.dev',
+        '*.picard.replit.dev',
+        '*.riker.replit.dev',
+        '*.kirk.replit.dev',
         'localhost'
       ],
       // Proxy configuration for backend API
@@ -81,11 +84,17 @@ export default defineConfig(async ({ mode }) => {
           ws: true,
           timeout: 120000,
           proxyTimeout: 120000,
+          configure: (proxy, options) => {
+            proxy.on('error', (err, req, res) => {
+              console.log('Proxy error:', err);
+            });
+          }
         },
         '/socket.io': {
           target: 'http://0.0.0.0:5000',
           changeOrigin: true,
           ws: true,
+          secure: false,
         }
       }
     },
