@@ -677,13 +677,14 @@ app.use((req, res, next) => {
     }
   });
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: any, res: any, next: any) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+    console.error('Server error:', err);
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     res.status(status).json({ message });
-    console.error('Server error:', err);
-  return res.status(500).json({ message: 'Internal server error' });
   });
 
   // importantly only setup vite in development and after
