@@ -1,6 +1,12 @@
-// Simple JSX file to help React plugin detect preamble
+
+/** @jsx React.createElement */
 import React from 'react';
 
-const ReactFix = () => <div>React JSX detected</div>;
+// This JSX file helps @vitejs/plugin-react detect React usage properly
+const ReactDetector = () => {
+  return React.createElement('div', { 
+    style: { display: 'none' } 
+  }, 'React JSX Detection Helper');
+};
 
-export default ReactFix;
+export default ReactDetector;
