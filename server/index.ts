@@ -94,9 +94,24 @@ app.use((req, res, next) => {
   console.log('🚀 Initializing enhanced systems...');
   
   try {
-    // Initialize database optimizations
-    await enhancedDbManager.createOptimizedIndexes();
-    console.log('✅ Database optimizations applied');
+    // Initialize database schema first
+    console.log('🔧 Checking database schema...');
+    
+    try {
+      // Test if basic tables exist
+      await enhancedDbManager.query('SELECT 1 FROM users LIMIT 1');
+      console.log('✅ Database schema exists');
+      
+      // Now apply optimizations
+      await enhancedDbManager.createOptimizedIndexes();
+      console.log('✅ Database optimizations applied');
+    } catch (schemaError) {
+      console.log('⚠️ Database schema needs initialization');
+      console.log('💡 Run the database initialization endpoint to set up the schema');
+      
+      // Continue without database optimizations for now
+      console.log('🔄 Starting without database optimizations');
+    }
     
     // Start monitoring
     console.log('✅ Advanced monitoring system started');
@@ -533,6 +548,76 @@ app.use((req, res, next) => {
   // Import and use the enhanced financial research route (consolidated)
   const enhancedFinancialResearchRouter = (await import('./routes/financial-research-enhanced.route')).default;
   app.use('/api/financial', enhancedFinancialResearchRouter);
+
+  // Database initialization endpoint
+  app.post('/api/admin/initialize-database', async (req, res) => {
+    try {
+      console.log('🔧 Initializing database schema...');
+      
+      // Run the schema migration
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      const schemaPath = path.join(process.cwd(), 'server/migrations/000_initialize_schema.sql');
+      
+      try {
+        const schemaSQL = await fs.readFile(schemaPath, 'utf-8');
+        await enhancedDbManager.query(schemaSQL);
+        console.log('✅ Database schema initialized successfully');
+        
+        // Now create optimized indexes
+        await enhancedDbManager.createOptimizedIndexes();
+        console.log('✅ Database optimizations applied');
+        
+        res.json({
+          success: true,
+          message: 'Database schema initialized successfully'
+        });
+      } catch (fileError) {
+        console.log('⚠️ Schema file not found, creating basic tables...');
+        
+        // Create basic tables if schema file doesn't exist
+        const basicSchema = `
+          CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(255) UNIQUE NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS conversations (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            title VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS messages (
+            id SERIAL PRIMARY KEY,
+            conversation_id INTEGER REFERENCES conversations(id),
+            content TEXT,
+            role VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `;
+        
+        await enhancedDbManager.query(basicSchema);
+        console.log('✅ Basic database schema created');
+        
+        res.json({
+          success: true,
+          message: 'Basic database schema created successfully'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Database initialization failed:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Database initialization failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
 
   // Import and use homework help route
   const homeworkRouter = (await import('./routes/homework')).default;
