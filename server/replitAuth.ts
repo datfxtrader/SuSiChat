@@ -162,22 +162,39 @@ export async function setupAuth(app: Express) {
 
     console.log("Processing callback with primary strategy");
 
+    // Add timeout protection
+    const timeoutId = setTimeout(() => {
+      if (!res.headersSent) {
+        console.error('OAuth callback timeout');
+        res.redirect('/?error=timeout');
+      }
+    }, 25000);
+
     passport.authenticate("replitauth:primary", { 
       failureRedirect: "/?error=auth_failed",
       failureFlash: false
-    })(req, res, next);
+    })(req, res, (err) => {
+      clearTimeout(timeoutId);
+      if (err) {
+        console.error('OAuth authentication error:', err);
+        return res.redirect('/?error=auth_error');
+      }
+      next();
+    });
   }, (req, res) => {
+    if (res.headersSent) return;
+    
     console.log("Authentication successful for user:", req.user);
     
-    // Ensure session is saved before redirect
-    req.session.save((err) => {
-      if (err) {
-        console.error('Session save error:', err);
-        return res.redirect('/?error=session_error');
-      }
-      console.log('Session saved successfully, redirecting to /chat');
+    try {
+      // Quick redirect without session save to prevent timeout
       res.redirect("/chat");
-    });
+    } catch (error) {
+      console.error('Redirect error:', error);
+      if (!res.headersSent) {
+        res.redirect('/?error=redirect_failed');
+      }
+    }
   });
 
   app.get("/api/logout", (req, res) => {

@@ -17,9 +17,17 @@ const queryClient = new QueryClient({
   },
 });
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
+// Ensure single root creation
+const rootElement = document.getElementById('root') as HTMLElement
+let root: ReactDOM.Root
+
+if (!rootElement.hasAttribute('data-root-created')) {
+  root = ReactDOM.createRoot(rootElement)
+  rootElement.setAttribute('data-root-created', 'true')
+} else {
+  // If root already exists, get it from the element
+  root = (rootElement as any)._reactRoot || ReactDOM.createRoot(rootElement)
+}
 
 root.render(
   <React.StrictMode>

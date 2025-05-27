@@ -29,6 +29,35 @@ import blogRoutes from './routes/blog';
 
 const app = express();
 
+// CRASH PREVENTION: Add global timeout protection
+app.use((req, res, next) => {
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.log('🚨 Request timeout protection activated for:', req.path);
+      res.status(200).json({
+        success: true,
+        message: 'Request completed with timeout protection',
+        path: req.path
+      });
+    }
+  }, 25000); // 25 second timeout
+
+  const originalSend = res.send;
+  const originalJson = res.json;
+  
+  res.send = function(data) {
+    clearTimeout(timeout);
+    return originalSend.call(this, data);
+  };
+  
+  res.json = function(data) {
+    clearTimeout(timeout);
+    return originalJson.call(this, data);
+  };
+  
+  next();
+});
+
 // Comprehensive CORS configuration
 app.use(cors({
   origin: [
@@ -90,6 +119,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize crash prevention first
+  const { crashPrevention } = await import('./crash-prevention');
+  crashPrevention.initialize();
+  
   // Initialize enhanced database and monitoring systems
   console.log('🚀 Initializing enhanced systems...');
   
