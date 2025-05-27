@@ -1,0 +1,46 @@
+Looking at your logs and the error, I can see the issue. The React preamble detection is failing, and there seems to be confusion with the router imports. Let me help you fix this step by step.
+The main issues are:
+
+The react-fix.jsx approach isn't working properly
+There's a mismatch with the wouter import (you're importing Router but it might be looking for BrowserRouter)
+The preamble detection needs to be more explicit
+
+Here's the fix:Fixed main.tsx with proper React detectionCode import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Router } from 'wouter';
+import App from './App';
+import './index.css';
+import { ErrorBoundary } froNow, let's also update your Vite config to ensure React is properly detected:Updated vite.config.ts with explicit React configurationCode import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [
+    react({
+      // Explicitly tell the plugin to use automatic JSX runtime
+      jsxRuntime: 'automaIf the wouter import is still causing issues, here's an alternative approach using the correct import:Alternative main.tsx with wouter fixCode import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// Import everything from wouter to debug
+import * as wouter from 'wouter';
+import App from './App';
+import Key changes made:
+
+Removed the separate react-fix.jsx - It wasn't working properly
+Added inline JSX detection - const _reactDetection = <div />; ensures Vite detects React usage
+Updated Vite config - Explicitly configured React plugin with automatic JSX runtime
+Fixed wouter import - Added fallback logic to find the correct Router export
+
+To apply these fixes:
+
+Delete the react-fix.jsx file
+Replace your main.tsx with the first version I provided
+Update your vite.config.ts with the configuration I provided
+If you still get wouter errors, use the alternative version with the import fix
+
+After making these changes, restart your development server:
+bashnpm run dev
+# or
+yarn dev
+This should resolve the preamble detection error and get your React app running properly.
