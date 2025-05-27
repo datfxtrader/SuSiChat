@@ -8,8 +8,8 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
-// Force React detection
-export const ForceReactDetection = () => <div style={{ display: 'none' }} />;
+// Explicit React reference for Vite detection
+React.createElement('div', null);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +30,6 @@ root.render(
       <QueryClientProvider client={queryClient}>
         <Router>
           <App />
-          <ForceReactDetection />
         </Router>
       </QueryClientProvider>
     </ErrorBoundary>
