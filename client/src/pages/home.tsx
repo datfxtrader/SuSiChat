@@ -43,13 +43,18 @@ const Home: React.FC = () => {
   }, []);
 
   const handleLoginSuccess = () => {
-    // Refresh the page or redirect to dashboard
-    window.location.reload();
+    try {
+      // Refresh the page or redirect to dashboard
+      window.location.reload();
+    } catch (error) {
+      console.error('Reload error:', error);
+      setErrorMessage('Failed to reload page. Please try refreshing manually.');
+    }
   };
 
   const handleLoginError = (error: string) => {
     console.error('Login error:', error);
-    // Show error message to user
+    setErrorMessage(error || 'Login failed. Please try again.');
   };
 
   return (

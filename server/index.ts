@@ -746,20 +746,25 @@ app.use((req, res, next) => {
   testServer.listen(port, "0.0.0.0");
 
   async function startServer() {
-     // Import setupAuth here to avoid top-level await
-    const { setupAuth } = await import('./auth');
-    // Set up Replit authentication
-    await setupAuth(app);
+    try {
+      // Import setupAuth here to avoid top-level await
+      const { setupAuth } = await import('./auth');
+      // Set up Replit authentication
+      await setupAuth(app);
 
-    server.listen(port, "0.0.0.0", (err?: Error) => {
-      if (err) {
-        console.error(`Failed to start server on port ${port}:`, err);
-        process.exit(1);
-      }
-      log(`🚀 Server successfully running on port ${port}`);
-      log(`🌐 Access your app at: http://0.0.0.0:${port}`);
-      log(`🔧 Environment: ${app.get("env")}`);
-    });
+      server.listen(port, "0.0.0.0", (err?: Error) => {
+        if (err) {
+          console.error(`Failed to start server on port ${port}:`, err);
+          process.exit(1);
+        }
+        log(`🚀 Server successfully running on port ${port}`);
+        log(`🌐 Access your app at: http://0.0.0.0:${port}`);
+        log(`🔧 Environment: ${app.get("env")}`);
+      });
+    } catch (error) {
+      console.error('Server startup error:', error);
+      process.exit(1);
+    }
   }
 
   // Handle server errors

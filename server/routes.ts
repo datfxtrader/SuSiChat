@@ -53,12 +53,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication test endpoint
   app.get('/api/auth/test', (req: any, res) => {
-    console.log("Auth test - Headers:", req.headers);
-    
-    res.json({
-      authenticated: !!req.headers.authorization,
-      headers: req.headers
-    });
+    try {
+      console.log("Auth test - Headers:", req.headers);
+      
+      res.json({
+        authenticated: !!req.headers.authorization,
+        headers: req.headers,
+        user: req.user || null
+      });
+    } catch (error) {
+      console.error('Auth test error:', error);
+      res.status(500).json({ error: 'Auth test failed' });
+    }
   });
 
 

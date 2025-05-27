@@ -35,18 +35,26 @@ export function useAuth() {
   });
 
   const login = () => {
-    window.location.href = '/api/login';
+    try {
+      window.location.href = '/api/login';
+    } catch (error) {
+      console.error('Login redirect error:', error);
+    }
   };
 
   const logout = () => {
-    window.location.href = '/api/logout';
+    try {
+      window.location.href = '/api/logout';
+    } catch (error) {
+      console.error('Logout redirect error:', error);
+    }
   };
 
   return {
     user,
     isLoading,
     isAuthenticated: !!user && user !== null,
-    error: null,
+    error: error || null,
     login,
     logout,
   };
