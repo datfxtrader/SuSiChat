@@ -7,6 +7,9 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
+// Force React detection for Vite
+const ForceReactDetection = () => <></>;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
