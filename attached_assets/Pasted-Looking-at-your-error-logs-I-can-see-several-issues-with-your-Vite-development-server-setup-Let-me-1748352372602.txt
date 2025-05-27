@@ -1,0 +1,78 @@
+Looking at your error logs, I can see several issues with your Vite development server setup. Let me help you fix these problems:
+
+## Main Issues:
+
+1. **Missing @emotion/babel-plugin dependency**
+2. **Syntax error in `src/pages/home.tsx`** - There's an unterminated string literal with triple backticks
+3. **Failed dependency resolution for @emotion packages**
+
+## Solution:
+
+First, let's install the missing dependencies:
+
+```bash
+cd /home/runner/workspace
+npm install --save-dev @emotion/babel-plugin @emotion/react @emotion/styled
+```
+
+If you're using the client directory separately:
+```bash
+cd /home/runner/workspace/client
+npm install --save-dev @emotion/babel-plugin @emotion/react @emotion/styled
+```
+
+Next, fix the syntax error in `src/pages/home.tsx` at line 107-108. The error shows there are triple backticks (```) that are causing an unterminated string literal. You need to either:
+- Remove the backticks if they're not needed
+- Properly close them if they're part of a template literal
+- Escape them if they're meant to be displayed as text
+
+Here's a common fix if you're trying to display code:
+```tsx
+// Instead of:
+const codeExample = ```
+// some code
+```
+
+// Use:
+const codeExample = `\`\`\`
+// some code
+\`\`\``
+
+// Or use a regular string:
+const codeExample = "```\n// some code\n```"
+```
+
+Finally, if the errors persist, try clearing Vite's cache and reinstalling dependencies:
+
+```bash
+# Clear Vite cache
+rm -rf node_modules/.vite
+
+# Clear npm cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+npm run dev
+```
+
+If you're still having issues with @emotion, you might need to add a Vite configuration to properly handle it. Create or update your `vite.config.ts`:
+
+```typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [
+    react({
+      jsxImportSource: '@emotion/react',
+      babel: {
+        plugins: ['@emotion/babel-plugin']
+      }
+    })
+  ],
+  optimizeDeps: {
+    include: ['@emotion/react', '@emotion/styled']
+  }
+})
+```
+
+This should resolve your development server issues!
