@@ -1,8 +1,9 @@
+
 import React from 'react';
 
-// Simple component to help React plugin detect JSX preamble
+// This component helps Vite's React plugin detect JSX usage
 const ReactPreamble: React.FC = () => {
-  return <div style={{ display: 'none' }}>React Preamble Helper</div>;
+  return <div style={{ display: 'none' }}>React Detected</div>;
 };
 
 export default ReactPreamble;

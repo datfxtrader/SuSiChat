@@ -1,12 +1,7 @@
 
-/** @jsx React.createElement */
 import React from 'react';
 
-// This file ensures @vitejs/plugin-react can detect React usage
-// The JSX pragma above helps the plugin identify React components
+// This file ensures that @vitejs/plugin-react can properly detect React usage
+// The preamble helps the plugin understand that this is a React project
 
-const Preamble: React.FC = () => {
-  return React.createElement('div', { style: { display: 'none' } }, 'React preamble loaded');
-};
-
-export default Preamble;
+export default React;
