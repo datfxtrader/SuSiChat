@@ -7,6 +7,10 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
+// Force React detection for Vite on Replit
+// This needs to be at the top level and use JSX
+const _jsx = <div />;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
