@@ -698,7 +698,7 @@ app.use((req, res, next) => {
 
   // Production server on port 5000 for API and client
   // this serves both the API and the client.
-  const port = parseInt(process.env.PORT || "5000");
+  const port = 5000;
 
   // Check if port is already in use
   const { createServer } = await import('net');
