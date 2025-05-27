@@ -18,12 +18,20 @@ export default defineConfig({
       clientPort: 443,
       protocol: 'wss'
     },
-    // Allow Replit hosts
     allowedHosts: [
       '.replit.dev',
       '.replit.app',
       '.repl.co',
       'localhost'
-    ]
-  }
+    ],
+    // Add proxy configuration for API calls
+    proxy: {
+      '/api': {
+        target: 'http://0.0.0.0:5000',
+        changeOrigin: true,
+      }
+    }
+  },
+  // Enable SPA routing
+  appType: 'spa',
 });
