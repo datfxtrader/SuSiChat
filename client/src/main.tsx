@@ -37,7 +37,8 @@ window.addEventListener('error', (event) => {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={ResearchAgent} />
+      <Route path="/home" component={Home} />
       <Route path="/chat" component={Chat} />
       <Route path="/family-room" component={FamilyRoom} />
       <Route path="/family-room/:id" component={FamilyRoomDetail} />

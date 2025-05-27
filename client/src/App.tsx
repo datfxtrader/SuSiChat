@@ -35,7 +35,8 @@ function App() {
 
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={ResearchAgent} />
+      <Route path="/home" component={Home} />
       <Route path="/chat" component={Chat} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/family-room" component={FamilyRoom} />
