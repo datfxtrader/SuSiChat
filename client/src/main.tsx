@@ -1,15 +1,16 @@
 
+// Force React detection for Vite on Replit - must be first
 import React from 'react';
+
+// Force JSX usage at module level
+const _forceReactDetection = React.createElement('div');
+
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
-
-// Force React detection for Vite on Replit
-// This needs to be at the top level and use JSX
-const _jsx = <div />;
 
 const queryClient = new QueryClient({
   defaultOptions: {
