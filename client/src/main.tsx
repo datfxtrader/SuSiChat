@@ -8,6 +8,8 @@ import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
+const ForceReactDetection = () => <div />;
+
 // Explicit React reference for Vite detection
 React.createElement('div', null);
 
