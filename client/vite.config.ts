@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -20,16 +21,21 @@ export default defineConfig({
       protocol: 'wss',
       overlay: false, // Disable error overlay to prevent reload loops
     },
-    allowedHosts: [
-      '.replit.dev',
-      '.replit.app',
-      '.repl.co',
-      'localhost',
-      '.picard.replit.dev'
-    ]
+    proxy: {
+      '/api': {
+        target: 'http://0.0.0.0:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/socket.io': {
+        target: 'http://0.0.0.0:5000',
+        changeOrigin: true,
+        ws: true,
+      }
+    }
   },
 
-  // Explicitly set the root to current directory when running from client/
+  // Set root to current directory when running from client/
   root: process.cwd(),
 
   resolve: {
