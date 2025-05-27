@@ -692,30 +692,30 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
-    // In development, proxy Vite assets to the Vite dev server
-    app.use(['/src', '/@vite', '/@id', '/__vite_ping', '/node_modules'], 
-      createProxyMiddleware({
-        target: 'http://0.0.0.0:5173',
-        changeOrigin: true,
-        ws: true, // Enable WebSocket proxy for HMR
-      })
-    );
+    // In development, don't serve frontend routes from Express
+    // Let Vite dev server handle all frontend assets and routing
+    console.log('🔧 Development mode: API-only Express server');
+    console.log('📱 Frontend served by Vite on port 5173');
+    console.log('🔗 API available at port 5000/api/*');
+    
+    // Health check endpoint for development
+    app.get('/health', (req, res) => {
+      res.json({ 
+        status: 'ok', 
+        mode: 'development',
+        timestamp: new Date().toISOString(),
+        message: 'Express API server running - Frontend on Vite port 5173'
+      });
+    });
 
-    // Proxy the main index.html and other frontend routes
-    app.use('/', 
-      createProxyMiddleware({
-        target: 'http://0.0.0.0:5173',
-        changeOrigin: true,
-        ws: true,
-        // Only proxy GET requests that accept HTML
-        filter: (req) => {
-          return req.method === 'GET' && 
-                 !req.url.startsWith('/api') &&
-                 !req.url.startsWith('/socket.io') &&
-                 req.headers.accept?.includes('text/html');
-        },
-      })
-    );
+    // Catch any non-API routes and redirect to Vite
+    app.get('*', (req, res) => {
+      if (!req.url.startsWith('/api') && !req.url.startsWith('/socket.io')) {
+        res.redirect(`http://0.0.0.0:5173${req.url}`);
+      } else {
+        res.status(404).json({ error: 'API endpoint not found' });
+      }
+    });
   } else {
     // In production, serve built files
     app.use(express.static(path.join(__dirname, "../client/dist")));
