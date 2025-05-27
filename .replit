@@ -1,10 +1,31 @@
 modules = ["nodejs-20", "web", "postgresql-16", "python-3.11", "python3"]
 run = "npm run dev"
-hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+hidden = [".config", "package-lock.json", ".git", "generated-icon.png", "node_modules", "dist"]
+entrypoint = "client/index.html"
+
+[languages]
+[languages.javascript]
+pattern = "**/{*.js,*.jsx,*.ts,*.tsx,*.json}"
+
+[languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+enabledForHosting = false
 
 [nix]
-channel = "stable-24_05"
+channel = "stable-22_11"
 packages = ["jq", "libxcrypt"]
+
+[env]
+XDG_CONFIG_HOME = "/home/runner/$REPL_SLUG/.config"
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -170,6 +191,10 @@ task = "shell.exec"
 args = "cd suna-repo/backend && python api.py"
 
 [[ports]]
+localPort = 5173
+externalPort = 80
+
+[[ports]]
 localPort = 3000
 externalPort = 3000
 
@@ -179,11 +204,7 @@ externalPort = 3001
 
 [[ports]]
 localPort = 5000
-externalPort = 80
-
-[[ports]]
-localPort = 5173
-externalPort = 5173
+externalPort = 3000
 
 [[ports]]
 localPort = 8000
