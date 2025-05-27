@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Research Platform</title>
+    <title>AI Research Platform - Loading Components</title>
     <style>
         * {
             margin: 0;
@@ -12,149 +13,453 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 3rem;
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        .component-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        .component-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(96, 165, 250, 0.5);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .component-title {
+            color: #60a5fa;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .component-description {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        /* Loading Component Styles */
+        .skeleton-demo {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            background: #374151;
+            border-radius: 0.375rem;
+        }
+        .skeleton-text { height: 1rem; margin-bottom: 0.5rem; }
+        .skeleton-text:last-child { width: 60%; }
+        .skeleton-avatar { width: 2rem; height: 2rem; border-radius: 50%; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #374151;
+            border-top: 2px solid #60a5fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .streaming-dots {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #6b7280;
+            border-radius: 50%;
+            animation: bounce 0.6s infinite;
+        }
+        .dot:nth-child(1) { animation-delay: 0s; }
+        .dot:nth-child(2) { animation-delay: 0.1s; }
+        .dot:nth-child(3) { animation-delay: 0.2s; }
+        
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 4px;
+            animation: progress 3s ease-in-out infinite;
+        }
+        
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
+        .research-stages {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1rem 0;
+        }
+        .stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .stage-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
-        .container {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            max-width: 800px;
-            width: 90%;
-        }
-        h1 {
-            color: #2d3748;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-        .status-card {
-            background: #f0f9ff;
-            border: 1px solid #0ea5e9;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-        }
-        .status-title {
-            color: #0ea5e9;
-            font-weight: bold;
-            margin-bottom: 1rem;
-        }
-        .status-item {
-            margin: 0.5rem 0;
-            color: #374151;
-        }
-        .api-section {
-            background: #f9fafb;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-        }
-        .test-button {
+        .stage-active {
             background: #3b82f6;
             color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            margin: 0.5rem;
-            font-weight: 500;
         }
-        .test-button:hover {
-            background: #2563eb;
+        .stage-inactive {
+            background: #374151;
+            color: #6b7280;
         }
-        .result-area {
-            background: #1f2937;
-            color: #f9fafb;
+        .stage-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .shimmer {
+            background: linear-gradient(90deg, #374151 0%, #4b5563 50%, #374151 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .pulse-loader {
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            border-radius: 50%;
+            animation: pulse-scale 1s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-scale {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+        
+        .typewriter-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1rem;
+            background: #6b7280;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .card-skeleton {
+            padding: 1.5rem;
+            background: rgba(55, 65, 81, 0.6);
+            border: 1px solid #374151;
+            border-radius: 12px;
+        }
+        
+        .message-skeleton {
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
             padding: 1rem;
-            border-radius: 6px;
-            margin-top: 1rem;
-            min-height: 100px;
-            font-family: monospace;
-            white-space: pre-wrap;
+        }
+        
+        .list-skeleton {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .success-animation {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+        }
+        .success-check {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            animation: success-bounce 0.6s ease-out;
+        }
+        
+        @keyframes success-bounce {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🤖 AI Research Platform</h1>
-        <p style="text-align: center; color: #6b7280; margin-bottom: 2rem;">
-            Your sophisticated multi-modal AI research platform is running successfully!
+        <h1>🔄 Comprehensive Loading Components</h1>
+        <p style="text-align: center; color: #94a3b8; margin-bottom: 3rem; font-size: 1.125rem;">
+            Advanced loading states and micro-interactions for your AI research platform
         </p>
         
-        <div class="status-card">
-            <div class="status-title">System Status</div>
-            <div class="status-item">✅ Backend server running and database connected</div>
-            <div class="status-item">✅ Research components loaded successfully</div>
-            <div class="status-item">✅ API endpoints functioning properly</div>
-            <div class="status-item">✅ Multi-LLM integration (DeepSeek, Gemini) ready</div>
+        <div class="grid">
+            <!-- Message Skeleton -->
+            <div class="component-card">
+                <div class="component-title">
+                    💬 Message Skeleton
+                </div>
+                <div class="component-description">
+                    Skeleton loading for chat messages and conversations
+                </div>
+                <div class="message-skeleton">
+                    <div class="skeleton-demo skeleton-avatar"></div>
+                    <div style="flex: 1;">
+                        <div class="skeleton-demo skeleton-text"></div>
+                        <div class="skeleton-demo skeleton-text"></div>
+                        <div class="skeleton-demo skeleton-text"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Card Skeleton -->
+            <div class="component-card">
+                <div class="component-title">
+                    🃏 Card Skeleton
+                </div>
+                <div class="component-description">
+                    Loading placeholder for content cards and panels
+                </div>
+                <div class="card-skeleton">
+                    <div class="skeleton-demo skeleton-text" style="width: 40%; margin-bottom: 1rem;"></div>
+                    <div class="skeleton-demo skeleton-text"></div>
+                    <div class="skeleton-demo skeleton-text"></div>
+                    <div class="skeleton-demo skeleton-text"></div>
+                </div>
+            </div>
+            
+            <!-- List Skeleton -->
+            <div class="component-card">
+                <div class="component-title">
+                    📋 List Skeleton
+                </div>
+                <div class="component-description">
+                    Loading state for lists and search results
+                </div>
+                <div>
+                    <div class="list-skeleton">
+                        <div class="skeleton-demo" style="width: 40px; height: 40px; border-radius: 8px;"></div>
+                        <div style="flex: 1;">
+                            <div class="skeleton-demo skeleton-text" style="width: 75%;"></div>
+                            <div class="skeleton-demo skeleton-text" style="width: 50%; height: 0.75rem;"></div>
+                        </div>
+                        <div class="skeleton-demo" style="width: 64px; height: 32px; border-radius: 4px;"></div>
+                    </div>
+                    <div class="list-skeleton">
+                        <div class="skeleton-demo" style="width: 40px; height: 40px; border-radius: 8px;"></div>
+                        <div style="flex: 1;">
+                            <div class="skeleton-demo skeleton-text" style="width: 85%;"></div>
+                            <div class="skeleton-demo skeleton-text" style="width: 60%; height: 0.75rem;"></div>
+                        </div>
+                        <div class="skeleton-demo" style="width: 64px; height: 32px; border-radius: 4px;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Research Progress -->
+            <div class="component-card">
+                <div class="component-title">
+                    🔬 Research Progress
+                </div>
+                <div class="component-description">
+                    Multi-stage progress indicator for research operations
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                        <span style="color: #e2e8f0; font-weight: 500;">Analyzing Sources</span>
+                        <span style="color: #94a3b8;">67%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 67%;"></div>
+                    </div>
+                    <div class="research-stages">
+                        <div class="stage">
+                            <div class="stage-circle stage-active">✓</div>
+                            <span class="stage-label">Search</span>
+                        </div>
+                        <div class="stage">
+                            <div class="stage-circle stage-active">2</div>
+                            <span class="stage-label">Analyze</span>
+                        </div>
+                        <div class="stage">
+                            <div class="stage-circle stage-inactive">3</div>
+                            <span class="stage-label">Process</span>
+                        </div>
+                        <div class="stage">
+                            <div class="stage-circle stage-inactive">4</div>
+                            <span class="stage-label">Finalize</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Streaming Dots -->
+            <div class="component-card">
+                <div class="component-title">
+                    ⚡ Streaming Indicators
+                </div>
+                <div class="component-description">
+                    Real-time streaming and typing indicators
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="color: #94a3b8;">Streaming:</span>
+                        <div class="streaming-dots">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="color: #94a3b8;">Typing:</span>
+                        <span>AI is thinking</span>
+                        <div class="typewriter-cursor"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Spinners -->
+            <div class="component-card">
+                <div class="component-title">
+                    🌀 Spinners & Loaders
+                </div>
+                <div class="component-description">
+                    Various loading spinners and animated indicators
+                </div>
+                <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                        <div class="spinner"></div>
+                        <span style="color: #94a3b8; font-size: 0.75rem;">Classic</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                        <div class="pulse-loader"></div>
+                        <span style="color: #94a3b8; font-size: 0.75rem;">Pulse</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                        <div class="streaming-dots">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                        <span style="color: #94a3b8; font-size: 0.75rem;">Dots</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Shimmer Effect -->
+            <div class="component-card">
+                <div class="component-title">
+                    ✨ Shimmer Loader
+                </div>
+                <div class="component-description">
+                    Elegant shimmer effect for content loading
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div class="shimmer" style="height: 1rem; border-radius: 4px;"></div>
+                    <div class="shimmer" style="height: 1rem; width: 75%; border-radius: 4px;"></div>
+                    <div class="shimmer" style="height: 1rem; width: 90%; border-radius: 4px;"></div>
+                    <div class="shimmer" style="height: 1rem; width: 60%; border-radius: 4px;"></div>
+                </div>
+            </div>
+            
+            <!-- Success Animation -->
+            <div class="component-card">
+                <div class="component-title">
+                    ✅ Success Animation
+                </div>
+                <div class="component-description">
+                    Completion and success state indicators
+                </div>
+                <div class="success-animation">
+                    <div class="success-check">✓</div>
+                    <div style="color: #e2e8f0; font-weight: 500;">Research Complete!</div>
+                </div>
+            </div>
         </div>
         
-        <div class="api-section">
-            <h3 style="margin-bottom: 1rem; color: #374151;">Test Research Functionality</h3>
-            <button class="test-button" onclick="testHealthCheck()">Health Check</button>
-            <button class="test-button" onclick="testResearch()">Test Research API</button>
-            <button class="test-button" onclick="testWebSearch()">Test Web Search</button>
-            <div id="results" class="result-area">Ready to test API endpoints...</div>
+        <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: rgba(30, 41, 59, 0.5); border-radius: 12px; border: 1px solid rgba(71, 85, 105, 0.3);">
+            <h3 style="color: #60a5fa; margin-bottom: 1rem;">🎯 LoadingStates.tsx Components</h3>
+            <p style="color: #94a3b8; line-height: 1.6;">
+                These components are available in <code style="background: rgba(55, 65, 81, 0.8); padding: 0.25rem 0.5rem; border-radius: 4px; color: #fbbf24;">client/src/components/shared/LoadingStates.tsx</code>
+                <br>
+                Import them using: <code style="background: rgba(55, 65, 81, 0.8); padding: 0.25rem 0.5rem; border-radius: 4px; color: #fbbf24;">import { LoadingPatterns } from '@/components/shared/LoadingStates'</code>
+            </p>
         </div>
     </div>
-
-    <script>
-        async function testHealthCheck() {
-            const results = document.getElementById('results');
-            results.textContent = 'Testing health check...';
-            
-            try {
-                const response = await fetch('/api/health');
-                const data = await response.json();
-                results.textContent = 'Health Check Result:\n' + JSON.stringify(data, null, 2);
-            } catch (error) {
-                results.textContent = 'Health Check Error:\n' + error.message;
-            }
-        }
-        
-        async function testResearch() {
-            const results = document.getElementById('results');
-            results.textContent = 'Testing research API...';
-            
-            try {
-                const response = await fetch('/api/research', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: 'What are the latest trends in AI research?',
-                        depth: '8k'
-                    })
-                });
-                const data = await response.json();
-                results.textContent = 'Research API Result:\n' + JSON.stringify(data, null, 2);
-            } catch (error) {
-                results.textContent = 'Research API Error:\n' + error.message;
-            }
-        }
-        
-        async function testWebSearch() {
-            const results = document.getElementById('results');
-            results.textContent = 'Testing web search...';
-            
-            try {
-                const response = await fetch('/api/web-search', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: 'artificial intelligence news 2024',
-                        maxResults: 5
-                    })
-                });
-                const data = await response.json();
-                results.textContent = 'Web Search Result:\n' + JSON.stringify(data, null, 2);
-            } catch (error) {
-                results.textContent = 'Web Search Error:\n' + error.message;
-            }
-        }
-    </script>
 </body>
 </html>
