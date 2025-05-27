@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
+import { ReplitSignIn } from "@/components/auth/ReplitSignIn";
 
 const Home: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -81,8 +81,8 @@ const Home: React.FC = () => {
                 Log in to get started with your personal AI assistant.
               </p>
               <div className="space-y-3">
-                
-                <GoogleSignIn 
+
+                <ReplitSignIn 
                   onSuccess={handleLoginSuccess}
                   onError={handleLoginError}
                 />
@@ -99,3 +99,4 @@ const Home: React.FC = () => {
 };
 
 export default Home;
+```

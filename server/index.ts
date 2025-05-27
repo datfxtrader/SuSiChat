@@ -44,17 +44,17 @@ app.use((req, res, next) => {
 
   const originalSend = res.send;
   const originalJson = res.json;
-  
+
   res.send = function(data) {
     clearTimeout(timeout);
     return originalSend.call(this, data);
   };
-  
+
   res.json = function(data) {
     clearTimeout(timeout);
     return originalJson.call(this, data);
   };
-  
+
   next();
 });
 
@@ -97,10 +97,10 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    
+
     // Record request for monitoring
     monitoringSystem.recordRequest(path);
-    
+
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
@@ -122,38 +122,38 @@ app.use((req, res, next) => {
   // Initialize crash prevention first
   const { crashPrevention } = await import('./crash-prevention');
   crashPrevention.initialize();
-  
+
   // Initialize enhanced database and monitoring systems
   console.log('🚀 Initializing enhanced systems...');
-  
+
   try {
     // Initialize database schema first
     console.log('🔧 Checking database schema...');
-    
+
     try {
       // Test if basic tables exist
       await enhancedDbManager.query('SELECT 1 FROM users LIMIT 1');
       console.log('✅ Database schema exists');
-      
+
       // Now apply optimizations
       await enhancedDbManager.createOptimizedIndexes();
       console.log('✅ Database optimizations applied');
     } catch (schemaError) {
       console.log('⚠️ Database schema needs initialization');
       console.log('💡 Run the database initialization endpoint to set up the schema');
-      
+
       // Continue without database optimizations for now
       console.log('🔄 Starting without database optimizations');
     }
-    
+
     // Start monitoring
     console.log('✅ Advanced monitoring system started');
-    
+
     // Initialize crash-safe storage system
     const { crashSafeStorage } = await import('./crash-safe-storage');
     await crashSafeStorage.initialize();
     console.log('✅ Crash-safe research storage initialized');
-    
+
   } catch (error) {
     console.error('❌ System initialization error:', error);
   }
@@ -586,29 +586,29 @@ app.use((req, res, next) => {
   app.post('/api/admin/initialize-database', async (req, res) => {
     try {
       console.log('🔧 Initializing database schema...');
-      
+
       // Run the schema migration
       const fs = await import('fs/promises');
       const path = await import('path');
-      
+
       const schemaPath = path.join(process.cwd(), 'server/migrations/000_initialize_schema.sql');
-      
+
       try {
         const schemaSQL = await fs.readFile(schemaPath, 'utf-8');
         await enhancedDbManager.query(schemaSQL);
         console.log('✅ Database schema initialized successfully');
-        
+
         // Now create optimized indexes
         await enhancedDbManager.createOptimizedIndexes();
         console.log('✅ Database optimizations applied');
-        
+
         res.json({
           success: true,
           message: 'Database schema initialized successfully'
         });
       } catch (fileError) {
         console.log('⚠️ Schema file not found, creating basic tables...');
-        
+
         // Create basic tables if schema file doesn't exist
         const basicSchema = `
           CREATE TABLE IF NOT EXISTS users (
@@ -617,14 +617,14 @@ app.use((req, res, next) => {
             email VARCHAR(255) UNIQUE NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
-          
+
           CREATE TABLE IF NOT EXISTS conversations (
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES users(id),
             title VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
-          
+
           CREATE TABLE IF NOT EXISTS messages (
             id SERIAL PRIMARY KEY,
             conversation_id INTEGER REFERENCES conversations(id),
@@ -633,10 +633,10 @@ app.use((req, res, next) => {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
         `;
-        
+
         await enhancedDbManager.query(basicSchema);
         console.log('✅ Basic database schema created');
-        
+
         res.json({
           success: true,
           message: 'Basic database schema created successfully'
@@ -666,7 +666,7 @@ app.use((req, res, next) => {
 
   // System health and monitoring routes
   app.use('/api/system', systemHealthRoutes);
-  
+
   // Search system status endpoint
   app.get('/api/search-status', (req, res) => {
     try {
@@ -745,7 +745,12 @@ app.use((req, res, next) => {
 
   testServer.listen(port, "0.0.0.0");
 
-  function startServer() {
+  async function startServer() {
+     // Import setupAuth here to avoid top-level await
+    const { setupAuth } = await import('./auth');
+    // Set up Replit authentication
+    await setupAuth(app);
+
     server.listen(port, "0.0.0.0", (err?: Error) => {
       if (err) {
         console.error(`Failed to start server on port ${port}:`, err);
@@ -772,21 +777,21 @@ app.use((req, res, next) => {
       // Shutdown monitoring system
       monitoringSystem.shutdown();
       console.log('✅ Monitoring system shutdown complete');
-      
+
       // Shutdown enhanced database manager
       await enhancedDbManager.shutdown();
       console.log('✅ Database manager shutdown complete');
-      
+
       // Shutdown research cache
       const { researchCache } = await import('./optimized-research-cache');
       await researchCache.shutdown();
       console.log('✅ Optimized cache shutdown complete');
-      
+
       await shutdownResearchService();
     } catch (error) {
       console.error('❌ Shutdown error:', error);
     }
-    
+
     server.close(() => {
       console.log('🔒 HTTP server closed');
       process.exit(0);

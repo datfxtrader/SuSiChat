@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { enhancedStorage } from "./storage-enhanced";
-import { GoogleAuthService } from "./auth/GoogleAuthService";
 import { isAuthenticated } from "./middleware/auth";
 import { WebSocketServer } from "ws";
 import { llmService } from "./llm";
@@ -36,8 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add input sanitization middleware
   app.use(sanitizeUserInput);
 
-  // Initialize Google Auth Service
-  const googleAuth = new GoogleAuthService();
+  
 
   // Health check endpoints
   app.get('/api/health/database', async (req, res) => {
@@ -50,106 +48,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Google Authentication Routes
-  app.post('/api/auth/google', async (req, res) => {
-    try {
-      const { idToken } = req.body;
-      
-      if (!idToken) {
-        return res.status(400).json({
-          success: false,
-          error: 'Google ID token is required'
-        });
-      }
-
-      const authResult = await googleAuth.verifyAndAuthorize(idToken);
-      
-      if (!authResult.authorized) {
-        return res.status(401).json({
-          success: false,
-          error: authResult.reason || 'Authentication failed'
-        });
-      }
-
-      // Set user session/cookie here if needed
-      res.json({
-        success: true,
-        user: authResult.user,
-        token: authResult.token
-      });
-    } catch (error) {
-      console.error('Google auth error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  });
-
-  app.get('/api/auth/user', async (req, res) => {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'No token provided' });
-      }
-
-      const token = authHeader.substring(7);
-      const user = googleAuth.verifyJWT(token);
-      
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid token' });
-      }
-
-      res.json(user);
-    } catch (error) {
-      console.error('Auth verification error:', error);
-      res.status(401).json({ error: 'Authentication failed' });
-    }
-  });
-
-  app.post('/api/auth/logout', (req, res) => {
-    // Clear any session data if needed
-    res.json({ success: true, message: 'Logged out successfully' });
-  });
-
-  // Admin routes for whitelist management
-  app.post('/api/auth/whitelist/add', isAuthenticated, async (req: any, res) => {
-    try {
-      const { email } = req.body;
-      const addedBy = req.user?.email;
-      
-      if (!addedBy) {
-        return res.status(401).json({ error: 'User not authenticated' });
-      }
-
-      await googleAuth.addToWhitelist(email, addedBy);
-      res.json({ success: true, message: 'Email added to whitelist' });
-    } catch (error) {
-      console.error('Whitelist add error:', error);
-      res.status(500).json({ error: 'Failed to add email to whitelist' });
-    }
-  });
-
-  app.delete('/api/auth/whitelist/:email', isAuthenticated, async (req: any, res) => {
-    try {
-      const { email } = req.params;
-      await googleAuth.removeFromWhitelist(email);
-      res.json({ success: true, message: 'Email removed from whitelist' });
-    } catch (error) {
-      console.error('Whitelist remove error:', error);
-      res.status(500).json({ error: 'Failed to remove email from whitelist' });
-    }
-  });
-
-  app.get('/api/auth/whitelist', isAuthenticated, async (req, res) => {
-    try {
-      const whitelist = await googleAuth.getWhitelist();
-      res.json({ success: true, data: whitelist });
-    } catch (error) {
-      console.error('Whitelist fetch error:', error);
-      res.status(500).json({ error: 'Failed to fetch whitelist' });
-    }
-  });
+  // Replit Authentication Routes (restored)
+  // These routes are handled by the Replit Auth system in replitAuth.ts
 
   // Authentication test endpoint
   app.get('/api/auth/test', (req: any, res) => {
