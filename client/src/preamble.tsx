@@ -1,4 +1,2 @@
 
-
-// This file is no longer needed - React detection handled by react-fix.jsx
-export {};
+// This file is no longer needed - React detection is handled in main.tsx
