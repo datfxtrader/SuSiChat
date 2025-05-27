@@ -12,7 +12,7 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [workflows]
-runButton = "Simple Dev Server"
+runButton = "Development Server"
 
 [[workflows.workflow]]
 name = "Project"
@@ -121,6 +121,19 @@ args = "cd client && npm install && npm run dev"
 name = "Simple Dev Server"
 author = 36382494
 mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd client && npm run dev"
+
+[[workflows.workflow]]
+name = "Development Server"
+author = 36382494
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev:server"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"

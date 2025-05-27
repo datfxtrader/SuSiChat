@@ -26,6 +26,7 @@ import factCheckRouter from './routes/fact-check';
 import cacheMonitoringRouter from './routes/cache-monitoring';
 import financialFactCheckingRouter from './routes/financial-fact-checking.route';
 import blogRoutes from './routes/blog';
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 
@@ -691,9 +692,38 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
-    await setupVite(app, server);
+    // In development, proxy Vite assets to the Vite dev server
+    app.use(['/src', '/@vite', '/@id', '/__vite_ping', '/node_modules'], 
+      createProxyMiddleware({
+        target: 'http://0.0.0.0:5173',
+        changeOrigin: true,
+        ws: true, // Enable WebSocket proxy for HMR
+      })
+    );
+
+    // Proxy the main index.html and other frontend routes
+    app.use('/', 
+      createProxyMiddleware({
+        target: 'http://0.0.0.0:5173',
+        changeOrigin: true,
+        ws: true,
+        // Only proxy GET requests that accept HTML
+        filter: (req) => {
+          return req.method === 'GET' && 
+                 !req.url.startsWith('/api') &&
+                 !req.url.startsWith('/socket.io') &&
+                 req.headers.accept?.includes('text/html');
+        },
+      })
+    );
   } else {
-    serveStatic(app);
+    // In production, serve built files
+    app.use(express.static(path.join(__dirname, "../client/dist")));
+
+    // Handle client-side routing
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+    });
   }
 
   // Production server on port 5000 for API and client
