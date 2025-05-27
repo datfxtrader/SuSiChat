@@ -662,9 +662,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Use port 8000 to avoid conflicts 
-  // Server on port 8000, Vite dev server on 5173
-  const port = parseInt(process.env.PORT || "8000");
+  // Use port 5000 (Replit's recommended web app port)
+  // Server on port 5000, Vite dev server on 5173
+  const port = parseInt(process.env.PORT || "5000");
 
   // Check if port is already in use
   const { createServer } = await import('net');
@@ -719,6 +719,7 @@ app.use((req, res, next) => {
       }
       log(`🚀 Server successfully running on port ${port}`);
       log(`🌐 Access your app at: http://0.0.0.0:${port}`);
+      log(`🔗 Replit webview will show your app automatically`);
       log(`🔧 Environment: ${app.get("env")}`);
     });
   }
