@@ -1,5 +1,3 @@
-
-/** @jsxImportSource react */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,12 +5,6 @@ import { Router } from 'wouter';
 import App from './App';
 import './index.css';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
-
-const ForceReactDetection = () => <div />;
-
-// Explicit React reference for Vite detection
-React.createElement('div', null);
-ForceReactDetection;
 
 const queryClient = new QueryClient({
   defaultOptions: {
