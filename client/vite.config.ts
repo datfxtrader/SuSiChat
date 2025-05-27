@@ -21,9 +21,8 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     hmr: {
-      clientPort: 443,
-      protocol: 'wss',
-      overlay: false
+      port: 5173,
+      host: '0.0.0.0'
     },
     // Allow all Replit hosts
     allowedHosts: [
