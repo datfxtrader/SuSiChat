@@ -12,6 +12,7 @@ const ForceReactDetection = () => <div />;
 
 // Explicit React reference for Vite detection
 React.createElement('div', null);
+ForceReactDetection;
 
 const queryClient = new QueryClient({
   defaultOptions: {
