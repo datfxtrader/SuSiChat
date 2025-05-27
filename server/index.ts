@@ -644,6 +644,17 @@ app.use((req, res, next) => {
     }
   });
 
+  // In development, proxy non-API requests to Vite
+  if (process.env.NODE_ENV === 'development') {
+    app.get('/', (req, res) => {
+      res.redirect('http://0.0.0.0:5174');
+    });
+    
+    app.get(/^(?!\/api).*/, (req, res) => {
+      res.redirect(`http://0.0.0.0:5174${req.url}`);
+    });
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
